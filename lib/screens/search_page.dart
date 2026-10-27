@@ -63,6 +63,12 @@ void reloadSearchHistoryFromStorage() {
       .get('searchHistory', defaultValue: []);
 }
 
+/// Bumped by the search shortcut; the page focuses its field once visible.
+final searchFocusRequest = ValueNotifier<int>(0);
+int _handledSearchFocusRequest = 0;
+
+void requestSearchFocus() => searchFocusRequest.value++;
+
 class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchBar = TextEditingController();
   final FocusNode _inputNode = FocusNode();
@@ -77,6 +83,23 @@ class _SearchPageState extends State<SearchPage> {
   Timer? _debounce;
   int _latestSuggestionRequest = 0;
   int _latestSearchRequest = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    searchFocusRequest.addListener(_focusOnRequest);
+    // A request made from another tab arrives before this page mounts.
+    if (searchFocusRequest.value != _handledSearchFocusRequest) {
+      _focusOnRequest();
+    }
+  }
+
+  void _focusOnRequest() {
+    _handledSearchFocusRequest = searchFocusRequest.value;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _inputNode.requestFocus();
+    });
+  }
 
   Future<void> _submitSearch([String? query]) async {
     if (query != null) {
@@ -97,6 +120,7 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    searchFocusRequest.removeListener(_focusOnRequest);
     _searchBar.dispose();
     _inputNode.dispose();
     _fetchingSongs.dispose();

@@ -38,6 +38,7 @@ import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/desktop_media_artwork.dart';
 import 'package:musify/services/desktop_window_service.dart';
 import 'package:musify/services/io_service.dart';
+import 'package:musify/services/keyboard_shortcuts_manager.dart';
 import 'package:musify/services/linux_media_controls.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/logger_service.dart';
@@ -280,7 +281,9 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
             routerConfig: NavigationManager.router,
             builder: isDesktopPlatform
                 ? (context, child) => DesktopTitleBarTheme(
-                    child: DesktopInterfaceScale(child: child!),
+                    child: DesktopInterfaceScale(
+                      child: GlobalShortcuts(child: child!),
+                    ),
                   )
                 : null,
           ),

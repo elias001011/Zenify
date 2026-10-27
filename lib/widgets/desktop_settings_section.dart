@@ -20,6 +20,7 @@
  */
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
@@ -54,7 +55,13 @@ class DesktopSettingsSection extends StatelessWidget {
           icon: FluentIcons.color_background_24_regular,
           setting: customTitleBar,
           storageKey: 'customTitleBar',
+        ),
+        CustomBar(
+          l10n.keyboardShortcuts,
+          FluentIcons.keyboard_24_regular,
+          description: l10n.keyboardShortcutsDescription,
           borderRadius: commonCustomBarRadiusLast,
+          onTap: () => context.push('/settings/keyboard-shortcuts'),
         ),
       ],
     );
@@ -68,7 +75,6 @@ class _SettingSwitch extends StatelessWidget {
     required this.icon,
     required this.setting,
     required this.storageKey,
-    this.borderRadius = BorderRadius.zero,
   });
 
   final String title;
@@ -76,7 +82,6 @@ class _SettingSwitch extends StatelessWidget {
   final IconData icon;
   final ValueNotifier<bool> setting;
   final String storageKey;
-  final BorderRadius borderRadius;
 
   @override
   Widget build(BuildContext context) {
@@ -86,7 +91,6 @@ class _SettingSwitch extends StatelessWidget {
         title,
         icon,
         description: description,
-        borderRadius: borderRadius,
         onTap: () => _set(!value),
         trailing: Switch(value: value, onChanged: _set),
       ),

@@ -36,6 +36,24 @@ class NowPlayingPage extends StatefulWidget {
   State<NowPlayingPage> createState() => _NowPlayingPageState();
 }
 
+/// Lets the player shortcut tell whether the player is the top route.
+const String nowPlayingRouteName = 'nowPlaying';
+
+Route<void> buildNowPlayingRoute() {
+  return PageRouteBuilder<void>(
+    settings: const RouteSettings(name: nowPlayingRouteName),
+    pageBuilder: (context, animation, _) => const NowPlayingPage(),
+    reverseTransitionDuration: const Duration(milliseconds: 250),
+    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+      final tween = Tween(
+        begin: const Offset(0, 1),
+        end: Offset.zero,
+      ).chain(CurveTween(curve: Curves.easeInOut));
+      return SlideTransition(position: animation.drive(tween), child: child);
+    },
+  );
+}
+
 class _NowPlayingPageState extends State<NowPlayingPage> {
   final _lyricsController = FlipCardController();
 

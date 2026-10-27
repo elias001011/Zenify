@@ -30,6 +30,7 @@ import 'package:musify/screens/bottom_navigation_page.dart';
 import 'package:musify/screens/equalizer_page.dart';
 import 'package:musify/screens/home_page.dart';
 import 'package:musify/screens/import_spotify_playlist_page.dart';
+import 'package:musify/screens/keyboard_shortcuts_page.dart';
 import 'package:musify/screens/library_page.dart';
 import 'package:musify/screens/playlist_folder_page.dart';
 import 'package:musify/screens/playlist_page.dart';
@@ -40,6 +41,7 @@ import 'package:musify/screens/time_machine_page.dart';
 import 'package:musify/screens/user_songs_page.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/offline_search_placeholder.dart';
 
 class NavigationManager {
@@ -289,6 +291,14 @@ class NavigationManager {
                 path: 'import-spotify-playlist',
                 pageBuilder: (context, state) => _pushPage(
                   child: const ImportSpotifyPlaylistPage(),
+                  state: state,
+                ),
+              ),
+              GoRoute(
+                path: 'keyboard-shortcuts',
+                redirect: (_, _) => isDesktopPlatform ? null : settingsPath,
+                pageBuilder: (context, state) => _pushPage(
+                  child: const KeyboardShortcutsPage(),
                   state: state,
                 ),
               ),
