@@ -38,6 +38,7 @@ import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/bottom_sheet_bar.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/section_header.dart';
 
@@ -256,10 +257,10 @@ class _LocalSyncPageState extends State<LocalSyncPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n!.syncTitle)),
+    return IslandScaffold(
+      title: context.l10n!.syncTitle,
       body: SingleChildScrollView(
-        padding: commonSingleChildScrollViewPadding,
+        padding: withIslandInset(context, commonSingleChildScrollViewPadding),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 880),

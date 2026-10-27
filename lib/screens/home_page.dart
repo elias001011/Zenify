@@ -33,6 +33,7 @@ import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
 import 'package:musify/widgets/announcement_box.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_cube.dart';
@@ -76,10 +77,11 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     final playlistHeight = MediaQuery.sizeOf(context).height * 0.25 / 1.1;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Musify.')),
+    return IslandScaffold(
+      title: 'Musify.',
+      brandTitle: true,
       body: SingleChildScrollView(
-        padding: commonSingleChildScrollViewPadding,
+        padding: withIslandInset(context, commonSingleChildScrollViewPadding),
         child: Column(
           children: [
             ValueListenableBuilder<String?>(

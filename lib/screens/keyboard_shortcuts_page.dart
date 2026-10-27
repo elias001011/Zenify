@@ -30,6 +30,7 @@ import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/section_header.dart';
 
@@ -63,21 +64,19 @@ class KeyboardShortcutsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n!;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.keyboardShortcuts),
-        actions: [
-          IconButton(
-            icon: const Icon(FluentIcons.arrow_reset_24_regular),
-            tooltip: l10n.resetToDefaults,
-            onPressed: () => _confirmReset(context),
-          ),
-        ],
-      ),
+    return IslandScaffold(
+      title: l10n.keyboardShortcuts,
+      actions: [
+        IconButton(
+          icon: const Icon(FluentIcons.arrow_reset_24_regular),
+          tooltip: l10n.resetToDefaults,
+          onPressed: () => _confirmReset(context),
+        ),
+      ],
       body: ValueListenableBuilder<Map<ShortcutAction, SingleActivator>>(
         valueListenable: KeyboardShortcutsManager.bindings,
         builder: (context, bindings, _) => SingleChildScrollView(
-          padding: commonSingleChildScrollViewPadding,
+          padding: withIslandInset(context, commonSingleChildScrollViewPadding),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 880),

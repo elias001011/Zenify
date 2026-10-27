@@ -26,6 +26,7 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 
 class EqualizerPage extends StatefulWidget {
@@ -194,25 +195,23 @@ class _EqualizerPageState extends State<EqualizerPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(context.l10n!.equalizer),
-        actions: [
-          IconButton(
-            icon: const Icon(FluentIcons.arrow_clockwise_24_filled),
-            tooltip: context.l10n!.equalizerResetBands,
-            onPressed: () async {
-              await audioHandler.resetEqualizerBands();
-              final params = _params;
-              if (!mounted || params == null) return;
-              setState(() {
-                _gains = List<double>.filled(params.bands.length, 0);
-                _activePreset = null;
-              });
-            },
-          ),
-        ],
-      ),
+    return IslandScaffold(
+      title: context.l10n!.equalizer,
+      actions: [
+        IconButton(
+          icon: const Icon(FluentIcons.arrow_clockwise_24_filled),
+          tooltip: context.l10n!.equalizerResetBands,
+          onPressed: () async {
+            await audioHandler.resetEqualizerBands();
+            final params = _params;
+            if (!mounted || params == null) return;
+            setState(() {
+              _gains = List<double>.filled(params.bands.length, 0);
+              _activePreset = null;
+            });
+          },
+        ),
+      ],
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _params == null
@@ -227,7 +226,10 @@ class _EqualizerPageState extends State<EqualizerPage> {
               ),
             )
           : ListView(
-              padding: commonSingleChildScrollViewPadding,
+              padding: withIslandInset(
+                context,
+                commonSingleChildScrollViewPadding,
+              ),
               children: [
                 // Enable/Disable Section
                 Card.filled(

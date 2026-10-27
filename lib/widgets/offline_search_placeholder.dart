@@ -22,14 +22,15 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/widgets/floating_island.dart';
 
 class OfflineSearchPlaceholder extends StatelessWidget {
   const OfflineSearchPlaceholder({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n!.search)),
+    return IslandScaffold(
+      title: context.l10n!.search,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

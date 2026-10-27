@@ -35,6 +35,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -94,8 +95,8 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
   Widget _buildEmptyState(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n!.timeMachine)),
+    return IslandScaffold(
+      title: context.l10n!.timeMachine,
       body: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -126,10 +127,13 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
       showAnnualRecap: showAnnualRecap,
     );
 
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n!.timeMachine)),
+    return IslandScaffold(
+      title: context.l10n!.timeMachine,
       body: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
+        padding: withIslandInset(
+          context,
+          const EdgeInsets.fromLTRB(10, 0, 10, 24),
+        ),
         scrollCacheExtent: const ScrollCacheExtent.pixels(500),
         itemCount: sections.length,
         itemBuilder: (context, index) {

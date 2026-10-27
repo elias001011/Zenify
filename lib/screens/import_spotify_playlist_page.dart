@@ -11,6 +11,7 @@ import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/formatter.dart';
 import 'package:musify/utilities/url_launcher.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
@@ -318,10 +319,13 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n!.importSpotifyPlaylistTitle)),
+    return IslandScaffold(
+      title: context.l10n!.importSpotifyPlaylistTitle,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        padding: withIslandInset(
+          context,
+          const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

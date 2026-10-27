@@ -26,6 +26,7 @@ import 'package:musify/main.dart';
 import 'package:musify/models/radio_model.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/radio_station_card.dart';
 
@@ -34,8 +35,8 @@ class RadioStationsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n!.radioStations)),
+    return IslandScaffold(
+      title: context.l10n!.radioStations,
       body: ValueListenableBuilder(
         valueListenable: userLikedRadioStations,
         builder: (context, likedStations, _) {
@@ -49,7 +50,10 @@ class RadioStationsPage extends StatelessWidget {
           }
 
           return SingleChildScrollView(
-            padding: commonSingleChildScrollViewPadding,
+            padding: withIslandInset(
+              context,
+              commonSingleChildScrollViewPadding,
+            ),
             child: Column(
               children: [
                 ...List.generate(stations.length, (index) {

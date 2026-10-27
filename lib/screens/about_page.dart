@@ -26,6 +26,7 @@ import 'package:musify/constants/version.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/utilities/url_launcher.dart';
 import 'package:musify/widgets/custom_bar.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 
 class AboutPage extends StatelessWidget {
@@ -33,10 +34,10 @@ class AboutPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(context.l10n!.about)),
+    return IslandScaffold(
+      title: context.l10n!.about,
       body: SingleChildScrollView(
-        padding: commonSingleChildScrollViewPadding,
+        padding: withIslandInset(context, commonSingleChildScrollViewPadding),
         child: Column(
           children: <Widget>[
             const SizedBox(height: 14),

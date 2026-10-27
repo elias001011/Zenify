@@ -42,7 +42,6 @@ const commonCustomBarRadiusLast = BorderRadius.vertical(
   bottom: Radius.circular(16),
 );
 
-
 const commonListViewBottomPadding = EdgeInsets.only(bottom: 8);
 
 const commonBarContentPadding = EdgeInsets.symmetric(
