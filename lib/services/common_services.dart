@@ -867,7 +867,11 @@ Future<bool> makeSongOffline(dynamic song) async {
     }
 
     if (isSongAlreadyOffline(ytid)) {
-      final existingPath = FilePaths.getAudioPath(ytid);
+      final existingPath = _storedOfflinePath(
+        ytid,
+        'audioPath',
+        FilePaths.getAudioPath(ytid),
+      );
       if (await File(existingPath).exists()) {
         unawaited(cacheSponsorBlockSegments(ytid));
         return true;
@@ -993,10 +997,25 @@ Future<void> _deleteFileIfExists(File file, String errorDescription) async {
   }
 }
 
+/// The path an offline song was saved to; it outlives a moved downloads folder.
+String _storedOfflinePath(String ytid, String key, String fallback) {
+  final stored = getOfflineSongByYtid(ytid)[key];
+  return stored is String && stored.isNotEmpty ? stored : fallback;
+}
+
 Future<bool> removeSongFromOffline(dynamic songId) async {
   try {
-    final audioPath = FilePaths.getAudioPath(songId);
-    final artworkPath = FilePaths.getArtworkPath(songId);
+    final ytid = songId.toString();
+    final audioPath = _storedOfflinePath(
+      ytid,
+      'audioPath',
+      FilePaths.getAudioPath(ytid),
+    );
+    final artworkPath = _storedOfflinePath(
+      ytid,
+      'artworkPath',
+      FilePaths.getArtworkPath(ytid),
+    );
 
     await Future.wait([
       _deleteFileIfExists(File(audioPath), 'audio file'),

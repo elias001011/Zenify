@@ -41,6 +41,46 @@ class FilePaths {
     return '$applicationDirPath/$artworksDir/$songId$artworkExtension';
   }
 
+  /// A YouTube id plus our extension, so the user's own files are never touched.
+  static bool isDownloadedFile(String path, {required bool artwork}) {
+    final name = path.split(RegExp(r'[/\\]')).last;
+    final extension = artwork ? artworkExtension : audioExtension;
+    if (!name.endsWith(extension)) return false;
+    return _youtubeIdPattern.hasMatch(
+      name.substring(0, name.length - extension.length),
+    );
+  }
+
+  static final _youtubeIdPattern = RegExp(r'^[A-Za-z0-9_-]{11}$');
+
+  /// Deletes the files [offlineSongs] point at, plus any of ours left behind.
+  static Future<void> deleteDownloadedFiles(List offlineSongs) async {
+    final paths = <String>{
+      for (final song in offlineSongs)
+        if (song is Map) ...[
+          if (song['audioPath'] case final String path) path,
+          if (song['artworkPath'] case final String path) path,
+        ],
+    };
+
+    for (final artwork in [false, true]) {
+      final directory = Directory(
+        '$applicationDirPath/${artwork ? artworksDir : tracksDir}',
+      );
+      if (!await directory.exists()) continue;
+      await for (final entity in directory.list()) {
+        if (entity is File && isDownloadedFile(entity.path, artwork: artwork)) {
+          paths.add(entity.path);
+        }
+      }
+    }
+
+    for (final path in paths) {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    }
+  }
+
   // Ensure directories exist
   static Future<void> ensureDirectoriesExist() async {
     final tracksDirectory = Directory('$applicationDirPath/$tracksDir');

@@ -303,15 +303,15 @@ Future<String?> initialisation() async {
     applicationDirPath = resolvedDirectory.path;
 
     if (isDesktopPlatform) {
-      // Older desktop builds stored Hive boxes and downloads in the document
-      // directory. Move them before Hive opens any box in the new location.
+      // Older desktop builds stored the Hive boxes in the documents
+      // directory. Copy them before Hive opens any box in the new location.
       if (resolvedDirectory.isFallback) {
         logger.log(
           'Skipping desktop data migration: application support directory '
           'could not be resolved',
         );
       } else {
-        await _migrateLegacyDesktopDataIfNeeded(applicationDirPath);
+        await _copyLegacyDesktopDataIfNeeded(applicationDirPath);
       }
       Hive.init(applicationDirPath);
     } else {
@@ -506,10 +506,10 @@ Future<({String path, bool isFallback})> _resolveApplicationDirPath() async {
   }
 }
 
-Future<void> _migrateLegacyDesktopDataIfNeeded(String targetPath) async {
+Future<void> _copyLegacyDesktopDataIfNeeded(String targetPath) async {
   try {
     final legacyDirectory = await getApplicationDocumentsDirectory();
-    final report = await migrateLegacyDesktopData(
+    final report = await copyLegacyDesktopData(
       from: legacyDirectory,
       to: Directory(targetPath),
       log: logger.log,
