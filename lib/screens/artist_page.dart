@@ -36,6 +36,7 @@ import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/artist_shelf.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_hero_artwork.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
@@ -209,9 +210,11 @@ class _ArtistPageState extends State<ArtistPage> {
 
     return AsyncLoader<Map<String, dynamic>?>(
       future: _artistFuture ??= _loadArtist(),
-      loadingWidget: Scaffold(appBar: AppBar(), body: const Spinner()),
+      loadingWidget: const IslandScaffold(title: '', body: Spinner()),
       emptyWidget: _buildNotFoundPage(),
-      builder: (context, _) => Scaffold(
+      builder: (context, _) => IslandScaffold(
+        title: _artistTitle,
+        fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
         body: Padding(
           padding: commonSingleChildScrollViewPadding,
           child: CustomScrollView(
@@ -290,10 +293,11 @@ class _ArtistPageState extends State<ArtistPage> {
   }
 
   Widget _buildNotFoundPage() {
-    return Scaffold(
-      appBar: AppBar(),
+    return IslandScaffold(
+      title: '',
       body: CustomScrollView(
         slivers: [
+          const SliverIslandTopSpace(),
           // Not finding an artist is an answer, not a failure of the app.
           EmptyPlaylistState(
             icon: FluentIcons.person_24_filled,

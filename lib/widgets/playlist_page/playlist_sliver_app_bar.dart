@@ -17,48 +17,55 @@
 
 import 'package:material_ui/material_ui.dart';
 
+/// The top of a playlist, album or artist page: the artwork and the title,
+/// which stays in place; the island shows it once it scrolls away.
 class PlaylistSliverAppBar extends StatelessWidget {
   const PlaylistSliverAppBar({
     super.key,
     required this.title,
     required this.artwork,
-    this.leading,
   });
 
   final String title;
   final Widget artwork;
-  final Widget? leading;
+
+  static double _artworkHeight(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    return size.width > size.height ? 260 : 220;
+  }
+
+  /// Where the island starts fading the title in.
+  static double titleFadeStart(BuildContext context) =>
+      _artworkHeight(context) + 16;
 
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.sizeOf(context);
+    final theme = Theme.of(context);
 
-    return SliverAppBar(
-      leading: leading,
-      pinned: true,
-      expandedHeight: screenSize.width > screenSize.height ? 380 : 340,
-      flexibleSpace: FlexibleSpaceBar(
-        centerTitle: true,
-        expandedTitleScale: 1.35,
-        titlePadding: const EdgeInsetsDirectional.only(
-          start: 64,
-          end: 64,
-          bottom: 16,
-        ),
-        title: Text(
-          title,
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.onSurface,
-            letterSpacing: 0,
+    return SliverToBoxAdapter(
+      child: Column(
+        children: [
+          SizedBox(height: MediaQuery.paddingOf(context).top),
+          SizedBox(
+            height: _artworkHeight(context),
+            child: Center(child: artwork),
           ),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        background: Padding(
-          padding: const EdgeInsets.only(top: 56, bottom: 64),
-          child: Center(child: artwork),
-        ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Text(
+              title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: theme.colorScheme.onSurface,
+                letterSpacing: 0,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -32,28 +32,64 @@ const double _islandMargin = 12;
 ///
 /// The body extends under the island and gets its height as top padding,
 /// which scroll views read like the bottom padding of the floating dock.
-class IslandScaffold extends StatelessWidget {
+class IslandScaffold extends StatefulWidget {
   const IslandScaffold({
     super.key,
     required this.title,
     required this.body,
-    this.titleOpacity,
+    this.fadeTitleAfter,
     this.actions = const [],
     this.brandTitle = false,
+    this.onBack,
   });
 
   final String title;
   final Widget body;
 
+  /// Scroll offset after which the title fades in, for pages that show their
+  /// own big title (playlists) until it scrolls under the island.
+  final double? fadeTitleAfter;
+  final List<Widget> actions;
+
   /// The app name in its logo font, for the home page.
   final bool brandTitle;
 
-  /// Fades the title in and out, e.g. once a playlist's own title scrolls away.
-  final ValueListenable<double>? titleOpacity;
-  final List<Widget> actions;
+  /// Replaces the default pop, e.g. to return a result.
+  final VoidCallback? onBack;
 
   /// Space a page keeps free at the top for the island.
   static const double inset = _islandHeight + _islandMargin * 2;
+
+  @override
+  State<IslandScaffold> createState() => _IslandScaffoldState();
+}
+
+class _IslandScaffoldState extends State<IslandScaffold> {
+  static const _fadeDistance = 32.0;
+
+  late final _titleOpacity = ValueNotifier<double>(
+    widget.fadeTitleAfter == null ? 1 : 0,
+  );
+
+  @override
+  void dispose() {
+    _titleOpacity.dispose();
+    super.dispose();
+  }
+
+  bool _onScroll(ScrollUpdateNotification notification) {
+    final start = widget.fadeTitleAfter;
+    if (start != null &&
+        notification.depth == 0 &&
+        notification.metrics.axis == Axis.vertical) {
+      _titleOpacity.value =
+          ((notification.metrics.pixels - start) / _fadeDistance).clamp(
+            0.0,
+            1.0,
+          );
+    }
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -62,20 +98,28 @@ class IslandScaffold extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
-          MediaQuery(
-            data: media.copyWith(
-              padding: media.padding.copyWith(top: media.padding.top + inset),
+          NotificationListener<ScrollUpdateNotification>(
+            onNotification: _onScroll,
+            child: MediaQuery(
+              data: media.copyWith(
+                padding: media.padding.copyWith(
+                  top: media.padding.top + IslandScaffold.inset,
+                ),
+              ),
+              child: widget.body,
             ),
-            child: body,
           ),
           Positioned(
             top: media.padding.top + _islandMargin,
             left: _islandMargin,
             child: _Island(
-              title: title,
-              brandTitle: brandTitle,
-              titleOpacity: titleOpacity,
-              actions: actions,
+              title: widget.title,
+              brandTitle: widget.brandTitle,
+              titleOpacity: widget.fadeTitleAfter == null
+                  ? null
+                  : _titleOpacity,
+              actions: widget.actions,
+              onBack: widget.onBack,
               maxWidth: media.size.width - _islandMargin * 2,
             ),
           ),
@@ -91,6 +135,7 @@ class _Island extends StatelessWidget {
     required this.brandTitle,
     required this.titleOpacity,
     required this.actions,
+    required this.onBack,
     required this.maxWidth,
   });
 
@@ -98,6 +143,7 @@ class _Island extends StatelessWidget {
   final bool brandTitle;
   final ValueListenable<double>? titleOpacity;
   final List<Widget> actions;
+  final VoidCallback? onBack;
   final double maxWidth;
 
   @override
@@ -148,7 +194,7 @@ class _Island extends StatelessWidget {
                 IconButton(
                   icon: const Icon(FluentIcons.arrow_left_24_regular),
                   tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  onPressed: () => Navigator.of(context).maybePop(),
+                  onPressed: onBack ?? () => Navigator.of(context).maybePop(),
                 ),
               Flexible(child: titleText),
               ...actions,

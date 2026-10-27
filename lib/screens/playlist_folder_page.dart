@@ -30,6 +30,7 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/dialog_item.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_bar.dart';
 import 'package:musify/widgets/popup_menu_item.dart';
@@ -68,79 +69,64 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
                   .where(PlaylistUtils.isPlaylistOffline)
                   .toList()
             : getPlaylistsInFolder(widget.folderId);
-        return Scaffold(
+        return IslandScaffold(
+          title: _folderName,
+          fadeTitleAfter: 150,
+          actions: [
+            PopupMenuButton<String>(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              color: Theme.of(context).colorScheme.surface,
+              itemBuilder: (context) => [
+                buildPopupMenuItem<String>(
+                  value: 'add',
+                  icon: FluentIcons.add_24_regular,
+                  label: context.l10n!.addPlaylist,
+                  colorScheme: Theme.of(context).colorScheme,
+                  iconSize: 18,
+                  spacing: 10,
+                ),
+                buildPopupMenuItem<String>(
+                  value: 'rename',
+                  icon: FluentIcons.edit_24_regular,
+                  label: context.l10n!.editFolder,
+                  colorScheme: Theme.of(context).colorScheme,
+                  iconSize: 18,
+                  spacing: 10,
+                ),
+                buildPopupMenuItem<String>(
+                  value: 'delete',
+                  icon: FluentIcons.delete_24_regular,
+                  label: context.l10n!.deleteFolder,
+                  colorScheme: Theme.of(context).colorScheme,
+                  iconColor: Theme.of(context).colorScheme.error,
+                  labelStyle: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                  iconSize: 18,
+                  spacing: 10,
+                ),
+              ],
+              onSelected: (value) {
+                if (value == 'add') {
+                  _showAddPlaylistDialog();
+                } else if (value == 'rename') {
+                  _showRenameFolderDialog();
+                } else if (value == 'delete') {
+                  _showDeleteFolderDialog();
+                }
+              },
+            ),
+          ],
           body: CustomScrollView(
             slivers: [
-              SliverAppBar(
-                pinned: true,
-                expandedHeight: 320,
-                flexibleSpace: FlexibleSpaceBar(
-                  centerTitle: true,
-                  expandedTitleScale: 1.35,
-                  titlePadding: const EdgeInsetsDirectional.only(
-                    start: 64,
-                    end: 64,
-                    bottom: 16,
-                  ),
-                  title: Text(
-                    _folderName,
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      letterSpacing: 0,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  background: _buildHeader(context, playlists.length),
+              const SliverIslandTopSpace(),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: _headerHeight,
+                  child: _buildHeader(context, playlists.length),
                 ),
-                actions: [
-                  PopupMenuButton<String>(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    color: Theme.of(context).colorScheme.surface,
-                    itemBuilder: (context) => [
-                      buildPopupMenuItem<String>(
-                        value: 'add',
-                        icon: FluentIcons.add_24_regular,
-                        label: context.l10n!.addPlaylist,
-                        colorScheme: Theme.of(context).colorScheme,
-                        iconSize: 18,
-                        spacing: 10,
-                      ),
-                      buildPopupMenuItem<String>(
-                        value: 'rename',
-                        icon: FluentIcons.edit_24_regular,
-                        label: context.l10n!.editFolder,
-                        colorScheme: Theme.of(context).colorScheme,
-                        iconSize: 18,
-                        spacing: 10,
-                      ),
-                      buildPopupMenuItem<String>(
-                        value: 'delete',
-                        icon: FluentIcons.delete_24_regular,
-                        label: context.l10n!.deleteFolder,
-                        colorScheme: Theme.of(context).colorScheme,
-                        iconColor: Theme.of(context).colorScheme.error,
-                        labelStyle: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                        ),
-                        iconSize: 18,
-                        spacing: 10,
-                      ),
-                    ],
-                    onSelected: (value) {
-                      if (value == 'add') {
-                        _showAddPlaylistDialog();
-                      } else if (value == 'rename') {
-                        _showRenameFolderDialog();
-                      } else if (value == 'delete') {
-                        _showDeleteFolderDialog();
-                      }
-                    },
-                  ),
-                ],
               ),
               if (playlists.isEmpty)
                 SliverFillRemaining(child: _buildEmptyState())
@@ -175,12 +161,14 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
     );
   }
 
+  static const _headerHeight = 264.0;
+
   Widget _buildHeader(BuildContext context, int playlistCount) {
     final colorScheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
     return Container(
       alignment: Alignment.center,
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 56),
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 8),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -204,7 +192,19 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          Text(
+            _folderName,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.headlineSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onSurface,
+              letterSpacing: 0,
+            ),
+          ),
+          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(

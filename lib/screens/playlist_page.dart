@@ -41,6 +41,7 @@ import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/song_filtering.dart';
 import 'package:musify/utilities/sort_utils.dart';
 import 'package:musify/widgets/edit_playlist_dialog.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_hero_artwork.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
@@ -192,7 +193,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return IslandScaffold(
+      title: _playlist != null ? _playlistTitle : '',
+      fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
+      onBack: () => Navigator.pop(context, widget.playlistData == _playlist),
       body: Padding(
         padding: commonSingleChildScrollViewPadding,
         child: _isInitializingPlaylist
@@ -204,7 +208,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
             ? CustomScrollView(
                 slivers: [
                   PlaylistSliverAppBar(
-                    leading: _buildBackButton(context),
                     title: _playlistTitle,
                     artwork: PlaylistHeroArtwork(
                       _playlist,
@@ -301,14 +304,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
         _applySort();
       });
     }
-  }
-
-  Widget _buildBackButton(BuildContext context) {
-    return IconButton(
-      icon: const Icon(FluentIcons.arrow_left_24_regular),
-      onPressed: () => Navigator.pop(context, widget.playlistData == _playlist),
-      tooltip: context.l10n!.back,
-    );
   }
 
   String get _playlistTitle => widget.isArtist

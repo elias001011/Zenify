@@ -33,6 +33,7 @@ import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/song_filtering.dart';
 import 'package:musify/utilities/sort_utils.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_hero_artwork.dart';
 import 'package:musify/widgets/playlist_page/empty_playlist_state.dart';
@@ -87,7 +88,9 @@ class _UserSongsPageState extends State<UserSongsPage> {
     final icon = getIcon(widget.page);
     final isOfflineSongs = title == context.l10n!.offlineSongs;
 
-    return Scaffold(
+    return IslandScaffold(
+      title: title,
+      fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
       body: Padding(
         padding: commonSingleChildScrollViewPadding,
         child: ValueListenableBuilder(
