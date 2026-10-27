@@ -188,7 +188,7 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
       );
     }
 
-    if (!isFdroidBuild && isMobilePlatform) {
+    if (!isFdroidBuild) {
       if (shouldWeCheckUpdates.value == true) {
         if (!isUpdateChecked && kReleaseMode) {
           SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -198,19 +198,11 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
             isUpdateChecked = true;
           });
         }
-      } else {
-        if (shouldWeCheckUpdates.value == null) {
-          // show dialog that asks user if they want to enable update checks
-          SchedulerBinding.instance.addPostFrameCallback((_) {
-            showUpdateCheckDialog(NavigationManager().context);
-          });
-        } else {
-          SchedulerBinding.instance.addPostFrameCallback((_) async {
-            if (!offlineMode.value) {
-              await fetchAnnouncementOnly();
-            }
-          });
-        }
+      } else if (shouldWeCheckUpdates.value == null) {
+        // show dialog that asks user if they want to enable update checks
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          showUpdateCheckDialog(NavigationManager().context);
+        });
       }
     }
   }
@@ -499,10 +491,6 @@ Future<String?> initialisation() async {
       );
     } on PlatformException {
       logger.log('Failed to get initial uri');
-    }
-
-    if (isFdroidBuild && !offlineMode.value) {
-      await fetchAnnouncementOnly();
     }
   } catch (e, stackTrace) {
     logger.log('Initialization Error', error: e, stackTrace: stackTrace);

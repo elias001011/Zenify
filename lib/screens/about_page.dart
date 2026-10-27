@@ -25,6 +25,7 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/constants/version.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/utilities/url_launcher.dart';
+import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 
 class AboutPage extends StatelessWidget {
@@ -88,79 +89,138 @@ class AboutPage extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-            Material(
-              color: Theme.of(context).colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(20),
-              clipBehavior: Clip.antiAlias,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
+            _PersonCard(
+              name: 'Elias Juriatti',
+              role: context.l10n!.aboutForkMaintainer,
+              avatarUrl: 'https://avatars.githubusercontent.com/elias001011',
+              links: [
+                (
+                  icon: FluentIcons.code_24_filled,
+                  tooltip: 'GitHub',
+                  url: 'https://github.com/elias001011',
                 ),
-                child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: Image.network(
-                        'https://avatars.githubusercontent.com/u/79704324?v=4',
-                        width: 52,
-                        height: 52,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Valeri Gokadze',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'WEB & APP Developer',
-                            style: TextStyle(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _SocialButton(
-                          icon: FluentIcons.code_24_filled,
-                          tooltip: 'Github',
-                          onPressed: () {
-                            launchURL(Uri.parse('https://github.com/gokadzev'));
-                          },
-                        ),
-                        const SizedBox(width: 8),
-                        _SocialButton(
-                          icon: FluentIcons.globe_24_filled,
-                          tooltip: 'Website',
-                          onPressed: () {
-                            launchURL(Uri.parse('https://gokadzev.github.io'));
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            _PersonCard(
+              name: 'Valeri Gokadze',
+              role: context.l10n!.aboutOriginalAuthor,
+              avatarUrl: 'https://avatars.githubusercontent.com/u/79704324?v=4',
+              links: [
+                (
+                  icon: FluentIcons.code_24_filled,
+                  tooltip: 'GitHub',
+                  url: 'https://github.com/gokadzev',
+                ),
+                (
+                  icon: FluentIcons.globe_24_filled,
+                  tooltip: 'Website',
+                  url: 'https://gokadzev.github.io',
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            CustomBar(
+              context.l10n!.aboutSourceCode,
+              FluentIcons.code_24_regular,
+              description: 'github.com/$appRepository',
+              borderRadius: commonCustomBarRadiusFirst,
+              onTap: () =>
+                  launchURL(Uri.parse('https://github.com/$appRepository')),
+            ),
+            CustomBar(
+              context.l10n!.aboutOriginalProject,
+              FluentIcons.heart_24_regular,
+              description: 'github.com/gokadzev/Musify',
+              borderRadius: commonCustomBarRadiusLast,
+              onTap: () =>
+                  launchURL(Uri.parse('https://github.com/gokadzev/Musify')),
+            ),
+            const MiniPlayerBottomSpace(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+typedef _Link = ({IconData icon, String tooltip, String url});
+
+class _PersonCard extends StatelessWidget {
+  const _PersonCard({
+    required this.name,
+    required this.role,
+    required this.avatarUrl,
+    required this.links,
+  });
+
+  final String name;
+  final String role;
+  final String avatarUrl;
+  final List<_Link> links;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(20),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.network(
+                avatarUrl,
+                width: 52,
+                height: 52,
+                fit: BoxFit.cover,
+                errorBuilder: (context, _, _) => Container(
+                  width: 52,
+                  height: 52,
+                  color: colorScheme.secondaryContainer,
+                  child: Icon(
+                    FluentIcons.person_24_regular,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
                 ),
               ),
             ),
-            const MiniPlayerBottomSpace(),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: TextStyle(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 15,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    role,
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            for (final link in links) ...[
+              const SizedBox(width: 8),
+              _SocialButton(
+                icon: link.icon,
+                tooltip: link.tooltip,
+                onPressed: () => launchURL(Uri.parse(link.url)),
+              ),
+            ],
           ],
         ),
       ),

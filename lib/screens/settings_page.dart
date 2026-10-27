@@ -477,12 +477,12 @@ class SettingsPage extends StatelessWidget {
             }
           },
         ),
-        if (!isFdroidBuild && isMobilePlatform)
+        if (!isFdroidBuild)
           CustomBar(
             context.l10n!.downloadAppUpdate,
             FluentIcons.arrow_download_24_regular,
             borderRadius: commonCustomBarRadiusLast,
-            onTap: checkAppUpdates,
+            onTap: () => checkAppUpdates(manual: true),
           ),
       ],
     );

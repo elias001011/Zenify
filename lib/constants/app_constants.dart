@@ -21,6 +21,9 @@
 
 import 'package:material_ui/material_ui.dart';
 
+/// Where this fork's source code and releases live.
+const appRepository = 'elias001011/Musify-Next';
+
 const recommendedCubesNumber = 8;
 
 const commonSingleChildScrollViewPadding = EdgeInsets.symmetric(horizontal: 10);

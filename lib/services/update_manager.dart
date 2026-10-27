@@ -26,56 +26,52 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/constants/version.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/utilities/url_launcher.dart';
 import 'package:musify/widgets/auto_format_text.dart';
 
-const String checkUrl =
-    'https://raw.githubusercontent.com/gokadzev/Musify/update/check.json';
 const String releasesUrl =
-    'https://api.github.com/repos/gokadzev/Musify/releases/latest';
-const String downloadUrlKey = 'url';
-const String downloadUrlArm64Key = 'arm64url';
-const String downloadFilename = 'Musify.apk';
+    'https://api.github.com/repos/$appRepository/releases/latest';
 
-Future<void> checkAppUpdates() async {
-  // Update distribution targets Android APK builds only.
-  if (!isMobilePlatform) return;
+/// [manual] reports "up to date" and failures, for the Settings entry.
+Future<void> checkAppUpdates({bool manual = false}) async {
+  void report(String Function(AppLocalizations l10n) message) {
+    final context = NavigationManager().context;
+    if (manual && context.mounted) showToast(context, message(context.l10n!));
+  }
+
   try {
-    final response = await http.get(Uri.parse(checkUrl));
+    final response = await http.get(Uri.parse(releasesUrl));
 
     if (response.statusCode != 200) {
       logger.log(
-        'Fetch update API (checkUrl) call returned status code ${response.statusCode}',
+        'Fetch update API call returned status code ${response.statusCode}',
       );
+      report((l10n) => l10n.updateCheckFailed);
       return;
     }
 
-    final map = json.decode(response.body) as Map<String, dynamic>;
-    announcementURL.value = map['announcementurl'];
-    final latestVersion = map['version'].toString();
+    final release = json.decode(response.body) as Map<String, dynamic>;
+    final latestVersion = release['tag_name'].toString().replaceFirst(
+      RegExp('^v'),
+      '',
+    );
 
     if (!isLatestVersionHigher(appVersion, latestVersion)) {
+      report((l10n) => l10n.appIsUpToDate);
       return;
     }
 
-    final releasesRequest = await http.get(Uri.parse(releasesUrl));
-
-    if (releasesRequest.statusCode != 200) {
-      logger.log(
-        'Fetch update API (releasesUrl) call returned status code ${response.statusCode}',
-      );
-      return;
-    }
-
-    final releasesResponse =
-        json.decode(releasesRequest.body) as Map<String, dynamic>;
+    final downloadUrl = pickUpdateAsset(release, await preferredUpdateAssets());
 
     await showDialog(
       context: NavigationManager().context,
@@ -139,7 +135,9 @@ Future<void> checkAppUpdates() async {
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: SingleChildScrollView(
-                  child: AutoFormatText(text: releasesResponse['body']),
+                  child: AutoFormatText(
+                    text: release['body']?.toString() ?? '',
+                  ),
                 ),
               ),
             ],
@@ -158,9 +156,8 @@ Future<void> checkAppUpdates() async {
             ),
             FilledButton.icon(
               onPressed: () {
-                getDownloadUrl(map).then(
-                  (url) => {launchURL(Uri.parse(url)), Navigator.pop(context)},
-                );
+                launchURL(Uri.parse(downloadUrl));
+                Navigator.pop(context);
               },
               icon: const Icon(FluentIcons.arrow_download_20_regular),
               label: Text(context.l10n!.download),
@@ -171,6 +168,7 @@ Future<void> checkAppUpdates() async {
     );
   } catch (e, stackTrace) {
     logger.log('Error in checkAppUpdates', error: e, stackTrace: stackTrace);
+    report((l10n) => l10n.updateCheckFailed);
   }
 }
 
@@ -233,70 +231,64 @@ void showUpdateCheckDialog(BuildContext context) {
   );
 }
 
+/// Whether [latestVersion] is newer, comparing numbers (`0.1.0-1` > `0.1.0`).
 bool isLatestVersionHigher(String appVersion, String latestVersion) {
-  final parsedAppVersion = appVersion.split('.');
-  final parsedAppLatestVersion = latestVersion.split('.');
-  final length = parsedAppVersion.length > parsedAppLatestVersion.length
-      ? parsedAppVersion.length
-      : parsedAppLatestVersion.length;
-  for (var i = 0; i < length; i++) {
-    final value1 = i < parsedAppVersion.length
-        ? int.parse(parsedAppVersion[i])
-        : 0;
-    final value2 = i < parsedAppLatestVersion.length
-        ? int.parse(parsedAppLatestVersion[i])
-        : 0;
-    if (value2 > value1) {
-      return true;
-    } else if (value2 < value1) {
-      return false;
-    }
-  }
+  List<int> parts(String version) => version
+      .split(RegExp(r'[.\-+]'))
+      .map((part) => int.tryParse(part) ?? 0)
+      .toList();
 
+  final current = parts(appVersion);
+  final latest = parts(latestVersion);
+  final length = current.length > latest.length
+      ? current.length
+      : latest.length;
+  for (var i = 0; i < length; i++) {
+    final a = i < current.length ? current[i] : 0;
+    final b = i < latest.length ? latest[i] : 0;
+    if (a != b) return b > a;
+  }
   return false;
 }
 
 Future<String> getCPUArchitecture() async {
   final info = await Process.run('uname', ['-m']);
-  final cpu = info.stdout.toString().replaceAll('\n', '');
-
-  return cpu;
+  return info.stdout.toString().trim();
 }
 
-Future<String> getDownloadUrl(Map<String, dynamic> map) async {
-  final cpuArchitecture = await getCPUArchitecture();
-  final url = cpuArchitecture == 'aarch64'
-      ? map[downloadUrlArm64Key].toString()
-      : map[downloadUrlKey].toString();
-
-  return url;
-}
-
-/// Fetch only the announcement URL from the `check.json` file and set the
-/// global `announcementURL` ValueNotifier. This does not trigger releases
-/// fetching or any update dialogs/downloads and is safe to call for F‑Droid
-/// builds where update prompts are not allowed.
-Future<void> fetchAnnouncementOnly() async {
-  try {
-    final response = await http.get(Uri.parse(checkUrl));
-
-    if (response.statusCode != 200) {
-      logger.log(
-        'Fetch announcement (checkUrl) call returned status code ${response.statusCode}',
-      );
-      return;
-    }
-
-    final map = json.decode(response.body) as Map<String, dynamic>;
-    final ann = map['announcementurl'];
-    if (ann != null) {
-      announcementURL.value = ann.toString();
-    }
-  } catch (e, stackTrace) {
-    logger.log(
-      'Error in fetchAnnouncementOnly',
-      error: e,
-      stackTrace: stackTrace,
-    );
+/// Release asset names that fit this install, best first.
+Future<List<String>> preferredUpdateAssets() async {
+  if (isAndroidPlatform) {
+    final arm64 = await getCPUArchitecture() == 'aarch64';
+    return [if (arm64) 'Musify-arm64-v8a.apk', 'Musify.apk'];
   }
+  final executable = Platform.resolvedExecutable;
+  if (Platform.isLinux) {
+    // The .deb installs under /usr/lib; anything else is the tarball.
+    return executable.startsWith('/usr/lib/')
+        ? ['Musify-linux-x64.deb']
+        : ['Musify-linux-x64.tar.gz'];
+  }
+  if (Platform.isWindows) {
+    final installed = File('${File(executable).parent.path}\\unins000.exe')
+        .existsSync();
+    return installed
+        ? ['Musify-windows-x64-setup.exe']
+        : ['Musify-windows-x64-portable.zip'];
+  }
+  return const [];
+}
+
+/// The first of [names] attached to [release], or the release page.
+String pickUpdateAsset(Map<String, dynamic> release, List<String> names) {
+  final assets = <String, String>{
+    for (final asset in release['assets'] as List? ?? const [])
+      if (asset is Map && asset['browser_download_url'] is String)
+        asset['name'].toString(): asset['browser_download_url'] as String,
+  };
+  for (final name in names) {
+    final url = assets[name];
+    if (url != null) return url;
+  }
+  return release['html_url'].toString();
 }

@@ -25,6 +25,7 @@ import 'dart:developer' as developer;
 
 import 'package:html/parser.dart' as html_parser;
 import 'package:http/http.dart' as http;
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/services/lyrics/lrc_parser.dart';
 import 'package:musify/services/lyrics/lyrics_models.dart';
 import 'package:musify/services/lyrics/lyrics_query.dart';
@@ -48,7 +49,7 @@ class LyricsManager {
   final http.Client? _client;
 
   static const _timeout = Duration(seconds: 8);
-  static const _userAgent = 'Musify (https://github.com/gokadzev/Musify)';
+  static const _userAgent = 'Musify (https://github.com/$appRepository)';
   static const _maxCacheEntries = 50;
   static const _hitTtl = Duration(hours: 6);
   static const _missTtl = Duration(minutes: 5);
