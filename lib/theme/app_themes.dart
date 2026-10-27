@@ -79,7 +79,7 @@ ColorScheme neutralSurfaces(ColorScheme scheme) {
       surfaceTint: Colors.transparent,
     );
   }
-  final black = usePureBlackColor.value;
+  final black = isPureBlackTheme;
   return scheme.copyWith(
     surface: black ? const Color(0xFF000000) : const Color(0xFF121212),
     surfaceDim: black ? const Color(0xFF000000) : const Color(0xFF121212),

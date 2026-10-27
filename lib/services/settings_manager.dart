@@ -42,11 +42,18 @@ final useSystemColor = ValueNotifier<bool>(
   Hive.box('settings').get('useSystemColor', defaultValue: true),
 );
 
-/// The dark theme is pure black. Not in Settings; set `pureBlackTheme` to false
-/// in the settings box for neutral dark greys instead.
+/// Album colours glowing behind their elements. It needs the pure black
+/// dark theme, so while it is on the pure black choice is not offered.
+final dynamicBackground = ValueNotifier<bool>(
+  Hive.box('settings').get('dynamicBackground', defaultValue: true),
+);
+
+/// The user's pure black choice, used when [dynamicBackground] is off.
 final usePureBlackColor = ValueNotifier<bool>(
   Hive.box('settings').get('pureBlackTheme', defaultValue: true),
 );
+
+bool get isPureBlackTheme => dynamicBackground.value || usePureBlackColor.value;
 
 final offlineMode = ValueNotifier<bool>(
   Hive.box('settings').get('offlineMode', defaultValue: false),
@@ -178,6 +185,10 @@ void reloadSettingsFromStorage() {
     defaultValue: false,
   );
   useSystemColor.value = settings.get('useSystemColor', defaultValue: true);
+  dynamicBackground.value = settings.get(
+    'dynamicBackground',
+    defaultValue: true,
+  );
   usePureBlackColor.value = settings.get('pureBlackTheme', defaultValue: true);
   offlineMode.value = settings.get('offlineMode', defaultValue: false);
   wrappedEnabled.value = settings.get('wrappedEnabled', defaultValue: true);

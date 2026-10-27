@@ -148,6 +148,26 @@ class SettingsPage extends StatelessWidget {
             FluentIcons.data_histogram_24_regular,
             onTap: () => context.push('/settings/equalizer'),
           ),
+        CustomBar(
+          context.l10n!.dynamicBackground,
+          FluentIcons.color_24_regular,
+          description: context.l10n!.dynamicBackgroundDescription,
+          trailing: Switch(
+            value: dynamicBackground.value,
+            onChanged: (value) => _toggleDynamicBackground(context, value),
+          ),
+        ),
+        if (Theme.of(context).brightness == Brightness.dark &&
+            !dynamicBackground.value)
+          CustomBar(
+            context.l10n!.pureBlackTheme,
+            FluentIcons.color_background_24_regular,
+            description: context.l10n!.pureBlackThemeDescription,
+            trailing: Switch(
+              value: usePureBlackColor.value,
+              onChanged: (value) => _togglePureBlack(context, value),
+            ),
+          ),
         if (isAndroidPlatform)
           CustomBar(
             context.l10n!.dynamicColor,
@@ -874,6 +894,20 @@ class SettingsPage extends StatelessWidget {
       newAccentColor: primaryColorSetting,
       useSystemColor: value,
     );
+    showToast(context, context.l10n!.settingChangedMsg);
+  }
+
+  void _toggleDynamicBackground(BuildContext context, bool value) {
+    addOrUpdateData<bool>('settings', 'dynamicBackground', value);
+    dynamicBackground.value = value;
+    Musify.updateAppState(context);
+    showToast(context, context.l10n!.settingChangedMsg);
+  }
+
+  void _togglePureBlack(BuildContext context, bool value) {
+    addOrUpdateData<bool>('settings', 'pureBlackTheme', value);
+    usePureBlackColor.value = value;
+    Musify.updateAppState(context);
     showToast(context, context.l10n!.settingChangedMsg);
   }
 

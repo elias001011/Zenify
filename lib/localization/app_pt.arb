@@ -100,6 +100,8 @@
   "downloadsFolderPickerUnavailable": "Não foi possível abrir o seletor de pastas",
   "downloadsFolderReset": "Usar local padrão",
   "downloadsFolderUnavailable": "{path} não está disponível, então os novos downloads vão para o local padrão por enquanto.",
+  "dynamicBackground": "Fundo dinâmico",
+  "dynamicBackgroundDescription": "As cores dos álbuns brilham suavemente atrás deles. Usa o tema escuro pure black.",
   "dynamicColor": "Cor de destaque dinâmica (Android 12+)",
   "dynamicColorDescription": "Use as cores de destaque do tema do seu sistema Android.",
   "editFolder": "Editar pasta",

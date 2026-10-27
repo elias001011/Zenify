@@ -100,6 +100,8 @@
   "downloadsFolderPickerUnavailable": "Could not open the folder picker",
   "downloadsFolderReset": "Use default location",
   "downloadsFolderUnavailable": "{path} is unavailable, so new downloads go to the default location for now.",
+  "dynamicBackground": "Dynamic background",
+  "dynamicBackgroundDescription": "Album colours glow softly behind them. Uses the pure black dark theme.",
   "dynamicColor": "Dynamic accent color (Android 12+)",
   "dynamicColorDescription": "Use the accent colors from your Android system theme.",
   "editFolder": "Edit folder",
