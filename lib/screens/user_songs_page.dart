@@ -39,7 +39,6 @@ import 'package:musify/widgets/playlist_hero_artwork.dart';
 import 'package:musify/widgets/playlist_page/empty_playlist_state.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
-import 'package:musify/widgets/playlist_page/search_bar_section.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:musify/widgets/sort_chips.dart';
 
@@ -56,8 +55,6 @@ class UserSongsPage extends StatefulWidget {
 
 class _UserSongsPageState extends State<UserSongsPage> {
   final ValueNotifier<String> _searchQueryNotifier = ValueNotifier('');
-  late final TextEditingController _searchController;
-  late final FocusNode _searchFocusNode;
 
   List _getDisplayList(List songsList) {
     var list = filterSongsByQuery(songsList, _searchQueryNotifier.value);
@@ -70,14 +67,10 @@ class _UserSongsPageState extends State<UserSongsPage> {
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController();
-    _searchFocusNode = FocusNode();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
-    _searchFocusNode.dispose();
     _searchQueryNotifier.dispose();
     super.dispose();
   }
@@ -91,6 +84,7 @@ class _UserSongsPageState extends State<UserSongsPage> {
     return IslandScaffold(
       title: title,
       fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
+      onFilter: (value) => _searchQueryNotifier.value = value,
       body: Padding(
         padding: commonSingleChildScrollViewPadding,
         child: ValueListenableBuilder(
@@ -269,15 +263,6 @@ class _UserSongsPageState extends State<UserSongsPage> {
                 offlineSortSetting = type.name;
               });
             },
-          ),
-        ],
-        if (songsLength > 0) ...[
-          const SizedBox(height: 16),
-          SearchBarSection(
-            controller: _searchController,
-            focusNode: _searchFocusNode,
-            onSearchChanged: (value) => _searchQueryNotifier.value = value,
-            labelText: context.l10n!.search,
           ),
         ],
         const SizedBox(height: 16),

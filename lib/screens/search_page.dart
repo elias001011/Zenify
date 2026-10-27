@@ -70,6 +70,14 @@ int _handledSearchFocusRequest = 0;
 
 void requestSearchFocus() => searchFocusRequest.value++;
 
+/// A query from the island's search shortcut, run once the page is shown.
+final pendingSearchQuery = ValueNotifier<String?>(null);
+
+void openSearch(String query) {
+  pendingSearchQuery.value = query;
+  NavigationManager.router.go(NavigationManager.searchPath);
+}
+
 class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchBar = TextEditingController();
   final FocusNode _inputNode = FocusNode();
@@ -89,10 +97,19 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     searchFocusRequest.addListener(_focusOnRequest);
+    pendingSearchQuery.addListener(_runPendingSearch);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _runPendingSearch());
     // A request made from another tab arrives before this page mounts.
     if (searchFocusRequest.value != _handledSearchFocusRequest) {
       _focusOnRequest();
     }
+  }
+
+  void _runPendingSearch() {
+    final query = pendingSearchQuery.value;
+    if (query == null || !mounted) return;
+    pendingSearchQuery.value = null;
+    _submitSearch(query);
   }
 
   void _focusOnRequest() {
@@ -122,6 +139,7 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void dispose() {
     searchFocusRequest.removeListener(_focusOnRequest);
+    pendingSearchQuery.removeListener(_runPendingSearch);
     _searchBar.dispose();
     _inputNode.dispose();
     _fetchingSongs.dispose();
@@ -290,6 +308,7 @@ class _SearchPageState extends State<SearchPage> {
     final primaryColor = Theme.of(context).colorScheme.primary;
     return IslandScaffold(
       title: context.l10n!.search,
+      globalSearch: false,
       body: SingleChildScrollView(
         padding: withIslandInset(context, commonSingleChildScrollViewPadding),
         child: Column(

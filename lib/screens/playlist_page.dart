@@ -51,7 +51,6 @@ import 'package:musify/widgets/playlist_page/like_button.dart';
 import 'package:musify/widgets/playlist_page/playlist_action_buttons.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
-import 'package:musify/widgets/playlist_page/search_bar_section.dart';
 import 'package:musify/widgets/recommended_songs_section.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:musify/widgets/sort_chips.dart';
@@ -107,8 +106,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
   // Search
   final ValueNotifier<String> _searchQueryNotifier = ValueNotifier('');
-  late final TextEditingController _searchController;
-  late final FocusNode _searchFocusNode;
 
   List _getSourceList(String searchQuery) {
     final list = _playlist?['list'] as List? ?? [];
@@ -121,15 +118,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
   @override
   void initState() {
     super.initState();
-    _searchController = TextEditingController();
-    _searchFocusNode = FocusNode();
     _initializePlaylist();
   }
 
   @override
   void dispose() {
-    _searchController.dispose();
-    _searchFocusNode.dispose();
     _searchQueryNotifier.dispose();
     super.dispose();
   }
@@ -196,6 +189,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
     return IslandScaffold(
       title: _playlist != null ? _playlistTitle : '',
       fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
+      onFilter: (value) => _searchQueryNotifier.value = value,
       onBack: () => Navigator.pop(context, widget.playlistData == _playlist),
       body: Padding(
         padding: commonSingleChildScrollViewPadding,
@@ -386,15 +380,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 _applySort();
               });
             },
-          ),
-        ],
-        if (songsLength > 0) ...[
-          const SizedBox(height: 16),
-          SearchBarSection(
-            controller: _searchController,
-            focusNode: _searchFocusNode,
-            onSearchChanged: (value) => _searchQueryNotifier.value = value,
-            labelText: context.l10n!.search,
           ),
         ],
         const SizedBox(height: 16),

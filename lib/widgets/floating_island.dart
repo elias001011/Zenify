@@ -21,11 +21,15 @@
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/extensions/l10n.dart';
+import 'package:musify/screens/search_page.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/floating_surface.dart';
 
-const double _islandHeight = 48;
-const double _islandMargin = 12;
+const double _islandHeight = 44;
+const double _islandMargin = 10;
 
 /// A page with the floating island in place of an app bar: back (when there
 /// is somewhere to go back to), the page title and optional actions.
@@ -39,20 +43,24 @@ class IslandScaffold extends StatefulWidget {
     required this.body,
     this.fadeTitleAfter,
     this.actions = const [],
-    this.brandTitle = false,
     this.onBack,
+    this.onFilter,
+    this.globalSearch = true,
   });
 
   final String title;
   final Widget body;
 
+  /// Turns the search shortcut into a live filter of this page (playlists).
+  final ValueChanged<String>? onFilter;
+
+  /// Offer the search shortcut, which opens the search page on Enter.
+  final bool globalSearch;
+
   /// Scroll offset after which the title fades in, for pages that show their
   /// own big title (playlists) until it scrolls under the island.
   final double? fadeTitleAfter;
   final List<Widget> actions;
-
-  /// The app name in its logo font, for the home page.
-  final bool brandTitle;
 
   /// Replaces the default pop, e.g. to return a result.
   final VoidCallback? onBack;
@@ -114,12 +122,13 @@ class _IslandScaffoldState extends State<IslandScaffold> {
             left: _islandMargin,
             child: _Island(
               title: widget.title,
-              brandTitle: widget.brandTitle,
               titleOpacity: widget.fadeTitleAfter == null
                   ? null
                   : _titleOpacity,
               actions: widget.actions,
               onBack: widget.onBack,
+              onFilter: widget.onFilter,
+              globalSearch: widget.globalSearch,
               maxWidth: media.size.width - _islandMargin * 2,
             ),
           ),
@@ -129,80 +138,197 @@ class _IslandScaffoldState extends State<IslandScaffold> {
   }
 }
 
-class _Island extends StatelessWidget {
+class _Island extends StatefulWidget {
   const _Island({
     required this.title,
-    required this.brandTitle,
     required this.titleOpacity,
     required this.actions,
     required this.onBack,
+    required this.onFilter,
+    required this.globalSearch,
     required this.maxWidth,
   });
 
   final String title;
-  final bool brandTitle;
   final ValueListenable<double>? titleOpacity;
   final List<Widget> actions;
   final VoidCallback? onBack;
+  final ValueChanged<String>? onFilter;
+  final bool globalSearch;
   final double maxWidth;
 
   @override
+  State<_Island> createState() => _IslandState();
+}
+
+class _IslandState extends State<_Island> {
+  static const _searchWidth = 480.0;
+
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode();
+  bool _searching = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _openSearch() {
+    setState(() => _searching = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  void _closeSearch() {
+    _controller.clear();
+    widget.onFilter?.call('');
+    setState(() => _searching = false);
+  }
+
+  void _submit(String query) {
+    if (widget.onFilter != null) {
+      _focusNode.unfocus();
+      return;
+    }
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return;
+    _closeSearch();
+    openSearch(trimmed);
+  }
+
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape) {
+      _closeSearch();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final showSearch =
+        widget.onFilter != null || (widget.globalSearch && !offlineMode.value);
+    final width = _searching
+        ? (widget.maxWidth < _searchWidth ? widget.maxWidth : _searchWidth)
+        : null;
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: widget.maxWidth),
+      child: FloatingSurface(
+        borderRadius: const BorderRadius.all(
+          Radius.circular(_islandHeight / 2),
+        ),
+        child: AnimatedSize(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.centerLeft,
+          child: SizedBox(
+            height: _islandHeight,
+            width: width,
+            child: _searching
+                ? _buildSearchField(context)
+                : _buildBar(context, showSearch),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBar(BuildContext context, bool showSearch) {
     final colorScheme = Theme.of(context).colorScheme;
     final canPop = Navigator.of(context).canPop();
 
     Widget titleText = Padding(
       padding: EdgeInsets.only(left: canPop ? 2 : 14, right: 10),
       child: Text(
-        title,
+        widget.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: brandTitle
-            ? TextStyle(
-                fontSize: 21,
-                fontFamily: 'paytoneOne',
-                color: colorScheme.primary,
-              )
-            : TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: colorScheme.onSurface,
-              ),
+        // The logo font sits low in its line box; even leading centres it.
+        style: TextStyle(
+          fontSize: 18,
+          height: 1,
+          leadingDistribution: TextLeadingDistribution.even,
+          fontFamily: 'paytoneOne',
+          color: colorScheme.primary,
+        ),
       ),
     );
-    if (titleOpacity != null) {
+    if (widget.titleOpacity != null) {
       titleText = ValueListenableBuilder<double>(
-        valueListenable: titleOpacity!,
+        valueListenable: widget.titleOpacity!,
         builder: (context, opacity, child) =>
             Opacity(opacity: opacity.clamp(0.0, 1.0), child: child),
         child: titleText,
       );
     }
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: maxWidth),
-      child: FloatingSurface(
-        borderRadius: const BorderRadius.all(
-          Radius.circular(_islandHeight / 2),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (canPop)
+          IconButton(
+            icon: const Icon(FluentIcons.arrow_left_24_regular),
+            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+            onPressed: widget.onBack ?? () => Navigator.of(context).maybePop(),
+          ),
+        if (widget.title.isNotEmpty) Flexible(child: titleText),
+        ...widget.actions,
+        if (showSearch)
+          IconButton(
+            icon: const Icon(FluentIcons.search_24_regular),
+            tooltip: context.l10n!.search,
+            onPressed: _openSearch,
+          ),
+        const SizedBox(width: 2),
+      ],
+    );
+  }
+
+  Widget _buildSearchField(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        const SizedBox(width: 14),
+        Icon(
+          FluentIcons.search_24_regular,
+          size: 20,
+          color: colorScheme.onSurfaceVariant,
         ),
-        child: SizedBox(
-          height: _islandHeight,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (canPop)
-                IconButton(
-                  icon: const Icon(FluentIcons.arrow_left_24_regular),
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  onPressed: onBack ?? () => Navigator.of(context).maybePop(),
-                ),
-              Flexible(child: titleText),
-              ...actions,
-              if (actions.isNotEmpty) const SizedBox(width: 2),
-            ],
+        const SizedBox(width: 8),
+        Expanded(
+          child: Focus(
+            onKeyEvent: _onKey,
+            canRequestFocus: false,
+            skipTraversal: true,
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              textInputAction: TextInputAction.search,
+              onChanged: widget.onFilter,
+              onSubmitted: _submit,
+              style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
+              decoration: InputDecoration(
+                hintText: context.l10n!.search,
+                filled: false,
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ),
           ),
         ),
-      ),
+        IconButton(
+          icon: const Icon(FluentIcons.dismiss_24_regular),
+          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+          onPressed: _closeSearch,
+        ),
+        const SizedBox(width: 2),
+      ],
     );
   }
 }

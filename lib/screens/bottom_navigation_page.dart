@@ -229,45 +229,27 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     );
   }
 
-  List<_NavigationItem> _getNavigationItems(bool isOfflineMode) {
-    final items = <_NavigationItem>[
-      _NavigationItem(
-        icon: FluentIcons.home_24_regular,
-        selectedIcon: FluentIcons.home_24_filled,
-        label: context.l10n?.home ?? 'Home',
-        shellIndex: 0,
-      ),
-    ];
-
-    // Only add search tab in online mode
-    if (!isOfflineMode) {
-      items.add(
-        _NavigationItem(
-          icon: FluentIcons.search_24_regular,
-          selectedIcon: FluentIcons.search_24_filled,
-          label: context.l10n?.search ?? 'Search',
-          shellIndex: 1,
-        ),
-      );
-    }
-
-    items.addAll([
-      _NavigationItem(
-        icon: FluentIcons.book_24_regular,
-        selectedIcon: FluentIcons.book_24_filled,
-        label: context.l10n?.library ?? 'Library',
-        shellIndex: 2,
-      ),
-      _NavigationItem(
-        icon: FluentIcons.settings_24_regular,
-        selectedIcon: FluentIcons.settings_24_filled,
-        label: context.l10n?.settings ?? 'Settings',
-        shellIndex: 3,
-      ),
-    ]);
-
-    return items;
-  }
+  // Search opens from the island, so it has no tab of its own.
+  List<_NavigationItem> _getNavigationItems(bool isOfflineMode) => [
+    _NavigationItem(
+      icon: FluentIcons.home_24_regular,
+      selectedIcon: FluentIcons.home_24_filled,
+      label: context.l10n?.home ?? 'Home',
+      shellIndex: 0,
+    ),
+    _NavigationItem(
+      icon: FluentIcons.book_24_regular,
+      selectedIcon: FluentIcons.book_24_filled,
+      label: context.l10n?.library ?? 'Library',
+      shellIndex: 2,
+    ),
+    _NavigationItem(
+      icon: FluentIcons.settings_24_regular,
+      selectedIcon: FluentIcons.settings_24_filled,
+      label: context.l10n?.settings ?? 'Settings',
+      shellIndex: 3,
+    ),
+  ];
 
   void _handleOfflineModeChange(bool isOfflineMode) {
     if (!mounted) return;
@@ -310,14 +292,8 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     final matchedIndex = items.indexWhere(
       (item) => item.shellIndex == currentShellIndex,
     );
-    if (matchedIndex != -1) return matchedIndex;
-
-    // If the Search branch (1) is active but Search is hidden in offline mode,
-    // fall back to the Home tab.
-    if (isOfflineMode && currentShellIndex == 1) return 0;
-
-    // Final fallback: return the first tab to keep UI in a valid state.
-    return 0;
+    // The search page (branch 1) opens from the island and has no tab.
+    return matchedIndex;
   }
 }
 

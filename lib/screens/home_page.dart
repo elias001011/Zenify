@@ -78,8 +78,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final playlistHeight = MediaQuery.sizeOf(context).height * 0.25 / 1.1;
     return IslandScaffold(
-      title: 'Musify.',
-      brandTitle: true,
+      title: 'Musify',
       body: SingleChildScrollView(
         padding: withIslandInset(context, commonSingleChildScrollViewPadding),
         child: Column(
