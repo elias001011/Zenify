@@ -1,106 +1,124 @@
 <div align="center">
-<img src="https://github.com/gokadzev/Musify/raw/master/.github/assets/Musify-banner.png" width="100%">
 
-# Musify
+# Musify Next
 
-Unlock the full potential of music: Stream effortlessly with one app!
+A community fork of [Musify](https://github.com/gokadzev/Musify) focused on stability, desktop support and syncing between your devices.
 
-[![Stars](https://img.shields.io/github/stars/gokadzev/Musify?style=flat-square&color=D3BEAB)](https://github.com/gokadzev/Musify/stargazers)
-[![Forks](https://img.shields.io/github/forks/gokadzev/Musify?style=flat-square&color=D3BEAB)](https://github.com/gokadzev/Musify/fork)
-[![Downloads](https://img.shields.io/github/downloads/gokadzev/Musify/total?style=flat-square&color=D3BEAB)](https://github.com/gokadzev/Musify/releases)
-[![GitHub release](https://img.shields.io/github/v/release/gokadzev/Musify?color=D3BEAB)](https://github.com/gokadzev/Musify/releases)
-[![License](https://img.shields.io/github/license/gokadzev/Musify?color=D3BEAB)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/elias001011/Musify-Next?color=2196F3)](https://github.com/elias001011/Musify-Next/releases)
+[![License](https://img.shields.io/github/license/elias001011/Musify-Next?color=2196F3)](LICENSE)
+[![Based on Musify](https://img.shields.io/badge/based%20on-gokadzev%2FMusify-2196F3)](https://github.com/gokadzev/Musify)
+[![Desktop features from Musify Desktop Port](https://img.shields.io/badge/desktop%20features-Musify%20Desktop%20Port-2196F3)](https://github.com/elias001011/Musify-Desktop-Port)
+
+</div>
 
 ---
 
-<a href="https://ko-fi.com/gokadzev" target="_blank" title="ko-fi">
-  <img src="https://github.com/user-attachments/assets/1c204507-d124-4b34-878b-96c39c9bb3f8"  alt="ko-fi badge" style="width: 150px;">
-</a>
+## Why this fork
 
+Musify is a great open source music app, but its future is uncertain: the
+original repository received a copyright complaint
+([gokadzev/Musify#1012](https://github.com/gokadzev/Musify/discussions/1012))
+and it is not clear how long it will stay available.
 
+Musify Next starts from the original code and keeps its infrastructure, while
+taking a different direction: a more modern app, first-class desktop support
+and stability before new features. The app will get its own name and icon in a
+future release; for now it is still Musify.
+
+Version 0.1.0 is the first stable base: upstream Musify plus the desktop
+features that were already proven in
+[Musify Desktop Port](https://github.com/elias001011/Musify-Desktop-Port).
 
 ---
 
 ## Features
 
-<center>
+Everything from Musify:
 
-Online song search with suggestions <br/>
-Offline listening support <br/>
-Import & export your data and never lose it <br/>
-Add custom playlists with link <br/>
-Listening Recaps <br/>
-Spotify playlist import <br/>
-Radio stations <br/>
-Optimized sound experience <br/>
-SponsorBlock support <br/>
-Lyrics support <br/>
-No ads <br/>
-No subscriptions <br/>
-Built-in updater <br/>
-Built-in equalizer with presets <br/>
-21 supported languages <br/>
-Material UI & accent colors & dynamic colors (Android 12+) <br/>
+- Online song search with suggestions
+- Offline listening support
+- Import & export your data and never lose it
+- Custom playlists from a link, and Spotify playlist import
+- Listening recaps
+- Radio stations
+- Synced lyrics
+- SponsorBlock support
+- Built-in equalizer with presets
+- No ads, no subscriptions
+- Material UI, accent colors and dynamic colors (Android 12+)
+- 21 languages
 
-</center>
+New in Musify Next:
 
+- **Local Sync**: pair Android, Linux and Windows devices with a PIN and keep
+  your liked songs, playlists, history, listening recap, searches and radio
+  stations in sync over Wi-Fi. No account or server, encrypted, off by default.
+- **Desktop settings**: interface scale that zooms the whole app, start
+  maximized and a title bar in the app colors.
+- **Keyboard shortcuts** for playback and navigation, all of them remappable.
+- **Volume control** in the player, with mute and mouse wheel support.
+- **Downloads folder** of your choice on desktop.
+- **Built-in updater** for Android, Linux and Windows.
+- **Desktop packages**: `.deb`, Windows installer and portable builds.
+
+New features are translated into English and Portuguese for now.
 
 ---
 
 ## Screenshots
 
-| ![Screenshot 1](https://raw.githubusercontent.com/gokadzev/Musify/master/fastlane/metadata/android/en-US/images/phoneScreenshots/01.jpg) | ![Screenshot 2](https://raw.githubusercontent.com/gokadzev/Musify/master/fastlane/metadata/android/en-US/images/phoneScreenshots/02.jpg) | ![Screenshot 3](https://raw.githubusercontent.com/gokadzev/Musify/master/fastlane/metadata/android/en-US/images/phoneScreenshots/03.jpg) | ![Screenshot 4](https://raw.githubusercontent.com/gokadzev/Musify/master/fastlane/metadata/android/en-US/images/phoneScreenshots/04.jpg) |
-|----------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
-
----
-
-## Supported platforms
-
-| Platform | Status | Dependencies |
-|----------|--------|--------------|
-| Android  | ✅ Supported | — |
-| Linux    | ✅  Supported (Beta) | Will be added soon... |
-| Windows    | ✅  Supported (Beta) | — |
-| IOS    | ❌ Unsupported | — |
+| ![Screenshot 1](fastlane/metadata/android/en-US/images/phoneScreenshots/01.jpg) | ![Screenshot 2](fastlane/metadata/android/en-US/images/phoneScreenshots/02.jpg) | ![Screenshot 3](fastlane/metadata/android/en-US/images/phoneScreenshots/03.jpg) | ![Screenshot 4](fastlane/metadata/android/en-US/images/phoneScreenshots/04.jpg) |
+|---|---|---|---|
 
 ---
 
 ## Download
 
+Get the files for your platform from the
+[latest release](https://github.com/elias001011/Musify-Next/releases/latest).
 
-[<img src="https://github.com/gokadzev/Musify/raw/master/.github/assets/get-it-on-github.png" alt="Get it on Github" height="80">](https://github.com/gokadzev/Musify/releases/latest)
-[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on Fdroid" height="80">](https://f-droid.org/packages/com.gokadzev.musify.fdroid)
+| Platform | File | Notes |
+|---|---|---|
+| Android | `Musify-arm64-v8a.apk` | Most phones. `Musify.apk` works on every device. |
+| Linux (Debian, Ubuntu) | `Musify-linux-x64.deb` | Installs `libmpv` for you. |
+| Linux (other) | `Musify-linux-x64.tar.gz` | Needs `libmpv`; run `install-linux-desktop.sh` to add it to your menu. |
+| Windows | `Musify-windows-x64-setup.exe` | Lets you choose where data and downloads go. |
+| Windows (portable) | `Musify-windows-x64-portable.zip` | No installation. |
 
+Every release includes `SHA256SUMS.txt` to verify the files. iOS is not
+supported.
 
 ---
 
-## Contributors
+## Roadmap
 
-Special thanks to all contributors for their time and effort.
-
-<a href="https://github.com/gokadzev/Musify/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=gokadzev/Musify" alt="Contributors"/>
-</a>
-
+- Own name and icon
+- Translations through Crowdin
+- A modernized interface
 
 ---
 
 ## Contribute
 
-Contributions are always welcome. Please read our [contributing guidelines](https://github.com/gokadzev/Musify/blob/master/CONTRIBUTING.md) before contributing.
-
----
-
-## F.A.Q
-
-You can see frequently asked questions and their answers [here](https://github.com/gokadzev/Musify/discussions/728).
+Contributions are welcome. Please read the
+[contributing guidelines](CONTRIBUTING.md) first.
 
 ---
 
 ## Credits
 
-[Musify](https://github.com/Harsh-23/Musify) - Original inspiration for the concept and name. It is now completely reimplemented with new design and branding.
+- [Musify](https://github.com/gokadzev/Musify) by **Valeri Gokadze** and its
+  [contributors](https://github.com/gokadzev/Musify/graphs/contributors): the
+  original project this fork is built on. Musify Next would not exist without
+  it.
+- [Musify Desktop Port](https://github.com/elias001011/Musify-Desktop-Port):
+  where the desktop features, Local Sync and packaging of this fork were first
+  built and tested.
+- [Musify](https://github.com/Harsh-23/Musify) by Harsh-23: the original
+  inspiration for the concept and name of Musify.
 
+Musify Next is developed and maintained by
+[Elias Juriatti](https://github.com/elias001011).
 
 ---
 
@@ -108,24 +126,29 @@ You can see frequently asked questions and their answers [here](https://github.c
 
 ```
 Copyright © 2026 Valeri Gokadze
+Copyright © 2026 Elias Juriatti and Musify Next contributors
 
-Musify is free software licensed under GPL v3.0. You may use, modify, and distribute
-this software freely, but must keep the source code open and publicly available, retain
-all copyright notices, disclose all changes made, and use the same GPL v3.0 license.
-
-Prohibited: Closed-source distributions or commercial redistribution of modified versions.
+Musify Next is free software licensed under GPL v3.0. You may use, modify, and
+distribute this software freely, but must keep the source code open and publicly
+available, retain all copyright notices, disclose all changes made, and use the
+same GPL v3.0 license.
 ```
 
-See the [GNU General Public License](https://github.com/gokadzev/Musify/blob/master/LICENSE) for full details.
+See the [GNU General Public License](LICENSE) for full details.
 
 ---
 
 ## Disclaimer
 
 ```
-Musify and its contributors do not host, own, or distribute any copyrighted audio content.
-The app provides access to content through plugins and external sources. All trademarks, songs, audio files, and related content remain the property of their respective owners and are protected by applicable copyright laws.
-Included plugins are provided for interoperability and educational purposes only. Users are solely responsible for ensuring that their use of the app complies with local laws, copyright regulations, and the terms of service of the respective content providers.
-The developers of Musify do not encourage or endorse copyright infringement and assume no liability for misuse of the software or third-party plugins.
+Musify Next and its contributors do not host, own, or distribute any copyrighted
+audio content. The app provides access to content through plugins and external
+sources. All trademarks, songs, audio files, and related content remain the
+property of their respective owners and are protected by applicable copyright laws.
+Included plugins are provided for interoperability and educational purposes only.
+Users are solely responsible for ensuring that their use of the app complies with
+local laws, copyright regulations, and the terms of service of the respective
+content providers. The developers of Musify Next do not encourage or endorse
+copyright infringement and assume no liability for misuse of the software or
+third-party plugins.
 ```
----
