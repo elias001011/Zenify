@@ -29,7 +29,7 @@ void main() {
   test('deleteDownloadedFiles removes ours and keeps the user files', () async {
     final root = await Directory.systemTemp.createTemp('musify_downloads');
     addTearDown(() => root.delete(recursive: true));
-    applicationDirPath = root.path;
+    downloadsDirPath = root.path;
     final tracks = Directory('${root.path}/${FilePaths.tracksDir}')
       ..createSync();
     final legacy = Directory('${root.path}/legacy')..createSync();

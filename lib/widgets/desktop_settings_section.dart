@@ -19,13 +19,22 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:async';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/main.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/downloads_location_service.dart';
+import 'package:musify/services/io_service.dart';
+import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/shapes/four_sided_cookie_shape.dart';
@@ -56,6 +65,7 @@ class DesktopSettingsSection extends StatelessWidget {
           setting: customTitleBar,
           storageKey: 'customTitleBar',
         ),
+        const _DownloadsFolderBar(),
         CustomBar(
           l10n.keyboardShortcuts,
           FluentIcons.keyboard_24_regular,
@@ -220,5 +230,153 @@ class _InterfaceScaleBarState extends State<_InterfaceScaleBar> {
     final rounded = (value / _step).round() * _step;
     interfaceScale.value = double.parse(rounded.toStringAsFixed(2));
     addOrUpdateData<double>('settings', 'interfaceScale', interfaceScale.value);
+  }
+}
+
+class _DownloadsFolderBar extends StatefulWidget {
+  const _DownloadsFolderBar();
+
+  @override
+  State<_DownloadsFolderBar> createState() => _DownloadsFolderBarState();
+}
+
+class _DownloadsFolderBarState extends State<_DownloadsFolderBar> {
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n!;
+    final custom = DownloadsLocation.customPath;
+    final description = DownloadsLocation.unavailable
+        ? l10n.downloadsFolderUnavailable(custom ?? '')
+        : custom ??
+              '${l10n.downloadsFolderDefault} (${DownloadsLocation.defaultPath})';
+
+    return CustomBar(
+      l10n.downloadsFolder,
+      FluentIcons.folder_open_24_regular,
+      description: description,
+      onTap: _showOptions,
+    );
+  }
+
+  void _showOptions() {
+    final l10n = context.l10n!;
+    final colorScheme = Theme.of(context).colorScheme;
+    final custom = DownloadsLocation.customPath;
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: Icon(
+          FluentIcons.folder_open_24_regular,
+          color: colorScheme.primary,
+          size: 32,
+        ),
+        title: Text(l10n.downloadsFolder),
+        content: Container(
+          constraints: const BoxConstraints(minWidth: 320, maxWidth: 420),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: SelectableText(
+            custom ?? DownloadsLocation.defaultPath,
+            textAlign: TextAlign.center,
+          ),
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          if (custom != null)
+            OutlinedButton(
+              onPressed: () {
+                Navigator.pop(dialogContext);
+                _confirmChange(null);
+              },
+              child: Text(l10n.downloadsFolderReset),
+            ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              _pickFolder();
+            },
+            child: Text(l10n.downloadsFolderChoose),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _pickFolder() async {
+    String? picked;
+    try {
+      picked = await FilePicker.getDirectoryPath(
+        dialogTitle: context.l10n!.downloadsFolder,
+        initialDirectory: downloadsDirPath,
+      );
+    } catch (e, stackTrace) {
+      logger.log('Folder picker failed', error: e, stackTrace: stackTrace);
+      if (mounted) {
+        showToast(context, context.l10n!.downloadsFolderPickerUnavailable);
+      }
+      return;
+    }
+    if (picked != null && mounted) _confirmChange(picked);
+  }
+
+  /// [folder] is null for the default location.
+  void _confirmChange(String? folder) {
+    final l10n = context.l10n!;
+    if (offlinePlaylistService.activeDownloads.isNotEmpty) {
+      showToast(context, l10n.downloadsFolderBusy);
+      return;
+    }
+
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => ConfirmationDialog(
+        confirmationMessage: l10n.downloadsFolderMoveConfirm(
+          folder ?? DownloadsLocation.defaultPath,
+        ),
+        submitMessage: l10n.confirm,
+        onCancel: () => Navigator.pop(dialogContext),
+        onSubmit: () {
+          Navigator.pop(dialogContext);
+          _move(folder);
+        },
+      ),
+    );
+  }
+
+  Future<void> _move(String? folder) async {
+    final l10n = context.l10n!;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => PopScope(
+          canPop: false,
+          child: AlertDialog(
+            content: Row(
+              children: [
+                const CircularProgressIndicator(),
+                const SizedBox(width: 20),
+                Expanded(child: Text(l10n.downloadsFolderMoving)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final status = await DownloadsLocation.change(folder);
+    navigator.pop();
+    if (!mounted) return;
+    setState(() {});
+    showToast(context, switch (status) {
+      DownloadsMoveStatus.moved => l10n.downloadsFolderMoved,
+      DownloadsMoveStatus.partiallyMoved => l10n.downloadsFolderPartiallyMoved,
+      DownloadsMoveStatus.notWritable => l10n.downloadsFolderNotWritable,
+    });
   }
 }

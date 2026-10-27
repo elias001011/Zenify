@@ -23,6 +23,10 @@ import 'dart:io';
 
 late String applicationDirPath;
 
+/// Root of `tracks/` and `artworks/`: [applicationDirPath] unless a desktop
+/// user chose another folder (see `downloads_location_service.dart`).
+late String downloadsDirPath;
+
 class FilePaths {
   // File extensions
   static const String audioExtension = '.m4a';
@@ -34,11 +38,11 @@ class FilePaths {
 
   // Get full paths for various file types
   static String getAudioPath(String songId) {
-    return '$applicationDirPath/$tracksDir/$songId$audioExtension';
+    return '$downloadsDirPath/$tracksDir/$songId$audioExtension';
   }
 
   static String getArtworkPath(String songId) {
-    return '$applicationDirPath/$artworksDir/$songId$artworkExtension';
+    return '$downloadsDirPath/$artworksDir/$songId$artworkExtension';
   }
 
   /// A YouTube id plus our extension, so the user's own files are never touched.
@@ -65,7 +69,7 @@ class FilePaths {
 
     for (final artwork in [false, true]) {
       final directory = Directory(
-        '$applicationDirPath/${artwork ? artworksDir : tracksDir}',
+        '$downloadsDirPath/${artwork ? artworksDir : tracksDir}',
       );
       if (!await directory.exists()) continue;
       await for (final entity in directory.list()) {
@@ -83,8 +87,8 @@ class FilePaths {
 
   // Ensure directories exist
   static Future<void> ensureDirectoriesExist() async {
-    final tracksDirectory = Directory('$applicationDirPath/$tracksDir');
-    final artworksDirectory = Directory('$applicationDirPath/$artworksDir');
+    final tracksDirectory = Directory('$downloadsDirPath/$tracksDir');
+    final artworksDirectory = Directory('$downloadsDirPath/$artworksDir');
 
     if (!await tracksDirectory.exists()) {
       await tracksDirectory.create(recursive: true);

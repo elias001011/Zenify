@@ -37,6 +37,7 @@ import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/desktop_media_artwork.dart';
 import 'package:musify/services/desktop_window_service.dart';
+import 'package:musify/services/downloads_location_service.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/keyboard_shortcuts_manager.dart';
 import 'package:musify/services/linux_media_controls.dart';
@@ -480,6 +481,7 @@ Future<String?> initialisation() async {
   }
 
   try {
+    await DownloadsLocation.initialise();
     await FilePaths.ensureDirectoriesExist();
   } catch (e, stackTrace) {
     logger.log(
