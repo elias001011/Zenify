@@ -138,37 +138,35 @@ const List<String> legacyDesktopBoxNames = [
   'cache',
 ];
 
-/// Outcome of [copyLegacyDesktopData].
-class DesktopDataMigration {
-  const DesktopDataMigration({this.copied = const [], this.failed = const []});
+/// Outcome of [copyHiveBoxes].
+class HiveCopyReport {
+  const HiveCopyReport({this.copied = const [], this.failed = const []});
 
   final List<String> copied;
   final List<String> failed;
 
   bool get hasWork => copied.isNotEmpty || failed.isNotEmpty;
 
-  String describe() {
-    final parts = <String>[];
-    if (copied.isNotEmpty) parts.add('copied ${copied.join(', ')}');
-    if (failed.isNotEmpty) parts.add('failed ${failed.join(', ')}');
-    return parts.isEmpty ? 'nothing to migrate' : parts.join('; ');
-  }
+  String describe() => failed.isEmpty
+      ? 'copied ${copied.join(', ')}'
+      : 'failed ${failed.join(', ')}';
 }
 
-/// Copies the Hive boxes older desktop builds kept in [from] into an empty [to].
+/// Copies the Hive boxes in [from] into [to] when [to] has none yet.
 ///
 /// Copy, not move: [from] may still belong to another Musify install.
-/// Downloads stay put, since offline songs store absolute paths.
-Future<DesktopDataMigration> copyLegacyDesktopData({
+/// Downloads stay put, since offline songs store absolute paths. A partly
+/// copied set is removed again, so old and new data never mix.
+Future<HiveCopyReport> copyHiveBoxes({
   required Directory from,
   required Directory to,
   void Function(String message, {Object? error, StackTrace? stackTrace})? log,
 }) async {
   if (from.absolute.path == to.absolute.path || !await from.exists()) {
-    return const DesktopDataMigration();
+    return const HiveCopyReport();
   }
   if (await _hasHiveBoxes(to) || !await _hasHiveBoxes(from)) {
-    return const DesktopDataMigration();
+    return const HiveCopyReport();
   }
 
   await to.create(recursive: true);
@@ -190,15 +188,18 @@ Future<DesktopDataMigration> copyLegacyDesktopData({
     } catch (e, stackTrace) {
       failed.add(name);
       log?.call('Failed to copy $name', error: e, stackTrace: stackTrace);
-      try {
-        if (await partial.exists()) await partial.delete();
-      } on FileSystemException {
-        // Nothing else to clean up.
-      }
+      if (await partial.exists()) await partial.delete();
     }
   }
 
-  return DesktopDataMigration(copied: copied, failed: failed);
+  if (failed.isNotEmpty) {
+    for (final name in copied) {
+      final file = File('${to.path}${Platform.pathSeparator}$name');
+      if (await file.exists()) await file.delete();
+    }
+    return HiveCopyReport(failed: failed);
+  }
+  return HiveCopyReport(copied: copied);
 }
 
 Future<bool> _hasHiveBoxes(Directory directory) async {

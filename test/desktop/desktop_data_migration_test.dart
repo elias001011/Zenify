@@ -26,7 +26,7 @@ void main() {
     final tracks = Directory('${legacy.path}/tracks')..createSync();
     File('${tracks.path}/dQw4w9WgXcQ.m4a').writeAsStringSync('audio');
 
-    final report = await copyLegacyDesktopData(from: legacy, to: target);
+    final report = await copyHiveBoxes(from: legacy, to: target);
 
     expect(report.failed, isEmpty);
     expect(report.copied, containsAll(['settings.hive', 'user.hive']));
@@ -48,7 +48,7 @@ void main() {
     File('${legacy.path}/user.hive').writeAsStringSync('legacy user');
     File('${target.path}/settings.hive').writeAsStringSync('current');
 
-    final report = await copyLegacyDesktopData(from: legacy, to: target);
+    final report = await copyHiveBoxes(from: legacy, to: target);
 
     expect(report.hasWork, isFalse);
     expect(File('${target.path}/settings.hive').readAsStringSync(), 'current');
@@ -58,9 +58,9 @@ void main() {
   test('is a no-op on the second start', () async {
     File('${legacy.path}/settings.hive').writeAsStringSync('settings');
 
-    final first = await copyLegacyDesktopData(from: legacy, to: target);
+    final first = await copyHiveBoxes(from: legacy, to: target);
     File('${legacy.path}/settings.hive').writeAsStringSync('changed later');
-    final second = await copyLegacyDesktopData(from: legacy, to: target);
+    final second = await copyHiveBoxes(from: legacy, to: target);
 
     expect(first.copied, ['settings.hive']);
     expect(second.hasWork, isFalse);
@@ -70,7 +70,7 @@ void main() {
   test('ignores a documents directory without Hive boxes', () async {
     File('${legacy.path}/notes.txt').writeAsStringSync('mine');
 
-    final report = await copyLegacyDesktopData(from: legacy, to: target);
+    final report = await copyHiveBoxes(from: legacy, to: target);
 
     expect(report.hasWork, isFalse);
     expect(target.listSync(), isEmpty);
@@ -79,7 +79,7 @@ void main() {
   test('is a no-op when there is no legacy directory', () async {
     await legacy.delete(recursive: true);
 
-    final report = await copyLegacyDesktopData(from: legacy, to: target);
+    final report = await copyHiveBoxes(from: legacy, to: target);
 
     expect(report.hasWork, isFalse);
   });
@@ -87,7 +87,7 @@ void main() {
   test('is a no-op when source and target are the same directory', () async {
     File('${target.path}/settings.hive').writeAsStringSync('settings');
 
-    final report = await copyLegacyDesktopData(from: target, to: target);
+    final report = await copyHiveBoxes(from: target, to: target);
 
     expect(report.hasWork, isFalse);
     expect(File('${target.path}/settings.hive').readAsStringSync(), 'settings');

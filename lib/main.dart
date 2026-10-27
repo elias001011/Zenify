@@ -39,6 +39,7 @@ import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/desktop_media_artwork.dart';
 import 'package:musify/services/desktop_window_service.dart';
 import 'package:musify/services/downloads_location_service.dart';
+import 'package:musify/services/install_config_service.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/keyboard_shortcuts_manager.dart';
 import 'package:musify/services/linux_media_controls.dart';
@@ -323,6 +324,10 @@ void main() async {
 
 Future<String?> initialisation() async {
   String? startupError;
+  // Folders chosen in the Windows installer, if any.
+  final installConfig = isDesktopPlatform
+      ? await InstallConfig.load()
+      : const InstallConfig();
 
   try {
     final resolvedDirectory = await _resolveApplicationDirPath();
@@ -338,6 +343,10 @@ Future<String?> initialisation() async {
         );
       } else {
         await _copyLegacyDesktopDataIfNeeded(applicationDirPath);
+        applicationDirPath = await installConfig.resolveDataDir(
+          applicationDirPath,
+          log: logger.log,
+        );
       }
       Hive.init(applicationDirPath);
     } else {
@@ -503,6 +512,7 @@ Future<String?> initialisation() async {
   }
 
   try {
+    await installConfig.applyDownloadsDir(log: logger.log);
     await DownloadsLocation.initialise();
     await FilePaths.ensureDirectoriesExist();
   } catch (e, stackTrace) {
@@ -545,7 +555,7 @@ Future<({String path, bool isFallback})> _resolveApplicationDirPath() async {
 Future<void> _copyLegacyDesktopDataIfNeeded(String targetPath) async {
   try {
     final legacyDirectory = await getApplicationDocumentsDirectory();
-    final report = await copyLegacyDesktopData(
+    final report = await copyHiveBoxes(
       from: legacyDirectory,
       to: Directory(targetPath),
       log: logger.log,
