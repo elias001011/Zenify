@@ -26,10 +26,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
+import 'package:musify/screens/local_sync_page.dart';
 import 'package:musify/screens/search_page.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/listening_stats_service.dart';
+import 'package:musify/services/local_sync_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
@@ -69,6 +71,7 @@ class SettingsPage extends StatelessWidget {
         ),
         if (!offlineMode.value) _buildOnlineFeaturesSection(context),
         if (isDesktopPlatform) const DesktopSettingsSection(),
+        const LocalSyncSettingsSection(),
         _buildOthersSection(context),
         const SizedBox(height: 20),
         const MiniPlayerBottomSpace(),
@@ -423,6 +426,8 @@ class SettingsPage extends StatelessWidget {
           FluentIcons.cloud_add_24_regular,
           onTap: () async {
             try {
+              await LocalSyncService.instance.pauseForStorageRestore();
+              if (!context.mounted) return;
               final result = await restoreData(context);
               if (result.success) {
                 reloadSettingsFromStorage();
@@ -467,6 +472,8 @@ class SettingsPage extends StatelessWidget {
                   icon: FluentIcons.error_circle_24_regular,
                 );
               }
+            } finally {
+              await LocalSyncService.instance.resumeAfterStorageRestore();
             }
           },
         ),
