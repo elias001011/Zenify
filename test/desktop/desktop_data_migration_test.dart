@@ -34,6 +34,7 @@ void main() {
     expect(File('${target.path}/user.hive').readAsStringSync(), 'user');
     expect(File('${legacy.path}/settings.hive').existsSync(), isTrue);
     expect(File('${legacy.path}/user.hive').existsSync(), isTrue);
+    expect(report.copied, isNot(contains('usernobackup.hive')));
     // Downloads keep playing from their stored absolute paths.
     expect(Directory('${target.path}/tracks').existsSync(), isFalse);
     expect(File('${tracks.path}/dQw4w9WgXcQ.m4a').existsSync(), isTrue);
@@ -91,5 +92,17 @@ void main() {
 
     expect(report.hasWork, isFalse);
     expect(File('${target.path}/settings.hive').readAsStringSync(), 'settings');
+  });
+
+  test('finds boxes by the lower-case names Hive writes', () async {
+    File('${legacy.path}/usernobackup.hive').writeAsStringSync('offline');
+
+    final report = await copyHiveBoxes(from: legacy, to: target);
+
+    expect(report.copied, ['usernobackup.hive']);
+    expect(
+      File('${target.path}/usernobackup.hive').readAsStringSync(),
+      'offline',
+    );
   });
 }

@@ -174,7 +174,8 @@ Future<HiveCopyReport> copyHiveBoxes({
   final failed = <String>[];
 
   for (final box in legacyDesktopBoxNames) {
-    final name = '$box.hive';
+    // Hive writes box files in lower case.
+    final name = '${box.toLowerCase()}.hive';
     final source = File('${from.path}${Platform.pathSeparator}$name');
     if (!await source.exists()) continue;
 
@@ -204,7 +205,9 @@ Future<HiveCopyReport> copyHiveBoxes({
 
 Future<bool> _hasHiveBoxes(Directory directory) async {
   for (final box in legacyDesktopBoxNames) {
-    final file = File('${directory.path}${Platform.pathSeparator}$box.hive');
+    final file = File(
+      '${directory.path}${Platform.pathSeparator}${box.toLowerCase()}.hive',
+    );
     if (await file.exists()) return true;
   }
   return false;

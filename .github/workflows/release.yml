@@ -1,105 +1,138 @@
+name: Desktop packages
+
+# Builds the Linux .deb and .tar.gz and the Windows installer and portable
+# zip, then publishes them as a draft release of this repository.
 on:
-  push:
-    branches:
-      - master
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag, e.g. desktop-v10.6.0. Defaults to desktop-v<pubspec version>."
+        required: false
+        type: string
 
-name: Test, Build and Release apk
-
-env:
-  PROPERTIES_PATH: './android/key.properties'
+permissions:
+  contents: write
 
 jobs:
-  build:
-    name: Build APK
-    if: "contains(github.event.head_commit.message, 'Update:')"
+  preflight:
+    name: Resolve release settings
     runs-on: ubuntu-latest
-
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      deb_revision: ${{ steps.release.outputs.deb_revision }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      # Extract version from commit message
-      - name: Extract version
-        id: extract_version
+      - uses: actions/checkout@v5
+      - id: release
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          version=$(echo ${{ github.event.head_commit.message }} | grep -oP '(?<=Update: v)\d+\.\d+\.\d+')
-          echo "version=${version}" >> $GITHUB_OUTPUT
+          version="$(sed -n 's/^version: \([^ +]*\).*/\1/p' pubspec.yaml)"
+          tag="${INPUT_TAG:-desktop-v${version}}"
+          if [[ ! "${tag}" =~ ^desktop-v${version}(-[0-9]+)?$ ]]; then
+            echo "Tag ${tag} does not match pubspec version ${version}." >&2
+            exit 1
+          fi
+          release_version="${tag#desktop-v}"
+          revision="${release_version#${version}}"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${release_version}" >> "$GITHUB_OUTPUT"
+          echo "deb_revision=${revision#-}" >> "$GITHUB_OUTPUT"
 
-      # Setup Java environment in order to build the Android app.
-      - name: Set up Java
-        uses: actions/setup-java@v5
-        with:
-          distribution: 'zulu'
-          java-version: '17.x'
-
-      # Gradle cache for faster builds
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v5
-        with:
-          path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      # Setup the Flutter environment.
-      - run: |
-          pip install -U yq
-          echo "FLUTTER_VERSION=$(yq -r .environment.flutter pubspec.yaml | sed 's/\^//g')" >> $GITHUB_ENV
+  build-linux:
+    name: Build Linux
+    needs: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev liblzma-dev libmpv-dev dpkg-dev pulseaudio xvfb
+      - name: Resolve Flutter version
+        run: |
+          echo "FLUTTER_VERSION=$(sed -n 's/^  flutter: \^*//p' pubspec.yaml)" >> "$GITHUB_ENV"
       - uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
-          flutter-version: "${{ env.FLUTTER_VERSION }}"
-
-      #
-      - run: |
-          echo keyPassword=\${{ secrets.KEY_STORE }} > ${{env.PROPERTIES_PATH}}
-          echo storePassword=\${{ secrets.KEY_PASSWORD }} >> ${{env.PROPERTIES_PATH}}
-          echo keyAlias=\${{ secrets.KEY_ALIAS }} >> ${{env.PROPERTIES_PATH}}
-      #
-      - run: echo "${{ secrets.KEYSTORE2 }}" | base64 --decode > android/app/key.jks
-
-      # Get Flutter dependencies.
-      - name: Get Flutter dependencies
-        run: flutter pub get
-
-      # # Check for any formatting issues in the code.
-      # - name: Check code formatting
-      #   run: dart format --set-exit-if-changed .
-
-      # Statically analyze the Dart code for any errors.
-      - name: Analyze Dart code
-        run: flutter analyze .
-
-      # Build arm64 APK for GitHub release
-      - name: Build arm64 APK
-        run: flutter build apk --release --split-per-abi --target-platform="android-arm64" --flavor github
-
-      # Release arm64 generated APK
-      - name: Release arm64 APK
-        uses: svenstaro/upload-release-action@v2
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test --concurrency=2
+      - run: flutter build linux --release
+      - name: Check startup
+        run: dbus-run-session -- xvfb-run -a python .github/scripts/check_desktop_startup.py build/linux/x64/release/bundle/musify
+      - name: Package
+        env:
+          DEB_REVISION: ${{ needs.preflight.outputs.deb_revision || '1' }}
+        run: .github/scripts/package_linux_desktop.sh
+      - uses: actions/upload-artifact@v4
         with:
-          repo_name: gokadzev/Musify
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/app/outputs/flutter-apk/app-arm64-v8a-github-release.apk
-          asset_name: Musify-arm64-v8a.apk
-          tag: ${{ steps.extract_version.outputs.version }}
-          prerelease: false
-          overwrite: true
+          name: musify-linux-x64
+          path: build/desktop-artifacts/Musify-linux-x64.*
+          if-no-files-found: error
 
-      # Build universal APK
-      - name: Build universal APK
-        run: flutter build apk --release --flavor github
-
-      # Release universal generated APK
-      - name: Release universal APK
-        uses: svenstaro/upload-release-action@v2
+  build-windows:
+    name: Build Windows
+    needs: preflight
+    runs-on: windows-latest
+    env:
+      MUSIFY_VERSION: ${{ needs.preflight.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resolve Flutter version
+        shell: bash
+        run: |
+          echo "FLUTTER_VERSION=$(sed -n 's/^  flutter: \^*//p' pubspec.yaml)" >> "$GITHUB_ENV"
+      - uses: subosito/flutter-action@v2
         with:
-          repo_name: gokadzev/Musify
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/app/outputs/flutter-apk/app-github-release.apk
-          asset_name: Musify.apk
-          tag: ${{ steps.extract_version.outputs.version }}
-          prerelease: false
-          overwrite: true
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - name: Test Windows Runtime initialization
+        run: |
+          cmake -S test/windows/runtime -B build/windows-runtime-test -A x64
+          cmake --build build/windows-runtime-test --config Release
+          ctest --test-dir build/windows-runtime-test -C Release --output-on-failure
+      - run: flutter build windows --release
+      - name: Check startup and icons
+        run: |
+          python .github/scripts/check_desktop_startup.py build/windows/x64/runner/Release/musify.exe
+          python .github/scripts/check_windows_icons.py build/windows/x64/runner/Release/musify.exe
+      - name: Package portable zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build\desktop-artifacts | Out-Null
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\desktop-artifacts\Musify-windows-x64-portable.zip -Force
+      - name: Build installer
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" .github\installer\windows\musify.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: musify-windows-x64
+          path: build/desktop-artifacts/Musify-windows-x64-*
+          if-no-files-found: error
+
+  release:
+    name: Publish draft release
+    needs: [preflight, build-linux, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+        run: |
+          (cd dist && sha256sum * > SHA256SUMS.txt)
+          gh release create "${TAG}" dist/* \
+            --repo "${{ github.repository }}" \
+            --target "${{ github.sha }}" \
+            --title "Musify ${TAG#desktop-v}" \
+            --draft \
+            --generate-notes
