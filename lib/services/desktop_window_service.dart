@@ -59,10 +59,12 @@ class DesktopWindow {
     );
   }
 
-  static void resetTitleBar() {
-    if (_lastTitleBarTheme == null) return;
-    _lastTitleBarTheme = null;
-    unawaited(_invoke('resetTitleBarTheme'));
+  /// System colours, still in the system's light or dark mode.
+  static void resetTitleBar({required bool dark}) {
+    final key = 'system:$dark';
+    if (key == _lastTitleBarTheme) return;
+    _lastTitleBarTheme = key;
+    unawaited(_invoke('resetTitleBarTheme', {'dark': dark}));
   }
 
   static Future<void> _invoke(String method, [Object? arguments]) async {
@@ -95,7 +97,9 @@ class DesktopTitleBarTheme extends StatelessWidget {
         if (enabled) {
           DesktopWindow.syncTitleBar(Theme.of(context));
         } else {
-          DesktopWindow.resetTitleBar();
+          DesktopWindow.resetTitleBar(
+            dark: MediaQuery.platformBrightnessOf(context) == Brightness.dark,
+          );
         }
         return child!;
       },

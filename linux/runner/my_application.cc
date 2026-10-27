@@ -61,10 +61,15 @@ static void apply_title_bar_theme(MyApplication* self, gboolean dark,
   gtk_css_provider_load_from_data(self->title_bar_css, css, -1, nullptr);
 }
 
-// Back to the system theme and GTK's own dark preference.
-static void reset_title_bar_theme(MyApplication* self) {
+// Back to the system colours. GTK 3 does not follow the desktop's dark mode on
+// its own, so the app passes it in [dark] when it knows it.
+static void reset_title_bar_theme(MyApplication* self, FlValue* dark) {
+  const gboolean prefer_dark =
+      dark != nullptr && fl_value_get_type(dark) == FL_VALUE_TYPE_BOOL
+          ? fl_value_get_bool(dark)
+          : self->default_prefer_dark_theme;
   g_object_set(gtk_settings_get_default(), "gtk-application-prefer-dark-theme",
-               self->default_prefer_dark_theme, nullptr);
+               prefer_dark, nullptr);
 
   if (self->title_bar_css != nullptr) {
     gtk_css_provider_load_from_data(self->title_bar_css, kHeaderBarSizeCss, -1,
@@ -109,7 +114,10 @@ static void window_method_call_cb(FlMethodChannel* channel,
       response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
     }
   } else if (strcmp(method, "resetTitleBarTheme") == 0) {
-    reset_title_bar_theme(self);
+    reset_title_bar_theme(
+        self, fl_value_get_type(args) == FL_VALUE_TYPE_MAP
+                  ? fl_value_lookup_string(args, "dark")
+                  : nullptr);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
   } else {
     response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
