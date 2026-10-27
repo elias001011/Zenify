@@ -24,12 +24,12 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart'
     show closeCurrentBottomSheet;
+import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/mini_player.dart';
 
 class BottomNavigationPage extends StatefulWidget {
@@ -76,94 +76,156 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
           }
           _previousOfflineMode = isOfflineMode;
 
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final isLargeScreen = MediaQuery.of(context).size.width >= 600;
-              final items = _getNavigationItems(isOfflineMode);
+          final isLargeScreen = MediaQuery.sizeOf(context).width >= 600;
+          final items = _getNavigationItems(isOfflineMode);
+          final selected = _getCurrentIndex(items, isOfflineMode);
 
-              return Scaffold(
-                body: SafeArea(
-                  child: Row(
-                    children: [
-                      if (isLargeScreen)
-                        NavigationRail(
-                          labelType: NavigationRailLabelType.selected,
-                          destinations: items
-                              .map(
-                                (item) => NavigationRailDestination(
-                                  icon: Icon(item.icon),
-                                  selectedIcon: Icon(item.selectedIcon),
-                                  label: Text(item.label),
-                                ),
-                              )
-                              .toList(),
-                          selectedIndex: _getCurrentIndex(items, isOfflineMode),
-                          onDestinationSelected: (index) =>
-                              _onTabTapped(index, items),
-                        ),
-                      Expanded(
-                        child: StreamBuilder<bool>(
-                          initialData: audioHandler.mediaItem.value != null,
-                          stream: _miniPlayerVisibilityStream,
-                          builder: (context, snapshot) {
-                            final mediaQuery = MediaQuery.of(context);
-                            final isMiniPlayerVisible = snapshot.data ?? false;
-                            final bottomPadding = !isMiniPlayerVisible
-                                ? mediaQuery.padding.bottom
-                                : mediaQuery.padding.bottom +
-                                      miniPlayerTotalHeight;
-
-                            return Stack(
-                              alignment: Alignment.bottomCenter,
-                              children: [
-                                MediaQuery(
-                                  data: mediaQuery.copyWith(
-                                    padding: mediaQuery.padding.copyWith(
-                                      bottom: bottomPadding,
-                                    ),
-                                  ),
-                                  child: widget.child,
-                                ),
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 8,
-                                  ),
-                                  child: MiniPlayer(),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                bottomNavigationBar: !isLargeScreen
-                    ? NavigationBar(
-                        selectedIndex: _getCurrentIndex(items, isOfflineMode),
-                        labelBehavior: languageSetting == const Locale('en', '')
-                            ? NavigationDestinationLabelBehavior
-                                  .onlyShowSelected
-                            : NavigationDestinationLabelBehavior.alwaysHide,
-                        onDestinationSelected: (index) =>
-                            _onTabTapped(index, items),
-                        destinations: items
-                            .map(
-                              (item) => NavigationDestination(
-                                icon: Icon(item.icon),
-                                selectedIcon: Icon(item.selectedIcon),
-                                label: item.label,
-                              ),
-                            )
-                            .toList(),
-                      )
-                    : null,
-              );
-            },
+          return Scaffold(
+            body: SafeArea(
+              bottom: false,
+              child: StreamBuilder<bool>(
+                initialData: audioHandler.mediaItem.value != null,
+                stream: _miniPlayerVisibilityStream,
+                builder: (context, snapshot) {
+                  final playing = snapshot.data ?? false;
+                  return isLargeScreen
+                      ? _buildDesktop(context, items, selected, playing)
+                      : _buildMobile(context, items, selected, playing);
+                },
+              ),
+            ),
           );
         },
       ),
+    );
+  }
+
+  static const _margin = 12.0;
+  static const _dockPadding = 6.0;
+  static const _dockBarHeight = 60.0;
+
+  /// Pages scroll under the floating elements; this is the space they keep
+  /// free at the end so nothing stays hidden behind them.
+  Widget _withBottomInset(BuildContext context, double inset) {
+    final media = MediaQuery.of(context);
+    return MediaQuery(
+      data: media.copyWith(
+        padding: media.padding.copyWith(bottom: media.padding.bottom + inset),
+      ),
+      child: widget.child,
+    );
+  }
+
+  Widget _buildMobile(
+    BuildContext context,
+    List<_NavigationItem> items,
+    int selected,
+    bool playing,
+  ) {
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final dockHeight =
+        _dockPadding * 2 +
+        _dockBarHeight +
+        (playing ? MiniPlayer.playerHeight + _dockPadding : 0);
+
+    return Stack(
+      children: [
+        _withBottomInset(context, _margin * 2 + dockHeight),
+        Positioned(
+          left: _margin,
+          right: _margin,
+          bottom: safeBottom + _margin,
+          child: FloatingSurface(
+            padding: const EdgeInsets.all(_dockPadding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (playing) ...[
+                  const MiniPlayer(),
+                  const SizedBox(height: _dockPadding),
+                ],
+                SizedBox(
+                  height: _dockBarHeight,
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < items.length; i++)
+                        Expanded(
+                          child: _DockButton(
+                            item: items[i],
+                            selected: i == selected,
+                            onTap: () => _onTabTapped(i, items),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktop(
+    BuildContext context,
+    List<_NavigationItem> items,
+    int selected,
+    bool playing,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final settingsIndex = items.indexWhere((item) => item.shellIndex == 3);
+
+    Widget railButton(int index) => _RailButton(
+      item: items[index],
+      selected: index == selected,
+      onTap: () => _onTabTapped(index, items),
+    );
+
+    return Row(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(_margin, _margin, 0, _margin),
+          child: FloatingSurface(
+            borderRadius: const BorderRadius.all(Radius.circular(24)),
+            child: SizedBox(
+              width: 72,
+              child: Column(
+                children: [
+                  const SizedBox(height: 18),
+                  Image.asset(
+                    'assets/icons/musify_icon.png',
+                    width: 34,
+                    height: 34,
+                    color: colorScheme.primary,
+                  ),
+                  const SizedBox(height: 22),
+                  for (var i = 0; i < items.length; i++)
+                    if (i != settingsIndex) railButton(i),
+                  const Spacer(),
+                  if (settingsIndex != -1) railButton(settingsIndex),
+                  const SizedBox(height: 12),
+                ],
+              ),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              _withBottomInset(
+                context,
+                playing ? MiniPlayer.playerHeight + _margin * 2 : 0,
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(_margin, 0, _margin, _margin),
+                child: MiniPlayer(),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -256,6 +318,111 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
 
     // Final fallback: return the first tab to keep UI in a valid state.
     return 0;
+  }
+}
+
+class _DockButton extends StatelessWidget {
+  const _DockButton({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _NavigationItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = selected
+        ? colorScheme.onSecondaryContainer
+        : colorScheme.onSurfaceVariant;
+
+    return Semantics(
+      selected: selected,
+      button: true,
+      label: item.label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              width: selected ? 56 : 40,
+              height: 30,
+              decoration: BoxDecoration(
+                color: selected
+                    ? colorScheme.secondaryContainer
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Icon(
+                selected ? item.selectedIcon : item.icon,
+                size: 22,
+                color: color,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              item.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RailButton extends StatelessWidget {
+  const _RailButton({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final _NavigationItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Tooltip(
+        message: item.label,
+        child: Material(
+          color: selected ? colorScheme.secondaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Icon(
+                selected ? item.selectedIcon : item.icon,
+                color: selected
+                    ? colorScheme.onSecondaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
