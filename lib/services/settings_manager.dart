@@ -42,8 +42,10 @@ final useSystemColor = ValueNotifier<bool>(
   Hive.box('settings').get('useSystemColor', defaultValue: true),
 );
 
+/// The dark theme is pure black. Not in Settings; set `pureBlackTheme` to false
+/// in the settings box for neutral dark greys instead.
 final usePureBlackColor = ValueNotifier<bool>(
-  Hive.box('settings').get('usePureBlackColor', defaultValue: false),
+  Hive.box('settings').get('pureBlackTheme', defaultValue: true),
 );
 
 final offlineMode = ValueNotifier<bool>(
@@ -176,10 +178,7 @@ void reloadSettingsFromStorage() {
     defaultValue: false,
   );
   useSystemColor.value = settings.get('useSystemColor', defaultValue: true);
-  usePureBlackColor.value = settings.get(
-    'usePureBlackColor',
-    defaultValue: false,
-  );
+  usePureBlackColor.value = settings.get('pureBlackTheme', defaultValue: true);
   offlineMode.value = settings.get('offlineMode', defaultValue: false);
   wrappedEnabled.value = settings.get('wrappedEnabled', defaultValue: true);
   sponsorBlockSupport.value = settings.get(

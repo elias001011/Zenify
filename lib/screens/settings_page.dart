@@ -148,16 +148,6 @@ class SettingsPage extends StatelessWidget {
             FluentIcons.data_histogram_24_regular,
             onTap: () => context.push('/settings/equalizer'),
           ),
-        if (themeMode == ThemeMode.dark)
-          CustomBar(
-            context.l10n!.pureBlackTheme,
-            FluentIcons.color_background_24_regular,
-            description: context.l10n!.pureBlackThemeDescription,
-            trailing: Switch(
-              value: usePureBlackColor.value,
-              onChanged: (value) => _togglePureBlack(context, value),
-            ),
-          ),
         if (isAndroidPlatform)
           CustomBar(
             context.l10n!.dynamicColor,
@@ -884,13 +874,6 @@ class SettingsPage extends StatelessWidget {
       newAccentColor: primaryColorSetting,
       useSystemColor: value,
     );
-    showToast(context, context.l10n!.settingChangedMsg);
-  }
-
-  void _togglePureBlack(BuildContext context, bool value) {
-    addOrUpdateData<bool>('settings', 'usePureBlackColor', value);
-    usePureBlackColor.value = value;
-    Musify.updateAppState(context);
     showToast(context, context.l10n!.settingChangedMsg);
   }
 

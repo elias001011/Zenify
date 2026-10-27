@@ -63,40 +63,52 @@ ColorScheme getAppColorScheme(
   }
 }
 
+/// Backgrounds stay neutral, never tinted by the accent: white in light mode,
+/// pure black in dark mode. The accent is kept for highlights.
+ColorScheme neutralSurfaces(ColorScheme scheme) {
+  if (scheme.brightness == Brightness.light) {
+    return scheme.copyWith(
+      surface: const Color(0xFFFFFFFF),
+      surfaceBright: const Color(0xFFFFFFFF),
+      surfaceDim: const Color(0xFFE4E4E4),
+      surfaceContainerLowest: const Color(0xFFFFFFFF),
+      surfaceContainerLow: const Color(0xFFF4F4F5),
+      surfaceContainer: const Color(0xFFEEEEEF),
+      surfaceContainerHigh: const Color(0xFFE8E8E9),
+      surfaceContainerHighest: const Color(0xFFE2E2E3),
+      surfaceTint: Colors.transparent,
+    );
+  }
+  final black = usePureBlackColor.value;
+  return scheme.copyWith(
+    surface: black ? const Color(0xFF000000) : const Color(0xFF121212),
+    surfaceDim: black ? const Color(0xFF000000) : const Color(0xFF121212),
+    surfaceBright: const Color(0xFF2C2C2C),
+    surfaceContainerLowest: black
+        ? const Color(0xFF000000)
+        : const Color(0xFF0E0E0E),
+    surfaceContainerLow: black
+        ? const Color(0xFF0E0E0E)
+        : const Color(0xFF1A1A1A),
+    surfaceContainer: black ? const Color(0xFF141414) : const Color(0xFF1F1F1F),
+    surfaceContainerHigh: black
+        ? const Color(0xFF1B1B1B)
+        : const Color(0xFF262626),
+    surfaceContainerHighest: black
+        ? const Color(0xFF232323)
+        : const Color(0xFF2E2E2E),
+    surfaceTint: Colors.transparent,
+  );
+}
+
 ThemeData getAppTheme(ColorScheme colorScheme) {
   final base = colorScheme.brightness == Brightness.light
       ? ThemeData.light()
       : ThemeData.dark();
 
-  final isLight = colorScheme.brightness == Brightness.light;
-  final isPureBlack =
-      colorScheme.brightness == Brightness.dark && usePureBlackColor.value;
-
-  // Pure black theme colors
-  const pureBlack = Color(0xFF000000);
-  const pureBlackElevated = Color(0xFF0A0A0A);
-  const pureBlackContainer = Color(0xFF121212);
-  const pureBlackContainerHigh = Color(0xFF1A1A1A);
-
-  final bgColor = isLight
-      ? colorScheme.surface
-      : (isPureBlack ? pureBlack : null);
-
-  final cardBgColor = isLight
-      ? colorScheme.surfaceContainerLow
-      : (isPureBlack ? pureBlackElevated : null);
-
-  // modified color scheme for pure black theme
-  final effectiveColorScheme = isPureBlack
-      ? colorScheme.copyWith(
-          surface: pureBlack,
-          surfaceContainerLowest: pureBlack,
-          surfaceContainerLow: pureBlackElevated,
-          surfaceContainer: pureBlackContainer,
-          surfaceContainerHigh: pureBlackContainerHigh,
-          surfaceContainerHighest: pureBlackContainerHigh,
-        )
-      : colorScheme;
+  final effectiveColorScheme = neutralSurfaces(colorScheme);
+  final bgColor = effectiveColorScheme.surface;
+  final cardBgColor = effectiveColorScheme.surfaceContainerLow;
 
   return ThemeData(
     scaffoldBackgroundColor: bgColor,
@@ -140,18 +152,12 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       thumbSize: WidgetStateProperty.all(const Size(6, 30)),
     ),
     bottomSheetTheme: base.bottomSheetTheme.copyWith(
-      backgroundColor: isLight
-          ? colorScheme.surfaceContainerLow
-          : (isPureBlack ? pureBlackElevated : null),
+      backgroundColor: cardBgColor,
     ),
     inputDecorationTheme: base.inputDecorationTheme.copyWith(
       filled: true,
       isDense: true,
-      fillColor: isLight
-          ? colorScheme.surfaceContainerHighest
-          : (isPureBlack
-                ? pureBlackContainerHigh
-                : colorScheme.surfaceContainerHigh),
+      fillColor: effectiveColorScheme.surfaceContainerHigh,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: BorderSide.none,
@@ -159,9 +165,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       contentPadding: const EdgeInsets.fromLTRB(18, 14, 20, 14),
     ),
     dialogTheme: base.dialogTheme.copyWith(
-      backgroundColor: isLight
-          ? colorScheme.surfaceContainerLow
-          : (isPureBlack ? pureBlackContainer : null),
+      backgroundColor: effectiveColorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
     ),
     navigationBarTheme: base.navigationBarTheme.copyWith(
@@ -220,9 +224,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       ),
     ),
     popupMenuTheme: base.popupMenuTheme.copyWith(
-      color: isLight
-          ? colorScheme.surfaceContainerLow
-          : (isPureBlack ? pureBlackContainer : null),
+      color: effectiveColorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),
     dividerTheme: base.dividerTheme.copyWith(
