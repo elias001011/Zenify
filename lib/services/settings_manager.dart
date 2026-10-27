@@ -72,6 +72,26 @@ final showAudioQualityBadge = ValueNotifier<bool>(
   Hive.box('settings').get('showAudioQualityBadge', defaultValue: false),
 );
 
+const double minInterfaceScale = 0.8;
+const double maxInterfaceScale = 1.6;
+
+double _readInterfaceScale() {
+  final raw = Hive.box('settings').get('interfaceScale', defaultValue: 1.0);
+  final value = raw is num ? raw.toDouble() : 1.0;
+  return value.clamp(minInterfaceScale, maxInterfaceScale);
+}
+
+// Desktop only.
+final interfaceScale = ValueNotifier<double>(_readInterfaceScale());
+
+final startMaximized = ValueNotifier<bool>(
+  Hive.box('settings').get('startMaximized', defaultValue: false),
+);
+
+final customTitleBar = ValueNotifier<bool>(
+  Hive.box('settings').get('customTitleBar', defaultValue: true),
+);
+
 final syncedLyricsEnabled = ValueNotifier<bool>(
   Hive.box('settings').get('syncedLyricsEnabled', defaultValue: true),
 );
@@ -162,6 +182,9 @@ void reloadSettingsFromStorage() {
     'showAudioQualityBadge',
     defaultValue: false,
   );
+  interfaceScale.value = _readInterfaceScale();
+  startMaximized.value = settings.get('startMaximized', defaultValue: false);
+  customTitleBar.value = settings.get('customTitleBar', defaultValue: true);
   syncedLyricsEnabled.value = settings.get(
     'syncedLyricsEnabled',
     defaultValue: true,

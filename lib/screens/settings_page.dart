@@ -45,6 +45,7 @@ import 'package:musify/utilities/url_launcher.dart';
 import 'package:musify/widgets/bottom_sheet_bar.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
+import 'package:musify/widgets/desktop_settings_section.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/shapes/four_sided_cookie_shape.dart';
@@ -67,6 +68,7 @@ class SettingsPage extends StatelessWidget {
           inactivatedColor,
         ),
         if (!offlineMode.value) _buildOnlineFeaturesSection(context),
+        if (isDesktopPlatform) const DesktopSettingsSection(),
         _buildOthersSection(context),
         const SizedBox(height: 20),
         const MiniPlayerBottomSpace(),
