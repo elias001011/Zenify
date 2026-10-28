@@ -25,11 +25,13 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
+import 'package:musify/widgets/flip_card.dart';
 import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/song_artwork.dart';
 
-/// The player's artwork. Tapping it swaps in the sound waves and back; on
-/// desktop it tilts in 3D, the side under the mouse sinking in.
+/// The player's artwork. Tapping it flips it round to sound waves on the
+/// page itself, and back; on desktop it tilts gently after the mouse, the side
+/// under it sinking in.
 class NowPlayingArtwork extends StatefulWidget {
   const NowPlayingArtwork({
     super.key,
@@ -49,7 +51,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
 
   /// -1 to 1 on each axis from the centre, while the mouse is over it.
   var _tilt = Offset.zero;
-  var _showWaves = false;
+  final _flip = FlipCardController();
 
   void _onHover(PointerHoverEvent event) {
     final half = widget.size / 2;
@@ -63,7 +65,6 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final size = widget.size;
 
     final artwork = DecoratedBox(
@@ -94,23 +95,15 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       ),
     );
 
-    final content = GestureDetector(
-      onTap: () => setState(() => _showWaves = !_showWaves),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: _showWaves
-            ? Container(
-                key: const ValueKey('waves'),
-                width: size,
-                height: size,
-                padding: EdgeInsets.all(size * 0.12),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainer.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(_radius),
-                ),
-                child: WaveVisualizer(size: size * 0.76),
-              )
-            : KeyedSubtree(key: const ValueKey('artwork'), child: artwork),
+    final content = FlipCard(
+      rotateSide: RotateSide.right,
+      onTapFlipping: true,
+      controller: _flip,
+      frontWidget: artwork,
+      // No card behind the waves: they sit on the page.
+      backWidget: SizedBox.square(
+        dimension: size,
+        child: Center(child: WaveVisualizer(size: size * 0.9)),
       ),
     );
 
@@ -121,15 +114,15 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       onExit: (_) => setState(() => _tilt = Offset.zero),
       child: TweenAnimationBuilder<Offset>(
         tween: Tween(end: _tilt),
-        duration: const Duration(milliseconds: 180),
+        duration: const Duration(milliseconds: 450),
         curve: Curves.easeOut,
         builder: (context, tilt, child) => Transform(
           alignment: Alignment.center,
           transform: Matrix4.identity()
             ..setEntry(3, 2, 0.0012)
             // Signs make the side under the mouse recede.
-            ..rotateX(tilt.dy * 0.16)
-            ..rotateY(-tilt.dx * 0.16),
+            ..rotateX(tilt.dy * 0.07)
+            ..rotateY(-tilt.dx * 0.07),
           child: child,
         ),
         child: content,
