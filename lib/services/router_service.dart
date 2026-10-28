@@ -27,6 +27,7 @@ import 'package:musify/constants/version.dart';
 import 'package:musify/screens/about_page.dart';
 import 'package:musify/screens/artist_page.dart';
 import 'package:musify/screens/bottom_navigation_page.dart';
+import 'package:musify/screens/downloads_page.dart';
 import 'package:musify/screens/equalizer_page.dart';
 import 'package:musify/screens/home_page.dart';
 import 'package:musify/screens/import_spotify_playlist_page.dart';
@@ -119,6 +120,8 @@ class NavigationManager {
       GlobalKey<NavigatorState>();
   static final GlobalKey<NavigatorState> settingsTabNavigatorKey =
       GlobalKey<NavigatorState>();
+  static final GlobalKey<NavigatorState> downloadsTabNavigatorKey =
+      GlobalKey<NavigatorState>();
 
   BuildContext get context {
     final ctx = router.routerDelegate.navigatorKey.currentContext;
@@ -140,6 +143,7 @@ class NavigationManager {
   static const String settingsPath = '/settings';
   static const String searchPath = '/search';
   static const String libraryPath = '/library';
+  static const String downloadsPath = '/downloads';
 
   /// Refresh the router configuration when offline mode changes
   static void refreshRouter() {
@@ -309,6 +313,17 @@ class NavigationManager {
                     _pushPage(child: const LocalSyncPage(), state: state),
               ),
             ],
+          ),
+        ],
+      ),
+      // Branch 4: Downloads (added last so the other indexes stay the same)
+      StatefulShellBranch(
+        navigatorKey: downloadsTabNavigatorKey,
+        routes: [
+          GoRoute(
+            path: downloadsPath,
+            pageBuilder: (context, state) =>
+                getPage(child: const DownloadsPage(), state: state),
           ),
         ],
       ),

@@ -157,28 +157,30 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                   MediaQuery.sizeOf(context).width - _margin * 2,
                 ),
           bottom: safeBottom + _margin,
-          child: FloatingSurface(
-            padding: const EdgeInsets.all(_dockPadding),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (playing) const MiniPlayer(embedded: true),
-                SizedBox(
-                  height: _dockBarHeight,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    spacing: 12,
-                    children: [
-                      for (var i = 0; i < items.length; i++)
-                        _DockButton(
-                          item: items[i],
-                          selected: i == selected,
-                          onTap: () => _onTabTapped(i, items),
-                        ),
-                    ],
+          child: RepaintBoundary(
+            child: FloatingSurface(
+              padding: const EdgeInsets.all(_dockPadding),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (playing) const MiniPlayer(embedded: true),
+                  SizedBox(
+                    height: _dockBarHeight,
+                    child: Row(
+                      // Even gaps fill the dock; each tap area stays compact.
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        for (var i = 0; i < items.length; i++)
+                          _DockButton(
+                            item: items[i],
+                            selected: i == selected,
+                            onTap: () => _onTabTapped(i, items),
+                          ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -265,6 +267,12 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
       selectedIcon: FluentIcons.book_24_filled,
       label: context.l10n?.library ?? 'Library',
       shellIndex: 2,
+    ),
+    _NavigationItem(
+      icon: FluentIcons.arrow_download_24_regular,
+      selectedIcon: FluentIcons.arrow_download_24_filled,
+      label: context.l10n?.downloads ?? 'Downloads',
+      shellIndex: 4,
     ),
     _NavigationItem(
       icon: FluentIcons.settings_24_regular,

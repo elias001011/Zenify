@@ -87,6 +87,8 @@
   "downloadCancelled": "Download cancelado",
   "downloadFailed": "Falha no download",
   "downloadPlaylist": "Baixar playlist",
+  "downloads": "Downloads",
+  "downloadsComingSoon": "O gerenciador de downloads chega em breve: o que está baixando, o que terminou e o que falhou, com opção de tentar de novo.",
   "downloadsDeleted": "Downloads excluídos com sucesso",
   "downloadsFolder": "Pasta de downloads",
   "downloadsFolderBusy": "Aguarde os downloads atuais terminarem",

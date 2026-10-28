@@ -87,6 +87,8 @@
   "downloadCancelled": "Download cancelled",
   "downloadFailed": "Download failed",
   "downloadPlaylist": "Download playlist",
+  "downloads": "Downloads",
+  "downloadsComingSoon": "The download manager is coming soon: what is downloading, what finished and what failed, with retry.",
   "downloadsDeleted": "Downloads deleted successfully",
   "downloadsFolder": "Downloads folder",
   "downloadsFolderBusy": "Wait for the current downloads to finish first",

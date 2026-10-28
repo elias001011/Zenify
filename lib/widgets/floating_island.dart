@@ -160,6 +160,7 @@ class _IslandState extends State<_Island> {
 
   @override
   void dispose() {
+    offlineMode.removeListener(_onOfflineChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -184,7 +185,7 @@ class _IslandState extends State<_Island> {
       return;
     }
     final trimmed = query.trim();
-    if (trimmed.isEmpty) return;
+    if (trimmed.isEmpty || offlineMode.value) return;
     _closeSearch();
     openSearch(trimmed);
   }
@@ -199,6 +200,21 @@ class _IslandState extends State<_Island> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    offlineMode.addListener(_onOfflineChanged);
+  }
+
+  void _onOfflineChanged() {
+    // Global search needs the network; a playlist filter does not.
+    if (offlineMode.value && _searching && widget.onFilter == null) {
+      _closeSearch();
+    } else {
+      setState(() {});
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final showSearch =
         widget.onFilter != null || (widget.globalSearch && !offlineMode.value);
@@ -206,22 +222,25 @@ class _IslandState extends State<_Island> {
         ? (widget.maxWidth < _searchWidth ? widget.maxWidth : _searchWidth)
         : null;
 
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: widget.maxWidth),
-      child: FloatingSurface(
-        borderRadius: const BorderRadius.all(
-          Radius.circular(_islandHeight / 2),
-        ),
-        child: AnimatedSize(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.centerLeft,
-          child: SizedBox(
-            height: _islandHeight,
-            width: width,
-            child: _searching
-                ? _buildSearchField(context)
-                : _buildBar(context, showSearch),
+    // Its own layer: with blur on, resizing would repaint the page each frame.
+    return RepaintBoundary(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: widget.maxWidth),
+        child: FloatingSurface(
+          borderRadius: const BorderRadius.all(
+            Radius.circular(_islandHeight / 2),
+          ),
+          child: AnimatedSize(
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.fastOutSlowIn,
+            alignment: Alignment.centerLeft,
+            child: SizedBox(
+              height: _islandHeight,
+              width: width,
+              child: _searching
+                  ? _buildSearchField(context)
+                  : _buildBar(context, showSearch),
+            ),
           ),
         ),
       ),
