@@ -82,9 +82,7 @@ class NavigationManager {
         final isOffline = offlineMode.value;
         final currentPath = state.matchedLocation;
 
-        if (isOffline &&
-            (currentPath == searchPath ||
-                currentPath.startsWith(timeMachinePath))) {
+        if (isOffline && currentPath.startsWith(timeMachinePath)) {
           // Redirect unavailable pages to home in offline mode
           return homePath;
         }
