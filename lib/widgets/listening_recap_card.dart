@@ -25,7 +25,6 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
-import 'package:musify/widgets/button_width.dart';
 import 'package:musify/widgets/song_artwork.dart';
 import 'package:musify/widgets/song_bar.dart';
 
@@ -119,15 +118,13 @@ class RecapSeeAllButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 6, 4, 0),
-      child: ButtonWidth(
-        child: SizedBox(
-          width: double.infinity,
-          child: FilledButton.tonalIcon(
-            onPressed: onPressed,
-            icon: const Icon(FluentIcons.arrow_right_24_regular),
-            iconAlignment: IconAlignment.end,
-            label: Text(context.l10n!.seeAll),
-          ),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton.tonalIcon(
+          onPressed: onPressed,
+          icon: const Icon(FluentIcons.arrow_right_24_regular),
+          iconAlignment: IconAlignment.end,
+          label: Text(context.l10n!.seeAll),
         ),
       ),
     );

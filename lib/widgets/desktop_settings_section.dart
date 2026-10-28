@@ -54,7 +54,6 @@ class DesktopSettingsSection extends StatelessWidget {
         SectionHeader(title: l10n.desktop, icon: FluentIcons.desktop_24_filled),
         const _InterfaceScaleBar(),
         const _PlayerLayoutBar(),
-        const _ContentWidthBar(),
         _SettingSwitch(
           title: l10n.startMaximized,
           description: l10n.startMaximizedDescription,
@@ -424,39 +423,6 @@ class _PlayerLayoutBar extends StatelessWidget {
       ],
       onChosen: (compact) =>
           addOrUpdateData<bool>('settings', 'compactDesktopPlayer', compact),
-    );
-  }
-}
-
-class _ContentWidthBar extends StatelessWidget {
-  const _ContentWidthBar();
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n!;
-    return ChoiceBar<ContentWidth>(
-      title: l10n.contentWidth,
-      icon: FluentIcons.arrow_autofit_width_24_regular,
-      setting: contentWidth,
-      choices: [
-        (
-          value: ContentWidth.narrow,
-          label: l10n.contentWidthNarrow,
-          icon: FluentIcons.text_column_one_narrow_24_regular,
-        ),
-        (
-          value: ContentWidth.medium,
-          label: l10n.contentWidthMedium,
-          icon: FluentIcons.text_column_one_24_regular,
-        ),
-        (
-          value: ContentWidth.full,
-          label: l10n.contentWidthFull,
-          icon: FluentIcons.text_column_one_wide_24_regular,
-        ),
-      ],
-      onChosen: (width) =>
-          addOrUpdateData<String>('settings', 'contentWidth', width.name),
     );
   }
 }

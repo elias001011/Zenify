@@ -37,7 +37,6 @@ import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/artist_shelf.dart';
 import 'package:musify/widgets/artwork_glow.dart';
-import 'package:musify/widgets/button_width.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
@@ -395,20 +394,18 @@ class _ArtistPageState extends State<ArtistPage> {
     return Padding(
       // Align with header action buttons
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-      child: ButtonWidth(
-        child: SizedBox(
-          width: double.infinity,
-          child: FilledButton.tonalIcon(
-            icon: const Icon(FluentIcons.arrow_right_24_regular),
-            iconAlignment: IconAlignment.end,
-            label: Text(context.l10n!.allSongs),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            onPressed: () => context.push(
-              NavigationManager.artistSongsPath(context, _resolvedArtistId),
-              extra: artistPlaylistData(_artist!),
-            ),
+      child: SizedBox(
+        width: double.infinity,
+        child: FilledButton.tonalIcon(
+          icon: const Icon(FluentIcons.arrow_right_24_regular),
+          iconAlignment: IconAlignment.end,
+          label: Text(context.l10n!.allSongs),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+          ),
+          onPressed: () => context.push(
+            NavigationManager.artistSongsPath(context, _resolvedArtistId),
+            extra: artistPlaylistData(_artist!),
           ),
         ),
       ),
