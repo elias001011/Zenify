@@ -25,7 +25,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
-import 'package:musify/widgets/flip_card.dart';
 import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/song_artwork.dart';
 
@@ -50,17 +49,20 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
   static const _radius = 24.0;
 
   /// -1 to 1 on each axis from the centre, while the mouse is over it.
-  var _tilt = Offset.zero;
-  final _flip = FlipCardController();
+  final _tilt = ValueNotifier<Offset>(Offset.zero);
 
   void _onHover(PointerHoverEvent event) {
     final half = widget.size / 2;
-    setState(
-      () => _tilt = Offset(
-        ((event.localPosition.dx - half) / half).clamp(-1, 1),
-        ((event.localPosition.dy - half) / half).clamp(-1, 1),
-      ),
+    _tilt.value = Offset(
+      ((event.localPosition.dx - half) / half).clamp(-1, 1),
+      ((event.localPosition.dy - half) / half).clamp(-1, 1),
     );
+  }
+
+  @override
+  void dispose() {
+    _tilt.dispose();
+    super.dispose();
   }
 
   @override
@@ -95,15 +97,20 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       ),
     );
 
-    final content = FlipCard(
-      rotateSide: RotateSide.right,
-      onTapFlipping: true,
-      controller: _flip,
-      frontWidget: artwork,
-      // No card behind the waves: they sit on the page.
-      backWidget: SizedBox.square(
-        dimension: size,
-        child: Center(child: WaveVisualizer(size: size * 0.9)),
+    final content = ValueListenableBuilder<bool>(
+      valueListenable: showPlayerVisualizer,
+      builder: (context, visualizer, _) => GestureDetector(
+        onTap: () => setPlayerVisualizer(!visualizer),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 350),
+          child: visualizer
+              ? SizedBox.square(
+                  key: const ValueKey('visualizer'),
+                  dimension: size,
+                  child: Center(child: WaveVisualizer(size: size * 0.8)),
+                )
+              : KeyedSubtree(key: const ValueKey('artwork'), child: artwork),
+        ),
       ),
     );
 
@@ -111,21 +118,25 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
 
     return MouseRegion(
       onHover: _onHover,
-      onExit: (_) => setState(() => _tilt = Offset.zero),
-      child: TweenAnimationBuilder<Offset>(
-        tween: Tween(end: _tilt),
-        duration: const Duration(milliseconds: 450),
-        curve: Curves.easeOut,
-        builder: (context, tilt, child) => Transform(
-          alignment: Alignment.center,
-          transform: Matrix4.identity()
-            ..setEntry(3, 2, 0.0012)
-            // Signs make the side under the mouse recede.
-            ..rotateX(tilt.dy * 0.07)
-            ..rotateY(-tilt.dx * 0.07),
+      onExit: (_) => _tilt.value = Offset.zero,
+      child: ValueListenableBuilder<Offset>(
+        valueListenable: _tilt,
+        child: content,
+        builder: (context, target, child) => TweenAnimationBuilder<Offset>(
+          tween: Tween(end: target),
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeOut,
+          builder: (context, tilt, child) => Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.identity()
+              ..setEntry(3, 2, 0.0012)
+              // Signs make the side under the mouse recede.
+              ..rotateX(tilt.dy * 0.07)
+              ..rotateY(-tilt.dx * 0.07),
+            child: child,
+          ),
           child: child,
         ),
-        child: content,
       ),
     );
   }

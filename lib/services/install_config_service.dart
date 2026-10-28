@@ -27,12 +27,13 @@ import 'package:musify/utilities/startup_support.dart';
 
 /// Folders chosen in the installer, from `install-config.txt` beside the exe.
 class InstallConfig {
-  const InstallConfig({this.dataDir, this.downloadsDir});
+  const InstallConfig({this.dataDir, this.downloadsDir, this.previousDataDir});
 
   static const fileName = 'install-config.txt';
   static const _appliedDownloadsKey = 'installDownloadsDirectory';
 
   final String? dataDir;
+  final String? previousDataDir;
   final String? downloadsDir;
 
   static InstallConfig parse(String text) {
@@ -49,6 +50,7 @@ class InstallConfig {
     return InstallConfig(
       dataDir: read('dataDir'),
       downloadsDir: read('downloadsDir'),
+      previousDataDir: read('previousDataDir'),
     );
   }
 
@@ -78,8 +80,12 @@ class InstallConfig {
     String defaultDir, {
     void Function(String message)? log,
   }) async {
-    final target = dataDir;
-    if (target == null || _same(target, defaultDir)) return defaultDir;
+    final target = dataDir ?? defaultDir;
+    final previous = previousDataDir;
+    final source = previous != null && await Directory(previous).exists()
+        ? previous
+        : defaultDir;
+    if (_same(target, source)) return source;
 
     try {
       final directory = Directory(target);
@@ -91,20 +97,22 @@ class InstallConfig {
       await probe.delete();
 
       final report = await copyHiveBoxes(
-        from: Directory(defaultDir),
+        from: Directory(source),
         to: directory,
       );
       if (report.failed.isNotEmpty) {
         log?.call('Could not copy ${report.failed.join(', ')} to $target');
-        return defaultDir;
+        return source;
       }
       if (report.copied.isNotEmpty) {
         log?.call('Copied ${report.copied.join(', ')} to $target');
       }
       return target;
+    } on HiveMigrationPending {
+      rethrow;
     } catch (e) {
-      log?.call('Data folder $target is unusable, using the default: $e');
-      return defaultDir;
+      log?.call('Data folder $target is unusable, keeping $source: $e');
+      return source;
     }
   }
 

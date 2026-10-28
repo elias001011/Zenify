@@ -25,8 +25,8 @@ import 'dart:math';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 
-/// Sound waves in the app colour, shaped like the app icon, moving while
-/// music plays. The player has no audio spectrum, so the motion is drawn.
+/// A restrained, single-colour playback animation. This is decorative,
+/// not an audio spectrum; no audio samples are analysed.
 class WaveVisualizer extends StatefulWidget {
   const WaveVisualizer({super.key, required this.size});
 
@@ -66,49 +66,35 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     return RepaintBoundary(
       child: CustomPaint(
         size: Size.square(widget.size),
-        painter: _WavePainter(
-          time: _time,
-          colors: [colorScheme.primary, colorScheme.tertiary],
-        ),
+        painter: _WavePainter(time: _time, color: colorScheme.primary),
       ),
     );
   }
 }
 
 class _WavePainter extends CustomPainter {
-  _WavePainter({required this.time, required this.colors})
+  _WavePainter({required this.time, required this.color})
     : super(repaint: time);
 
   final Animation<double> time;
-  final List<Color> colors;
+  final Color color;
 
-  static const _bars = 21;
+  static const _bars = 9;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final step = size.width / (_bars - 0.4);
-    final barWidth = step * 0.6;
+    final step = size.width / (_bars + 2);
+    final barWidth = step * 0.35;
     final t = time.value * 2 * pi;
-    final paint = Paint()
-      ..shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: colors,
-      ).createShader(Offset.zero & size);
-
+    final paint = Paint()..color = color;
     for (var i = 0; i < _bars; i++) {
-      final x = (i - (_bars - 1) / 2) / ((_bars - 1) / 2);
-      // Bell-shaped like the icon, each bar breathing at its own pace.
-      final envelope = exp(-x * x * 2.2);
       final motion =
-          0.55 +
-          0.25 * sin(t * (2 + i % 3) + i * 1.7) +
-          0.2 * sin(t * (5 + i % 4) + i * 0.6);
-      final height = max(barWidth, size.height * 0.85 * envelope * motion);
+          0.5 + 0.25 * sin(t * 2 + i * 0.8) + 0.15 * sin(t * 3 - i * 1.2);
+      final height = max(barWidth, size.height * 0.55 * motion);
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromCenter(
-            center: Offset(i * step + barWidth / 2, size.height / 2),
+            center: Offset((i + 1.5) * step, size.height / 2),
             width: barWidth,
             height: height,
           ),
@@ -120,5 +106,5 @@ class _WavePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_WavePainter oldDelegate) => oldDelegate.colors != colors;
+  bool shouldRepaint(_WavePainter oldDelegate) => oldDelegate.color != color;
 }

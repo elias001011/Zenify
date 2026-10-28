@@ -214,12 +214,13 @@ class _RowGlowPainter extends CustomPainter {
     final halfWidth = rowHeight * 1.6;
     final centerY = rowTop + rowHeight / 2;
 
+    canvas.saveLayer(Offset.zero & size, Paint());
     for (final index in colors.indices) {
       final centerX = index * itemExtent + itemExtent / 2 - offset;
       if (centerX < -halfWidth || centerX > size.width + halfWidth) continue;
       final color = colors.colorAt(index);
       if (color == null || color.a == 0) continue;
-      // Muted, so a row of covers does not turn into a rainbow.
+      // Fade the complete band at the viewport edges as well as vertically.
       final hsl = HSLColor.fromColor(color);
       paintArtworkGlow(
         canvas,
@@ -229,9 +230,25 @@ class _RowGlowPainter extends CustomPainter {
           height: rowHeight * 2.1,
         ),
         hsl.withSaturation(hsl.saturation * 0.6).toColor(),
-        strength * 0.75 * color.a,
+        strength * 0.9 * color.a,
       );
     }
+    canvas
+      ..drawRect(
+        Offset.zero & size,
+        Paint()
+          ..blendMode = BlendMode.dstIn
+          ..shader = const LinearGradient(
+            colors: [
+              Colors.transparent,
+              Colors.white,
+              Colors.white,
+              Colors.transparent,
+            ],
+            stops: [0, 0.12, 0.88, 1],
+          ).createShader(Offset.zero & size),
+      )
+      ..restore();
   }
 
   @override
@@ -269,4 +286,59 @@ class _ArrowButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Mobile's weighted carousel has its own viewport: paint the halo outside
+/// its clipping layer, with room to fade to the page above and below.
+class CarouselGlow extends StatefulWidget {
+  const CarouselGlow({super.key, required this.sources, required this.child});
+  final List<String?> sources;
+  final Widget child;
+  @override
+  State<CarouselGlow> createState() => _CarouselGlowState();
+}
+
+class _CarouselGlowState extends State<CarouselGlow> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final width = constraints.maxWidth;
+      final source = widget.sources.isEmpty
+          ? null
+          : widget.sources[_index.clamp(0, widget.sources.length - 1)];
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            right: 0,
+            top: -constraints.maxHeight * 0.7,
+            bottom: -constraints.maxHeight * 0.7,
+            child: IgnorePointer(
+              child: PageGlow(source: source, strength: 0.5),
+            ),
+          ),
+          NotificationListener<ScrollUpdateNotification>(
+            onNotification: (notification) {
+              if (notification.depth == 0 &&
+                  notification.metrics.axis == Axis.horizontal &&
+                  width > 0) {
+                final index = (notification.metrics.pixels / (width / 2))
+                    .round()
+                    .clamp(
+                      0,
+                      widget.sources.isEmpty ? 0 : widget.sources.length - 1,
+                    );
+                if (index != _index) setState(() => _index = index);
+              }
+              return false;
+            },
+            child: widget.child,
+          ),
+        ],
+      );
+    },
+  );
 }

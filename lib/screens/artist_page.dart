@@ -216,7 +216,9 @@ class _ArtistPageState extends State<ArtistPage> {
       builder: (context, _) => IslandScaffold(
         title: _artistTitle,
         fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
-        background: PageGlow(source: _artist?['image']?.toString()),
+        background: _artist == null
+            ? null
+            : PageGlow(source: _artist?['image']?.toString()),
         body: Padding(
           padding: commonSingleChildScrollViewPadding,
           child: CustomScrollView(

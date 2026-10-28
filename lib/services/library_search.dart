@@ -44,9 +44,11 @@ LibraryMatches searchLibrary(String query, {bool offlineOnly = false}) {
   final addedIds = userPlaylists.value.toSet();
 
   final playlists = _uniqueByYtid([
-    ...userCustomPlaylists.value,
-    for (final folder in userPlaylistFolders.value)
-      ...(folder['playlists'] as List? ?? const []).whereType<Map>(),
+    if (!offlineOnly) ...[
+      ...getUserCustomPlaylists(),
+      for (final folder in userPlaylistFolders.value)
+        ...(folder['playlists'] as List? ?? const []).whereType<Map>(),
+    ],
     ...offlinePlaylists,
     if (!offlineOnly) ...[
       ...getLikedPlaylistItems(),
@@ -59,7 +61,7 @@ LibraryMatches searchLibrary(String query, {bool offlineOnly = false}) {
     ...userOfflineSongs.value.whereType<Map>(),
     if (!offlineOnly) ...[
       ...userLikedSongsList.value.whereType<Map>(),
-      for (final playlist in userCustomPlaylists.value)
+      for (final playlist in getUserCustomPlaylists())
         ...(playlist['list'] as List? ?? const []).whereType<Map>(),
     ],
   ]).where((song) => matches(song['title']) || matches(song['artist']));

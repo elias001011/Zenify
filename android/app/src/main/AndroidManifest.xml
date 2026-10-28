@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
-    package="com.gokadzev.musify">
+    package="io.github.elias001011.zenify">
 
 
     <!-- Permissions -->

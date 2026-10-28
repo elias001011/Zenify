@@ -24,10 +24,14 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
           restore-keys: |
             ${{ runner.os }}-gradle-
+      - name: Resolve Flutter version
+        run: |
+          echo "FLUTTER_VERSION=$(sed -n 's/^  flutter: \^*//p' pubspec.yaml)" >> "$GITHUB_ENV"
       # Setup the flutter environment.
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
+          flutter-version: ${{ env.FLUTTER_VERSION }}
       # Get flutter dependencies.
       - run: flutter pub get
       # # Check for any formatting issues in the code.

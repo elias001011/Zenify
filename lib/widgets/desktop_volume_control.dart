@@ -113,3 +113,39 @@ class DesktopVolumeControl extends StatelessWidget {
     );
   }
 }
+
+/// Shared, anchored popup for both player surfaces. Only desktop gets it.
+class DesktopVolumeButton extends StatelessWidget {
+  const DesktopVolumeButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!supportsDesktopVolumeControl) return const SizedBox.shrink();
+    return MenuAnchor(
+      alignmentOffset: const Offset(0, 8),
+      style: const MenuStyle(
+        padding: WidgetStatePropertyAll(EdgeInsets.all(8)),
+      ),
+      menuChildren: const [
+        SizedBox(
+          width: 236,
+          height: 48,
+          child: DesktopVolumeControl(sliderWidth: 180),
+        ),
+      ],
+      builder: (context, controller, child) => StreamBuilder<double>(
+        stream: audioHandler.volumeStream,
+        initialData: audioHandler.volume,
+        builder: (context, snapshot) => IconButton(
+          constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+          padding: EdgeInsets.zero,
+          iconSize: 24,
+          tooltip: context.l10n!.volume,
+          icon: Icon(volumeIcon(snapshot.data ?? audioHandler.volume)),
+          onPressed: () =>
+              controller.isOpen ? controller.close() : controller.open(),
+        ),
+      ),
+    );
+  }
+}

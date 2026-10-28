@@ -24,7 +24,6 @@ import 'dart:math';
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart';
 import 'package:musify/widgets/artwork_glow.dart';
@@ -64,6 +63,33 @@ Route<void> buildNowPlayingRoute() {
 class _NowPlayingPageState extends State<NowPlayingPage> {
   /// Open beside the player (wide layout only). Closed by default.
   PlayerPanel? _panel;
+  Animation<double>? _routeAnimation;
+  bool _backgroundVisible = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.animation;
+    if (_routeAnimation == animation) return;
+    _routeAnimation?.removeStatusListener(_onRouteStatus);
+    _routeAnimation = animation;
+    animation?.addStatusListener(_onRouteStatus);
+    _backgroundVisible =
+        animation == null || animation.status == AnimationStatus.completed;
+  }
+
+  void _onRouteStatus(AnimationStatus status) {
+    final visible = status == AnimationStatus.completed;
+    if (mounted && visible != _backgroundVisible) {
+      setState(() => _backgroundVisible = visible);
+    }
+  }
+
+  @override
+  void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteStatus);
+    super.dispose();
+  }
 
   static bool _isWide(Size size) => size.width >= 900 && size.height >= 560;
 
@@ -92,7 +118,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
   static String? _artworkSource(MediaItem metadata) {
     final uri = metadata.artUri;
     if (uri?.scheme == 'file')
-      return metadata.extras?['artWorkPath']?.toString();
+      return metadata.extras?['artWorkPath']?.toString() ?? uri!.toFilePath();
     return uri?.toString();
   }
 
@@ -116,7 +142,12 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
           return Stack(
             children: [
               Positioned.fill(
-                child: PageGlow(source: _artworkSource(metadata)),
+                child: AnimatedOpacity(
+                  opacity: _backgroundVisible ? 1 : 0,
+                  duration: const Duration(milliseconds: 700),
+                  curve: Curves.easeOutCubic,
+                  child: PageGlow(source: _artworkSource(metadata)),
+                ),
               ),
               SafeArea(
                 child: _isWide(MediaQuery.sizeOf(context))
@@ -124,7 +155,6 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                         metadata: metadata,
                         actions: actions,
                         panel: _panel,
-                        onClosePanel: () => setState(() => _panel = null),
                       )
                     : _CompactLayout(metadata: metadata, actions: actions),
               ),
@@ -233,13 +263,11 @@ class _WideLayout extends StatelessWidget {
     required this.metadata,
     required this.actions,
     required this.panel,
-    required this.onClosePanel,
   });
 
   final MediaItem metadata;
   final Widget actions;
   final PlayerPanel? panel;
-  final VoidCallback onClosePanel;
 
   @override
   Widget build(BuildContext context) {
@@ -272,11 +300,7 @@ class _WideLayout extends StatelessWidget {
                         padding: const EdgeInsets.fromLTRB(0, 0, 16, 16),
                         child: SizedBox(
                           width: 400,
-                          child: _SidePanel(
-                            panel: panel,
-                            metadata: metadata,
-                            onClose: onClosePanel,
-                          ),
+                          child: _SidePanel(panel: panel, metadata: metadata),
                         ),
                       ),
               ),
@@ -335,50 +359,17 @@ class _WideLayout extends StatelessWidget {
 }
 
 class _SidePanel extends StatelessWidget {
-  const _SidePanel({
-    required this.panel,
-    required this.metadata,
-    required this.onClose,
-  });
+  const _SidePanel({required this.panel, required this.metadata});
 
   final PlayerPanel panel;
   final MediaItem metadata;
-  final VoidCallback onClose;
 
   @override
   Widget build(BuildContext context) {
     return FloatingSurface(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 8, 0),
-            child: Row(
-              children: [
-                // The queue has a header of its own.
-                Expanded(
-                  child: panel == PlayerPanel.lyrics
-                      ? Text(
-                          context.l10n!.lyrics,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        )
-                      : const SizedBox.shrink(),
-                ),
-                IconButton(
-                  icon: const Icon(FluentIcons.dismiss_24_regular),
-                  tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                  onPressed: onClose,
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: panel == PlayerPanel.queue
-                ? const QueueWidget()
-                : LyricsPanel(metadata: metadata),
-          ),
-        ],
-      ),
+      child: panel == PlayerPanel.queue
+          ? const QueueWidget()
+          : LyricsPanel(metadata: metadata),
     );
   }
 }

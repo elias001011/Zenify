@@ -35,6 +35,7 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/services/sleep_timer.dart';
 import 'package:musify/utilities/map_utils.dart';
 import 'package:musify/utilities/media_duration.dart';
 import 'package:musify/utilities/mediaitem.dart';
@@ -113,7 +114,22 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   int _consecutiveErrors = 0;
 
   // Timers and sleep-timer state.
-  Timer? _sleepTimer;
+  late final _sleepTimer = SleepTimer(
+    readVolume: () => volume,
+    writeVolume: (value) => audioPlayer.setVolume(value),
+    onExpired: () async {
+      final command = _sleepTimerCommand;
+      sleepTimerExpired = true;
+      sleepTimerEndOfSong = false;
+      await stop();
+      if (command == _sleepTimerCommand) sleepTimerNotifier.value = null;
+    },
+    onError: (error, stack) {
+      logger.log('Sleep timer fade failed', error: error, stackTrace: stack);
+      sleepTimerNotifier.value = null;
+    },
+  );
+  int _sleepTimerCommand = 0;
   Timer? _debounceTimer;
   bool sleepTimerExpired = false;
   bool sleepTimerEndOfSong = false;
@@ -2710,50 +2726,30 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }
 
   Future<void> setSleepTimer(Duration duration) async {
-    try {
-      _sleepTimer?.cancel();
-      sleepTimerExpired = false;
-      sleepTimerNotifier.value = duration;
-
-      _sleepTimer = Timer(duration, () async {
-        sleepTimerExpired = true;
-        await stop();
-        sleepTimerNotifier.value = null;
-      });
-    } catch (e, stackTrace) {
-      logger.log('Error setting sleep timer', error: e, stackTrace: stackTrace);
-    }
+    final command = ++_sleepTimerCommand;
+    await _sleepTimer.start(duration);
+    if (command != _sleepTimerCommand) return;
+    sleepTimerExpired = false;
+    sleepTimerEndOfSong = false;
+    sleepTimerNotifier.value = duration;
   }
 
-  void cancelSleepTimer() {
-    try {
-      _sleepTimer?.cancel();
-      _sleepTimer = null;
-      sleepTimerExpired = false;
-      sleepTimerEndOfSong = false;
-      sleepTimerNotifier.value = Duration.zero;
-    } catch (e, stackTrace) {
-      logger.log(
-        'Error canceling sleep timer',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    }
+  Future<void> cancelSleepTimer() async {
+    final command = ++_sleepTimerCommand;
+    await _sleepTimer.cancel();
+    if (command != _sleepTimerCommand) return;
+    sleepTimerExpired = false;
+    sleepTimerEndOfSong = false;
+    sleepTimerNotifier.value = null;
   }
 
   Future<void> setSleepTimerEndOfSong() async {
-    try {
-      _sleepTimer?.cancel();
-      sleepTimerExpired = false;
-      sleepTimerEndOfSong = true;
-      sleepTimerNotifier.value = const Duration(milliseconds: -1);
-    } catch (e, stackTrace) {
-      logger.log(
-        'Error setting sleep timer end of song',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    }
+    final command = ++_sleepTimerCommand;
+    await _sleepTimer.cancel();
+    if (command != _sleepTimerCommand) return;
+    sleepTimerExpired = false;
+    sleepTimerEndOfSong = true;
+    sleepTimerNotifier.value = const Duration(milliseconds: -1);
   }
 
   @override

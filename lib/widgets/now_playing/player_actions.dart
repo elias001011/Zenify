@@ -62,8 +62,8 @@ class PlayerActions extends StatefulWidget {
 class _PlayerActionsState extends State<PlayerActions> {
   late final ValueNotifier<bool> _songLikeStatus;
   late final ValueNotifier<bool> _songOfflineStatus;
-  late final String? audioId = widget.metadata.extras?['ytid'];
-  late final bool isRadioStation = widget.metadata.extras?['isLive'] ?? false;
+  String? get audioId => widget.metadata.extras?['ytid'];
+  bool get isRadioStation => widget.metadata.extras?['isLive'] ?? false;
 
   @override
   void initState() {
@@ -104,7 +104,17 @@ class _PlayerActionsState extends State<PlayerActions> {
   void didUpdateWidget(PlayerActions oldWidget) {
     super.didUpdateWidget(oldWidget);
     final oldAudioId = oldWidget.metadata.extras?['ytid'];
-    if (oldAudioId != audioId) {
+    final oldRadio = oldWidget.metadata.extras?['isLive'] == true;
+    if (oldRadio != isRadioStation) {
+      if (oldRadio) {
+        userLikedRadioStations.removeListener(_syncRadioLikeStatus);
+        userLikedSongsList.addListener(_syncLikeStatus);
+      } else {
+        userLikedSongsList.removeListener(_syncLikeStatus);
+        userLikedRadioStations.addListener(_syncRadioLikeStatus);
+      }
+    }
+    if (oldAudioId != audioId || oldRadio != isRadioStation) {
       if (isRadioStation) {
         _songLikeStatus.value = isRadioStationLiked(audioId ?? '');
       } else {
@@ -132,6 +142,7 @@ class _PlayerActionsState extends State<PlayerActions> {
     final colorScheme = Theme.of(context).colorScheme;
     final l10n = context.l10n!;
     final online = !offlineMode.value;
+    final actionAudioId = audioId;
 
     return StreamBuilder<List<Map>>(
       stream: audioHandler.queueAsMapStream,
@@ -154,7 +165,7 @@ class _PlayerActionsState extends State<PlayerActions> {
                 active: widget.panel == PlayerPanel.queue,
                 onPressed: () => widget.onPanel(PlayerPanel.queue, context),
               ),
-            if (supportsDesktopVolumeControl) const _VolumeButton(),
+            if (supportsDesktopVolumeControl) const DesktopVolumeButton(),
             ValueListenableBuilder<Duration?>(
               valueListenable: sleepTimerNotifier,
               builder: (context, timer, _) => _ActionButton(
@@ -179,6 +190,7 @@ class _PlayerActionsState extends State<PlayerActions> {
                           _songOfflineStatus,
                           audioId,
                           widget.metadata,
+                          isCurrent: () => mounted && audioId == actionAudioId,
                         ),
                 ),
               ),
@@ -231,18 +243,18 @@ class _PlayerActionsState extends State<PlayerActions> {
         );
       }
     } catch (e) {
-      _songLikeStatus.value = originalValue; // revert on failure
+      if (mounted && audioId == id) _songLikeStatus.value = originalValue;
       logger.log('Error toggling like status', error: e);
     }
   }
 
-  void _onSleepTimer(BuildContext context, bool active) {
+  Future<void> _onSleepTimer(BuildContext context, bool active) async {
     if (!active) {
       _showSleepTimerDialog(context);
       return;
     }
-    audioHandler.cancelSleepTimer();
-    sleepTimerNotifier.value = null;
+    await audioHandler.cancelSleepTimer();
+    if (!context.mounted) return;
     showToast(
       context,
       context.l10n!.sleepTimerCancelled,
@@ -320,66 +332,12 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-/// Opens the volume control in a popup above itself.
-class _VolumeButton extends StatelessWidget {
-  const _VolumeButton();
-
-  void _open(BuildContext context) {
-    final box = context.findRenderObject()! as RenderBox;
-    final overlay =
-        Navigator.of(context).overlay!.context.findRenderObject()! as RenderBox;
-    final rect = Rect.fromPoints(
-      box.localToGlobal(Offset.zero, ancestor: overlay),
-      box.localToGlobal(box.size.bottomRight(Offset.zero), ancestor: overlay),
-    );
-    showMenu<void>(
-      context: context,
-      position: RelativeRect.fromRect(rect, Offset.zero & overlay.size),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      items: const [_VolumeMenuEntry()],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return StreamBuilder<double>(
-      stream: audioHandler.volumeStream,
-      initialData: audioHandler.volume,
-      builder: (context, snapshot) => _ActionButton(
-        icon: volumeIcon(snapshot.data ?? 1),
-        tooltip: context.l10n!.volume,
-        onPressed: () => _open(context),
-      ),
-    );
-  }
-}
-
-class _VolumeMenuEntry extends PopupMenuEntry<void> {
-  const _VolumeMenuEntry();
-
-  @override
-  double get height => 56;
-
-  @override
-  bool represents(void value) => false;
-
-  @override
-  State<_VolumeMenuEntry> createState() => _VolumeMenuEntryState();
-}
-
-class _VolumeMenuEntryState extends State<_VolumeMenuEntry> {
-  @override
-  Widget build(BuildContext context) => const Padding(
-    padding: EdgeInsets.symmetric(horizontal: 8),
-    child: DesktopVolumeControl(sliderWidth: 180),
-  );
-}
-
 Future<void> _toggleOffline(
   ValueNotifier<bool> status,
   String? audioId,
-  MediaItem metadata,
-) async {
+  MediaItem metadata, {
+  required bool Function() isCurrent,
+}) async {
   final originalValue = status.value;
   status.value = !originalValue;
 
@@ -394,11 +352,11 @@ Future<void> _toggleOffline(
     } else {
       success = await makeSongOffline(mediaItemToMap(metadata));
     }
-    if (!success) {
+    if (!success && isCurrent()) {
       status.value = originalValue;
     }
   } catch (e) {
-    status.value = originalValue;
+    if (isCurrent()) status.value = originalValue;
     logger.log('Error toggling offline status', error: e);
   }
 }

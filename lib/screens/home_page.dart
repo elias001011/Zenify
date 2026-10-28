@@ -204,14 +204,19 @@ class _HomePageState extends State<HomePage> {
     int itemCount,
     double height,
   ) {
-    return CarouselView.weighted(
-      flexWeights: const <int>[3, 2, 1],
-      itemSnapping: true,
-      onTap: (index) =>
-          context.push('/home/playlist/${playlists[index]['ytid']}'),
-      children: List.generate(itemCount, (index) {
-        return PlaylistCube(playlists[index], size: height * 2);
-      }),
+    return CarouselGlow(
+      sources: [
+        for (final playlist in playlists) playlist['image']?.toString(),
+      ],
+      child: CarouselView.weighted(
+        flexWeights: const <int>[3, 2, 1],
+        itemSnapping: true,
+        onTap: (index) =>
+            context.push('/home/playlist/${playlists[index]['ytid']}'),
+        children: List.generate(itemCount, (index) {
+          return PlaylistCube(playlists[index], size: height * 2);
+        }),
+      ),
     );
   }
 

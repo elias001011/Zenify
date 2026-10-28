@@ -19,8 +19,6 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
-import 'dart:math';
-
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/artwork_colors.dart';
@@ -37,6 +35,7 @@ const _falloff = [1.0, 0.82, 0.42, 0.084, 0.0];
 /// Paints one soft glow filling the oval [bounds]: the look of the dynamic
 /// background, shared by every glow so they all match.
 void paintArtworkGlow(Canvas canvas, Rect bounds, Color color, double alpha) {
+  if (bounds.isEmpty || alpha <= 0) return;
   final radius = bounds.height / 2;
   canvas
     ..save()
@@ -88,10 +87,9 @@ class GlowColors {
   }
 
   /// Glows for [sources]; one without artwork, or without a colour found in
-  /// it, glows in [appColor]. Known colours show at once the first time.
+  /// it, glows in [appColor]. Cached colours also fade in on a newly opened page.
   void update(List<String?> sources, Color appColor) {
     if (appColor == _appColor && listEquals(sources, _sources)) return;
-    final first = _sources == null;
     _sources = List.of(sources);
     _appColor = appColor;
     final generation = ++_generation;
@@ -112,11 +110,7 @@ class GlowColors {
       }
     }
 
-    if (first) {
-      _to = next;
-    } else {
-      _retarget(next);
-    }
+    _retarget(next);
   }
 
   void _retarget(Map<int, Color> next) {
@@ -138,10 +132,11 @@ class GlowColors {
 /// when the dynamic background is on: a large soft ball of its colour from
 /// the top, emptying into the page, and a fainter neighbouring hue below.
 class PageGlow extends StatefulWidget {
-  const PageGlow({super.key, required this.source});
+  const PageGlow({super.key, required this.source, this.strength});
 
   /// The artwork's network URL or file path.
   final String? source;
+  final double? strength;
 
   @override
   State<PageGlow> createState() => _PageGlowState();
@@ -183,7 +178,7 @@ class _PageGlowState extends State<PageGlow>
                 size: Size.infinite,
                 painter: _PageGlowPainter(
                   colors: _colors,
-                  strength: artworkGlowStrength(context),
+                  strength: widget.strength ?? artworkGlowStrength(context),
                 ),
               ),
             ),
@@ -203,16 +198,16 @@ class _PageGlowPainter extends CustomPainter {
     final color = colors.colorAt(0);
     if (color == null || color.a == 0) return;
     final alpha = strength * color.a;
-    final extent = max(size.width, size.height);
 
     // A neighbouring hue, as the second light of a stage.
     final hsl = HSLColor.fromColor(color);
     final second = hsl.withHue((hsl.hue + 28) % 360).toColor();
     paintArtworkGlow(
       canvas,
-      Rect.fromCircle(
-        center: Offset(size.width * 0.82, size.height * 0.78),
-        radius: extent * 0.5,
+      Rect.fromCenter(
+        center: Offset(size.width * 0.65, size.height * 0.65),
+        width: size.width * 0.7,
+        height: size.height * 0.7,
       ),
       second,
       alpha * 0.55,
@@ -220,9 +215,9 @@ class _PageGlowPainter extends CustomPainter {
     paintArtworkGlow(
       canvas,
       Rect.fromCenter(
-        center: Offset(size.width * 0.42, size.height * 0.12),
-        width: extent * 1.5,
-        height: extent * 1.1,
+        center: Offset(size.width * 0.5, size.height * 0.5),
+        width: size.width,
+        height: size.height,
       ),
       color,
       alpha,

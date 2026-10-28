@@ -42,22 +42,33 @@ class SongArtworkWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return metadata.artUri?.scheme == 'file'
+    final uri = metadata.artUri;
+    if (uri == null || uri.toString().isEmpty) {
+      return NullArtworkWidget(iconSize: errorWidgetIconSize, size: size);
+    }
+    return uri.scheme == 'file'
         ? SizedBox(
             width: size,
             height: size,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
               child: Image.file(
-                File(metadata.extras?['artWorkPath']),
+                File(
+                  metadata.extras?['artWorkPath']?.toString() ??
+                      uri.toFilePath(),
+                ),
                 fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => NullArtworkWidget(
+                  iconSize: errorWidgetIconSize,
+                  size: size,
+                ),
               ),
             ),
           )
         : CachedNetworkImage(
             width: size,
             height: size,
-            imageUrl: metadata.artUri.toString(),
+            imageUrl: uri.toString(),
             imageBuilder: (context, imageProvider) => ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
               child: Image(image: imageProvider, fit: BoxFit.cover),

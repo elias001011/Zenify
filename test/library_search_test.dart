@@ -56,6 +56,29 @@ void main() {
     expect(result.songs.map((s) => s['ytid']), ['s1']);
   });
 
+  test('folder songs remain searchable and online playlists stay out of offline results', () {
+    userCustomPlaylists.value = [];
+    userPlaylistFolders.value = [
+      {
+        'id': 'folder',
+        'name': 'Folder',
+        'playlists': [
+          {
+            'ytid': 'folder-playlist',
+            'title': 'Blue folder',
+            'source': 'user-created',
+            'list': [song('folder-song', 'Blue folder song', 'Artist')],
+          },
+        ],
+      },
+    ];
+    expect(
+      searchLibrary('blue').songs.map((s) => s['ytid']),
+      contains('folder-song'),
+    );
+    expect(searchLibrary('blue', offlineOnly: true).playlists, isEmpty);
+  });
+
   test('an empty query matches nothing', () {
     expect(searchLibrary('  ').songs, isEmpty);
   });

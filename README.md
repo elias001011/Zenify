@@ -5,12 +5,11 @@
 # Zenify
 
 A calm, modern music app: the community edition of
-[Musify](https://github.com/gokadzev/Musify), with first-class desktop support,
+Musify, with first-class desktop support,
 a redesigned interface and syncing between your devices.
 
 [![GitHub release](https://img.shields.io/github/v/release/elias001011/Zenify?color=2196F3)](https://github.com/elias001011/Zenify/releases)
 [![License](https://img.shields.io/github/license/elias001011/Zenify?color=2196F3)](LICENSE)
-[![Based on Musify](https://img.shields.io/badge/based%20on-gokadzev%2FMusify-2196F3)](https://github.com/gokadzev/Musify)
 [![Desktop features from Musify Desktop Port](https://img.shields.io/badge/desktop%20features-Musify%20Desktop%20Port-2196F3)](https://github.com/elias001011/Musify-Desktop-Port)
 
 </div>
@@ -23,12 +22,6 @@ Zenify is a modified version of Musify by Valeri Gokadze, maintained by the
 community since October 2026. It keeps Musify's code, features and license,
 and goes further where Musify stops: the desktop, the look of the app and
 moving your library between devices.
-
-Musify is a great open source music app, but its future is uncertain: the
-original repository received a copyright complaint
-([gokadzev/Musify#1012](https://github.com/gokadzev/Musify/discussions/1012))
-and it is not clear how long it will stay available. Zenify keeps the project
-alive under its own name, so it never passes itself off as the original.
 
 ### How it differs from Musify
 
@@ -134,9 +127,8 @@ Contributions are welcome. Please read the
 
 ## Credits
 
-- [Musify](https://github.com/gokadzev/Musify) by **Valeri Gokadze** and its
-  [contributors](https://github.com/gokadzev/Musify/graphs/contributors): the
-  original project this fork is built on. Zenify would not exist without it.
+- Musify by **Valeri Gokadze** and its contributors: the original codebase,
+  preserved under its original copyright notices and GPL license.
 - [Musify Desktop Port](https://github.com/elias001011/Musify-Desktop-Port):
   where the desktop features, Local Sync and packaging of this fork were first
   built and tested.

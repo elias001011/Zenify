@@ -52,7 +52,6 @@ import 'package:musify/widgets/floating_effect_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/section_header.dart';
-import 'package:musify/widgets/shapes/four_sided_cookie_shape.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -329,7 +328,6 @@ class SettingsPage extends StatelessWidget {
         ),
 
         _buildToolsSection(context),
-        _buildSponsorSection(context),
       ],
     );
   }
@@ -496,59 +494,6 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _buildSponsorSection(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      children: [
-        SectionHeader(
-          title: context.l10n!.becomeSponsor,
-          icon: FluentIcons.heart_24_filled,
-        ),
-        Card(
-          margin: const EdgeInsets.only(bottom: 8),
-          elevation: 0,
-          color: colorScheme.primaryContainer,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: InkWell(
-            onTap: () => launchURL(Uri.parse('https://ko-fi.com/gokadzev')),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-              child: Row(
-                children: [
-                  FourSidedCookieShape(
-                    size: 44,
-                    color: colorScheme.onPrimaryContainer.withValues(
-                      alpha: 0.14,
-                    ),
-                    child: Icon(
-                      FluentIcons.heart_24_filled,
-                      color: colorScheme.onPrimaryContainer,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Text(
-                      context.l10n!.sponsorProject,
-                      style: TextStyle(
-                        color: colorScheme.onPrimaryContainer,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildOthersSection(BuildContext context) {
     return Column(
       children: [
@@ -566,8 +511,11 @@ class SettingsPage extends StatelessWidget {
           context.l10n!.translate,
           FluentIcons.translate_24_regular,
           description: context.l10n!.translateDescription,
-          onTap: () =>
-              launchURL(Uri.parse('https://crowdin.com/project/musify')),
+          onTap: () => launchURL(
+            Uri.parse(
+              'https://github.com/elias001011/Zenify/blob/master/CONTRIBUTING.md',
+            ),
+          ),
         ),
         ValueListenableBuilder<int>(
           valueListenable: logger.logCount,

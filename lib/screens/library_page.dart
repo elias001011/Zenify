@@ -58,6 +58,26 @@ class _LibraryPageState extends State<LibraryPage> {
   var _filter = _LibraryFilter.all;
   var _query = '';
 
+  Future<List<dynamic>>? _addedPlaylists;
+
+  @override
+  void initState() {
+    super.initState();
+    userPlaylists.addListener(_invalidateAddedPlaylists);
+    userPlaylistFolders.addListener(_invalidateAddedPlaylists);
+  }
+
+  void _invalidateAddedPlaylists() {
+    _addedPlaylists = null;
+  }
+
+  @override
+  void dispose() {
+    userPlaylists.removeListener(_invalidateAddedPlaylists);
+    userPlaylistFolders.removeListener(_invalidateAddedPlaylists);
+    super.dispose();
+  }
+
   bool _shows(_LibraryFilter filter) =>
       _filter == _LibraryFilter.all || _filter == filter;
 
@@ -384,9 +404,27 @@ class _LibraryPageState extends State<LibraryPage> {
     }
 
     final offlinePlaylists = _shows(_LibraryFilter.offline)
-        ? offlinePlaylistsNotInFolders.where(_matches).toList()
+        ? (_filter == _LibraryFilter.offline
+                  ? visibleOfflinePlaylists
+                  : offlinePlaylistsNotInFolders)
+              .where(_matches)
+              .toList()
         : const [];
 
+    if (_filter == _LibraryFilter.offline &&
+        userOfflineSongs.value.isNotEmpty) {
+      slivers.add(
+        SliverToBoxAdapter(
+          child: PlaylistBar(
+            context.l10n!.offlineSongs,
+            onPressed: () =>
+                NavigationManager.router.go('/library/userSongs/offline'),
+            cubeIcon: FluentIcons.cloud_off_24_regular,
+            showBuildActions: false,
+          ),
+        ),
+      );
+    }
     if (offlinePlaylists.isNotEmpty) {
       slivers
         ..add(
@@ -420,7 +458,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 ),
               ),
               AsyncLoader<List<dynamic>>(
-                future: getUserPlaylistsNotInFolders(),
+                future: _addedPlaylists ??= getUserPlaylistsNotInFolders(),
                 emptyWidget: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Text(

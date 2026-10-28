@@ -192,7 +192,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
       fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
       onFilter: (value) => _searchQueryNotifier.value = value,
       onBack: () => Navigator.pop(context, widget.playlistData == _playlist),
-      background: PageGlow(source: _playlist?['image']?.toString()),
+      background: _playlist == null
+          ? null
+          : PageGlow(source: _playlist?['image']?.toString()),
       body: Padding(
         padding: commonSingleChildScrollViewPadding,
         child: _isInitializingPlaylist

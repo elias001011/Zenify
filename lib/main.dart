@@ -342,10 +342,14 @@ Future<String?> initialisation() async {
           'could not be resolved',
         );
       } else {
-        await _copyLegacyDesktopDataIfNeeded(applicationDirPath);
+        final defaultSupportPath = applicationDirPath;
         applicationDirPath = await installConfig.resolveDataDir(
-          applicationDirPath,
+          defaultSupportPath,
           log: logger.log,
+        );
+        await _copyLegacyDesktopDataIfNeeded(
+          applicationDirPath,
+          defaultSupportPath,
         );
       }
       Hive.init(applicationDirPath);
@@ -374,7 +378,7 @@ Future<String?> initialisation() async {
       audioHandler = await AudioService.init(
         builder: MusifyAudioHandler.new,
         config: const AudioServiceConfig(
-          androidNotificationChannelId: 'com.gokadzev.musify',
+          androidNotificationChannelId: 'io.github.elias001011.zenify',
           androidNotificationChannelName: appName,
           androidNotificationIcon: 'drawable/ic_launcher_foreground',
           androidShowNotificationBadge: true,
@@ -548,24 +552,28 @@ Future<({String path, bool isFallback})> _resolveApplicationDirPath() async {
   }
 }
 
-Future<void> _copyLegacyDesktopDataIfNeeded(String targetPath) async {
-  try {
-    final legacyDirectory = await getApplicationDocumentsDirectory();
-    final report = await copyHiveBoxes(
-      from: legacyDirectory,
-      to: Directory(targetPath),
-      log: logger.log,
-    );
-    if (report.hasWork) {
-      logger.log('Desktop data migration: ${report.describe()}');
-    }
-  } catch (e, stackTrace) {
-    logger.log(
-      'Desktop data migration skipped',
-      error: e,
-      stackTrace: stackTrace,
+Future<void> _copyLegacyDesktopDataIfNeeded(
+  String targetPath,
+  String defaultSupportPath,
+) async {
+  final documents = await getApplicationDocumentsDirectory();
+  final report = await migrateLegacyDesktopData(
+    target: Directory(targetPath),
+    sources: [
+      ...legacyMusifyDirectories(
+        defaultSupportPath,
+        windows: Platform.isWindows,
+      ),
+      documents,
+    ],
+  );
+  if (report.failed.isNotEmpty) {
+    throw StateError(
+      'Could not safely import the Musify library. Close Musify and restart Zenify.',
     );
   }
+  if (report.hasWork)
+    logger.log('Desktop data migration: ${report.describe()}');
 }
 
 void handleIncomingLink(Uri? uri) async {

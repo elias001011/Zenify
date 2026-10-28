@@ -1,0 +1,80 @@
+name: Validate Windows package
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [Dev]
+
+concurrency:
+  group: windows-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Resolve Flutter and app versions
+        shell: bash
+        run: |
+          echo "FLUTTER_VERSION=$(sed -n 's/^  flutter: \^*//p' pubspec.yaml)" >> "$GITHUB_ENV"
+          echo "ZENIFY_VERSION=$(sed -n 's/^version: \([^ +]*\).*/\1/p' pubspec.yaml)" >> "$GITHUB_ENV"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - run: flutter analyze
+      - name: Check migration and backups on Windows
+        run: flutter test test/install_config_test.dart test/desktop/migration_recovery_test.dart test/backup_validation_test.dart
+      - name: Test Windows Runtime initialization
+        run: |
+          cmake -S test/windows/runtime -B build/windows-runtime-test -A x64
+          cmake --build build/windows-runtime-test --config Release
+          ctest --test-dir build/windows-runtime-test -C Release --output-on-failure
+      - run: flutter build windows --release
+      - name: Check startup and icons
+        run: |
+          python .github/scripts/check_desktop_startup.py build/windows/x64/runner/Release/zenify.exe
+          python .github/scripts/check_windows_icons.py build/windows/x64/runner/Release/zenify.exe
+      - name: Build installer and portable package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build\desktop-artifacts | Out-Null
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\desktop-artifacts\Zenify-windows-x64-portable.zip -Force
+          choco install innosetup -y --no-progress
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" .github\installer\windows\zenify.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Smoke-test installation and saved locations
+        shell: pwsh
+        run: |
+          $installer = Resolve-Path build\desktop-artifacts\Zenify-windows-x64-setup.exe
+          $firstApp = Join-Path $env:RUNNER_TEMP 'Zenify-smoke-app'
+          $secondApp = Join-Path $env:RUNNER_TEMP 'Zenify-smoke-moved-app'
+          $firstData = Join-Path $env:RUNNER_TEMP 'Zenify-smoke-data-1'
+          $secondData = Join-Path $env:RUNNER_TEMP 'Zenify-smoke-data-2'
+          $thirdData = Join-Path $env:RUNNER_TEMP 'Zenify-smoke-data-3'
+          $downloads = Join-Path $env:RUNNER_TEMP 'Zenify-smoke-downloads'
+          function Install-Zenify($appPath, $dataPath) {
+            $arguments = @('/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/SP-',
+              "/DIR=`"$appPath`"", "/DATADIR=`"$dataPath`"", "/DOWNLOADSDIR=`"$downloads`"")
+            $process = Start-Process $installer -ArgumentList $arguments -Wait -PassThru
+            if ($process.ExitCode -ne 0) { throw "Installer exited with $($process.ExitCode)" }
+            $config = Get-Content (Join-Path $appPath 'install-config.txt')
+            if ($config -notcontains "dataDir=$dataPath") { throw 'Data folder was not saved' }
+            if ($config -notcontains "downloadsDir=$downloads") { throw 'Downloads folder was not saved' }
+            return $config
+          }
+          Install-Zenify $firstApp $firstData
+          $upgrade = Install-Zenify $firstApp $secondData
+          if ($upgrade -notcontains "previousDataDir=$firstData") { throw 'Upgrade lost its previous data folder' }
+          $moved = Install-Zenify $secondApp $thirdData
+          if ($moved -notcontains "previousDataDir=$secondData") { throw 'Moving the executable lost the custom data folder' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: zenify-windows-test
+          path: build/desktop-artifacts/*
+          if-no-files-found: error

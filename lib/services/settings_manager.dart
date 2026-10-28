@@ -47,6 +47,23 @@ final dynamicBackground = ValueNotifier<bool>(
   Hive.box('settings').get('dynamicBackground', defaultValue: true),
 );
 
+/// Shared by the full player and dock, and included in settings backups.
+final showPlayerVisualizer = ValueNotifier<bool>(
+  Hive.box('settings').get('showPlayerVisualizer', defaultValue: false),
+);
+
+Future<void> setPlayerVisualizer(bool value) async {
+  final previous = showPlayerVisualizer.value;
+  showPlayerVisualizer.value = value;
+  try {
+    await Hive.box('settings').put('showPlayerVisualizer', value);
+  } catch (_) {
+    if (showPlayerVisualizer.value == value)
+      showPlayerVisualizer.value = previous;
+    rethrow;
+  }
+}
+
 final usePureBlackColor = ValueNotifier<bool>(
   Hive.box('settings').get('pureBlackTheme', defaultValue: true),
 );
@@ -206,6 +223,10 @@ void reloadSettingsFromStorage() {
   );
   useSystemColor.value = settings.get('useSystemColor', defaultValue: true);
   floatingEffect.value = _readFloatingEffect();
+  showPlayerVisualizer.value = settings.get(
+    'showPlayerVisualizer',
+    defaultValue: false,
+  );
   dynamicBackground.value = settings.get(
     'dynamicBackground',
     defaultValue: true,

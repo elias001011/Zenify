@@ -303,7 +303,9 @@ void main() {
     }),
   );
 
-  testWidgets('standard volume fits a 400 px mini player', (tester) async {
+  testWidgets('collapsed volume and popup fit a 400 px mini player', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(400, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -329,6 +331,10 @@ void main() {
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
+    expect(find.byType(Slider), findsNothing);
+    expect(find.byType(DesktopVolumeButton), findsOneWidget);
+    await tester.tap(find.byType(DesktopVolumeButton));
+    await tester.pumpAndSettle();
     expect(find.byType(Slider), findsOneWidget);
     final bounds = tester.getRect(find.byType(Slider));
     expect(bounds.left, greaterThanOrEqualTo(0));
