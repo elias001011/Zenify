@@ -56,6 +56,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.byTooltip('Lyrics'));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(LyricsPanel), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);

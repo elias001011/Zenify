@@ -298,6 +298,7 @@ class _UprightStageState extends State<_UprightStage>
     with SingleTickerProviderStateMixin {
   static const _headerSize = 56.0;
   static const _titleHeight = 72.0;
+  static const _gap = 16.0;
 
   late final _controller = AnimationController(
     vsync: this,
@@ -337,11 +338,12 @@ class _UprightStageState extends State<_UprightStage>
             builder: (context, c) {
               final artSize = min(
                 c.maxWidth * 0.92,
-                c.maxHeight - _titleHeight - 16,
+                c.maxHeight - _titleHeight - _gap * 2,
               );
+              // The artwork and the song under it, centred together.
               final artOrigin = Offset(
                 (c.maxWidth - artSize) / 2,
-                (c.maxHeight - _titleHeight - artSize) / 2,
+                (c.maxHeight - artSize - _gap - _titleHeight) / 2,
               );
               // Laid out once at full size and scaled, so the artwork keeps
               // its decoded image while it moves.
@@ -355,6 +357,17 @@ class _UprightStageState extends State<_UprightStage>
                 child: artwork,
                 builder: (context, artwork) {
                   final t = _progress.value;
+                  final shown = artSize + (_headerSize - artSize) * t;
+                  final art = Rect.fromLTWH(
+                    artOrigin.dx * (1 - t),
+                    artOrigin.dy * (1 - t),
+                    shown,
+                    shown,
+                  );
+                  // Both titles follow the artwork: the one under it rises
+                  // with it and leaves, the header's arrives beside it.
+                  final under = 1 - const Interval(0, 0.5).transform(t);
+                  final beside = const Interval(0.5, 1).transform(t);
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -369,15 +382,14 @@ class _UprightStageState extends State<_UprightStage>
                             ),
                           ),
                         ),
-                      // The song under the artwork, leaving as it shrinks...
-                      if (t < 1)
+                      if (under > 0)
                         Positioned(
                           left: 0,
                           right: 0,
-                          bottom: 0,
+                          top: art.bottom + _gap,
                           height: _titleHeight,
                           child: Opacity(
-                            opacity: 1 - t,
+                            opacity: under,
                             child: Center(
                               child: NowPlayingTitle(
                                 metadata: metadata,
@@ -388,15 +400,14 @@ class _UprightStageState extends State<_UprightStage>
                             ),
                           ),
                         ),
-                      // ...and beside it once it is the header.
-                      if (t > 0)
+                      if (beside > 0)
                         Positioned(
-                          left: _headerSize + 14,
+                          left: art.right + 14,
                           right: 0,
-                          top: 0,
+                          top: art.center.dy - _headerSize / 2,
                           height: _headerSize,
                           child: Opacity(
-                            opacity: t,
+                            opacity: beside,
                             child: Align(
                               alignment: AlignmentDirectional.centerStart,
                               child: NowPlayingTitle(
@@ -410,10 +421,10 @@ class _UprightStageState extends State<_UprightStage>
                           ),
                         ),
                       Positioned(
-                        left: artOrigin.dx * (1 - t),
-                        top: artOrigin.dy * (1 - t),
+                        left: art.left,
+                        top: art.top,
                         child: Transform.scale(
-                          scale: 1 + (_headerSize / artSize - 1) * t,
+                          scale: shown / artSize,
                           alignment: Alignment.topLeft,
                           // Same tree in both states, so the artwork keeps
                           // its state; as the header it goes back.
