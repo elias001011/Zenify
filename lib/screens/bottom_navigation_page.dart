@@ -19,6 +19,8 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:math' as math;
+
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -88,9 +90,18 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                 stream: _miniPlayerVisibilityStream,
                 builder: (context, snapshot) {
                   final playing = snapshot.data ?? false;
-                  return isLargeScreen
-                      ? _buildDesktop(context, items, selected, playing)
-                      : _buildMobile(context, items, selected, playing);
+                  return ValueListenableBuilder<bool>(
+                    valueListenable: compactDesktopPlayer,
+                    builder: (context, compact, _) => isLargeScreen && !compact
+                        ? _buildDesktop(context, items, selected, playing)
+                        : _buildMobile(
+                            context,
+                            items,
+                            selected,
+                            playing,
+                            maxDockWidth: isLargeScreen ? 420 : null,
+                          ),
+                  );
                 },
               ),
             ),
@@ -120,8 +131,9 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     BuildContext context,
     List<_NavigationItem> items,
     int selected,
-    bool playing,
-  ) {
+    bool playing, {
+    double? maxDockWidth,
+  }) {
     final safeBottom = MediaQuery.paddingOf(context).bottom;
     final dockHeight =
         _dockPadding * 2 +
@@ -133,7 +145,13 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
         _withBottomInset(context, _margin * 2 + dockHeight),
         Positioned(
           left: _margin,
-          right: _margin,
+          right: maxDockWidth == null ? _margin : null,
+          width: maxDockWidth == null
+              ? null
+              : math.min(
+                  maxDockWidth,
+                  MediaQuery.sizeOf(context).width - _margin * 2,
+                ),
           bottom: safeBottom + _margin,
           child: FloatingSurface(
             padding: const EdgeInsets.all(_dockPadding),

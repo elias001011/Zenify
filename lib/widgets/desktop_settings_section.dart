@@ -34,6 +34,7 @@ import 'package:musify/services/io_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/widgets/bottom_sheet_bar.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/section_header.dart';
@@ -51,6 +52,7 @@ class DesktopSettingsSection extends StatelessWidget {
       children: [
         SectionHeader(title: l10n.desktop, icon: FluentIcons.desktop_24_filled),
         const _InterfaceScaleBar(),
+        const _PlayerLayoutBar(),
         _SettingSwitch(
           title: l10n.startMaximized,
           description: l10n.startMaximizedDescription,
@@ -378,5 +380,62 @@ class _DownloadsFolderBarState extends State<_DownloadsFolderBar> {
       DownloadsMoveStatus.partiallyMoved => l10n.downloadsFolderPartiallyMoved,
       DownloadsMoveStatus.notWritable => l10n.downloadsFolderNotWritable,
     });
+  }
+}
+
+class _PlayerLayoutBar extends StatelessWidget {
+  const _PlayerLayoutBar();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n!;
+    return ValueListenableBuilder<bool>(
+      valueListenable: compactDesktopPlayer,
+      builder: (context, compact, _) => CustomBar(
+        l10n.playerLayout,
+        FluentIcons.panel_left_24_regular,
+        description: compact
+            ? l10n.playerLayoutCompact
+            : l10n.playerLayoutDesktop,
+        onTap: () => _choose(context),
+      ),
+    );
+  }
+
+  void _choose(BuildContext context) {
+    final l10n = context.l10n!;
+
+    Widget option(bool compact, String title, IconData icon) => BottomSheetBar(
+      title,
+      () {
+        compactDesktopPlayer.value = compact;
+        addOrUpdateData<bool>('settings', 'compactDesktopPlayer', compact);
+        Navigator.pop(context);
+      },
+      compactDesktopPlayer.value == compact,
+      icon: icon,
+    );
+
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(l10n.playerLayout),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            option(
+              false,
+              l10n.playerLayoutDesktop,
+              FluentIcons.panel_left_24_regular,
+            ),
+            option(
+              true,
+              l10n.playerLayoutCompact,
+              FluentIcons.phone_24_regular,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

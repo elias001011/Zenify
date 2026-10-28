@@ -99,6 +99,12 @@ final startMaximized = ValueNotifier<bool>(
   Hive.box('settings').get('startMaximized', defaultValue: false),
 );
 
+/// Desktop only: `compact` puts the phone dock (player + navigation) in the
+/// bottom-left corner instead of the side rail.
+final compactDesktopPlayer = ValueNotifier<bool>(
+  Hive.box('settings').get('compactDesktopPlayer', defaultValue: false),
+);
+
 final customTitleBar = ValueNotifier<bool>(
   Hive.box('settings').get('customTitleBar', defaultValue: true),
 );
@@ -212,6 +218,10 @@ void reloadSettingsFromStorage() {
   interfaceScale.value = _readInterfaceScale();
   startMaximized.value = settings.get('startMaximized', defaultValue: false);
   customTitleBar.value = settings.get('customTitleBar', defaultValue: true);
+  compactDesktopPlayer.value = settings.get(
+    'compactDesktopPlayer',
+    defaultValue: false,
+  );
   if (isDesktopPlatform) KeyboardShortcutsManager.reload();
   syncedLyricsEnabled.value = settings.get(
     'syncedLyricsEnabled',
