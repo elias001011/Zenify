@@ -27,6 +27,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart';
+import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/now_playing/lyrics_panel.dart';
@@ -92,19 +93,13 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     super.dispose();
   }
 
-  static bool _isWide(Size size) => size.width >= 900 && size.height >= 560;
-
   /// [sheetContext] sits under the page's scaffold, which sheets open in.
   void _onPanel(
     PlayerPanel panel,
     MediaItem metadata,
     BuildContext sheetContext,
   ) {
-    final size = MediaQuery.sizeOf(context);
-    // Wide players open panels beside the artwork; upright phones show the
-    // lyrics in place of it, as Tidal does.
-    if (_isWide(size) ||
-        (panel == PlayerPanel.lyrics && size.height > size.width)) {
+    if (_PlayerLayout.of(MediaQuery.sizeOf(context)).showsInline(panel)) {
       setState(() => _panel = _panel == panel ? null : panel);
       return;
     }
@@ -117,14 +112,6 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
               child: LyricsPanel(metadata: metadata),
             ),
     );
-  }
-
-  /// The artwork as [PageGlow] reads it: a file path or a URL.
-  static String? _artworkSource(MediaItem metadata) {
-    final uri = metadata.artUri;
-    if (uri?.scheme == 'file')
-      return metadata.extras?['artWorkPath']?.toString() ?? uri!.toFilePath();
-    return uri?.toString();
   }
 
   @override
@@ -151,11 +138,13 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                   opacity: _backgroundVisible ? 1 : 0,
                   duration: const Duration(milliseconds: 700),
                   curve: Curves.easeOutCubic,
-                  child: PageGlow(source: _artworkSource(metadata)),
+                  child: PageGlow(source: mediaItemArtworkSource(metadata)),
                 ),
               ),
               SafeArea(
-                child: _isWide(MediaQuery.sizeOf(context))
+                child:
+                    _PlayerLayout.of(MediaQuery.sizeOf(context)) ==
+                        _PlayerLayout.wide
                     ? _WideLayout(
                         metadata: metadata,
                         actions: actions,
@@ -174,6 +163,27 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
       ),
     );
   }
+}
+
+enum _PlayerLayout {
+  /// Desktop and tablets: queue and lyrics open beside the artwork.
+  wide,
+
+  /// Upright phones: the lyrics take the artwork's place, the queue is a
+  /// sheet.
+  upright,
+
+  /// Phones on their side: both open as sheets.
+  sideways;
+
+  static _PlayerLayout of(Size size) => size.width >= 900 && size.height >= 560
+      ? wide
+      : size.height >= size.width
+      ? upright
+      : sideways;
+
+  bool showsInline(PlayerPanel panel) =>
+      this == wide || (this == upright && panel == PlayerPanel.lyrics);
 }
 
 class _CloseButton extends StatelessWidget {
@@ -223,7 +233,6 @@ class _CompactLayout extends StatelessWidget {
         ? const SizedBox.shrink()
         : NowPlayingControls(
             size: size,
-            audioId: metadata.extras?['ytid'],
             adjustedIconSize: iconSize,
             adjustedMiniIconSize: miniIconSize,
             metadata: metadata,
@@ -235,7 +244,7 @@ class _CompactLayout extends StatelessWidget {
       ),
     );
 
-    final stage = size.width > size.height
+    final stage = _PlayerLayout.of(size) == _PlayerLayout.sideways
         ? Row(
             children: [
               Expanded(
@@ -351,6 +360,27 @@ class _UprightStageState extends State<_UprightStage>
                 metadata: metadata,
                 size: artSize,
               );
+              // Built once: the frames of the move only reposition and fade
+              // them.
+              final lyrics = LyricsPanel(metadata: metadata);
+              final songTitle = Center(
+                child: NowPlayingTitle(
+                  metadata: metadata,
+                  titleSize: getResponsiveTitleFontSize(screen),
+                  artistSize: getResponsiveArtistFontSize(screen),
+                  spacing: 6,
+                ),
+              );
+              final headerTitle = Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: NowPlayingTitle(
+                  metadata: metadata,
+                  titleSize: 17,
+                  artistSize: 14,
+                  spacing: 2,
+                  alignment: CrossAxisAlignment.start,
+                ),
+              );
 
               return AnimatedBuilder(
                 animation: _progress,
@@ -378,7 +408,7 @@ class _UprightStageState extends State<_UprightStage>
                             opacity: Curves.easeIn.transform(t),
                             child: IgnorePointer(
                               ignoring: t < 1,
-                              child: LyricsPanel(metadata: metadata),
+                              child: lyrics,
                             ),
                           ),
                         ),
@@ -388,17 +418,7 @@ class _UprightStageState extends State<_UprightStage>
                           right: 0,
                           top: art.bottom + _gap,
                           height: _titleHeight,
-                          child: Opacity(
-                            opacity: under,
-                            child: Center(
-                              child: NowPlayingTitle(
-                                metadata: metadata,
-                                titleSize: getResponsiveTitleFontSize(screen),
-                                artistSize: getResponsiveArtistFontSize(screen),
-                                spacing: 6,
-                              ),
-                            ),
-                          ),
+                          child: Opacity(opacity: under, child: songTitle),
                         ),
                       if (beside > 0)
                         Positioned(
@@ -406,19 +426,7 @@ class _UprightStageState extends State<_UprightStage>
                           right: 0,
                           top: art.center.dy - _headerSize / 2,
                           height: _headerSize,
-                          child: Opacity(
-                            opacity: beside,
-                            child: Align(
-                              alignment: AlignmentDirectional.centerStart,
-                              child: NowPlayingTitle(
-                                metadata: metadata,
-                                titleSize: 17,
-                                artistSize: 14,
-                                spacing: 2,
-                                alignment: CrossAxisAlignment.start,
-                              ),
-                            ),
-                          ),
+                          child: Opacity(opacity: beside, child: headerTitle),
                         ),
                       Positioned(
                         left: art.left,
@@ -461,7 +469,7 @@ class _UprightStageState extends State<_UprightStage>
 
 /// Desktop and tablets, as Tidal: the artwork with the song, playback and
 /// actions under it in one column, centred; queue and lyrics open beside it.
-class _WideLayout extends StatelessWidget {
+class _WideLayout extends StatefulWidget {
   const _WideLayout({
     required this.metadata,
     required this.actions,
@@ -472,13 +480,31 @@ class _WideLayout extends StatelessWidget {
   final Widget actions;
   final PlayerPanel? panel;
 
-  /// Height the song, playback and actions take under the artwork.
-  static const double _below = 344;
+  @override
+  State<_WideLayout> createState() => _WideLayoutState();
+}
+
+class _WideLayoutState extends State<_WideLayout> {
+  final _belowKey = GlobalKey();
+
+  /// What the song, playback and actions take under the artwork, measured
+  /// after each layout: it changes with the text size and for live radio.
+  /// Starts generous, so the first frame never overflows.
+  double _below = 400;
+
+  void _measure(Duration _) {
+    final height = _belowKey.currentContext?.size?.height;
+    if (mounted && height != null && (height - _below).abs() > 0.5) {
+      setState(() => _below = height);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final metadata = widget.metadata;
     final isLive = metadata.extras?['isLive'] ?? false;
-    final panel = this.panel;
+    final panel = widget.panel;
+    WidgetsBinding.instance.addPostFrameCallback(_measure);
 
     return Column(
       children: [
@@ -491,7 +517,7 @@ class _WideLayout extends StatelessWidget {
                 child: LayoutBuilder(
                   builder: (context, c) {
                     final size = min(
-                      c.maxHeight - _below,
+                      c.maxHeight - _below - 16,
                       c.maxWidth - 64,
                     ).clamp(160.0, 560.0);
                     return Center(
@@ -502,25 +528,32 @@ class _WideLayout extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             NowPlayingArtwork(metadata: metadata, size: size),
-                            const SizedBox(height: 28),
-                            NowPlayingTitle(
-                              metadata: metadata,
-                              titleSize: 24,
-                              artistSize: 16,
-                              spacing: 4,
-                              alignment: CrossAxisAlignment.start,
+                            Column(
+                              key: _belowKey,
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                const SizedBox(height: 28),
+                                NowPlayingTitle(
+                                  metadata: metadata,
+                                  titleSize: 24,
+                                  artistSize: 16,
+                                  spacing: 4,
+                                  alignment: CrossAxisAlignment.start,
+                                ),
+                                const SizedBox(height: 12),
+                                if (!isLive) ...[
+                                  const PositionSlider(flush: true),
+                                  PlayerControlButtons(
+                                    metadata: metadata,
+                                    iconSize: 40,
+                                    miniIconSize: 20,
+                                    flush: true,
+                                  ),
+                                ],
+                                const SizedBox(height: 16),
+                                PlayerActionBar(child: widget.actions),
+                              ],
                             ),
-                            const SizedBox(height: 12),
-                            if (!isLive) ...[
-                              const PositionSlider(),
-                              PlayerControlButtons(
-                                metadata: metadata,
-                                iconSize: 40,
-                                miniIconSize: 20,
-                              ),
-                            ],
-                            const SizedBox(height: 16),
-                            PlayerActionBar(child: actions),
                           ],
                         ),
                       ),

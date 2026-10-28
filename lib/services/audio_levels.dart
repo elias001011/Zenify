@@ -44,6 +44,8 @@ class AudioLevels {
   static const _frames = EventChannel('zenify/audio_levels/frames');
 
   /// mpv's label for the filters; their numbers land in `af-metadata/zviz`.
+  /// They join mpv's filter chain beside media_kit's own (scaletempo for the
+  /// speed) and leave it when the waves stop listening.
   static const _label = 'zviz';
   static const _spectralFilter =
       '@$_label:lavfi=[astats=metadata=1:reset=1:measure_perchannel=none:'
@@ -53,8 +55,6 @@ class AudioLevels {
   static const _loudnessFilter =
       '@$_label:lavfi=[astats=metadata=1:reset=1:measure_perchannel=none:'
       'measure_overall=RMS_level]';
-
-  static bool _filterSet = false;
 
   /// Whether levels can be read without asking the user anything.
   static Future<bool> get available async {
@@ -122,22 +122,33 @@ class AudioLevels {
     var lastEnergy = 0.0;
     var frames = 0;
     var silentPolls = 0;
-    var fellBack = false;
+    var filter = _spectralFilter;
     var polling = false;
+
+    Future<void> attach(MediaKitPlayer player) async {
+      await player.mpvCommand(['af', 'remove', '@$_label']);
+      await player.mpvCommand(['af', 'add', filter]);
+    }
 
     Future<void> poll(MediaKitPlayer player) async {
       final text = await player.getMpvProperty('af-metadata/$_label');
-      // mpv drops a filter that fails to start. Frames without the spectral
-      // numbers, or none for seconds of playback, mean it did: fall back to
-      // loudness alone, once.
-      if (text.isEmpty) silentPolls++;
-      if (!fellBack &&
-          ((frames == 0 && silentPolls >= 120) ||
-              (frames >= 20 && !last.contains('aspectralstats')))) {
-        fellBack = true;
-        await player.setMpvProperty('af', _loudnessFilter);
+      // A filter just (re)started reports '{}' until its first frame.
+      final hasFrame = text.contains('lavfi.');
+      if (!hasFrame && ++silentPolls % 40 == 0) {
+        // Nothing for a second of playback: media_kit replaced the chain
+        // (a speed change does), or mpv dropped a filter that failed to
+        // start, which without any frame yet means aspectralstats.
+        if (frames == 0) filter = _loudnessFilter;
+        await attach(player);
       }
-      if (text.isEmpty || text == last) return;
+      if (frames >= 20 &&
+          filter == _spectralFilter &&
+          !last.contains('aspectralstats')) {
+        filter = _loudnessFilter;
+        await attach(player);
+      }
+      if (!hasFrame || text == last) return;
+      silentPolls = 0;
       last = text;
       frames++;
       final Map<String, dynamic> values;
@@ -160,14 +171,12 @@ class AudioLevels {
       ));
     }
 
+    MediaKitPlayer? player;
     controller = StreamController(
       onListen: () async {
-        final player = MediaKitPlayer.latest;
-        if (player == null) return;
-        if (!_filterSet) {
-          _filterSet = true;
-          await player.setMpvProperty('af', _spectralFilter);
-        }
+        final current = player = MediaKitPlayer.latest;
+        if (current == null) return;
+        await attach(current);
         timer = Timer.periodic(const Duration(milliseconds: 25), (_) async {
           if (polling ||
               controller.isClosed ||
@@ -176,13 +185,16 @@ class AudioLevels {
           }
           polling = true;
           try {
-            await poll(player);
+            await poll(current);
           } finally {
             polling = false;
           }
         });
       },
-      onCancel: () => timer?.cancel(),
+      onCancel: () async {
+        timer?.cancel();
+        await player?.mpvCommand(['af', 'remove', '@$_label']);
+      },
     );
     return controller.stream;
   }

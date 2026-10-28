@@ -99,6 +99,9 @@ class InstallConfig {
       final report = await copyHiveBoxes(
         from: Directory(source),
         to: directory,
+        log: log == null
+            ? null
+            : (message, {error, stackTrace}) => log('$message: $error'),
       );
       if (report.failed.isNotEmpty) {
         log?.call('Could not copy ${report.failed.join(', ')} to $target');

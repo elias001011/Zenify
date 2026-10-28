@@ -36,7 +36,6 @@
   "backedupSuccess": "데이터가 성공적으로 백업되었음",
   "backupError": "데이터 백업 중 오류가 발생하였음",
   "backupUserData": "사용자 데이터 백업",
-  "becomeSponsor": "후원하기",
   "cacheMsg": "캐시가 성공적으로 지워졌음",
   "cancel": "취소",
   "cancellingDownload": "Cancelling download...",

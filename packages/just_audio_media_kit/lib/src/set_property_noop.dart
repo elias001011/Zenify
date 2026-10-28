@@ -11,3 +11,8 @@ Future<String> getProperty(Player player, String key) {
   // noop
   return Future.value('');
 }
+
+Future<void> command(Player player, List<String> args) {
+  // noop
+  return Future.value();
+}

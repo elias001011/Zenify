@@ -36,7 +36,6 @@
   "backedupSuccess": "Data har säkerhetskopierats",
   "backupError": "Fel uppstod när data säkerhetskopierades",
   "backupUserData": "Säkerhetskopiera användardata",
-  "becomeSponsor": "Bli sponsor",
   "cacheMsg": "Cacheminnet har rensats",
   "cancel": "Avbryt",
   "cancellingDownload": "Avbryter nedladdningen...",

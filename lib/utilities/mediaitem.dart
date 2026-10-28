@@ -76,6 +76,17 @@ MediaItem mapToMediaItem(Map song) {
 ///
 /// This prevents unnecessary updates when duration values have minor variations
 /// (e.g., due to buffering or precision differences).
+/// Where [item]'s artwork is: a file path for a downloaded song, otherwise
+/// its URL; null without one.
+String? mediaItemArtworkSource(MediaItem item) {
+  final uri = item.artUri;
+  if (uri == null || uri.toString().isEmpty) return null;
+  if (uri.scheme == 'file') {
+    return item.extras?['artWorkPath']?.toString() ?? uri.toFilePath();
+  }
+  return uri.toString();
+}
+
 bool durationEquals(Duration? prev, Duration? curr) {
   if (prev == curr) return true;
   if (prev == null || curr == null) return prev == curr;

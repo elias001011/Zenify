@@ -124,7 +124,8 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       onExit: (_) => _tilt.value = Offset.zero,
       child: ValueListenableBuilder<Offset>(
         valueListenable: _tilt,
-        child: content,
+        // Tilting moves the artwork without repainting it.
+        child: RepaintBoundary(child: content),
         builder: (context, target, child) => TweenAnimationBuilder<Offset>(
           tween: Tween(end: target),
           duration: const Duration(milliseconds: 450),

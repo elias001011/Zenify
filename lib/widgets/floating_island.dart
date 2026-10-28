@@ -45,7 +45,6 @@ class IslandScaffold extends StatefulWidget {
     this.actions = const [],
     this.onBack,
     this.onFilter,
-    this.onFilterSubmitted,
     this.globalSearch = true,
     this.background,
   });
@@ -58,9 +57,6 @@ class IslandScaffold extends StatefulWidget {
 
   /// Turns the search shortcut into a live filter of this page (playlists).
   final ValueChanged<String>? onFilter;
-
-  /// Enter in the filter, e.g. to search further than the page.
-  final ValueChanged<String>? onFilterSubmitted;
 
   /// Offer the search shortcut, which opens the search page on Enter.
   final bool globalSearch;
@@ -134,7 +130,6 @@ class _IslandScaffoldState extends State<IslandScaffold> {
               actions: widget.actions,
               onBack: widget.onBack,
               onFilter: widget.onFilter,
-              onFilterSubmitted: widget.onFilterSubmitted,
               globalSearch: widget.globalSearch,
               maxWidth: media.size.width - left - _islandMargin * 2,
             ),
@@ -152,7 +147,6 @@ class _Island extends StatefulWidget {
     required this.actions,
     required this.onBack,
     required this.onFilter,
-    required this.onFilterSubmitted,
     required this.globalSearch,
     required this.maxWidth,
   });
@@ -162,7 +156,6 @@ class _Island extends StatefulWidget {
   final List<Widget> actions;
   final VoidCallback? onBack;
   final ValueChanged<String>? onFilter;
-  final ValueChanged<String>? onFilterSubmitted;
   final bool globalSearch;
   final double maxWidth;
 
@@ -199,12 +192,11 @@ class _IslandState extends State<_Island> {
   }
 
   void _submit(String query) {
-    final trimmed = query.trim();
     if (widget.onFilter != null) {
       _focusNode.unfocus();
-      if (trimmed.isNotEmpty) widget.onFilterSubmitted?.call(trimmed);
       return;
     }
+    final trimmed = query.trim();
     if (trimmed.isEmpty || offlineMode.value) return;
     _closeSearch();
     openSearch(trimmed);

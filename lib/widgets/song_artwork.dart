@@ -24,6 +24,7 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/no_artwork_cube.dart';
 import 'package:musify/widgets/spinner.dart';
 
@@ -42,21 +43,18 @@ class SongArtworkWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uri = metadata.artUri;
-    if (uri == null || uri.toString().isEmpty) {
+    final source = mediaItemArtworkSource(metadata);
+    if (source == null) {
       return NullArtworkWidget(iconSize: errorWidgetIconSize, size: size);
     }
-    return uri.scheme == 'file'
+    return metadata.artUri!.scheme == 'file'
         ? SizedBox(
             width: size,
             height: size,
             child: ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
               child: Image.file(
-                File(
-                  metadata.extras?['artWorkPath']?.toString() ??
-                      uri.toFilePath(),
-                ),
+                File(source),
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => NullArtworkWidget(
                   iconSize: errorWidgetIconSize,
@@ -68,7 +66,7 @@ class SongArtworkWidget extends StatelessWidget {
         : CachedNetworkImage(
             width: size,
             height: size,
-            imageUrl: uri.toString(),
+            imageUrl: source,
             imageBuilder: (context, imageProvider) => ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
               child: Image(image: imageProvider, fit: BoxFit.cover),

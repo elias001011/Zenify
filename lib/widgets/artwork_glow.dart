@@ -116,6 +116,9 @@ class GlowColors {
       } else if (ArtworkColors.isCached(source)) {
         next[i] = ArtworkColors.cached(source) ?? appColor;
       } else {
+        // Until its colour is read, a glow keeps the one it has, so a new
+        // song doesn't dip to dark first.
+        if (_to[i] case final current?) next[i] = current;
         pending.add(ArtworkColors.of(source).then((color) => (i, color)));
       }
     }

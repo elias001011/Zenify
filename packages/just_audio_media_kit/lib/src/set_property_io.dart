@@ -11,3 +11,8 @@ Future<String> getProperty(Player player, String key) async {
   if (player.platform is! NativePlayer) return '';
   return (player.platform as NativePlayer).getProperty(key);
 }
+
+Future<void> command(Player player, List<String> args) async {
+  if (player.platform is! NativePlayer) return;
+  await (player.platform as NativePlayer).command(args);
+}

@@ -210,6 +210,7 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     try {
+      final known = librarySongsById();
       final artistsFuture = searchArtists(query);
 
       Future<void> publishSongs() async {
@@ -236,7 +237,7 @@ class _SearchPageState extends State<SearchPage> {
             () => _songsSearchResult = libraryFirst(
               _libraryResult.songs,
               songs,
-              known: librarySongsById(),
+              known: known,
             ),
           );
         } catch (e, stackTrace) {

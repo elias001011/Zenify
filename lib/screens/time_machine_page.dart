@@ -22,10 +22,10 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
@@ -200,8 +200,13 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
       limit: wrappedExpandedSongsLimit,
     );
     final previewSongs = songs.take(wrappedShareSongsLimit).toList();
-    final monthTitle = _formatMonthTitle(context, monthKey);
-    final periodLabel = _formatMonthPeriodLabel(context, monthKey);
+    final locale = Localizations.localeOf(context);
+    final monthTitle = formatMonthPeriodLabel(
+      locale,
+      monthKey,
+      withYear: false,
+    );
+    final periodLabel = formatMonthPeriodLabel(locale, monthKey);
 
     return _PeriodSection(
       title: monthTitle,
@@ -261,10 +266,9 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
   void _showMoreSongs(
     BuildContext context,
     String title,
-    List<Map<String, dynamic>> songs, {
-    int limit = wrappedExpandedSongsLimit,
-  }) {
-    final visibleSongs = songs.take(limit).toList();
+    List<Map<String, dynamic>> songs,
+  ) {
+    final visibleSongs = songs.take(wrappedExpandedSongsLimit).toList();
 
     showModalBottomSheet(
       context: context,
@@ -327,36 +331,6 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
   }
 }
 
-String _formatMonthTitle(BuildContext context, String monthKey) {
-  final parts = monthKey.split('-');
-  if (parts.length != 2) return monthKey;
-
-  final year = int.tryParse(parts[0]);
-  final month = int.tryParse(parts[1]);
-  if (year == null || month == null) return monthKey;
-
-  final locale = Localizations.localeOf(context).toString();
-  final monthName = DateFormat.MMMM(locale).format(DateTime(year, month));
-  return monthName.isEmpty
-      ? monthKey
-      : '${monthName[0].toUpperCase()}${monthName.substring(1)}';
-}
-
-String _formatMonthPeriodLabel(BuildContext context, String monthKey) {
-  final parts = monthKey.split('-');
-  if (parts.length != 2) return monthKey;
-
-  final year = int.tryParse(parts[0]);
-  final month = int.tryParse(parts[1]);
-  if (year == null || month == null) return monthKey;
-
-  final locale = Localizations.localeOf(context).toString();
-  final label = DateFormat.yMMMM(locale).format(DateTime(year, month));
-  return label.isEmpty
-      ? monthKey
-      : '${label[0].toUpperCase()}${label.substring(1)}';
-}
-
 /// A period's title and its cards, which the share button sends as an image.
 /// The cards name the period themselves, so the title and [footer] stay out.
 class _PeriodSection extends StatefulWidget {
@@ -394,6 +368,19 @@ class _PeriodSectionState extends State<_PeriodSection> {
       image.dispose();
       final bytes = byteData?.buffer.asUint8List();
       if (bytes == null) return;
+
+      // Linux has no share sheet for files: save the image instead.
+      if (Platform.isLinux) {
+        final saved = await FilePicker.saveFile(
+          fileName: widget.fileName,
+          type: FileType.image,
+          bytes: bytes,
+        );
+        if (saved != null && mounted) {
+          showToast(context, context.l10n!.imageSaved);
+        }
+        return;
+      }
 
       final directory = await getTemporaryDirectory();
       final file = File('${directory.path}/${widget.fileName}');
@@ -491,7 +478,10 @@ class TopArtistsPage extends StatelessWidget {
           itemBuilder: (context, index) {
             if (index == months.length) return const MiniPlayerBottomSpace();
             final (monthKey, artists) = months[index];
-            final period = _formatMonthPeriodLabel(context, monthKey);
+            final period = formatMonthPeriodLabel(
+              Localizations.localeOf(context),
+              monthKey,
+            );
             return _PeriodSection(
               title: period,
               shareText: context.l10n!.shareRecapText(period),

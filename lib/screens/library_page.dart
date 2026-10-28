@@ -58,6 +58,19 @@ enum _LibraryFilter { all, custom, youtube, albums, artists, offline }
 class _LibraryPageState extends State<LibraryPage> {
   var _filter = _LibraryFilter.all;
   var _query = '';
+  Timer? _filterDebounce;
+
+  void _onFilter(String value) {
+    _filterDebounce?.cancel();
+    final query = value.trim().toLowerCase();
+    // Clearing shows everything at once; typing waits for a pause.
+    _filterDebounce = Timer(
+      query.isEmpty ? Duration.zero : const Duration(milliseconds: 150),
+      () {
+        if (mounted && query != _query) setState(() => _query = query);
+      },
+    );
+  }
 
   Future<List<dynamic>>? _addedPlaylists;
 
@@ -76,6 +89,7 @@ class _LibraryPageState extends State<LibraryPage> {
   void dispose() {
     userPlaylists.removeListener(_invalidateAddedPlaylists);
     userPlaylistFolders.removeListener(_invalidateAddedPlaylists);
+    _filterDebounce?.cancel();
     super.dispose();
   }
 
@@ -175,7 +189,7 @@ class _LibraryPageState extends State<LibraryPage> {
     return IslandScaffold(
       title: context.l10n!.library,
       // The library's own search: it stays here and finds songs too.
-      onFilter: (value) => setState(() => _query = value.trim().toLowerCase()),
+      onFilter: _onFilter,
       body: AnimatedBuilder(
         animation: Listenable.merge([
           pinnedPlaylistIds,
@@ -504,10 +518,10 @@ class _LibraryPageState extends State<LibraryPage> {
   /// filter says.
   List<Widget> _buildSongSlivers() {
     if (_query.isEmpty || !_shows(_LibraryFilter.offline)) return [];
-    final songs = searchLibrary(
+    final songs = searchLibrarySongs(
       _query,
       offlineOnly: offlineMode.value || _filter == _LibraryFilter.offline,
-    ).songs;
+    );
     if (songs.isEmpty) return [];
     return [
       SliverToBoxAdapter(

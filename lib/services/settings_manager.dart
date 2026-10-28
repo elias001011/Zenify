@@ -64,8 +64,13 @@ Future<void> setPlayerVisualizer(bool value) async {
   }
 }
 
+/// Musify stored this as 'usePureBlackColor', and only once the user chose,
+/// so a choice from a restored or copied Musify library still counts.
+bool _readPureBlack(Box settings) =>
+    settings.get('pureBlackTheme') ?? settings.get('usePureBlackColor') ?? true;
+
 final usePureBlackColor = ValueNotifier<bool>(
-  Hive.box('settings').get('pureBlackTheme', defaultValue: true),
+  _readPureBlack(Hive.box('settings')),
 );
 
 enum FloatingEffect { solid, translucent, blurred }
@@ -230,7 +235,7 @@ void reloadSettingsFromStorage() {
     'dynamicBackground',
     defaultValue: true,
   );
-  usePureBlackColor.value = settings.get('pureBlackTheme', defaultValue: true);
+  usePureBlackColor.value = _readPureBlack(settings);
   offlineMode.value = settings.get('offlineMode', defaultValue: false);
   wrappedEnabled.value = settings.get('wrappedEnabled', defaultValue: true);
   sponsorBlockSupport.value = settings.get(

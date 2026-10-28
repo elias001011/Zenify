@@ -1,8 +1,6 @@
 {
   "about": "About",
   "aboutForkMaintainer": "Fork developer and maintainer",
-  "aboutOriginalAuthor": "Original author of Musify",
-  "aboutOriginalProject": "Original project",
   "aboutSourceCode": "Source code",
   "accentChangeMsg": "Accent color updated successfully",
   "accentColor": "Accent color",
@@ -48,7 +46,6 @@
   "backedupSuccess": "Data successfully backed up",
   "backupError": "Error occurred while backing up data",
   "backupUserData": "Backup user data",
-  "becomeSponsor": "Become a sponsor",
   "cacheMsg": "Cache cleared",
   "cancel": "Cancel",
   "cancellingDownload": "Cancelling download...",
@@ -378,7 +375,6 @@
   "syncPairDescription": "{device} wants to pair. Type this PIN there; cancel if you did not start it.",
   "syncUnchanged": "No selected data changed.",
   "syncOverNetwork": "Sync over local network",
-  "syncOnDescription": "This device is visible to other Zenify devices on the same Wi-Fi. Pair them once with a PIN, then libraries merge both ways.",
   "syncOffDescription": "Sync your library and listening recap between your devices over Wi-Fi. No account or cloud server.",
   "syncDevices": "Devices",
   "syncFindDevices": "Find devices on this network and pair them.",
@@ -440,5 +436,6 @@
   "volume": "Volume",
   "yes": "Yes",
   "youtubePlaylistLinkOrId": "YouTube playlist link or ID",
-  "wavesFollowMusic": "Follow the music (asks for audio access)"
+  "wavesFollowMusic": "Follow the music (asks for audio access)",
+  "imageSaved": "Image saved"
 }

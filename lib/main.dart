@@ -566,6 +566,7 @@ Future<void> _copyLegacyDesktopDataIfNeeded(
       ),
       documents,
     ],
+    log: logger.log,
   );
   if (report.failed.isNotEmpty) {
     throw StateError(

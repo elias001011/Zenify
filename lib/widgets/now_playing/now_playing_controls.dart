@@ -40,14 +40,12 @@ class NowPlayingControls extends StatelessWidget {
   const NowPlayingControls({
     super.key,
     required this.size,
-    required this.audioId,
     required this.adjustedIconSize,
     required this.adjustedMiniIconSize,
     required this.metadata,
   });
 
   final Size size;
-  final dynamic audioId;
   final double adjustedIconSize;
   final double adjustedMiniIconSize;
   final MediaItem metadata;
@@ -222,10 +220,14 @@ class PlayerControlButtons extends StatelessWidget {
     required this.metadata,
     required this.iconSize,
     required this.miniIconSize,
+    this.flush = false,
   });
   final MediaItem metadata;
   final double iconSize;
   final double miniIconSize;
+
+  /// The outer buttons reach the edges, to line up with an artwork above.
+  final bool flush;
 
   @override
   Widget build(BuildContext context) {
@@ -241,7 +243,9 @@ class PlayerControlButtons extends StatelessWidget {
         final isTight = maxWidth < 360;
         final isUltraTight = maxWidth < 320;
 
-        final horizontalPadding = isUltraTight
+        final horizontalPadding = flush
+            ? 0.0
+            : isUltraTight
             ? 10.0
             : isTight
             ? 14.0

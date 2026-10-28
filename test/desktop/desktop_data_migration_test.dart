@@ -105,4 +105,29 @@ void main() {
       'offline',
     );
   });
+
+  test(
+    'copies a library whose lock it cannot open, once it checks out',
+    () async {
+      // An empty file is a valid (empty) Hive box; the lock path is taken by a
+      // directory, so it can't be opened, like a folder Zenify may only read.
+      File('${legacy.path}/user.hive').writeAsBytesSync(const []);
+      Directory('${legacy.path}/user.lock').createSync();
+
+      final report = await copyHiveBoxes(from: legacy, to: target);
+
+      expect(report.failed, isEmpty);
+      expect(report.copied, ['user.hive']);
+    },
+  );
+
+  test('refuses an unlockable library that is not a valid box', () async {
+    File('${legacy.path}/user.hive').writeAsStringSync('not hive');
+    Directory('${legacy.path}/user.lock').createSync();
+
+    final report = await copyHiveBoxes(from: legacy, to: target);
+
+    expect(report.failed, isNotEmpty);
+    expect(File('${target.path}/user.hive').existsSync(), isFalse);
+  });
 }

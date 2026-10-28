@@ -57,17 +57,24 @@ LibraryMatches searchLibrary(String query, {bool offlineOnly = false}) {
     ],
   ]).where((playlist) => matches(playlist['title'])).toList();
 
-  final songs = _librarySongs(offlineOnly)
-      .where((song) => matches(song['title']) || matches(song['artist']));
+  final songs = searchLibrarySongs(query, offlineOnly: offlineOnly);
 
   final artists = getLikedArtistItems(offlineOnly: offlineOnly)
       .where((artist) => matches(artist['title']));
 
-  return (
-    artists: artists.toList(),
-    playlists: playlists,
-    songs: songs.toList(),
-  );
+  return (artists: artists.toList(), playlists: playlists, songs: songs);
+}
+
+/// The library's songs whose title or artist matches [query].
+List<Map> searchLibrarySongs(String query, {bool offlineOnly = false}) {
+  final needle = query.trim().toLowerCase();
+  if (needle.isEmpty) return const [];
+  bool matches(Object? value) =>
+      value?.toString().toLowerCase().contains(needle) ?? false;
+  return [
+    for (final song in _librarySongs(offlineOnly))
+      if (matches(song['title']) || matches(song['artist'])) song,
+  ];
 }
 
 /// Every song of the library once: downloaded first, so a song plays from

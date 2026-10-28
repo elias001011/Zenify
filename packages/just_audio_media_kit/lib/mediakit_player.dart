@@ -70,6 +70,9 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   /// Reads an mpv property of this player as a string ('' when unset).
   Future<String> getMpvProperty(String key) => getProperty(_player, key);
 
+  /// Runs an mpv input command on this player, e.g. `['af', 'add', ...]`.
+  Future<void> mpvCommand(List<String> args) => command(_player, args);
+
   MediaKitPlayer(super.id) {
     latest = this;
     _player = Player(
