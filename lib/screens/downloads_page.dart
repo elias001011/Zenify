@@ -37,8 +37,6 @@ import 'package:musify/widgets/song_bar.dart';
 class DownloadsPage extends StatelessWidget {
   const DownloadsPage({super.key});
 
-  static const double _maxWidth = 880;
-
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n!;
@@ -74,20 +72,13 @@ class DownloadsPage extends StatelessWidget {
           ],
           body: entries.isEmpty
               ? _buildEmpty(context)
-              : LayoutBuilder(
-                  builder: (context, constraints) {
-                    final side =
-                        (constraints.maxWidth - _maxWidth).clamp(
-                              0.0,
-                              double.infinity,
-                            ) /
-                            2 +
-                        commonSingleChildScrollViewPadding.left;
+              : Builder(
+                  builder: (context) {
                     return CustomScrollView(
                       slivers: [
                         const SliverIslandTopSpace(),
                         SliverPadding(
-                          padding: EdgeInsets.symmetric(horizontal: side),
+                          padding: commonSingleChildScrollViewPadding,
                           sliver: SliverMainAxisGroup(
                             slivers: [
                               ..._section(

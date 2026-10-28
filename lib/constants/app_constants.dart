@@ -50,9 +50,12 @@ const commonCustomBarRadiusLast = BorderRadius.vertical(
 
 const commonListViewBottomPadding = EdgeInsets.only(bottom: 8);
 
-const commonBarContentPadding = EdgeInsets.symmetric(
-  vertical: 12,
-  horizontal: 10,
+/// Shared by list rows (songs, playlists, artists, settings, radio), so
+/// every list lines up the same.
+const commonBarPadding = EdgeInsetsDirectional.symmetric(
+  vertical: 10,
+  horizontal: 12,
 );
+const commonBarArtworkSize = 52.0;
 
 const commonPlaylistArtworkDivision = 1.75;

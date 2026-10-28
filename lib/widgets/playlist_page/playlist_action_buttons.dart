@@ -23,6 +23,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/widgets/button_width.dart';
 
 /// Play and shuffle whatever the page is about, shared by the playlist and the
 /// artist pages. While [isLoading] the songs are still being read, so both
@@ -47,32 +48,34 @@ class PlaylistActionButtons extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          Expanded(
-            child: FilledButton.icon(
-              icon: isLoading
-                  ? const _Spinner()
-                  : const Icon(FluentIcons.play_24_filled),
-              label: Text(context.l10n!.play),
-              onPressed: isLoading ? null : onPlay,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.secondaryContainer,
-                foregroundColor: colorScheme.onSecondaryContainer,
+      child: ButtonWidth(
+        child: Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                icon: isLoading
+                    ? const _Spinner()
+                    : const Icon(FluentIcons.play_24_filled),
+                label: Text(context.l10n!.play),
+                onPressed: isLoading ? null : onPlay,
               ),
-              icon: isLoading
-                  ? const _Spinner()
-                  : const Icon(FluentIcons.arrow_shuffle_24_filled),
-              label: Text(context.l10n!.shuffle),
-              onPressed: isLoading ? null : onShuffle,
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: colorScheme.secondaryContainer,
+                  foregroundColor: colorScheme.onSecondaryContainer,
+                ),
+                icon: isLoading
+                    ? const _Spinner()
+                    : const Icon(FluentIcons.arrow_shuffle_24_filled),
+                label: Text(context.l10n!.shuffle),
+                onPressed: isLoading ? null : onShuffle,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

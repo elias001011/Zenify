@@ -77,30 +77,25 @@ class KeyboardShortcutsPage extends StatelessWidget {
         valueListenable: KeyboardShortcutsManager.bindings,
         builder: (context, bindings, _) => SingleChildScrollView(
           padding: withIslandInset(context, commonSingleChildScrollViewPadding),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 880),
-              child: Column(
-                children: [
-                  _buildSection(
-                    context,
-                    l10n.playback,
-                    FluentIcons.play_circle_24_filled,
-                    _playbackActions,
-                    bindings,
-                  ),
-                  _buildSection(
-                    context,
-                    l10n.navigation,
-                    FluentIcons.navigation_24_filled,
-                    _navigationActions,
-                    bindings,
-                  ),
-                  const SizedBox(height: 20),
-                  const MiniPlayerBottomSpace(),
-                ],
+          child: Column(
+            children: [
+              _buildSection(
+                context,
+                l10n.playback,
+                FluentIcons.play_circle_24_filled,
+                _playbackActions,
+                bindings,
               ),
-            ),
+              _buildSection(
+                context,
+                l10n.navigation,
+                FluentIcons.navigation_24_filled,
+                _navigationActions,
+                bindings,
+              ),
+              const SizedBox(height: 20),
+              const MiniPlayerBottomSpace(),
+            ],
           ),
         ),
       ),

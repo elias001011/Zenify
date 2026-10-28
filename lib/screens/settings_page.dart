@@ -84,14 +84,7 @@ class SettingsPage extends StatelessWidget {
       title: context.l10n!.settings,
       body: SingleChildScrollView(
         padding: withIslandInset(context, commonSingleChildScrollViewPadding),
-        child: isDesktopPlatform
-            ? Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 880),
-                  child: content,
-                ),
-              )
-            : content,
+        child: content,
       ),
     );
   }

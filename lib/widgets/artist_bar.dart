@@ -21,6 +21,7 @@
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/artist_service.dart';
 import 'package:musify/utilities/artwork_provider.dart';
@@ -52,7 +53,7 @@ class ArtistBar extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+          padding: commonBarPadding,
           child: Row(
             children: [
               _ArtistArtwork(image: image),
@@ -109,8 +110,8 @@ class _ArtistArtwork extends StatelessWidget {
       return ClipOval(
         child: Image(
           image: ArtworkProvider.get(image!),
-          width: 52,
-          height: 52,
+          width: commonBarArtworkSize,
+          height: commonBarArtworkSize,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _fallback(colorScheme),
         ),
@@ -122,8 +123,8 @@ class _ArtistArtwork extends StatelessWidget {
 
   Widget _fallback(ColorScheme colorScheme) {
     return Container(
-      width: 52,
-      height: 52,
+      width: commonBarArtworkSize,
+      height: commonBarArtworkSize,
       decoration: BoxDecoration(
         color: colorScheme.secondaryContainer,
         shape: BoxShape.circle,

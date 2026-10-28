@@ -35,6 +35,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
+import 'package:musify/widgets/button_width.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
@@ -486,12 +487,14 @@ class _ViewMoreButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
-      child: SizedBox(
-        width: double.infinity,
-        child: FilledButton.tonalIcon(
-          onPressed: onPressed,
-          icon: const Icon(FluentIcons.more_horizontal_24_regular),
-          label: Text(context.l10n!.tapToView),
+      child: ButtonWidth(
+        child: SizedBox(
+          width: double.infinity,
+          child: FilledButton.tonalIcon(
+            onPressed: onPressed,
+            icon: const Icon(FluentIcons.more_horizontal_24_regular),
+            label: Text(context.l10n!.tapToView),
+          ),
         ),
       ),
     );
