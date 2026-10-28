@@ -29,6 +29,7 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/downloads_location_service.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
@@ -325,13 +326,19 @@ class _DownloadsFolderBarState extends State<_DownloadsFolderBar> {
     if (picked != null && mounted) _confirmChange(picked);
   }
 
+  /// Files being written can't be moved; tells the user when so.
+  bool _downloadsBusy() {
+    final busy =
+        offlinePlaylistService.activeDownloads.isNotEmpty ||
+        DownloadManager.instance.active.isNotEmpty;
+    if (busy) showToast(context, context.l10n!.downloadsFolderBusy);
+    return busy;
+  }
+
   /// [folder] is null for the default location.
   void _confirmChange(String? folder) {
     final l10n = context.l10n!;
-    if (offlinePlaylistService.activeDownloads.isNotEmpty) {
-      showToast(context, l10n.downloadsFolderBusy);
-      return;
-    }
+    if (_downloadsBusy()) return;
 
     showDialog<void>(
       context: context,
@@ -350,6 +357,8 @@ class _DownloadsFolderBarState extends State<_DownloadsFolderBar> {
   }
 
   Future<void> _move(String? folder) async {
+    // A download may have started while the confirmation was open.
+    if (_downloadsBusy()) return;
     final l10n = context.l10n!;
     final navigator = Navigator.of(context, rootNavigator: true);
     unawaited(
@@ -371,8 +380,15 @@ class _DownloadsFolderBarState extends State<_DownloadsFolderBar> {
       ),
     );
 
-    final status = await DownloadsLocation.change(folder);
-    navigator.pop();
+    DownloadsMoveStatus status;
+    try {
+      status = await DownloadsLocation.change(folder);
+    } catch (e, stackTrace) {
+      logger.log('Moving downloads failed', error: e, stackTrace: stackTrace);
+      status = DownloadsMoveStatus.partiallyMoved;
+    } finally {
+      navigator.pop();
+    }
     if (!mounted) return;
     setState(() {});
     showToast(context, switch (status) {

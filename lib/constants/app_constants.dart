@@ -23,6 +23,9 @@ import 'package:material_ui/material_ui.dart';
 
 const appName = 'Zenify';
 
+/// Package id on Android and app id (`.desktop` name) on Linux.
+const appDesktopId = 'io.github.elias001011.zenify';
+
 /// Where this fork's source code and releases live.
 const appRepository = 'elias001011/Musify-Next';
 

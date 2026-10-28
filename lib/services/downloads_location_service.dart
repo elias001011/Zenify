@@ -90,19 +90,25 @@ class DownloadsLocation {
     final sources = <String>{downloadsDirPath, defaultPath, ?customPath}
       ..remove(target);
 
-    for (final source in sources) {
-      failed += await _moveFolderContents(source, target);
-    }
+    try {
+      for (final source in sources) {
+        failed += await _moveFolderContents(source, target);
+      }
 
-    // Copied, not moved: files outside our folders, such as an older
-    // documents directory, may still belong to another Musify install.
-    for (final song in userOfflineSongs.value) {
-      if (song is! Map) continue;
-      failed += await _copyReferencedFile(song['audioPath'], target, false);
-      failed += await _copyReferencedFile(song['artworkPath'], target, true);
+      // Copied, not moved: files outside our folders, such as an older
+      // documents directory, may still belong to another Musify install.
+      for (final song in userOfflineSongs.value) {
+        if (song is! Map) continue;
+        failed += await _copyReferencedFile(song['audioPath'], target, false);
+        failed += await _copyReferencedFile(song['artworkPath'], target, true);
+      }
+    } catch (e, stackTrace) {
+      failed++;
+      logger.log('Moving downloads stopped', error: e, stackTrace: stackTrace);
+    } finally {
+      // Whatever moved so far must be found again.
+      _rewriteStoredPaths(target);
     }
-
-    _rewriteStoredPaths(target);
 
     if (target == _trimSeparator(defaultPath)) {
       await deleteData('userNoBackup', _storageKey);
@@ -173,7 +179,7 @@ class DownloadsLocation {
     final destination = '$target/$subDir/${file.uri.pathSegments.last}';
     if (destination == path || await File(destination).exists()) return 0;
     try {
-      await file.copy(destination);
+      await _copy(file, destination);
       return 0;
     } catch (e, stackTrace) {
       logger.log(
@@ -187,7 +193,9 @@ class DownloadsLocation {
 
   static Future<bool> _moveFile(File file, String destination) async {
     try {
-      if (await File(destination).exists()) {
+      final existing = File(destination);
+      if (await existing.exists() &&
+          await existing.length() == await file.length()) {
         // Same song id, already there: keep one copy, not two.
         await file.delete();
         return true;
@@ -196,7 +204,7 @@ class DownloadsLocation {
         await file.rename(destination);
       } on FileSystemException {
         // rename() can't cross drives: copy, then delete the original.
-        await file.copy(destination);
+        await _copy(file, destination);
         await file.delete();
       }
       return true;
@@ -207,6 +215,19 @@ class DownloadsLocation {
         stackTrace: stackTrace,
       );
       return false;
+    }
+  }
+
+  /// Through a temporary name, so an interrupted copy never looks complete.
+  static Future<void> _copy(File file, String destination) async {
+    final partial = '$destination.partial';
+    try {
+      await file.copy(partial);
+      await File(partial).rename(destination);
+    } catch (_) {
+      final leftover = File(partial);
+      if (await leftover.exists()) await leftover.delete();
+      rethrow;
     }
   }
 

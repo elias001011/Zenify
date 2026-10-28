@@ -6,7 +6,7 @@
 #define RepoRoot "..\..\.."
 
 [Setup]
-AppId={{B57BDAA0-67EF-45CD-A1E7-68DBFE7F5CCC}
+AppId={{15A7A56C-610A-462A-9210-1DFA1036E882}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}

@@ -27,7 +27,7 @@ class LinuxMediaControls extends DBusObject {
     DBusClient? bus,
     String? name,
   }) : _bus = bus ?? DBusClient.session(),
-       name = name ?? 'org.mpris.MediaPlayer2.musify.instance$pid',
+       name = name ?? 'org.mpris.MediaPlayer2.zenify.instance$pid',
        super(DBusObjectPath('/org/mpris/MediaPlayer2'));
 
   static const rootInterface = 'org.mpris.MediaPlayer2';
@@ -119,7 +119,7 @@ class LinuxMediaControls extends DBusObject {
     'CanRaise': DBusBoolean(raise != null),
     'HasTrackList': const DBusBoolean(false),
     'Identity': const DBusString(appName),
-    'DesktopEntry': const DBusString('musify'),
+    'DesktopEntry': const DBusString(appDesktopId),
     'SupportedUriSchemes': DBusArray.string([]),
     'SupportedMimeTypes': DBusArray.string([]),
   };

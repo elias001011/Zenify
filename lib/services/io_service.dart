@@ -57,13 +57,31 @@ class FilePaths {
 
   static final _youtubeIdPattern = RegExp(r'^[A-Za-z0-9_-]{11}$');
 
+  /// Whether [path] is inside our download folders. Files elsewhere, such as
+  /// a library copied from another Musify install, are never deleted.
+  static bool isOwnDownload(String path) {
+    String normalize(String value) {
+      final result = value.replaceAll(r'\', '/');
+      return Platform.isWindows ? result.toLowerCase() : result;
+    }
+
+    final file = normalize(path);
+    return {downloadsDirPath, applicationDirPath}.any((root) {
+      final prefix = normalize(root);
+      return file.startsWith(prefix.endsWith('/') ? prefix : '$prefix/');
+    });
+  }
+
   /// Deletes the files [offlineSongs] point at, plus any of ours left behind.
   static Future<void> deleteDownloadedFiles(List offlineSongs) async {
     final paths = <String>{
       for (final song in offlineSongs)
         if (song is Map) ...[
-          if (song['audioPath'] case final String path) path,
-          if (song['artworkPath'] case final String path) path,
+          if (song['audioPath'] case final String path when isOwnDownload(path))
+            path,
+          if (song['artworkPath'] case final String path
+              when isOwnDownload(path))
+            path,
         ],
     };
 

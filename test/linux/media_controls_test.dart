@@ -140,7 +140,7 @@ void main() {
       () async {
         expect(
           (await remote.getProperty(root, 'DesktopEntry')).asString(),
-          'musify',
+          'io.github.elias001011.zenify',
         );
         expect(
           (await remote.getProperty(root, 'Identity')).asString(),

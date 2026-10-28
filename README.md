@@ -95,8 +95,9 @@ Get the files for your platform from the
 | Windows | `Zenify-windows-x64-setup.exe` | Lets you choose where data and downloads go. |
 | Windows (portable) | `Zenify-windows-x64-portable.zip` | No installation. |
 
-Zenify installs next to Musify and keeps its own data; use the backup in
-Settings to bring your library over.
+Zenify installs next to Musify and keeps its own data. On desktop, the first
+run copies an existing Musify library (Musify's own files are never changed);
+elsewhere, use the backup in Settings to bring it over.
 
 Every release includes `SHA256SUMS.txt` to verify the files. iOS is not
 supported.

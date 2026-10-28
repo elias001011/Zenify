@@ -33,7 +33,7 @@ String desktopAudioErrorMessage(Object error) {
   final details = error.toString();
   if (details.toLowerCase().contains('libmpv')) {
     return '$appName could not start playback because libmpv is not installed.\n\n'
-        'Install the libmpv runtime library and restart Musify:\n'
+        'Install the libmpv runtime library and restart $appName:\n'
         '  Fedora:         sudo dnf install mpv-libs\n'
         '  Debian/Ubuntu:  sudo apt install libmpv2 (libmpv1 on older releases)\n'
         '  Arch:           sudo pacman -S mpv\n\n'
