@@ -5,7 +5,7 @@ repository: https://github.com/elias001011/Musify-Next
 issue_tracker: https://github.com/elias001011/Musify-Next/issues
 
 publish_to: 'none'
-version: 0.1.1+2 # run update.sh after changing the version
+version: 0.1.2+3 # run update.sh after changing the version
 
 environment:
   sdk: '>=3.13.0 <4.0.0'
