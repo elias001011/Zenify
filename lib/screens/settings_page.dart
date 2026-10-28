@@ -160,8 +160,7 @@ class SettingsPage extends StatelessWidget {
             onChanged: (value) => _toggleDynamicBackground(context, value),
           ),
         ),
-        if (Theme.of(context).brightness == Brightness.dark &&
-            !dynamicBackground.value)
+        if (Theme.of(context).brightness == Brightness.dark)
           CustomBar(
             context.l10n!.pureBlackTheme,
             FluentIcons.color_background_24_regular,
@@ -903,7 +902,6 @@ class SettingsPage extends StatelessWidget {
   void _toggleDynamicBackground(BuildContext context, bool value) {
     addOrUpdateData<bool>('settings', 'dynamicBackground', value);
     dynamicBackground.value = value;
-    Musify.updateAppState(context);
     showToast(context, context.l10n!.settingChangedMsg);
   }
 

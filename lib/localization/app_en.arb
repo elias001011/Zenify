@@ -112,7 +112,7 @@
   "downloadsRetry": "Retry",
   "downloadsRetryAll": "Retry all",
   "dynamicBackground": "Dynamic background",
-  "dynamicBackgroundDescription": "Album colours glow softly behind them. Uses the pure black dark theme.",
+  "dynamicBackgroundDescription": "Album colours softly paint the page background.",
   "dynamicColor": "Dynamic accent color (Android 12+)",
   "dynamicColorDescription": "Use the accent colors from your Android system theme.",
   "editFolder": "Edit folder",

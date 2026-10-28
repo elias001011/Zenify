@@ -112,7 +112,7 @@
   "downloadsRetry": "Tentar de novo",
   "downloadsRetryAll": "Tentar todos",
   "dynamicBackground": "Fundo dinâmico",
-  "dynamicBackgroundDescription": "As cores dos álbuns brilham suavemente atrás deles. Usa o tema escuro pure black.",
+  "dynamicBackgroundDescription": "As cores dos álbuns pintam suavemente o fundo da página.",
   "dynamicColor": "Cor de destaque dinâmica (Android 12+)",
   "dynamicColorDescription": "Use as cores de destaque do tema do seu sistema Android.",
   "editFolder": "Editar pasta",

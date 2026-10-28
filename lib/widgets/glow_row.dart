@@ -20,7 +20,6 @@
  */
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -51,31 +50,33 @@ class GlowRow extends StatefulWidget {
   State<GlowRow> createState() => _GlowRowState();
 }
 
-class _GlowRowState extends State<GlowRow>
-    with SingleTickerProviderStateMixin, ArtworkGlowColors {
+class _GlowRowState extends State<GlowRow> with SingleTickerProviderStateMixin {
   final _controller = ScrollController();
+  late final _colors = GlowColors(this);
+  late final _repaint = Listenable.merge([_controller, _colors.listenable]);
 
   /// Whether there is more to see before and after, for the desktop arrows.
   final _canScroll = ValueNotifier<(bool, bool)>((false, false));
-  late final Listenable _repaint = Listenable.merge([_controller, glowRepaint]);
+
+  void _update() =>
+      _colors.update(widget.sources, Theme.of(context).colorScheme.primary);
 
   @override
-  void initState() {
-    super.initState();
-    resolveGlowColors(widget.sources);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _update();
   }
 
   @override
   void didUpdateWidget(GlowRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!listEquals(oldWidget.sources, widget.sources)) {
-      resolveGlowColors(widget.sources);
-    }
+    _update();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _colors.dispose();
     _canScroll.dispose();
     super.dispose();
   }
@@ -127,7 +128,7 @@ class _GlowRowState extends State<GlowRow>
       builder: (context, constraints) {
         final height = constraints.maxHeight;
         // The glow reaches well past the row, above and below it.
-        final reach = height * 0.6;
+        final reach = height * 0.9;
 
         return Stack(
           clipBehavior: Clip.none,
@@ -146,13 +147,11 @@ class _GlowRowState extends State<GlowRow>
                           child: CustomPaint(
                             painter: _RowGlowPainter(
                               controller: _controller,
-                              colors: glowColors,
-                              appColor: Theme.of(context).colorScheme.primary,
+                              colors: _colors,
                               itemExtent: widget.itemExtent,
                               rowTop: reach,
                               rowHeight: height,
                               strength: artworkGlowStrength(context),
-                              fade: glowFade,
                               repaint: _repaint,
                             ),
                           ),
@@ -194,40 +193,36 @@ class _RowGlowPainter extends CustomPainter {
   _RowGlowPainter({
     required this.controller,
     required this.colors,
-    required this.appColor,
     required this.itemExtent,
     required this.rowTop,
     required this.rowHeight,
     required this.strength,
-    required this.fade,
     required Listenable repaint,
   }) : super(repaint: repaint);
 
   final ScrollController controller;
-  final Map<int, Color?> colors;
-  final Color appColor;
+  final GlowColors colors;
   final double itemExtent;
   final double rowTop;
   final double rowHeight;
   final double strength;
-  final Animation<double> fade;
 
   @override
   void paint(Canvas canvas, Size size) {
     final offset = controller.hasClients ? controller.offset : 0.0;
-    final radius = rowHeight * 1.1;
+    final radius = rowHeight * 1.35;
     final centerY = rowTop + rowHeight / 2;
-    final alpha = strength * fade.value;
-    if (alpha <= 0) return;
 
-    for (final entry in colors.entries) {
-      final centerX = entry.key * itemExtent + itemExtent / 2 - offset;
+    for (final index in colors.indices) {
+      final centerX = index * itemExtent + itemExtent / 2 - offset;
       if (centerX < -radius || centerX > size.width + radius) continue;
+      final color = colors.colorAt(index);
+      if (color == null || color.a == 0) continue;
       paintArtworkGlow(
         canvas,
         Rect.fromCircle(center: Offset(centerX, centerY), radius: radius),
-        entry.value ?? appColor,
-        alpha,
+        color,
+        strength * color.a,
       );
     }
   }
@@ -235,7 +230,7 @@ class _RowGlowPainter extends CustomPainter {
   @override
   bool shouldRepaint(_RowGlowPainter oldDelegate) =>
       oldDelegate.strength != strength ||
-      oldDelegate.appColor != appColor ||
+      oldDelegate.colors != colors ||
       oldDelegate.itemExtent != itemExtent ||
       oldDelegate.rowHeight != rowHeight;
 }

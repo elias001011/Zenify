@@ -19,13 +19,18 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/artwork_colors.dart';
 import 'package:musify/services/settings_manager.dart';
 
 /// Glow strength at the centre, by theme.
 double artworkGlowStrength(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark ? 0.5 : 0.35;
+    Theme.of(context).brightness == Brightness.dark ? 0.42 : 0.3;
+
+// (1 - x²)³ from the centre (x = 0) to the edge (x = 1): no visible rim.
+const _falloffStops = [0.0, 0.25, 0.5, 0.75, 1.0];
+const _falloff = [1.0, 0.82, 0.42, 0.084, 0.0];
 
 /// Paints one soft glow filling the oval [bounds]: the look of the dynamic
 /// background, shared by every glow so they all match.
@@ -37,72 +42,93 @@ void paintArtworkGlow(Canvas canvas, Rect bounds, Color color, double alpha) {
     ..scale(bounds.width / bounds.height, 1);
   final paint = Paint()
     ..shader = RadialGradient(
-      colors: [
-        color.withValues(alpha: alpha),
-        color.withValues(alpha: alpha * 0.45),
-        color.withValues(alpha: 0),
-      ],
-      stops: const [0, 0.5, 1],
+      colors: [for (final f in _falloff) color.withValues(alpha: alpha * f)],
+      stops: _falloffStops,
     ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius));
   canvas
     ..drawCircle(Offset.zero, radius, paint)
     ..restore();
 }
 
-/// Resolves artwork colours for glows and fades them in when they arrive.
-/// Colours already known (coming back to a page) show at once.
-mixin ArtworkGlowColors<T extends StatefulWidget>
-    on SingleTickerProviderStateMixin<T> {
-  /// Glow colour by index; null glows in the app colour (no artwork, or no
-  /// colour found in it). Missing while still resolving.
-  final glowColors = <int, Color?>{};
-  final _colorsChanged = ValueNotifier<int>(0);
-  late final _fadeIn = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
+/// The glow colours of a set of artworks, by index. They ease from one set
+/// to the next, and each fades in when its artwork's colour arrives.
+class GlowColors {
+  GlowColors(TickerProvider vsync)
+    : _transition = AnimationController(
+        vsync: vsync,
+        duration: const Duration(milliseconds: 1200),
+        value: 1,
+      );
+
+  final AnimationController _transition;
+  var _from = <int, Color>{};
+  var _to = <int, Color>{};
+  List<String?>? _sources;
+  Color? _appColor;
   int _generation = 0;
 
-  /// 0 to 1, for the painter's alpha.
-  Animation<double> get glowFade => _fadeIn;
-
   /// What a glow painter repaints on.
-  late final Listenable glowRepaint = Listenable.merge([
-    _fadeIn,
-    _colorsChanged,
-  ]);
+  Listenable get listenable => _transition;
 
-  void resolveGlowColors(List<String?> sources) {
+  /// Indices that have a glow now or are easing out of one.
+  Iterable<int> get indices => {..._from.keys, ..._to.keys};
+
+  /// The colour of glow [index] now; its alpha carries the fade.
+  Color? colorAt(int index) {
+    final from = _from[index];
+    final to = _to[index];
+    if (from == null && to == null) return null;
+    return Color.lerp(
+      from ?? to!.withAlpha(0),
+      to ?? from!.withAlpha(0),
+      Curves.easeInOut.transform(_transition.value),
+    );
+  }
+
+  /// Glows for [sources]; one without artwork, or without a colour found in
+  /// it, glows in [appColor]. Known colours show at once the first time.
+  void update(List<String?> sources, Color appColor) {
+    if (appColor == _appColor && listEquals(sources, _sources)) return;
+    final first = _sources == null;
+    _sources = List.of(sources);
+    _appColor = appColor;
     final generation = ++_generation;
-    glowColors.clear();
-    var allCached = true;
+
+    final next = <int, Color>{};
     for (var i = 0; i < sources.length; i++) {
       final source = sources[i];
       if (source == null || source.isEmpty) {
-        glowColors[i] = null;
-        continue;
+        next[i] = appColor;
+      } else if (ArtworkColors.isCached(source)) {
+        next[i] = ArtworkColors.cached(source) ?? appColor;
+      } else {
+        ArtworkColors.of(source).then((color) {
+          if (generation == _generation) {
+            _retarget({..._to, i: color ?? appColor});
+          }
+        });
       }
-      if (ArtworkColors.isCached(source)) {
-        glowColors[i] = ArtworkColors.cached(source);
-        continue;
-      }
-      allCached = false;
-      ArtworkColors.of(source).then((color) {
-        if (!mounted || generation != _generation) return;
-        glowColors[i] = color;
-        _colorsChanged.value++;
-        if (!_fadeIn.isAnimating && !_fadeIn.isCompleted) _fadeIn.forward();
-      });
     }
-    if (allCached) _fadeIn.value = 1;
-    _colorsChanged.value++;
+
+    if (first) {
+      _to = next;
+    } else {
+      _retarget(next);
+    }
   }
 
-  @override
+  void _retarget(Map<int, Color> next) {
+    _from = {
+      for (final i in indices)
+        if (colorAt(i) case final color? when color.a > 0) i: color,
+    };
+    _to = next;
+    _transition.forward(from: 0);
+  }
+
   void dispose() {
-    _colorsChanged.dispose();
-    _fadeIn.dispose();
-    super.dispose();
+    _generation++;
+    _transition.dispose();
   }
 }
 
@@ -121,17 +147,28 @@ class ArtworkGlow extends StatefulWidget {
 }
 
 class _ArtworkGlowState extends State<ArtworkGlow>
-    with SingleTickerProviderStateMixin, ArtworkGlowColors {
+    with SingleTickerProviderStateMixin {
+  late final _colors = GlowColors(this);
+
+  void _update() =>
+      _colors.update([widget.source], Theme.of(context).colorScheme.primary);
+
   @override
-  void initState() {
-    super.initState();
-    resolveGlowColors([widget.source]);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _update();
   }
 
   @override
   void didUpdateWidget(ArtworkGlow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.source != widget.source) resolveGlowColors([widget.source]);
+    _update();
+  }
+
+  @override
+  void dispose() {
+    _colors.dispose();
+    super.dispose();
   }
 
   @override
@@ -142,11 +179,8 @@ class _ArtworkGlowState extends State<ArtworkGlow>
           ? child!
           : CustomPaint(
               painter: _GlowPainter(
-                colors: glowColors,
-                appColor: Theme.of(context).colorScheme.primary,
-                fade: glowFade,
+                colors: _colors,
                 strength: artworkGlowStrength(context),
-                repaint: glowRepaint,
               ),
               child: child,
             ),
@@ -156,34 +190,26 @@ class _ArtworkGlowState extends State<ArtworkGlow>
 }
 
 class _GlowPainter extends CustomPainter {
-  _GlowPainter({
-    required this.colors,
-    required this.appColor,
-    required this.fade,
-    required this.strength,
-    required Listenable repaint,
-  }) : super(repaint: repaint);
+  _GlowPainter({required this.colors, required this.strength})
+    : super(repaint: colors.listenable);
 
-  final Map<int, Color?> colors;
-  final Color appColor;
-  final Animation<double> fade;
+  final GlowColors colors;
   final double strength;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final alpha = strength * fade.value;
-    if (!colors.containsKey(0) || alpha <= 0) return;
-    final color = colors[0] ?? appColor;
+    final color = colors.colorAt(0);
+    if (color == null || color.a == 0) return;
     // Wider than tall and well past the child, so it reads as background.
     final bounds = Rect.fromCenter(
       center: size.center(Offset.zero),
-      width: (size.width * 1.2).clamp(0, size.height * 5),
-      height: size.height * 2.4,
+      width: (size.width * 1.3).clamp(0, size.height * 5),
+      height: size.height * 2.8,
     );
-    paintArtworkGlow(canvas, bounds, color, alpha);
+    paintArtworkGlow(canvas, bounds, color, strength * color.a);
   }
 
   @override
   bool shouldRepaint(_GlowPainter oldDelegate) =>
-      oldDelegate.strength != strength || oldDelegate.appColor != appColor;
+      oldDelegate.strength != strength || oldDelegate.colors != colors;
 }

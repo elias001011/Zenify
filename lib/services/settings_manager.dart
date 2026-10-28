@@ -42,13 +42,11 @@ final useSystemColor = ValueNotifier<bool>(
   Hive.box('settings').get('useSystemColor', defaultValue: true),
 );
 
-/// Album colours glowing behind their elements. It needs the pure black
-/// dark theme, so while it is on the pure black choice is not offered.
+/// Album colours glowing softly in the page background.
 final dynamicBackground = ValueNotifier<bool>(
   Hive.box('settings').get('dynamicBackground', defaultValue: true),
 );
 
-/// The user's pure black choice, used when [dynamicBackground] is off.
 final usePureBlackColor = ValueNotifier<bool>(
   Hive.box('settings').get('pureBlackTheme', defaultValue: true),
 );
@@ -69,7 +67,7 @@ FloatingEffect _readFloatingEffect() {
 /// How the floating island, dock and rail let the content behind show.
 final floatingEffect = ValueNotifier<FloatingEffect>(_readFloatingEffect());
 
-bool get isPureBlackTheme => dynamicBackground.value || usePureBlackColor.value;
+bool get isPureBlackTheme => usePureBlackColor.value;
 
 final offlineMode = ValueNotifier<bool>(
   Hive.box('settings').get('offlineMode', defaultValue: false),
