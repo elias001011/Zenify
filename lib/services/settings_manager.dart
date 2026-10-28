@@ -53,6 +53,22 @@ final usePureBlackColor = ValueNotifier<bool>(
   Hive.box('settings').get('pureBlackTheme', defaultValue: true),
 );
 
+enum FloatingEffect { solid, translucent, blurred }
+
+FloatingEffect _readFloatingEffect() {
+  final stored = Hive.box('settings').get('floatingEffect');
+  for (final effect in FloatingEffect.values) {
+    if (effect.name == stored) return effect;
+  }
+  // Blur costs GPU time; phones get the cheap tint by default.
+  return isDesktopPlatform
+      ? FloatingEffect.blurred
+      : FloatingEffect.translucent;
+}
+
+/// How the floating island, dock and rail let the content behind show.
+final floatingEffect = ValueNotifier<FloatingEffect>(_readFloatingEffect());
+
 bool get isPureBlackTheme => dynamicBackground.value || usePureBlackColor.value;
 
 final offlineMode = ValueNotifier<bool>(
@@ -191,6 +207,7 @@ void reloadSettingsFromStorage() {
     defaultValue: false,
   );
   useSystemColor.value = settings.get('useSystemColor', defaultValue: true);
+  floatingEffect.value = _readFloatingEffect();
   dynamicBackground.value = settings.get(
     'dynamicBackground',
     defaultValue: true,

@@ -19,10 +19,15 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:ui' show ImageFilter;
+
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/services/settings_manager.dart';
 
 /// The rounded surface every floating element (top island, bottom dock,
 /// desktop rail, mini player) sits on, so they share one look.
+///
+/// [floatingEffect] decides how much of the content behind shows through.
 class FloatingSurface extends StatelessWidget {
   const FloatingSurface({
     super.key,
@@ -35,11 +40,55 @@ class FloatingSurface extends StatelessWidget {
   final BorderRadius borderRadius;
   final EdgeInsetsGeometry padding;
 
+  static const _blurSigma = 18.0;
+
   @override
   Widget build(BuildContext context) {
+    return ValueListenableBuilder<FloatingEffect>(
+      valueListenable: floatingEffect,
+      builder: (context, effect, _) => _build(context, effect),
+    );
+  }
+
+  Widget _build(BuildContext context, FloatingEffect effect) {
     final colorScheme = Theme.of(context).colorScheme;
     final dark = colorScheme.brightness == Brightness.dark;
+    final base = colorScheme.surfaceContainer;
+    final color = switch (effect) {
+      FloatingEffect.solid => base,
+      FloatingEffect.translucent => base.withValues(alpha: dark ? 0.78 : 0.82),
+      FloatingEffect.blurred => base.withValues(alpha: dark ? 0.55 : 0.6),
+    };
 
+    Widget surface = Material(
+      color: color,
+      borderRadius: borderRadius,
+      clipBehavior: Clip.antiAlias,
+      child: DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
+        child: Padding(padding: padding, child: child),
+      ),
+    );
+
+    if (effect == FloatingEffect.blurred) {
+      surface = ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
+          child: surface,
+        ),
+      );
+    }
+
+    // A shadow under a see-through surface would darken what shows through.
+    if (effect != FloatingEffect.solid) return surface;
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: borderRadius,
@@ -51,22 +100,7 @@ class FloatingSurface extends StatelessWidget {
           ),
         ],
       ),
-      child: Material(
-        color: colorScheme.surfaceContainer,
-        borderRadius: borderRadius,
-        clipBehavior: Clip.antiAlias,
-        child: DecoratedBox(
-          position: DecorationPosition.foreground,
-          decoration: BoxDecoration(
-            borderRadius: borderRadius,
-            border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-              width: 0.8,
-            ),
-          ),
-          child: Padding(padding: padding, child: child),
-        ),
-      ),
+      child: surface,
     );
   }
 }

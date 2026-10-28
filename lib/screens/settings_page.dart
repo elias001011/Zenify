@@ -48,6 +48,7 @@ import 'package:musify/widgets/bottom_sheet_bar.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/desktop_settings_section.dart';
+import 'package:musify/widgets/floating_effect_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/section_header.dart';
@@ -158,6 +159,7 @@ class SettingsPage extends StatelessWidget {
             onChanged: (value) => _toggleDynamicBackground(context, value),
           ),
         ),
+        const FloatingEffectBar(),
         if (Theme.of(context).brightness == Brightness.dark &&
             !dynamicBackground.value)
           CustomBar(
