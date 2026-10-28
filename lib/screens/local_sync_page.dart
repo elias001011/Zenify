@@ -261,28 +261,22 @@ class _LocalSyncPageState extends State<LocalSyncPage> {
       title: context.l10n!.syncTitle,
       body: SingleChildScrollView(
         padding: withIslandInset(context, commonSingleChildScrollViewPadding),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 880),
-            child: ValueListenableBuilder<bool>(
-              valueListenable: localSyncEnabled,
-              builder: (context, enabled, _) => Column(
-                children: [
-                  _buildThisDevice(context, enabled),
-                  if (enabled) ...[
-                    _buildCategories(context),
-                    ValueListenableBuilder<LocalSyncState>(
-                      valueListenable: _service.state,
-                      builder: (context, state, _) =>
-                          _buildDevices(context, state),
-                    ),
-                  ] else
-                    _buildOffHint(context),
-                  const SizedBox(height: 20),
-                  const MiniPlayerBottomSpace(),
-                ],
-              ),
-            ),
+        child: ValueListenableBuilder<bool>(
+          valueListenable: localSyncEnabled,
+          builder: (context, enabled, _) => Column(
+            children: [
+              _buildThisDevice(context, enabled),
+              if (enabled) ...[
+                _buildCategories(context),
+                ValueListenableBuilder<LocalSyncState>(
+                  valueListenable: _service.state,
+                  builder: (context, state, _) => _buildDevices(context, state),
+                ),
+              ] else
+                _buildOffHint(context),
+              const SizedBox(height: 20),
+              const MiniPlayerBottomSpace(),
+            ],
           ),
         ),
       ),

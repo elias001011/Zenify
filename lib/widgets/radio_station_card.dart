@@ -21,6 +21,7 @@
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/models/radio_model.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/utilities/artwork_provider.dart';
@@ -97,19 +98,19 @@ class _RadioStationCardState extends State<RadioStationCard> {
       child: GestureDetector(
         onTap: widget.onPressed,
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: commonBarPadding,
           child: Row(
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: Image(
                   image: ArtworkProvider.get(widget.station.image),
-                  width: 56,
-                  height: 56,
+                  width: commonBarArtworkSize,
+                  height: commonBarArtworkSize,
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) => Container(
-                    width: 56,
-                    height: 56,
+                    width: commonBarArtworkSize,
+                    height: commonBarArtworkSize,
                     color: colorScheme.primaryContainer,
                     child: Icon(
                       FluentIcons.sound_source_24_regular,

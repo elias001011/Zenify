@@ -27,6 +27,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
@@ -309,6 +310,7 @@ class SongBar extends StatefulWidget {
     this.playCount,
     this.barPadding,
     this.onAdd,
+    this.trailing,
     super.key,
   });
 
@@ -334,6 +336,9 @@ class SongBar extends StatefulWidget {
 
   /// Replaces the trailing overflow menu with an add button when set.
   final VoidCallback? onAdd;
+
+  /// Shown before the menu, e.g. a download's status.
+  final Widget? trailing;
 
   @override
   State<SongBar> createState() => _SongBarState();
@@ -440,12 +445,7 @@ class _SongBarState extends State<SongBar> {
       child: InkWell(
         onTap: _handleSongTap,
         child: Padding(
-          padding:
-              widget.barPadding ??
-              const EdgeInsetsDirectional.symmetric(
-                vertical: 10,
-                horizontal: 12,
-              ),
+          padding: widget.barPadding ?? commonBarPadding,
           child: Row(
             children: [
               if (widget.rank != null) ...[
@@ -476,6 +476,7 @@ class _SongBarState extends State<SongBar> {
                 ),
               ),
 
+              ?widget.trailing,
               if (widget.onAdd != null)
                 IconButton(
                   padding: EdgeInsets.zero,
@@ -531,7 +532,7 @@ class _SongBarState extends State<SongBar> {
   }
 
   Widget _buildAlbumArt(ColorScheme colorScheme) {
-    const size = 52.0;
+    const size = commonBarArtworkSize;
     final isDurationAvailable =
         widget.showMusicDuration && widget.song['duration'] != null;
 

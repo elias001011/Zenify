@@ -20,6 +20,7 @@
  */
 
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/widgets/shapes/four_sided_cookie_shape.dart';
 
 class CustomBar extends StatelessWidget {
@@ -61,11 +62,11 @@ class CustomBar extends StatelessWidget {
         onTap: onTap,
         onLongPress: onLongPress,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          padding: commonBarPadding,
           child: Row(
             children: [
               FourSidedCookieShape(
-                size: 52,
+                size: commonBarArtworkSize,
                 color: colorScheme.secondaryContainer,
                 child: Icon(tileIcon, size: 26, color: effectiveIconColor),
               ),

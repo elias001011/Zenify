@@ -36,6 +36,7 @@ import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/artist_shelf.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
@@ -45,6 +46,7 @@ import 'package:musify/widgets/playlist_page/like_button.dart';
 import 'package:musify/widgets/playlist_page/playlist_action_buttons.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
+import 'package:musify/widgets/playlist_page/sync_button.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:musify/widgets/spinner.dart';
@@ -214,6 +216,9 @@ class _ArtistPageState extends State<ArtistPage> {
       builder: (context, _) => IslandScaffold(
         title: _artistTitle,
         fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
+        background: _artist == null
+            ? null
+            : PageGlow(source: _artist?['image']?.toString()),
         body: Padding(
           padding: commonSingleChildScrollViewPadding,
           child: CustomScrollView(
@@ -334,12 +339,7 @@ class _ArtistPageState extends State<ArtistPage> {
               songs: _catalog?['list'] as List?,
               requireSnapshotMatch: true,
             ),
-            IconButton.filledTonal(
-              icon: const Icon(FluentIcons.arrow_sync_24_filled),
-              iconSize: 24,
-              onPressed: _refresh,
-              tooltip: context.l10n!.update,
-            ),
+            SyncButton(onSync: _refresh),
           ],
         ),
       ],

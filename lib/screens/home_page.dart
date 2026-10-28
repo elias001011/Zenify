@@ -28,6 +28,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/async_loader.dart';
@@ -56,7 +57,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _suggestedPlaylistsFuture = getPlaylists(
-      playlistsNum: recommendedCubesNumber,
+      playlistsNum: suggestedPlaylistsNumber,
     );
     _recommendedSongsFuture = getRecommendedSongs();
     externalRecommendations.addListener(_refreshRecommendedSongs);
@@ -154,7 +155,7 @@ class _HomePageState extends State<HomePage> {
     final sectionTitle = showOnlyLiked
         ? context.l10n!.backToFavorites
         : context.l10n!.suggestedPlaylists;
-    final itemsNumber = playlists.length.clamp(0, recommendedCubesNumber);
+    final itemsNumber = playlists.length;
     final isLargeScreen = MediaQuery.of(context).size.width > 480;
 
     return Column(
@@ -203,14 +204,19 @@ class _HomePageState extends State<HomePage> {
     int itemCount,
     double height,
   ) {
-    return CarouselView.weighted(
-      flexWeights: const <int>[3, 2, 1],
-      itemSnapping: true,
-      onTap: (index) =>
-          context.push('/home/playlist/${playlists[index]['ytid']}'),
-      children: List.generate(itemCount, (index) {
-        return PlaylistCube(playlists[index], size: height * 2);
-      }),
+    return CarouselGlow(
+      sources: [
+        for (final playlist in playlists) playlist['image']?.toString(),
+      ],
+      child: CarouselView.weighted(
+        flexWeights: const <int>[3, 2, 1],
+        itemSnapping: true,
+        onTap: (index) =>
+            context.push('/home/playlist/${playlists[index]['ytid']}'),
+        children: List.generate(itemCount, (index) {
+          return PlaylistCube(playlists[index], size: height * 2);
+        }),
+      ),
     );
   }
 
@@ -250,22 +256,20 @@ class _HomePageState extends State<HomePage> {
               title: context.l10n!.timeMachine,
               icon: FluentIcons.data_trending_24_filled,
             ),
-            ListeningRecapCard(
+            ListeningRecapCards(
               periodLabel: periodLabel,
               minutes: displayMinutes,
               songs: previewSongs,
               onSongTap: (index) => _playRecapSongs(previewSongs, index),
+              topArtist: listeningStatsService
+                  .monthTopArtists(currentMonthKey)
+                  .firstOrNull,
+              onMinutesTap: () =>
+                  context.push(NavigationManager.timeMachinePath),
+              onArtistTap: () => context.push(NavigationManager.topArtistsPath),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.tonalIcon(
-                  onPressed: () => context.push('/home/timeMachine'),
-                  icon: const Icon(FluentIcons.arrow_right_24_regular),
-                  label: Text(context.l10n!.listeningStats),
-                ),
-              ),
+            RecapSeeAllButton(
+              onPressed: () => context.push(NavigationManager.timeMachinePath),
             ),
           ],
         );

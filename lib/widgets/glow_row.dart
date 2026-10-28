@@ -20,7 +20,6 @@
  */
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -51,31 +50,33 @@ class GlowRow extends StatefulWidget {
   State<GlowRow> createState() => _GlowRowState();
 }
 
-class _GlowRowState extends State<GlowRow>
-    with SingleTickerProviderStateMixin, ArtworkGlowColors {
+class _GlowRowState extends State<GlowRow> with SingleTickerProviderStateMixin {
   final _controller = ScrollController();
+  late final _colors = GlowColors(this);
+  late final _repaint = Listenable.merge([_controller, _colors.listenable]);
 
   /// Whether there is more to see before and after, for the desktop arrows.
   final _canScroll = ValueNotifier<(bool, bool)>((false, false));
-  late final Listenable _repaint = Listenable.merge([_controller, glowRepaint]);
+
+  void _update() =>
+      _colors.update(widget.sources, Theme.of(context).colorScheme.primary);
 
   @override
-  void initState() {
-    super.initState();
-    resolveGlowColors(widget.sources);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _update();
   }
 
   @override
   void didUpdateWidget(GlowRow oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!listEquals(oldWidget.sources, widget.sources)) {
-      resolveGlowColors(widget.sources);
-    }
+    _update();
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _colors.dispose();
     _canScroll.dispose();
     super.dispose();
   }
@@ -127,7 +128,7 @@ class _GlowRowState extends State<GlowRow>
       builder: (context, constraints) {
         final height = constraints.maxHeight;
         // The glow reaches well past the row, above and below it.
-        final reach = height * 0.6;
+        final reach = height * 0.55;
 
         return Stack(
           clipBehavior: Clip.none,
@@ -146,13 +147,11 @@ class _GlowRowState extends State<GlowRow>
                           child: CustomPaint(
                             painter: _RowGlowPainter(
                               controller: _controller,
-                              colors: glowColors,
-                              appColor: Theme.of(context).colorScheme.primary,
+                              colors: _colors,
                               itemExtent: widget.itemExtent,
                               rowTop: reach,
                               rowHeight: height,
                               strength: artworkGlowStrength(context),
-                              fade: glowFade,
                               repaint: _repaint,
                             ),
                           ),
@@ -194,48 +193,68 @@ class _RowGlowPainter extends CustomPainter {
   _RowGlowPainter({
     required this.controller,
     required this.colors,
-    required this.appColor,
     required this.itemExtent,
     required this.rowTop,
     required this.rowHeight,
     required this.strength,
-    required this.fade,
     required Listenable repaint,
   }) : super(repaint: repaint);
 
   final ScrollController controller;
-  final Map<int, Color?> colors;
-  final Color appColor;
+  final GlowColors colors;
   final double itemExtent;
   final double rowTop;
   final double rowHeight;
   final double strength;
-  final Animation<double> fade;
 
   @override
   void paint(Canvas canvas, Size size) {
     final offset = controller.hasClients ? controller.offset : 0.0;
-    final radius = rowHeight * 1.1;
+    // Wide and low: neighbouring glows merge into one soft band.
+    final halfWidth = rowHeight * 1.6;
     final centerY = rowTop + rowHeight / 2;
-    final alpha = strength * fade.value;
-    if (alpha <= 0) return;
 
-    for (final entry in colors.entries) {
-      final centerX = entry.key * itemExtent + itemExtent / 2 - offset;
-      if (centerX < -radius || centerX > size.width + radius) continue;
+    canvas.saveLayer(Offset.zero & size, Paint());
+    for (final index in colors.indices) {
+      final centerX = index * itemExtent + itemExtent / 2 - offset;
+      if (centerX < -halfWidth || centerX > size.width + halfWidth) continue;
+      final color = colors.colorAt(index);
+      if (color == null || color.a == 0) continue;
+      // Fade the complete band at the viewport edges as well as vertically.
+      final hsl = HSLColor.fromColor(color);
       paintArtworkGlow(
         canvas,
-        Rect.fromCircle(center: Offset(centerX, centerY), radius: radius),
-        entry.value ?? appColor,
-        alpha,
+        Rect.fromCenter(
+          center: Offset(centerX, centerY),
+          width: halfWidth * 2,
+          height: rowHeight * 2.1,
+        ),
+        hsl.withSaturation(hsl.saturation * 0.6).toColor(),
+        strength * 0.9 * color.a,
       );
     }
+    canvas
+      ..drawRect(
+        Offset.zero & size,
+        Paint()
+          ..blendMode = BlendMode.dstIn
+          ..shader = const LinearGradient(
+            colors: [
+              Colors.transparent,
+              Colors.white,
+              Colors.white,
+              Colors.transparent,
+            ],
+            stops: [0, 0.12, 0.88, 1],
+          ).createShader(Offset.zero & size),
+      )
+      ..restore();
   }
 
   @override
   bool shouldRepaint(_RowGlowPainter oldDelegate) =>
       oldDelegate.strength != strength ||
-      oldDelegate.appColor != appColor ||
+      oldDelegate.colors != colors ||
       oldDelegate.itemExtent != itemExtent ||
       oldDelegate.rowHeight != rowHeight;
 }
@@ -267,4 +286,59 @@ class _ArrowButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Mobile's weighted carousel has its own viewport: paint the halo outside
+/// its clipping layer, with room to fade to the page above and below.
+class CarouselGlow extends StatefulWidget {
+  const CarouselGlow({super.key, required this.sources, required this.child});
+  final List<String?> sources;
+  final Widget child;
+  @override
+  State<CarouselGlow> createState() => _CarouselGlowState();
+}
+
+class _CarouselGlowState extends State<CarouselGlow> {
+  int _index = 0;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final width = constraints.maxWidth;
+      final source = widget.sources.isEmpty
+          ? null
+          : widget.sources[_index.clamp(0, widget.sources.length - 1)];
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            right: 0,
+            top: -constraints.maxHeight * 0.7,
+            bottom: -constraints.maxHeight * 0.7,
+            child: IgnorePointer(
+              child: PageGlow(source: source, strength: 0.5),
+            ),
+          ),
+          NotificationListener<ScrollUpdateNotification>(
+            onNotification: (notification) {
+              if (notification.depth == 0 &&
+                  notification.metrics.axis == Axis.horizontal &&
+                  width > 0) {
+                final index = (notification.metrics.pixels / (width / 2))
+                    .round()
+                    .clamp(
+                      0,
+                      widget.sources.isEmpty ? 0 : widget.sources.length - 1,
+                    );
+                if (index != _index) setState(() => _index = index);
+              }
+              return false;
+            },
+            child: widget.child,
+          ),
+        ],
+      );
+    },
+  );
 }

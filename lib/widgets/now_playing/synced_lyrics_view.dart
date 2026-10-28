@@ -140,7 +140,7 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textColor = colorScheme.onSecondaryContainer;
+    final textColor = colorScheme.onSurface;
     final lines = _lines;
 
     return Column(

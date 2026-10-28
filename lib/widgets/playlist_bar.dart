@@ -24,6 +24,7 @@ import 'dart:async';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/common_services.dart';
@@ -104,7 +105,7 @@ class PlaylistBar extends StatelessWidget {
       child: InkWell(
         onTap: onPressed ?? _getDefaultOnPressed(context, updatedPlaylist),
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+          padding: commonBarPadding,
           child: Row(
             children: [
               if (isFolder)
@@ -329,8 +330,8 @@ class PlaylistBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(isArtist ? 26 : 12),
         child: Image(
           image: ArtworkProvider.get(artwork),
-          width: 52,
-          height: 52,
+          width: commonBarArtworkSize,
+          height: commonBarArtworkSize,
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _buildIconFallback(colorScheme),
         ),
@@ -342,8 +343,8 @@ class PlaylistBar extends StatelessWidget {
   Widget _buildIconFallback(ColorScheme colorScheme) {
     if (isArtist) {
       return Container(
-        width: 52,
-        height: 52,
+        width: commonBarArtworkSize,
+        height: commonBarArtworkSize,
         decoration: BoxDecoration(
           color: colorScheme.secondaryContainer,
           shape: BoxShape.circle,
@@ -357,7 +358,7 @@ class PlaylistBar extends StatelessWidget {
     }
 
     return SevenSidedCookieShape(
-      size: 52,
+      size: commonBarArtworkSize,
       color: colorScheme.secondaryContainer,
       child: Icon(cubeIcon, size: 26, color: colorScheme.onSecondaryContainer),
     );

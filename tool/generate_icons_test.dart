@@ -1,4 +1,4 @@
-// Draws the Zenify icon (a mouth of blue waves on black) in every size the
+// Draws the Zenify icon (a blue audio waveform on black) in every size the
 // platforms need. Run from the repository root:
 //   flutter test tool/generate_icons_test.dart
 
@@ -15,51 +15,46 @@ const _glow = Color(0xFF2F7BFF);
 
 enum _Style { color, white }
 
-/// Paints the waves centred in [rect]; small sizes get fewer, bolder lines.
-void _paintWaves(Canvas canvas, Rect rect, double pixels, _Style style) {
-  final layers = pixels >= 96 ? 5 : (pixels >= 40 ? 4 : 3);
-  final stroke =
-      rect.width * (layers == 5 ? 0.024 : (layers == 4 ? 0.034 : 0.06));
-  final left = rect.left + stroke / 2;
-  final width = rect.width - stroke;
-  final cy = rect.center.dy;
-  final amp = rect.width * 0.26;
+/// Bar heights of the waveform, by how many bars fit the size.
+const _waveforms = {
+  9: [.3, .56, .4, .8, 1.0, .8, .4, .56, .3],
+  7: [.32, .6, .84, 1.0, .84, .6, .32],
+  5: [.42, .76, 1.0, .76, .42],
+};
 
-  final paint = Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round
-    ..strokeWidth = stroke;
+/// Paints an audio waveform centred in [rect]. Small sizes get fewer, wider
+/// bars so they stay legible.
+void _paintWaves(Canvas canvas, Rect rect, double pixels, _Style style) {
+  final heights = _waveforms[pixels >= 96 ? 9 : (pixels >= 40 ? 7 : 5)]!;
+  // Bar, gap, bar...: bars take 60% of each step.
+  final step = rect.width / (heights.length - 0.4);
+  final barWidth = step * 0.6;
+
+  final paint = Paint();
   if (style == _Style.color) {
     paint.shader = ui.Gradient.linear(
-      Offset(rect.left, 0),
-      Offset(rect.right, 0),
+      rect.topLeft,
+      rect.bottomRight,
       _gradient,
-      const [0, 0.55, 1],
+      const [0, 0.5, 1],
     );
   } else {
     paint.color = Colors.white;
   }
 
-  const steps = 240;
-  for (var l = 0; l < layers; l++) {
-    final scale = 1 - l / layers;
-    for (final sign in const [-1.0, 1.0]) {
-      final path = Path();
-      for (var i = 0; i <= steps; i++) {
-        final t = i / steps;
-        final envelope = pow(sin(pi * t), 1.5);
-        final wave = 1 + 0.1 * sin(2 * pi * 2.5 * t + l * 0.8);
-        final point = Offset(
-          left + width * t,
-          cy + sign * amp * scale * envelope * wave,
-        );
-        i == 0
-            ? path.moveTo(point.dx, point.dy)
-            : path.lineTo(point.dx, point.dy);
-      }
-      canvas.drawPath(path, paint);
-    }
+  for (var i = 0; i < heights.length; i++) {
+    final height = max(barWidth, rect.height * heights[i]);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(rect.left + i * step + barWidth / 2, rect.center.dy),
+          width: barWidth,
+          height: height,
+        ),
+        Radius.circular(barWidth / 2),
+      ),
+      paint,
+    );
   }
 }
 

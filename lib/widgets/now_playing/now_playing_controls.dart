@@ -54,12 +54,10 @@ class NowPlayingControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final isDesktop = size.width > 800;
 
     final titleFontSize = getResponsiveTitleFontSize(size);
     final artistFontSize = getResponsiveArtistFontSize(size);
-    final canOpenArtist = _canOpenArtist(metadata);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -89,35 +87,11 @@ class NowPlayingControls extends StatelessWidget {
                 horizontal: isDesktop ? 16 : 24,
                 vertical: spacing,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onLongPress: () => _copyNowPlayingSong(context, metadata),
-                    child: MarqueeTextWidget(
-                      text: metadata.title,
-                      fontColor: colorScheme.secondary,
-                      fontSize: titleFontSize * fontScale,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: spacing),
-                  if (metadata.artist != null)
-                    GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: canOpenArtist
-                          ? () => _openArtistPage(context, metadata)
-                          : null,
-                      onLongPress: () => _copyNowPlayingSong(context, metadata),
-                      child: MarqueeTextWidget(
-                        text: metadata.artist!,
-                        fontColor: colorScheme.onSurfaceVariant,
-                        fontSize: artistFontSize * fontScale,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                ],
+              child: NowPlayingTitle(
+                metadata: metadata,
+                titleSize: titleFontSize * fontScale,
+                artistSize: artistFontSize * fontScale,
+                spacing: spacing,
               ),
             ),
             if (!isCompact) const Spacer(),
@@ -139,6 +113,62 @@ class NowPlayingControls extends StatelessWidget {
       },
     );
   }
+}
+
+/// The song title and artist, scrolling when long. Tapping the artist opens
+/// their page; a long press copies both.
+class NowPlayingTitle extends StatelessWidget {
+  const NowPlayingTitle({
+    super.key,
+    required this.metadata,
+    required this.titleSize,
+    required this.artistSize,
+    this.spacing = 8,
+    this.alignment = CrossAxisAlignment.center,
+  });
+
+  final MediaItem metadata;
+  final double titleSize;
+  final double artistSize;
+  final double spacing;
+  final CrossAxisAlignment alignment;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final canOpenArtist = _canOpenArtist(metadata);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: alignment,
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPress: () => _copyNowPlayingSong(context, metadata),
+          child: MarqueeTextWidget(
+            text: metadata.title,
+            fontColor: colorScheme.onSurface,
+            fontSize: titleSize,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: spacing),
+        if (metadata.artist != null)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: canOpenArtist
+                ? () => _openArtistPage(context, metadata)
+                : null,
+            onLongPress: () => _copyNowPlayingSong(context, metadata),
+            child: MarqueeTextWidget(
+              text: metadata.artist!,
+              fontColor: colorScheme.onSurfaceVariant,
+              fontSize: artistSize,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+      ],
+    );
+  }
 
   bool _canOpenArtist(MediaItem metadata) {
     final info = _extractArtistInfo(metadata);
@@ -150,28 +180,18 @@ class NowPlayingControls extends StatelessWidget {
 
   void _openArtistPage(BuildContext context, MediaItem metadata) {
     final info = _extractArtistInfo(metadata);
-    final lookup = info.artistId.isNotEmpty
-        ? info.artistId
-        : info.artist.isNotEmpty
-        ? info.artist
-        : info.sourceSongId;
-
-    if (lookup.isEmpty) return;
+    final destination = NavigationManager.artistDestination(
+      context,
+      name: info.artist,
+      artistId: info.artistId,
+      sourceSongId: info.sourceSongId,
+      videoAuthor: info.videoAuthor,
+    );
+    if (destination == null) return;
 
     final router = GoRouter.of(context);
-    final artistPath = NavigationManager.artistPath(context, lookup);
-    final artistData = {
-      'ytid': info.artistId.isNotEmpty ? info.artistId : lookup,
-      if (info.artist.isNotEmpty) 'title': info.artist,
-      if (info.sourceSongId.isNotEmpty) 'sourceSongId': info.sourceSongId,
-      if (info.videoAuthor.isNotEmpty) 'videoAuthor': info.videoAuthor,
-      'source': 'youtube-artist',
-      'isArtist': true,
-      'list': [],
-    };
-
     Navigator.of(context).pop();
-    unawaited(router.push(artistPath, extra: artistData));
+    unawaited(router.push(destination.path, extra: destination.extra));
   }
 
   ({String artist, String artistId, String sourceSongId, String videoAuthor})

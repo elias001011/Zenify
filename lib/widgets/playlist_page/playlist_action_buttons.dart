@@ -47,32 +47,38 @@ class PlaylistActionButtons extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          Expanded(
-            child: FilledButton.icon(
-              icon: isLoading
-                  ? const _Spinner()
-                  : const Icon(FluentIcons.play_24_filled),
-              label: Text(context.l10n!.play),
-              onPressed: isLoading ? null : onPlay,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: FilledButton.icon(
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.secondaryContainer,
-                foregroundColor: colorScheme.onSecondaryContainer,
+      // Phone-sized on wide screens too.
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  icon: isLoading
+                      ? const _Spinner()
+                      : const Icon(FluentIcons.play_24_filled),
+                  label: Text(context.l10n!.play),
+                  onPressed: isLoading ? null : onPlay,
+                ),
               ),
-              icon: isLoading
-                  ? const _Spinner()
-                  : const Icon(FluentIcons.arrow_shuffle_24_filled),
-              label: Text(context.l10n!.shuffle),
-              onPressed: isLoading ? null : onShuffle,
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.secondaryContainer,
+                    foregroundColor: colorScheme.onSecondaryContainer,
+                  ),
+                  icon: isLoading
+                      ? const _Spinner()
+                      : const Icon(FluentIcons.arrow_shuffle_24_filled),
+                  label: Text(context.l10n!.shuffle),
+                  onPressed: isLoading ? null : onShuffle,
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

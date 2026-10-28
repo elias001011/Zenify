@@ -42,13 +42,28 @@ final useSystemColor = ValueNotifier<bool>(
   Hive.box('settings').get('useSystemColor', defaultValue: true),
 );
 
-/// Album colours glowing behind their elements. It needs the pure black
-/// dark theme, so while it is on the pure black choice is not offered.
+/// Album colours glowing softly in the page background.
 final dynamicBackground = ValueNotifier<bool>(
   Hive.box('settings').get('dynamicBackground', defaultValue: true),
 );
 
-/// The user's pure black choice, used when [dynamicBackground] is off.
+/// Shared by the full player and dock, and included in settings backups.
+final showPlayerVisualizer = ValueNotifier<bool>(
+  Hive.box('settings').get('showPlayerVisualizer', defaultValue: false),
+);
+
+Future<void> setPlayerVisualizer(bool value) async {
+  final previous = showPlayerVisualizer.value;
+  showPlayerVisualizer.value = value;
+  try {
+    await Hive.box('settings').put('showPlayerVisualizer', value);
+  } catch (_) {
+    if (showPlayerVisualizer.value == value)
+      showPlayerVisualizer.value = previous;
+    rethrow;
+  }
+}
+
 final usePureBlackColor = ValueNotifier<bool>(
   Hive.box('settings').get('pureBlackTheme', defaultValue: true),
 );
@@ -69,7 +84,7 @@ FloatingEffect _readFloatingEffect() {
 /// How the floating island, dock and rail let the content behind show.
 final floatingEffect = ValueNotifier<FloatingEffect>(_readFloatingEffect());
 
-bool get isPureBlackTheme => dynamicBackground.value || usePureBlackColor.value;
+bool get isPureBlackTheme => usePureBlackColor.value;
 
 final offlineMode = ValueNotifier<bool>(
   Hive.box('settings').get('offlineMode', defaultValue: false),
@@ -208,6 +223,10 @@ void reloadSettingsFromStorage() {
   );
   useSystemColor.value = settings.get('useSystemColor', defaultValue: true);
   floatingEffect.value = _readFloatingEffect();
+  showPlayerVisualizer.value = settings.get(
+    'showPlayerVisualizer',
+    defaultValue: false,
+  );
   dynamicBackground.value = settings.get(
     'dynamicBackground',
     defaultValue: true,

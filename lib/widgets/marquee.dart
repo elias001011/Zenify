@@ -19,6 +19,8 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:async';
+
 import 'package:material_ui/material_ui.dart';
 
 class MarqueeWidget extends StatefulWidget {
@@ -46,6 +48,8 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
   late ScrollController _scrollController;
   bool _isAnimating = false;
   bool _isDisposed = false;
+  Timer? _pauseTimer;
+  Completer<void>? _pauseCompleter;
 
   @override
   bool get wantKeepAlive => true;
@@ -60,6 +64,9 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
   @override
   void dispose() {
     _isDisposed = true;
+    _pauseTimer?.cancel();
+    _pauseCompleter?.complete();
+    _pauseCompleter = null;
     _scrollController.dispose();
     super.dispose();
   }
@@ -67,16 +74,33 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return RepaintBoundary(
-      child: SingleChildScrollView(
-        scrollDirection: widget.direction,
-        controller: _scrollController,
-        physics: widget.manualScrollEnabled
-            ? const AlwaysScrollableScrollPhysics()
-            : const NeverScrollableScrollPhysics(),
-        child: widget.child,
+    return NotificationListener<ScrollMetricsNotification>(
+      onNotification: (notification) {
+        if (notification.metrics.maxScrollExtent > 0) _startAnimation();
+        return false;
+      },
+      child: RepaintBoundary(
+        child: SingleChildScrollView(
+          scrollDirection: widget.direction,
+          controller: _scrollController,
+          physics: widget.manualScrollEnabled
+              ? const AlwaysScrollableScrollPhysics()
+              : const NeverScrollableScrollPhysics(),
+          child: widget.child,
+        ),
       ),
     );
+  }
+
+  Future<void> _wait(Duration duration) {
+    if (_isDisposed) return Future.value();
+    final completer = Completer<void>();
+    _pauseCompleter = completer;
+    _pauseTimer = Timer(duration, () {
+      _pauseCompleter = null;
+      completer.complete();
+    });
+    return completer.future;
   }
 
   Future<void> _startAnimation() async {
@@ -87,12 +111,9 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
     while (_scrollController.hasClients && !_isDisposed) {
       try {
         // Check if content actually needs scrolling
-        if (_scrollController.position.maxScrollExtent <= 0) {
-          await Future.delayed(const Duration(seconds: 1));
-          continue;
-        }
+        if (_scrollController.position.maxScrollExtent <= 0) break;
 
-        await Future.delayed(widget.pauseDuration);
+        await _wait(widget.pauseDuration);
         if (_isDisposed || !_scrollController.hasClients) break;
 
         await _scrollController.animateTo(
@@ -100,8 +121,9 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
           duration: widget.animationDuration,
           curve: Curves.linear,
         );
+        if (_isDisposed || !_scrollController.hasClients) break;
 
-        await Future.delayed(widget.pauseDuration);
+        await _wait(widget.pauseDuration);
         if (_isDisposed || !_scrollController.hasClients) break;
 
         await _scrollController.animateTo(

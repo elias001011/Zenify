@@ -23,7 +23,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "com.gokadzev.musify"
+    namespace = "io.github.elias001011.zenify"
     compileSdk = 36
     ndkVersion = "28.2.13676358"
 

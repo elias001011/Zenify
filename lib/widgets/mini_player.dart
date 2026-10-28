@@ -28,8 +28,10 @@ import 'package:musify/main.dart';
 import 'package:musify/models/full_player_state.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/marquee.dart';
+import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/song_artwork.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -266,11 +268,19 @@ class _ArtworkWidget extends StatelessWidget {
               ),
             ],
           ),
-          child: SongArtworkWidget(
-            metadata: metadata,
-            size: MiniPlayer._artworkSize,
-            errorWidgetIconSize: 24,
-            borderRadius: MiniPlayer._artworkRadius,
+          child: ValueListenableBuilder<bool>(
+            valueListenable: showPlayerVisualizer,
+            builder: (context, visualizer, _) => visualizer
+                ? const SizedBox.square(
+                    dimension: MiniPlayer._artworkSize,
+                    child: Center(child: WaveVisualizer(size: 40)),
+                  )
+                : SongArtworkWidget(
+                    metadata: metadata,
+                    size: MiniPlayer._artworkSize,
+                    errorWidgetIconSize: 24,
+                    borderRadius: MiniPlayer._artworkRadius,
+                  ),
           ),
         ),
       ),
@@ -352,7 +362,7 @@ class _ControlsWidget extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (supportsDesktopVolumeControl) ...[
-          const DesktopVolumeControl(),
+          const DesktopVolumeButton(),
           const SizedBox(width: 4),
         ],
         _CircularPlayButton(

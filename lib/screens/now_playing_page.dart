@@ -19,14 +19,20 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:math';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
-import 'package:musify/widgets/flip_card.dart';
-import 'package:musify/widgets/now_playing/bottom_actions_row.dart';
+import 'package:musify/utilities/flutter_bottom_sheet.dart';
+import 'package:musify/widgets/artwork_glow.dart';
+import 'package:musify/widgets/floating_surface.dart';
+import 'package:musify/widgets/now_playing/lyrics_panel.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
+import 'package:musify/widgets/now_playing/player_actions.dart';
+import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/queue_list_view.dart';
 
 class NowPlayingPage extends StatefulWidget {
@@ -55,257 +61,315 @@ Route<void> buildNowPlayingRoute() {
 }
 
 class _NowPlayingPageState extends State<NowPlayingPage> {
-  final _lyricsController = FlipCardController();
+  /// Open beside the player (wide layout only). Closed by default.
+  PlayerPanel? _panel;
+  Animation<double>? _routeAnimation;
+  bool _backgroundVisible = false;
 
   @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final isLargeScreen = size.width > 800 && size.height > 600;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final screenWidth = size.width;
-    final baseIconSize = screenWidth < 360
-        ? 36.0
-        : screenWidth < 400
-        ? 40.0
-        : 44.0;
-    final miniIconSize = screenWidth < 360 ? 18.0 : 22.0;
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final animation = ModalRoute.of(context)?.animation;
+    if (_routeAnimation == animation) return;
+    _routeAnimation?.removeStatusListener(_onRouteStatus);
+    _routeAnimation = animation;
+    animation?.addStatusListener(_onRouteStatus);
+    _backgroundVisible =
+        animation == null || animation.status == AnimationStatus.completed;
+  }
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: StreamBuilder<MediaItem?>(
-          stream: audioHandler.mediaItem,
-          builder: (context, snapshot) {
-            if (snapshot.data == null || !snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final metadata = snapshot.data!;
-            return Column(
-              children: [
-                _buildAppBar(context, colorScheme),
-                Expanded(
-                  child: isLargeScreen
-                      ? _DesktopLayout(
-                          metadata: metadata,
-                          size: size,
-                          adjustedIconSize: baseIconSize,
-                          adjustedMiniIconSize: miniIconSize,
-                          lyricsController: _lyricsController,
-                        )
-                      : _MobileLayout(
-                          metadata: metadata,
-                          size: size,
-                          adjustedIconSize: baseIconSize,
-                          adjustedMiniIconSize: miniIconSize,
-                          isLargeScreen: isLargeScreen,
-                          lyricsController: _lyricsController,
-                        ),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
+  void _onRouteStatus(AnimationStatus status) {
+    final visible = status == AnimationStatus.completed;
+    if (mounted && visible != _backgroundVisible) {
+      setState(() => _backgroundVisible = visible);
+    }
+  }
+
+  @override
+  void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteStatus);
+    super.dispose();
+  }
+
+  static bool _isWide(Size size) => size.width >= 900 && size.height >= 560;
+
+  /// [sheetContext] sits under the page's scaffold, which sheets open in.
+  void _onPanel(
+    PlayerPanel panel,
+    MediaItem metadata,
+    BuildContext sheetContext,
+  ) {
+    if (_isWide(MediaQuery.sizeOf(context))) {
+      setState(() => _panel = _panel == panel ? null : panel);
+      return;
+    }
+    showCustomBottomSheet(
+      sheetContext,
+      panel == PlayerPanel.queue
+          ? const QueueWidget(isBottomSheet: true)
+          : SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.6,
+              child: LyricsPanel(metadata: metadata),
+            ),
     );
   }
 
-  Widget _buildAppBar(BuildContext context, ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Row(
-        children: [
-          IconButton(
-            iconSize: 26,
-            icon: const Icon(FluentIcons.chevron_down_24_regular),
-            style: IconButton.styleFrom(
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+  /// The artwork as [PageGlow] reads it: a file path or a URL.
+  static String? _artworkSource(MediaItem metadata) {
+    final uri = metadata.artUri;
+    if (uri?.scheme == 'file')
+      return metadata.extras?['artWorkPath']?.toString() ?? uri!.toFilePath();
+    return uri?.toString();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: StreamBuilder<MediaItem?>(
+        stream: audioHandler.mediaItem,
+        builder: (context, snapshot) {
+          final metadata = snapshot.data;
+          if (metadata == null) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final actions = PlayerActions(
+            metadata: metadata,
+            panel: _panel,
+            onPanel: (panel, sheetContext) =>
+                _onPanel(panel, metadata, sheetContext),
+          );
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: AnimatedOpacity(
+                  opacity: _backgroundVisible ? 1 : 0,
+                  duration: const Duration(milliseconds: 700),
+                  curve: Curves.easeOutCubic,
+                  child: PageGlow(source: _artworkSource(metadata)),
+                ),
               ),
-            ),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
+              SafeArea(
+                child: _isWide(MediaQuery.sizeOf(context))
+                    ? _WideLayout(
+                        metadata: metadata,
+                        actions: actions,
+                        panel: _panel,
+                      )
+                    : _CompactLayout(metadata: metadata, actions: actions),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
-class _DesktopLayout extends StatelessWidget {
-  const _DesktopLayout({
-    required this.metadata,
-    required this.size,
-    required this.adjustedIconSize,
-    required this.adjustedMiniIconSize,
-    required this.lyricsController,
-  });
-  final MediaItem metadata;
-  final Size size;
-  final double adjustedIconSize;
-  final double adjustedMiniIconSize;
-  final FlipCardController lyricsController;
+class _CloseButton extends StatelessWidget {
+  const _CloseButton();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: IconButton(
+          iconSize: 26,
+          icon: const Icon(FluentIcons.chevron_down_24_regular),
+          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+          onPressed: () => Navigator.pop(context),
+        ),
+      ),
+    );
+  }
+}
+
+/// Phones: the artwork, the song and playback, then the action bar.
+class _CompactLayout extends StatelessWidget {
+  const _CompactLayout({required this.metadata, required this.actions});
+
+  final MediaItem metadata;
+  final Widget actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    final isLive = metadata.extras?['isLive'] ?? false;
+    final iconSize = size.width < 360 ? 36.0 : (size.width < 400 ? 40.0 : 44.0);
+    final miniIconSize = size.width < 360 ? 18.0 : 22.0;
+
+    final controls = isLive
+        ? const SizedBox.shrink()
+        : NowPlayingControls(
+            size: size,
+            audioId: metadata.extras?['ytid'],
+            adjustedIconSize: iconSize,
+            adjustedMiniIconSize: miniIconSize,
+            metadata: metadata,
+          );
+    Widget artwork(BoxConstraints constraints, double share) => Center(
+      child: NowPlayingArtwork(
+        metadata: metadata,
+        size: min(constraints.maxWidth * share, constraints.maxHeight) - 8,
+      ),
+    );
+
+    return Column(
       children: [
+        const _CloseButton(),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              children: [
-                const SizedBox(height: 16),
-                Expanded(
-                  flex: 5,
-                  child: Center(
-                    child: NowPlayingArtwork(
-                      size: size,
-                      metadata: metadata,
-                      lyricsController: lyricsController,
-                    ),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: size.width > size.height
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, c) => artwork(c, 1),
+                        ),
+                      ),
+                      const SizedBox(width: 24),
+                      Expanded(child: controls),
+                    ],
+                  )
+                : Column(
+                    children: [
+                      Expanded(
+                        flex: 5,
+                        child: LayoutBuilder(
+                          builder: (context, c) => artwork(c, 0.92),
+                        ),
+                      ),
+                      Expanded(flex: 4, child: controls),
+                    ],
                   ),
-                ),
-                if (!(metadata.extras?['isLive'] ?? false))
-                  Expanded(
-                    flex: 4,
-                    child: NowPlayingControls(
-                      size: size,
-                      audioId: metadata.extras?['ytid'],
-                      adjustedIconSize: adjustedIconSize,
-                      adjustedMiniIconSize: adjustedMiniIconSize,
-                      metadata: metadata,
-                    ),
-                  ),
-                BottomActionsRow(
-                  metadata: metadata,
-                  iconSize: adjustedMiniIconSize,
-                  isLargeScreen: true,
-                  lyricsController: lyricsController,
-                ),
-                const SizedBox(height: 16),
-              ],
-            ),
           ),
         ),
-        const Expanded(child: QueueWidget()),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: PlayerActionBar(child: actions),
+        ),
       ],
     );
   }
 }
 
-class _MobileLayout extends StatelessWidget {
-  const _MobileLayout({
+/// Desktop and tablets: the artwork takes the stage, with a bar below for
+/// the song, playback and actions. Queue and lyrics open beside it.
+class _WideLayout extends StatelessWidget {
+  const _WideLayout({
     required this.metadata,
-    required this.size,
-    required this.adjustedIconSize,
-    required this.adjustedMiniIconSize,
-    required this.isLargeScreen,
-    required this.lyricsController,
+    required this.actions,
+    required this.panel,
   });
+
   final MediaItem metadata;
-  final Size size;
-  final double adjustedIconSize;
-  final double adjustedMiniIconSize;
-  final bool isLargeScreen;
-  final FlipCardController lyricsController;
+  final Widget actions;
+  final PlayerPanel? panel;
 
   @override
   Widget build(BuildContext context) {
-    final isLandscape = size.width > size.height;
-
-    if (isLandscape) {
-      return _buildLandscapeLayout(context);
-    }
-    return _buildPortraitLayout(context);
-  }
-
-  Widget _buildPortraitLayout(BuildContext context) {
     final isLive = metadata.extras?['isLive'] ?? false;
+    final panel = this.panel;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          const SizedBox(height: 8),
-          Expanded(
-            flex: 5,
-            child: Center(
-              child: NowPlayingArtwork(
-                size: size,
-                metadata: metadata,
-                lyricsController: lyricsController,
-              ),
-            ),
-          ),
-          if (!isLive)
-            Expanded(
-              flex: 4,
-              child: NowPlayingControls(
-                size: size,
-                audioId: metadata.extras?['ytid'],
-                adjustedIconSize: adjustedIconSize,
-                adjustedMiniIconSize: adjustedMiniIconSize,
-                metadata: metadata,
-              ),
-            ),
-          BottomActionsRow(
-            metadata: metadata,
-            iconSize: adjustedMiniIconSize,
-            isLargeScreen: isLargeScreen,
-            lyricsController: lyricsController,
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLandscapeLayout(BuildContext context) {
-    final isLive = metadata.extras?['isLive'] ?? false;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            flex: 4,
-            child: Center(
-              child: NowPlayingArtwork(
-                size: size,
-                metadata: metadata,
-                lyricsController: lyricsController,
-              ),
-            ),
-          ),
-          const SizedBox(width: 24),
-          Expanded(
-            flex: 5,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (!isLive)
-                  Expanded(
-                    child: NowPlayingControls(
-                      size: size,
-                      audioId: metadata.extras?['ytid'],
-                      adjustedIconSize: adjustedIconSize,
-                      adjustedMiniIconSize: adjustedMiniIconSize,
+    return Column(
+      children: [
+        const _CloseButton(),
+        Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, c) => Center(
+                    child: NowPlayingArtwork(
                       metadata: metadata,
+                      size: min(min(c.maxHeight * 0.86, c.maxWidth * 0.7), 620),
                     ),
                   ),
-                BottomActionsRow(
-                  metadata: metadata,
-                  iconSize: adjustedMiniIconSize,
-                  isLargeScreen: isLargeScreen,
-                  lyricsController: lyricsController,
                 ),
-                const SizedBox(height: 8),
+              ),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOutCubic,
+                child: panel == null
+                    ? const SizedBox.shrink()
+                    : Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 0, 16, 16),
+                        child: SizedBox(
+                          width: 400,
+                          child: _SidePanel(panel: panel, metadata: metadata),
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: FloatingSurface(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: NowPlayingTitle(
+                    metadata: metadata,
+                    titleSize: 18,
+                    artistSize: 14,
+                    spacing: 2,
+                    alignment: CrossAxisAlignment.start,
+                  ),
+                ),
+                Expanded(
+                  flex: 4,
+                  child: isLive
+                      ? const SizedBox.shrink()
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            PlayerControlButtons(
+                              metadata: metadata,
+                              iconSize: 36,
+                              miniIconSize: 20,
+                            ),
+                            const PositionSlider(),
+                          ],
+                        ),
+                ),
+                Expanded(
+                  flex: 3,
+                  child: Align(
+                    alignment: AlignmentDirectional.centerEnd,
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: actions,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SidePanel extends StatelessWidget {
+  const _SidePanel({required this.panel, required this.metadata});
+
+  final PlayerPanel panel;
+  final MediaItem metadata;
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingSurface(
+      child: panel == PlayerPanel.queue
+          ? const QueueWidget()
+          : LyricsPanel(metadata: metadata),
     );
   }
 }

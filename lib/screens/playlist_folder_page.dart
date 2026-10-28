@@ -73,6 +73,7 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
         return IslandScaffold(
           title: _folderName,
           fadeTitleAfter: 150,
+          background: const PageGlow(source: null),
           actions: [
             PopupMenuButton<String>(
               shape: RoundedRectangleBorder(
@@ -124,12 +125,9 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
             slivers: [
               const SliverIslandTopSpace(),
               SliverToBoxAdapter(
-                child: ArtworkGlow(
-                  source: null,
-                  child: SizedBox(
-                    height: _headerHeight,
-                    child: _buildHeader(context, playlists.length),
-                  ),
+                child: SizedBox(
+                  height: _headerHeight,
+                  child: _buildHeader(context, playlists.length),
                 ),
               ),
               if (playlists.isEmpty)

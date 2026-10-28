@@ -27,35 +27,43 @@ import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/utilities/flutter_bottom_sheet.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
-import 'package:musify/widgets/queue_list_view.dart';
+import 'package:musify/widgets/floating_surface.dart';
 
-class BottomActionsRow extends StatefulWidget {
-  const BottomActionsRow({
+/// Side panels of the player: shown beside it on wide screens, as sheets on
+/// phones.
+enum PlayerPanel { queue, lyrics }
+
+/// The player's actions besides playback: lyrics, queue, volume, sleep
+/// timer, download, add to playlist and like.
+class PlayerActions extends StatefulWidget {
+  const PlayerActions({
     super.key,
     required this.metadata,
-    required this.iconSize,
-    required this.isLargeScreen,
-    required this.lyricsController,
+    required this.panel,
+    required this.onPanel,
   });
+
   final MediaItem metadata;
-  final double iconSize;
-  final bool isLargeScreen;
-  final dynamic lyricsController;
+
+  /// The panel open beside the player, highlighted.
+  final PlayerPanel? panel;
+
+  /// Given a context under the player's scaffold, which sheets need.
+  final void Function(PlayerPanel panel, BuildContext context) onPanel;
 
   @override
-  State<BottomActionsRow> createState() => _BottomActionsRowState();
+  State<PlayerActions> createState() => _PlayerActionsState();
 }
 
-class _BottomActionsRowState extends State<BottomActionsRow> {
+class _PlayerActionsState extends State<PlayerActions> {
   late final ValueNotifier<bool> _songLikeStatus;
   late final ValueNotifier<bool> _songOfflineStatus;
-  late final String? audioId = widget.metadata.extras?['ytid'];
-  late final bool isRadioStation = widget.metadata.extras?['isLive'] ?? false;
+  String? get audioId => widget.metadata.extras?['ytid'];
+  bool get isRadioStation => widget.metadata.extras?['isLive'] ?? false;
 
   @override
   void initState() {
@@ -93,10 +101,20 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
   }
 
   @override
-  void didUpdateWidget(BottomActionsRow oldWidget) {
+  void didUpdateWidget(PlayerActions oldWidget) {
     super.didUpdateWidget(oldWidget);
     final oldAudioId = oldWidget.metadata.extras?['ytid'];
-    if (oldAudioId != audioId) {
+    final oldRadio = oldWidget.metadata.extras?['isLive'] == true;
+    if (oldRadio != isRadioStation) {
+      if (oldRadio) {
+        userLikedRadioStations.removeListener(_syncRadioLikeStatus);
+        userLikedSongsList.addListener(_syncLikeStatus);
+      } else {
+        userLikedSongsList.removeListener(_syncLikeStatus);
+        userLikedRadioStations.addListener(_syncRadioLikeStatus);
+      }
+    }
+    if (oldAudioId != audioId || oldRadio != isRadioStation) {
       if (isRadioStation) {
         _songLikeStatus.value = isRadioStationLiked(audioId ?? '');
       } else {
@@ -123,227 +141,193 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final l10n = context.l10n!;
-
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final responsiveIconSize = screenWidth < 360
-        ? widget.iconSize * 0.85
-        : widget.iconSize;
+    final online = !offlineMode.value;
+    final actionAudioId = audioId;
 
     return StreamBuilder<List<Map>>(
       stream: audioHandler.queueAsMapStream,
       builder: (context, snapshot) {
-        final queue = snapshot.data ?? [];
-
-        final actions = <Widget>[
-          if (supportsDesktopVolumeControl) const DesktopVolumeControl(),
-          if (!isRadioStation)
-            _buildActionButton(
-              context: context,
-              icon: FluentIcons.cloud_arrow_down_24_regular,
-              activeIcon: FluentIcons.cloud_off_24_filled,
-              colorScheme: colorScheme,
-              size: responsiveIconSize,
-              statusNotifier: _songOfflineStatus,
-              onPressed: audioId == null
-                  ? null
-                  : () => _toggleOffline(
-                      _songOfflineStatus,
-                      audioId,
-                      widget.metadata,
-                    ),
-              tooltip: l10n.makeOffline,
-            ),
-          _buildSleepTimerButton(context, colorScheme, responsiveIconSize),
-          if (!offlineMode.value && !isRadioStation)
-            _buildSimpleActionButton(
-              context: context,
-              icon: FluentIcons.album_add_24_regular,
-              colorScheme: colorScheme,
-              size: responsiveIconSize,
-              onPressed: () => showAddToPlaylistDialog(
-                context,
-                song: mediaItemToMap(widget.metadata),
-              ),
-              tooltip: l10n.addToPlaylist,
-            ),
-          if (queue.isNotEmpty && !isRadioStation && !widget.isLargeScreen)
-            _buildSimpleActionButton(
-              context: context,
-              icon: FluentIcons.apps_list_24_filled,
-              colorScheme: colorScheme,
-              size: responsiveIconSize,
-              onPressed: () => showCustomBottomSheet(
-                context,
-                const QueueWidget(isBottomSheet: true),
-              ),
-              tooltip: l10n.queue,
-            ),
-          if (!offlineMode.value) ...[
-            if (!isRadioStation)
-              _buildSimpleActionButton(
-                context: context,
+        final queue = snapshot.data ?? const [];
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (online && !isRadioStation)
+              _ActionButton(
                 icon: FluentIcons.text_quote_24_regular,
-                colorScheme: colorScheme,
-                size: responsiveIconSize,
-                onPressed: widget.lyricsController.flipcard,
                 tooltip: l10n.lyrics,
+                active: widget.panel == PlayerPanel.lyrics,
+                onPressed: () => widget.onPanel(PlayerPanel.lyrics, context),
               ),
-            _buildActionButton(
-              context: context,
-              icon: FluentIcons.heart_24_regular,
-              activeIcon: FluentIcons.heart_24_filled,
-              colorScheme: colorScheme,
-              size: responsiveIconSize,
-              statusNotifier: _songLikeStatus,
-              activeColor: colorScheme.primary,
-              onPressed: () async {
-                final id = audioId;
-                if (id == null) return;
-
-                final originalValue = _songLikeStatus.value;
-                _songLikeStatus.value = !originalValue;
-
-                try {
-                  if (isRadioStation) {
-                    if (originalValue) {
-                      await removeRadioStationFromLiked(id);
-                    } else {
-                      await addRadioStationToLiked(id);
-                    }
-                  } else {
-                    await updateSongLikeStatus(
-                      audioId,
-                      !originalValue,
-                      songData: mediaItemToMap(widget.metadata),
-                    );
-                  }
-                } catch (e) {
-                  _songLikeStatus.value = originalValue; // revert on failure
-                  logger.log('Error toggling like status', error: e);
-                }
-              },
-              tooltip: l10n.likedSongs,
+            if (queue.isNotEmpty && !isRadioStation)
+              _ActionButton(
+                icon: FluentIcons.apps_list_24_regular,
+                tooltip: l10n.queue,
+                active: widget.panel == PlayerPanel.queue,
+                onPressed: () => widget.onPanel(PlayerPanel.queue, context),
+              ),
+            if (supportsDesktopVolumeControl) const DesktopVolumeButton(),
+            ValueListenableBuilder<Duration?>(
+              valueListenable: sleepTimerNotifier,
+              builder: (context, timer, _) => _ActionButton(
+                icon: FluentIcons.timer_24_regular,
+                activeIcon: FluentIcons.timer_24_filled,
+                tooltip: l10n.sleepTimer,
+                active: timer != null,
+                onPressed: () => _onSleepTimer(context, timer != null),
+              ),
             ),
+            if (!isRadioStation)
+              ValueListenableBuilder<bool>(
+                valueListenable: _songOfflineStatus,
+                builder: (context, offline, _) => _ActionButton(
+                  icon: FluentIcons.cloud_arrow_down_24_regular,
+                  activeIcon: FluentIcons.cloud_off_24_filled,
+                  tooltip: l10n.makeOffline,
+                  active: offline,
+                  onPressed: audioId == null
+                      ? null
+                      : () => _toggleOffline(
+                          _songOfflineStatus,
+                          audioId,
+                          widget.metadata,
+                          isCurrent: () => mounted && audioId == actionAudioId,
+                        ),
+                ),
+              ),
+            if (online && !isRadioStation)
+              _ActionButton(
+                icon: FluentIcons.album_add_24_regular,
+                tooltip: l10n.addToPlaylist,
+                onPressed: () => showAddToPlaylistDialog(
+                  context,
+                  song: mediaItemToMap(widget.metadata),
+                ),
+              ),
+            if (online)
+              ValueListenableBuilder<bool>(
+                valueListenable: _songLikeStatus,
+                builder: (context, liked, _) => _ActionButton(
+                  icon: FluentIcons.heart_24_regular,
+                  activeIcon: FluentIcons.heart_24_filled,
+                  tooltip: l10n.likedSongs,
+                  active: liked,
+                  activeColor: colorScheme.primary,
+                  onPressed: _toggleLike,
+                ),
+              ),
           ],
-        ];
-
-        return Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainerHigh,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: actions,
-          ),
         );
       },
     );
   }
 
-  Widget _buildActionButton({
-    required BuildContext context,
-    required IconData icon,
-    required IconData activeIcon,
-    required ColorScheme colorScheme,
-    required double size,
-    required ValueNotifier<bool> statusNotifier,
-    required VoidCallback? onPressed,
-    Color? activeColor,
-    String? tooltip,
-  }) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: statusNotifier,
-      builder: (_, isActive, __) {
-        return IconButton(
-          icon: Icon(
-            isActive ? activeIcon : icon,
-            color: isActive
-                ? (activeColor ?? colorScheme.primary)
-                : colorScheme.onSurfaceVariant,
-          ),
-          iconSize: size,
-          tooltip: tooltip,
-          style: IconButton.styleFrom(
-            backgroundColor: isActive
-                ? (activeColor ?? colorScheme.primary).withValues(alpha: 0.15)
-                : Colors.transparent,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          onPressed: onPressed,
+  Future<void> _toggleLike() async {
+    final id = audioId;
+    if (id == null) return;
+
+    final originalValue = _songLikeStatus.value;
+    _songLikeStatus.value = !originalValue;
+
+    try {
+      if (isRadioStation) {
+        if (originalValue) {
+          await removeRadioStationFromLiked(id);
+        } else {
+          await addRadioStationToLiked(id);
+        }
+      } else {
+        await updateSongLikeStatus(
+          audioId,
+          !originalValue,
+          songData: mediaItemToMap(widget.metadata),
         );
-      },
-    );
+      }
+    } catch (e) {
+      if (mounted && audioId == id) _songLikeStatus.value = originalValue;
+      logger.log('Error toggling like status', error: e);
+    }
   }
 
-  Widget _buildSimpleActionButton({
-    required BuildContext context,
-    required IconData icon,
-    required ColorScheme colorScheme,
-    required double size,
-    required VoidCallback onPressed,
-    String? tooltip,
-  }) {
-    return IconButton(
-      icon: Icon(icon, color: colorScheme.onSurfaceVariant),
-      iconSize: size,
-      tooltip: tooltip,
-      style: IconButton.styleFrom(
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  Future<void> _onSleepTimer(BuildContext context, bool active) async {
+    if (!active) {
+      _showSleepTimerDialog(context);
+      return;
+    }
+    await audioHandler.cancelSleepTimer();
+    if (!context.mounted) return;
+    showToast(
+      context,
+      context.l10n!.sleepTimerCancelled,
+      duration: const Duration(seconds: 1, milliseconds: 500),
+    );
+  }
+}
+
+/// The actions in a wide floating bar that scrolls sideways when they do
+/// not fit, in the island's style.
+class PlayerActionBar extends StatelessWidget {
+  const PlayerActionBar({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return FloatingSurface(
+      child: SizedBox(
+        height: 64,
+        child: Center(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: child,
+          ),
+        ),
       ),
-      onPressed: onPressed,
     );
   }
+}
 
-  Widget _buildSleepTimerButton(
-    BuildContext context,
-    ColorScheme colorScheme,
-    double size,
-  ) {
-    return ValueListenableBuilder<Duration?>(
-      valueListenable: sleepTimerNotifier,
-      builder: (_, value, __) {
-        final isActive = value != null;
-        return IconButton(
-          icon: Icon(
-            isActive
-                ? FluentIcons.timer_24_filled
-                : FluentIcons.timer_24_regular,
-            color: isActive
-                ? colorScheme.primary
-                : colorScheme.onSurfaceVariant,
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+    this.activeIcon,
+    this.active = false,
+    this.activeColor,
+  });
+
+  final IconData icon;
+  final IconData? activeIcon;
+  final String tooltip;
+  final VoidCallback? onPressed;
+  final bool active;
+  final Color? activeColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = activeColor ?? colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+      child: IconButton(
+        icon: Icon(
+          active ? activeIcon ?? icon : icon,
+          color: active ? color : colorScheme.onSurfaceVariant,
+        ),
+        iconSize: 24,
+        tooltip: tooltip,
+        style: IconButton.styleFrom(
+          minimumSize: const Size.square(48),
+          backgroundColor: active
+              ? color.withValues(alpha: 0.15)
+              : Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          iconSize: size,
-          tooltip: context.l10n!.sleepTimer,
-          style: IconButton.styleFrom(
-            backgroundColor: isActive
-                ? colorScheme.primary.withValues(alpha: 0.15)
-                : Colors.transparent,
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          onPressed: () {
-            if (isActive) {
-              audioHandler.cancelSleepTimer();
-              sleepTimerNotifier.value = null;
-              showToast(
-                context,
-                context.l10n!.sleepTimerCancelled,
-                duration: const Duration(seconds: 1, milliseconds: 500),
-              );
-            } else {
-              _showSleepTimerDialog(context);
-            }
-          },
-        );
-      },
+        ),
+        onPressed: onPressed,
+      ),
     );
   }
 }
@@ -351,8 +335,9 @@ class _BottomActionsRowState extends State<BottomActionsRow> {
 Future<void> _toggleOffline(
   ValueNotifier<bool> status,
   String? audioId,
-  MediaItem metadata,
-) async {
+  MediaItem metadata, {
+  required bool Function() isCurrent,
+}) async {
   final originalValue = status.value;
   status.value = !originalValue;
 
@@ -367,11 +352,11 @@ Future<void> _toggleOffline(
     } else {
       success = await makeSongOffline(mediaItemToMap(metadata));
     }
-    if (!success) {
+    if (!success && isCurrent()) {
       status.value = originalValue;
     }
   } catch (e) {
-    status.value = originalValue;
+    if (isCurrent()) status.value = originalValue;
     logger.log('Error toggling offline status', error: e);
   }
 }

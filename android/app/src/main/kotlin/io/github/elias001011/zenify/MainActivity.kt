@@ -1,3 +1,5 @@
+package io.github.elias001011.zenify
+
 import android.os.Build
 import android.os.Bundle
 import androidx.core.view.WindowCompat

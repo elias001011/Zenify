@@ -19,6 +19,7 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -153,6 +154,15 @@ class HiveCopyReport {
       : 'failed ${failed.join(', ')}';
 }
 
+/// A staged migration must finish before any participating database reopens.
+class HiveMigrationPending implements Exception {
+  const HiveMigrationPending(this.path);
+  final String path;
+  @override
+  String toString() =>
+      'Library migration to $path is pending. Close other music apps and restart Zenify.';
+}
+
 /// Copies the Hive boxes in [from] into [to] when [to] has none yet.
 ///
 /// Copy, not move: [from] may still belong to another Musify install.
@@ -163,45 +173,117 @@ Future<HiveCopyReport> copyHiveBoxes({
   required Directory to,
   void Function(String message, {Object? error, StackTrace? stackTrace})? log,
 }) async {
-  if (from.absolute.path == to.absolute.path || !await from.exists()) {
-    return const HiveCopyReport();
-  }
-  if (await _hasHiveBoxes(to) || !await _hasHiveBoxes(from)) {
-    return const HiveCopyReport();
-  }
-
+  if (from.absolute.path == to.absolute.path) return const HiveCopyReport();
+  final staging = Directory('${to.path}/.hive-migration');
+  final journal = File('${staging.path}/pending.json');
   await to.create(recursive: true);
   final copied = <String>[];
-  final failed = <String>[];
-
-  for (final box in legacyDesktopBoxNames) {
-    // Hive writes box files in lower case.
-    final name = '${box.toLowerCase()}.hive';
-    final source = File('${from.path}${Platform.pathSeparator}$name');
-    if (!await source.exists()) continue;
-
-    final target = File('${to.path}${Platform.pathSeparator}$name');
-    final partial = File('${target.path}.partial');
-    try {
-      // A temporary name, so an interrupted copy never leaves a truncated box.
-      await source.copy(partial.path);
-      await partial.rename(target.path);
+  final locks = <RandomAccessFile>[];
+  try {
+    // Resume a complete staged snapshot after interruption between renames.
+    if (!await journal.exists()) {
+      if (await _hasHiveBoxes(to) || !await _hasHiveBoxes(from)) {
+        return const HiveCopyReport();
+      }
+      if (await staging.exists()) await staging.delete(recursive: true);
+      await staging.create(recursive: true);
+      final names = <String>[];
+      for (final box in legacyDesktopBoxNames) {
+        final name = '${box.toLowerCase()}.hive';
+        final source = File('${from.path}/$name');
+        if (!await source.exists()) continue;
+        // Hive holds this lock while its box is open. Refuse a live source
+        // rather than copy a snapshot that is changing underneath us.
+        final lockFile = File('${from.path}/${box.toLowerCase()}.lock');
+        {
+          final lock = await lockFile.open(mode: FileMode.append);
+          try {
+            await lock.lock();
+            locks.add(lock);
+          } catch (_) {
+            await lock.close();
+            rethrow;
+          }
+        }
+        names.add(name);
+      }
+      for (final name in names) {
+        final bytes = await File('${from.path}/$name').readAsBytes();
+        await File('${staging.path}/$name').writeAsBytes(bytes, flush: true);
+      }
+      final pending = File('${journal.path}.tmp');
+      await pending.writeAsString(jsonEncode(names), flush: true);
+      await pending.rename(journal.path);
+    }
+    final names = (jsonDecode(await journal.readAsString()) as List)
+        .cast<String>();
+    for (final name in names) {
+      if (!legacyDesktopBoxNames.any(
+        (box) => '${box.toLowerCase()}.hive' == name,
+      )) {
+        throw const FormatException('Invalid migration journal');
+      }
+      final staged = File('${staging.path}/$name');
+      final target = File('${to.path}/$name');
+      if (await staged.exists()) {
+        if (await target.exists())
+          throw StateError('Migration target already exists: $name');
+        await staged.rename(target.path);
+      } else if (!await target.exists()) {
+        throw StateError('Incomplete migration snapshot: $name');
+      }
       copied.add(name);
-    } catch (e, stackTrace) {
-      failed.add(name);
-      log?.call('Failed to copy $name', error: e, stackTrace: stackTrace);
-      if (await partial.exists()) await partial.delete();
+    }
+    await journal.delete();
+    await staging.delete(recursive: true);
+    return HiveCopyReport(copied: copied);
+  } catch (error, stack) {
+    log?.call('Hive migration failed', error: error, stackTrace: stack);
+    // A journal means a complete snapshot exists: preserve it for recovery.
+    // The caller must not open missing boxes until this transaction completes.
+    if (await journal.exists()) throw HiveMigrationPending(to.path);
+    return const HiveCopyReport(failed: ['migration']);
+  } finally {
+    for (final lock in locks) {
+      await lock.unlock();
+      await lock.close();
     }
   }
+}
 
-  if (failed.isNotEmpty) {
-    for (final name in copied) {
-      final file = File('${to.path}${Platform.pathSeparator}$name');
-      if (await file.exists()) await file.delete();
-    }
-    return HiveCopyReport(failed: failed);
+/// Modern Musify data precedes the old Documents layout. Existing Zenify
+/// data wins; original files/downloads are never moved or deleted.
+Future<HiveCopyReport> migrateLegacyDesktopData({
+  required Directory target,
+  required List<Directory> sources,
+}) async {
+  for (final source in sources) {
+    final report = await copyHiveBoxes(from: source, to: target);
+    if (report.hasWork) return report;
   }
-  return HiveCopyReport(copied: copied);
+  return const HiveCopyReport();
+}
+
+/// Platform support paths used before the Zenify identity change.
+List<Directory> legacyMusifyDirectories(
+  String targetPath, {
+  required bool windows,
+  Map<String, String>? environment,
+}) {
+  final env = environment ?? Platform.environment;
+  if (windows) {
+    final appData = env['APPDATA'];
+    return [
+      if (appData != null) ...[
+        Directory('$appData/com.gokadzev/musify'),
+        Directory('$appData/com.gokadzev/Musify'),
+        Directory('$appData/com.gokadzev.musify'),
+      ],
+    ];
+  }
+  return [
+    Directory('${Directory(targetPath).parent.path}/com.gokadzev.musify'),
+  ];
 }
 
 Future<bool> _hasHiveBoxes(Directory directory) async {

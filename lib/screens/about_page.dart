@@ -102,40 +102,14 @@ class AboutPage extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
-            _PersonCard(
-              name: 'Valeri Gokadze',
-              role: context.l10n!.aboutOriginalAuthor,
-              avatarUrl: 'https://avatars.githubusercontent.com/u/79704324?v=4',
-              links: [
-                (
-                  icon: FluentIcons.code_24_filled,
-                  tooltip: 'GitHub',
-                  url: 'https://github.com/gokadzev',
-                ),
-                (
-                  icon: FluentIcons.globe_24_filled,
-                  tooltip: 'Website',
-                  url: 'https://gokadzev.github.io',
-                ),
-              ],
-            ),
             const SizedBox(height: 24),
             CustomBar(
               context.l10n!.aboutSourceCode,
               FluentIcons.code_24_regular,
               description: 'github.com/$appRepository',
-              borderRadius: commonCustomBarRadiusFirst,
+              borderRadius: commonCustomBarRadius,
               onTap: () =>
                   launchURL(Uri.parse('https://github.com/$appRepository')),
-            ),
-            CustomBar(
-              context.l10n!.aboutOriginalProject,
-              FluentIcons.heart_24_regular,
-              description: 'github.com/gokadzev/Musify',
-              borderRadius: commonCustomBarRadiusLast,
-              onTap: () =>
-                  launchURL(Uri.parse('https://github.com/gokadzev/Musify')),
             ),
             const MiniPlayerBottomSpace(),
           ],

@@ -20,10 +20,17 @@
  */
 
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:hive/hive.dart';
+// Hive 2.x exposes neither a strict backup parser nor a public registry factory.
+// Parsing in memory avoids its recovery/truncation and failed-open cleanup.
+// ignore: implementation_imports
+import 'package:hive/src/binary/binary_reader_impl.dart';
+// ignore: implementation_imports
+import 'package:hive/src/hive_impl.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
@@ -329,14 +336,19 @@ Future<({String message, bool success})> restoreData(
 
   final restoredBoxes = <String>[];
   try {
+    // Validate before closing live boxes; recovery must never turn a corrupt
+    // backup into an apparently valid empty library.
+    for (final boxName in boxNames) {
+      await validateHiveBackup(boxName, backupBytes[boxName]!);
+    }
     for (final boxName in boxNames) {
       if (Hive.isBoxOpen(boxName)) {
+        await Hive.box(boxName).flush();
+        originalBytes[boxName] = Uint8List.fromList(
+          await File(boxPaths[boxName]!).readAsBytes(),
+        );
         await Hive.box(boxName).close();
       }
-    }
-
-    for (final boxName in boxNames) {
-      await _validateHiveBytes(boxName, backupBytes[boxName]!);
     }
 
     for (final boxName in boxNames) {
@@ -379,19 +391,15 @@ Future<Uint8List> _readPickedFile(PlatformFile file) async {
   return file.readAsBytes();
 }
 
-Future<void> _validateHiveBytes(String boxName, Uint8List bytes) async {
-  final validationDirectory = await Directory.systemTemp.createTemp(
-    'musify_restore_',
-  );
-  try {
-    final validationFile = File('${validationDirectory.path}/$boxName.hive');
-    await validationFile.writeAsBytes(bytes, flush: true);
-    final box = await Hive.openBox(boxName, path: validationDirectory.path);
-    await box.close();
-  } finally {
-    await validationDirectory.delete(recursive: true);
-  }
-}
+Future<void> validateHiveBackup(String boxName, Uint8List bytes) =>
+    Isolate.run(() {
+      final reader = BinaryReaderImpl(bytes, HiveImpl());
+      while (reader.availableBytes > 0) {
+        if (reader.readFrame() == null) {
+          throw FormatException('Corrupt Hive backup: $boxName');
+        }
+      }
+    });
 
 Future<void> _replaceHiveFile(String targetPath, Uint8List bytes) async {
   final targetFile = File(targetPath);

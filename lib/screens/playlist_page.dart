@@ -40,6 +40,7 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/song_filtering.dart';
 import 'package:musify/utilities/sort_utils.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/edit_playlist_dialog.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
@@ -50,6 +51,7 @@ import 'package:musify/widgets/playlist_page/like_button.dart';
 import 'package:musify/widgets/playlist_page/playlist_action_buttons.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
+import 'package:musify/widgets/playlist_page/sync_button.dart';
 import 'package:musify/widgets/recommended_songs_section.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:musify/widgets/sort_chips.dart';
@@ -190,6 +192,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
       fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
       onFilter: (value) => _searchQueryNotifier.value = value,
       onBack: () => Navigator.pop(context, widget.playlistData == _playlist),
+      background: _playlist == null
+          ? null
+          : PageGlow(source: _playlist?['image']?.toString()),
       body: Padding(
         padding: commonSingleChildScrollViewPadding,
         child: _isInitializingPlaylist
@@ -352,7 +357,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 PlaylistAddToPlaylistButton(
                   resolvePlaylist: () async => _playlist,
                 ),
-                if (!isUserCreated) _buildSyncButton(),
+                if (!isUserCreated) SyncButton(onSync: _handleSyncPlaylist),
               ],
               if (songsLength > 0) _buildDownloadButton(),
               if (isUserCreated) ...[_buildShareButton(), _buildEditButton()],
@@ -410,15 +415,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
         }
       },
       tooltip: context.l10n!.share,
-    );
-  }
-
-  Widget _buildSyncButton() {
-    return IconButton.filledTonal(
-      icon: const Icon(FluentIcons.arrow_sync_24_filled),
-      iconSize: 24,
-      onPressed: _handleSyncPlaylist,
-      tooltip: context.l10n!.update,
     );
   }
 
@@ -516,7 +512,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
     );
   }
 
-  void _handleSyncPlaylist() async {
+  Future<void> _handleSyncPlaylist() async {
     final playlistId = _playlist?['ytid']?.toString();
     if (playlistId == null || playlistId.isEmpty) return;
 

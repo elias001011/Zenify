@@ -122,22 +122,29 @@ class DesktopInterfaceScale extends StatelessWidget {
       builder: (context, scale, child) {
         if (scale == 1) return child!;
         final media = MediaQuery.of(context);
-        return FittedBox(
-          fit: BoxFit.fill,
-          alignment: Alignment.topLeft,
-          child: SizedBox.fromSize(
-            size: media.size / scale,
-            child: MediaQuery(
-              data: media.copyWith(
-                size: media.size / scale,
-                devicePixelRatio: media.devicePixelRatio * scale,
-                padding: media.padding / scale,
-                viewPadding: media.viewPadding / scale,
-                viewInsets: media.viewInsets / scale,
+        // Sized from the space actually given, not the window: a mismatch
+        // would scale width and height differently and stretch everything.
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final size = constraints.biggest / scale;
+            return FittedBox(
+              fit: BoxFit.fill,
+              alignment: Alignment.topLeft,
+              child: SizedBox.fromSize(
+                size: size,
+                child: MediaQuery(
+                  data: media.copyWith(
+                    size: size,
+                    devicePixelRatio: media.devicePixelRatio * scale,
+                    padding: media.padding / scale,
+                    viewPadding: media.viewPadding / scale,
+                    viewInsets: media.viewInsets / scale,
+                  ),
+                  child: child!,
+                ),
               ),
-              child: child!,
-            ),
-          ),
+            );
+          },
         );
       },
       child: child,

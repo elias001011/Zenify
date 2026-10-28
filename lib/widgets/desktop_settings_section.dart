@@ -35,7 +35,7 @@ import 'package:musify/services/io_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
-import 'package:musify/widgets/bottom_sheet_bar.dart';
+import 'package:musify/widgets/choice_bar.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/section_header.dart';
@@ -405,62 +405,24 @@ class _PlayerLayoutBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n!;
-    return ValueListenableBuilder<bool>(
-      valueListenable: compactDesktopPlayer,
-      builder: (context, compact, _) => CustomBar(
-        l10n.playerLayout,
-        FluentIcons.panel_left_24_regular,
-        description: compact
-            ? l10n.playerLayoutCompact
-            : l10n.playerLayoutDesktop,
-        onTap: () => _choose(context),
-      ),
-    );
-  }
-
-  void _choose(BuildContext context) {
-    final l10n = context.l10n!;
-
-    // The dialog sits on the root navigator; popping the settings context
-    // would close the settings page instead (see gokadzev/Musify#1010).
-    Widget option(
-      BuildContext dialogContext,
-      bool compact,
-      String title,
-      IconData icon,
-    ) => BottomSheetBar(
-      title,
-      () {
-        Navigator.pop(dialogContext);
-        compactDesktopPlayer.value = compact;
-        addOrUpdateData<bool>('settings', 'compactDesktopPlayer', compact);
-      },
-      compactDesktopPlayer.value == compact,
-      icon: icon,
-    );
-
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(l10n.playerLayout),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            option(
-              dialogContext,
-              false,
-              l10n.playerLayoutDesktop,
-              FluentIcons.panel_left_24_regular,
-            ),
-            option(
-              dialogContext,
-              true,
-              l10n.playerLayoutCompact,
-              FluentIcons.phone_24_regular,
-            ),
-          ],
+    return ChoiceBar<bool>(
+      title: l10n.playerLayout,
+      icon: FluentIcons.panel_left_24_regular,
+      setting: compactDesktopPlayer,
+      choices: [
+        (
+          value: false,
+          label: l10n.playerLayoutDesktop,
+          icon: FluentIcons.panel_left_24_regular,
         ),
-      ),
+        (
+          value: true,
+          label: l10n.playerLayoutCompact,
+          icon: FluentIcons.phone_24_regular,
+        ),
+      ],
+      onChosen: (compact) =>
+          addOrUpdateData<bool>('settings', 'compactDesktopPlayer', compact),
     );
   }
 }

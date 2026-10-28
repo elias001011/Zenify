@@ -13,6 +13,10 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
+DisableDirPage=no
+CloseApplications=yes
+RestartApplications=no
+AppMutex=ZenifyDataInUse
 OutputDir={#RepoRoot}\build\desktop-artifacts
 OutputBaseFilename=Zenify-windows-x64-setup
 Compression=lzma
@@ -46,10 +50,11 @@ const
 var
   LocationsPage: TInputDirWizardPage;
   LocationsConfirmed: Boolean;
+  PreviousDataDir, PreviousDownloadsDir, PreviousMigrationSource: String;
 
 function ConfigPath: String;
 begin
-  Result := ExpandConstant('{app}\' + ConfigFileName);
+  Result := AddBackslash(WizardDirValue) + ConfigFileName;
 end;
 
 function ReadConfigValue(const Key: String): String;
@@ -72,6 +77,12 @@ end;
 
 procedure InitializeWizard;
 begin
+  // Capture the previous install before the user changes the executable folder.
+  PreviousDataDir := GetPreviousData('DataDir', ReadConfigValue('dataDir'));
+  PreviousDownloadsDir := GetPreviousData('DownloadsDir', ReadConfigValue('downloadsDir'));
+  PreviousMigrationSource := GetPreviousData('MigrationSource', ReadConfigValue('previousDataDir'));
+  if PreviousDataDir = '' then
+    PreviousDataDir := ExpandConstant('{userappdata}\io.github.elias001011\Zenify');
   LocationsPage := CreateInputDirPage(wpSelectDir,
     'Data locations',
     'Where should Zenify keep your data?',
@@ -80,7 +91,7 @@ begin
     'Avoid folders synced by OneDrive or similar services. ' +
     'Existing data is copied to a new data folder and the original is kept.',
     False, '');
-  LocationsPage.Add('Application data folder:');
+  LocationsPage.Add('Application data folder (playlists, history and settings):');
   LocationsPage.Add('Downloads folder:');
   LocationsPage.Values[0] := ExpandConstant('{param:DATADIR|}');
   LocationsPage.Values[1] := ExpandConstant('{param:DOWNLOADSDIR|}');
@@ -91,9 +102,13 @@ begin
   if (CurPageID = LocationsPage.ID) and not LocationsConfirmed then
   begin
     if LocationsPage.Values[0] = '' then
-      LocationsPage.Values[0] := ReadConfigValue('dataDir');
+      LocationsPage.Values[0] := PreviousDataDir;
+    if LocationsPage.Values[0] = '' then
+      LocationsPage.Values[0] := ExpandConstant('{userappdata}\io.github.elias001011\Zenify');
     if LocationsPage.Values[1] = '' then
-      LocationsPage.Values[1] := ReadConfigValue('downloadsDir');
+      LocationsPage.Values[1] := PreviousDownloadsDir;
+    if LocationsPage.Values[1] = '' then
+      LocationsPage.Values[1] := ExpandConstant('{userappdata}\io.github.elias001011\Zenify\downloads');
   end;
 end;
 
@@ -102,6 +117,7 @@ var
   I: Integer;
 begin
   Result := True;
+  if WizardSilent then Exit;
   if CurPageID = LocationsPage.ID then
   begin
     for I := 0 to 1 do
@@ -114,8 +130,49 @@ begin
         Exit;
       end;
     end;
+    if (LocationsPage.Values[0] <> PreviousDataDir) and
+       (FileExists(AddBackslash(LocationsPage.Values[0]) + 'user.hive') or
+        FileExists(AddBackslash(LocationsPage.Values[0]) + 'settings.hive')) then
+    begin
+      if MsgBox('This folder already contains application data. Zenify will use it without overwriting it. Continue?', mbConfirmation, MB_YESNO) <> IDYES then
+      begin
+        Result := False;
+        Exit;
+      end;
+    end;
+    if (Pos('onedrive', Lowercase(LocationsPage.Values[0])) > 0) or
+       (Pos('dropbox', Lowercase(LocationsPage.Values[0])) > 0) then
+    begin
+      if MsgBox('This data folder appears to be cloud-synchronized. Concurrent syncing can damage the library. Use this folder anyway?', mbConfirmation, MB_YESNO) <> IDYES then
+      begin
+        Result := False;
+        Exit;
+      end;
+    end;
     LocationsConfirmed := True;
   end;
+end;
+
+procedure ResolveLocations(var DataDir, DownloadsDir: String);
+begin
+  if LocationsConfirmed then
+  begin
+    DataDir := LocationsPage.Values[0];
+    DownloadsDir := LocationsPage.Values[1];
+  end
+  else
+  begin
+    DataDir := Trim(ExpandConstant('{param:DATADIR|}'));
+    DownloadsDir := Trim(ExpandConstant('{param:DOWNLOADSDIR|}'));
+    if DataDir = '' then DataDir := PreviousDataDir;
+    if DownloadsDir = '' then DownloadsDir := PreviousDownloadsDir;
+  end;
+end;
+
+function MigrationSource(const DataDir: String): String;
+begin
+  if DataDir = PreviousDataDir then Result := PreviousMigrationSource
+  else Result := PreviousDataDir;
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -124,21 +181,21 @@ var
   DataDir, DownloadsDir: String;
 begin
   if CurStep <> ssPostInstall then Exit;
-  if LocationsConfirmed then
-  begin
-    DataDir := LocationsPage.Values[0];
-    DownloadsDir := LocationsPage.Values[1];
-  end
-  else
-  begin
-    // Silent installs keep earlier choices unless the command line gives new ones.
-    DataDir := Trim(ExpandConstant('{param:DATADIR|}'));
-    DownloadsDir := Trim(ExpandConstant('{param:DOWNLOADSDIR|}'));
-    if DataDir = '' then DataDir := ReadConfigValue('dataDir');
-    if DownloadsDir = '' then DownloadsDir := ReadConfigValue('downloadsDir');
-  end;
-  SetArrayLength(Lines, 2);
+  ResolveLocations(DataDir, DownloadsDir);
+  SetArrayLength(Lines, 3);
   Lines[0] := 'dataDir=' + DataDir;
   Lines[1] := 'downloadsDir=' + DownloadsDir;
-  SaveStringsToUTF8File(ConfigPath, Lines, False);
+  Lines[2] := 'previousDataDir=' + MigrationSource(DataDir);
+  if not SaveStringsToUTF8File(ConfigPath, Lines, False) then
+    RaiseException('Could not save Zenify data locations.');
+end;
+
+procedure RegisterPreviousData(PreviousDataKey: Integer);
+var
+  DataDir, DownloadsDir: String;
+begin
+  ResolveLocations(DataDir, DownloadsDir);
+  SetPreviousData(PreviousDataKey, 'DataDir', DataDir);
+  SetPreviousData(PreviousDataKey, 'DownloadsDir', DownloadsDir);
+  SetPreviousData(PreviousDataKey, 'MigrationSource', MigrationSource(DataDir));
 end;

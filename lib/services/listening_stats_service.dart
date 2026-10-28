@@ -113,6 +113,14 @@ class ListeningStatsService {
     return annualListeningSongsFromMonths(months, limit: limit);
   }
 
+  /// Worked out from the month's songs on demand; nothing extra is stored.
+  List<ListeningArtist> monthTopArtists(String monthKey) => topListeningArtists(
+    monthTopSongs(monthKey, limit: wrappedCurrentMonthSongsLimit),
+  );
+
+  List<ListeningArtist> yearTopArtists() =>
+      topListeningArtists(yearTopSongs(limit: wrappedCurrentMonthSongsLimit));
+
   void recordListeningTime(Duration listenedDuration, {DateTime? listenedAt}) {
     if (!wrappedEnabled.value) return;
     if (listenedDuration <= Duration.zero) return;

@@ -19,17 +19,23 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/artwork_colors.dart';
 import 'package:musify/services/settings_manager.dart';
 
 /// Glow strength at the centre, by theme.
 double artworkGlowStrength(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark ? 0.5 : 0.35;
+    Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.22;
+
+// (1 - x²)³ from the centre (x = 0) to the edge (x = 1): no visible rim.
+const _falloffStops = [0.0, 0.25, 0.5, 0.75, 1.0];
+const _falloff = [1.0, 0.82, 0.42, 0.084, 0.0];
 
 /// Paints one soft glow filling the oval [bounds]: the look of the dynamic
 /// background, shared by every glow so they all match.
 void paintArtworkGlow(Canvas canvas, Rect bounds, Color color, double alpha) {
+  if (bounds.isEmpty || alpha <= 0) return;
   final radius = bounds.height / 2;
   canvas
     ..save()
@@ -37,153 +43,188 @@ void paintArtworkGlow(Canvas canvas, Rect bounds, Color color, double alpha) {
     ..scale(bounds.width / bounds.height, 1);
   final paint = Paint()
     ..shader = RadialGradient(
-      colors: [
-        color.withValues(alpha: alpha),
-        color.withValues(alpha: alpha * 0.45),
-        color.withValues(alpha: 0),
-      ],
-      stops: const [0, 0.5, 1],
+      colors: [for (final f in _falloff) color.withValues(alpha: alpha * f)],
+      stops: _falloffStops,
     ).createShader(Rect.fromCircle(center: Offset.zero, radius: radius));
   canvas
     ..drawCircle(Offset.zero, radius, paint)
     ..restore();
 }
 
-/// Resolves artwork colours for glows and fades them in when they arrive.
-/// Colours already known (coming back to a page) show at once.
-mixin ArtworkGlowColors<T extends StatefulWidget>
-    on SingleTickerProviderStateMixin<T> {
-  /// Glow colour by index; null glows in the app colour (no artwork, or no
-  /// colour found in it). Missing while still resolving.
-  final glowColors = <int, Color?>{};
-  final _colorsChanged = ValueNotifier<int>(0);
-  late final _fadeIn = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
+/// The glow colours of a set of artworks, by index. They ease from one set
+/// to the next, and each fades in when its artwork's colour arrives.
+class GlowColors {
+  GlowColors(TickerProvider vsync)
+    : _transition = AnimationController(
+        vsync: vsync,
+        duration: const Duration(milliseconds: 1200),
+        value: 1,
+      );
+
+  final AnimationController _transition;
+  var _from = <int, Color>{};
+  var _to = <int, Color>{};
+  List<String?>? _sources;
+  Color? _appColor;
   int _generation = 0;
 
-  /// 0 to 1, for the painter's alpha.
-  Animation<double> get glowFade => _fadeIn;
-
   /// What a glow painter repaints on.
-  late final Listenable glowRepaint = Listenable.merge([
-    _fadeIn,
-    _colorsChanged,
-  ]);
+  Listenable get listenable => _transition;
 
-  void resolveGlowColors(List<String?> sources) {
+  /// Indices that have a glow now or are easing out of one.
+  Iterable<int> get indices => {..._from.keys, ..._to.keys};
+
+  /// The colour of glow [index] now; its alpha carries the fade.
+  Color? colorAt(int index) {
+    final from = _from[index];
+    final to = _to[index];
+    if (from == null && to == null) return null;
+    return Color.lerp(
+      from ?? to!.withAlpha(0),
+      to ?? from!.withAlpha(0),
+      Curves.easeInOut.transform(_transition.value),
+    );
+  }
+
+  /// Glows for [sources]; one without artwork, or without a colour found in
+  /// it, glows in [appColor]. Cached colours also fade in on a newly opened page.
+  void update(List<String?> sources, Color appColor) {
+    if (appColor == _appColor && listEquals(sources, _sources)) return;
+    _sources = List.of(sources);
+    _appColor = appColor;
     final generation = ++_generation;
-    glowColors.clear();
-    var allCached = true;
+
+    final next = <int, Color>{};
     for (var i = 0; i < sources.length; i++) {
       final source = sources[i];
       if (source == null || source.isEmpty) {
-        glowColors[i] = null;
-        continue;
+        next[i] = appColor;
+      } else if (ArtworkColors.isCached(source)) {
+        next[i] = ArtworkColors.cached(source) ?? appColor;
+      } else {
+        ArtworkColors.of(source).then((color) {
+          if (generation == _generation) {
+            _retarget({..._to, i: color ?? appColor});
+          }
+        });
       }
-      if (ArtworkColors.isCached(source)) {
-        glowColors[i] = ArtworkColors.cached(source);
-        continue;
-      }
-      allCached = false;
-      ArtworkColors.of(source).then((color) {
-        if (!mounted || generation != _generation) return;
-        glowColors[i] = color;
-        _colorsChanged.value++;
-        if (!_fadeIn.isAnimating && !_fadeIn.isCompleted) _fadeIn.forward();
-      });
     }
-    if (allCached) _fadeIn.value = 1;
-    _colorsChanged.value++;
+
+    _retarget(next);
+  }
+
+  void _retarget(Map<int, Color> next) {
+    _from = {
+      for (final i in indices)
+        if (colorAt(i) case final color? when color.a > 0) i: color,
+    };
+    _to = next;
+    _transition.forward(from: 0);
+  }
+
+  void dispose() {
+    _generation++;
+    _transition.dispose();
+  }
+}
+
+/// The page background for an artwork (or the app colour, without one),
+/// when the dynamic background is on: a large soft ball of its colour from
+/// the top, emptying into the page, and a fainter neighbouring hue below.
+class PageGlow extends StatefulWidget {
+  const PageGlow({super.key, required this.source, this.strength});
+
+  /// The artwork's network URL or file path.
+  final String? source;
+  final double? strength;
+
+  @override
+  State<PageGlow> createState() => _PageGlowState();
+}
+
+class _PageGlowState extends State<PageGlow>
+    with SingleTickerProviderStateMixin {
+  late final _colors = GlowColors(this);
+
+  void _update() =>
+      _colors.update([widget.source], Theme.of(context).colorScheme.primary);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _update();
+  }
+
+  @override
+  void didUpdateWidget(PageGlow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _update();
   }
 
   @override
   void dispose() {
-    _colorsChanged.dispose();
-    _fadeIn.dispose();
+    _colors.dispose();
     super.dispose();
-  }
-}
-
-/// A wide glow of an artwork's colour (or the app colour, without one)
-/// behind [child], reaching past it into the page, when the dynamic
-/// background is on. Used by page headers.
-class ArtworkGlow extends StatefulWidget {
-  const ArtworkGlow({super.key, required this.source, required this.child});
-
-  /// The artwork's network URL or file path.
-  final String? source;
-  final Widget child;
-
-  @override
-  State<ArtworkGlow> createState() => _ArtworkGlowState();
-}
-
-class _ArtworkGlowState extends State<ArtworkGlow>
-    with SingleTickerProviderStateMixin, ArtworkGlowColors {
-  @override
-  void initState() {
-    super.initState();
-    resolveGlowColors([widget.source]);
-  }
-
-  @override
-  void didUpdateWidget(ArtworkGlow oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.source != widget.source) resolveGlowColors([widget.source]);
   }
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: dynamicBackground,
-      builder: (context, enabled, child) => !enabled
-          ? child!
-          : CustomPaint(
-              painter: _GlowPainter(
-                colors: glowColors,
-                appColor: Theme.of(context).colorScheme.primary,
-                fade: glowFade,
-                strength: artworkGlowStrength(context),
-                repaint: glowRepaint,
+      builder: (context, enabled, _) => !enabled
+          ? const SizedBox.expand()
+          : RepaintBoundary(
+              child: CustomPaint(
+                size: Size.infinite,
+                painter: _PageGlowPainter(
+                  colors: _colors,
+                  strength: widget.strength ?? artworkGlowStrength(context),
+                ),
               ),
-              child: child,
             ),
-      child: widget.child,
     );
   }
 }
 
-class _GlowPainter extends CustomPainter {
-  _GlowPainter({
-    required this.colors,
-    required this.appColor,
-    required this.fade,
-    required this.strength,
-    required Listenable repaint,
-  }) : super(repaint: repaint);
+class _PageGlowPainter extends CustomPainter {
+  _PageGlowPainter({required this.colors, required this.strength})
+    : super(repaint: colors.listenable);
 
-  final Map<int, Color?> colors;
-  final Color appColor;
-  final Animation<double> fade;
+  final GlowColors colors;
   final double strength;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final alpha = strength * fade.value;
-    if (!colors.containsKey(0) || alpha <= 0) return;
-    final color = colors[0] ?? appColor;
-    // Wider than tall and well past the child, so it reads as background.
-    final bounds = Rect.fromCenter(
-      center: size.center(Offset.zero),
-      width: (size.width * 1.2).clamp(0, size.height * 5),
-      height: size.height * 2.4,
+    final color = colors.colorAt(0);
+    if (color == null || color.a == 0) return;
+    final alpha = strength * color.a;
+
+    // A neighbouring hue, as the second light of a stage.
+    final hsl = HSLColor.fromColor(color);
+    final second = hsl.withHue((hsl.hue + 28) % 360).toColor();
+    paintArtworkGlow(
+      canvas,
+      Rect.fromCenter(
+        center: Offset(size.width * 0.65, size.height * 0.65),
+        width: size.width * 0.7,
+        height: size.height * 0.7,
+      ),
+      second,
+      alpha * 0.55,
     );
-    paintArtworkGlow(canvas, bounds, color, alpha);
+    paintArtworkGlow(
+      canvas,
+      Rect.fromCenter(
+        center: Offset(size.width * 0.5, size.height * 0.5),
+        width: size.width,
+        height: size.height,
+      ),
+      color,
+      alpha,
+    );
   }
 
   @override
-  bool shouldRepaint(_GlowPainter oldDelegate) =>
-      oldDelegate.strength != strength || oldDelegate.appColor != appColor;
+  bool shouldRepaint(_PageGlowPainter oldDelegate) =>
+      oldDelegate.strength != strength || oldDelegate.colors != colors;
 }

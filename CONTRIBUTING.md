@@ -1,4 +1,4 @@
-# Contributing to Musify
+# Contributing to Zenify
 
 Thank you for considering contributing to this project! We welcome and appreciate all contributions.
 
@@ -12,7 +12,7 @@ Thank you for considering contributing to this project! We welcome and appreciat
 
 ## Code of Conduct
 
-All contributors are expected to abide by our code of conduct. Please make sure to read and understand the [code of conduct](https://github.com/gokadzev/Musify/blob/master/CODE_OF_CONDUCT.md) before making a contribution.
+All contributors are expected to abide by our code of conduct. Please make sure to read and understand the [code of conduct](CODE_OF_CONDUCT.md) before making a contribution.
 
 ## Code Reviews
 
@@ -25,3 +25,9 @@ By contributing to this project, you agree to allow your contributions to be use
 ## Questions
 
 If you have any questions about contributing, please contact the project maintainers.
+
+## Translations
+
+Edit the ARB files in `lib/localization/`. Add new strings to English and
+Portuguese first, then run `flutter gen-l10n` and `flutter analyze`. Zenify
+currently accepts translations through pull requests.
