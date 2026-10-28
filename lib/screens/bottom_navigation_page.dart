@@ -166,14 +166,14 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                 SizedBox(
                   height: _dockBarHeight,
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    spacing: 12,
                     children: [
                       for (var i = 0; i < items.length; i++)
-                        Expanded(
-                          child: _DockButton(
-                            item: items[i],
-                            selected: i == selected,
-                            onTap: () => _onTabTapped(i, items),
-                          ),
+                        _DockButton(
+                          item: items[i],
+                          selected: i == selected,
+                          onTap: () => _onTabTapped(i, items),
                         ),
                     ],
                   ),
@@ -336,34 +336,38 @@ class _DockButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Tooltip(
-      message: item.label,
-      child: Semantics(
-        selected: selected,
-        button: true,
-        label: item.label,
-        excludeSemantics: true,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Center(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOut,
-              width: selected ? 60 : 44,
-              height: 34,
-              decoration: BoxDecoration(
-                color: selected
-                    ? colorScheme.secondaryContainer
-                    : Colors.transparent,
+    // A fixed slot, so the pill can grow without moving its neighbours.
+    return SizedBox(
+      width: 64,
+      child: Center(
+        child: Tooltip(
+          message: item.label,
+          child: Semantics(
+            selected: selected,
+            button: true,
+            label: item.label,
+            excludeSemantics: true,
+            child: Material(
+              color: selected
+                  ? colorScheme.secondaryContainer
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(17),
+              child: InkWell(
+                onTap: onTap,
                 borderRadius: BorderRadius.circular(17),
-              ),
-              child: Icon(
-                selected ? item.selectedIcon : item.icon,
-                size: 22,
-                color: selected
-                    ? colorScheme.onSecondaryContainer
-                    : colorScheme.onSurfaceVariant,
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOut,
+                  width: selected ? 60 : 44,
+                  height: 34,
+                  child: Icon(
+                    selected ? item.selectedIcon : item.icon,
+                    size: 22,
+                    color: selected
+                        ? colorScheme.onSecondaryContainer
+                        : colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
             ),
           ),
