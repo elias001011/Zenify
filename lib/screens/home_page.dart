@@ -56,7 +56,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _suggestedPlaylistsFuture = getPlaylists(
-      playlistsNum: recommendedCubesNumber,
+      playlistsNum: suggestedPlaylistsNumber,
     );
     _recommendedSongsFuture = getRecommendedSongs();
     externalRecommendations.addListener(_refreshRecommendedSongs);
@@ -154,7 +154,7 @@ class _HomePageState extends State<HomePage> {
     final sectionTitle = showOnlyLiked
         ? context.l10n!.backToFavorites
         : context.l10n!.suggestedPlaylists;
-    final itemsNumber = playlists.length.clamp(0, recommendedCubesNumber);
+    final itemsNumber = playlists.length;
     final isLargeScreen = MediaQuery.of(context).size.width > 480;
 
     return Column(

@@ -30,6 +30,7 @@ const appDesktopId = 'io.github.elias001011.zenify';
 const appRepository = 'elias001011/Musify-Next';
 
 const recommendedCubesNumber = 8;
+const suggestedPlaylistsNumber = 16;
 
 const commonSingleChildScrollViewPadding = EdgeInsets.symmetric(horizontal: 10);
 var commonBarRadius = BorderRadius.circular(16);
