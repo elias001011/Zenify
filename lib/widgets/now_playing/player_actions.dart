@@ -51,7 +51,9 @@ class PlayerActions extends StatefulWidget {
 
   /// The panel open beside the player, highlighted.
   final PlayerPanel? panel;
-  final ValueChanged<PlayerPanel> onPanel;
+
+  /// Given a context under the player's scaffold, which sheets need.
+  final void Function(PlayerPanel panel, BuildContext context) onPanel;
 
   @override
   State<PlayerActions> createState() => _PlayerActionsState();
@@ -143,14 +145,14 @@ class _PlayerActionsState extends State<PlayerActions> {
                 icon: FluentIcons.text_quote_24_regular,
                 tooltip: l10n.lyrics,
                 active: widget.panel == PlayerPanel.lyrics,
-                onPressed: () => widget.onPanel(PlayerPanel.lyrics),
+                onPressed: () => widget.onPanel(PlayerPanel.lyrics, context),
               ),
             if (queue.isNotEmpty && !isRadioStation)
               _ActionButton(
                 icon: FluentIcons.apps_list_24_regular,
                 tooltip: l10n.queue,
                 active: widget.panel == PlayerPanel.queue,
-                onPressed: () => widget.onPanel(PlayerPanel.queue),
+                onPressed: () => widget.onPanel(PlayerPanel.queue, context),
               ),
             if (supportsDesktopVolumeControl) const _VolumeButton(),
             ValueListenableBuilder<Duration?>(

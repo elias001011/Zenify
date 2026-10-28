@@ -67,13 +67,18 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
 
   static bool _isWide(Size size) => size.width >= 900 && size.height >= 560;
 
-  void _onPanel(PlayerPanel panel, MediaItem metadata) {
+  /// [sheetContext] sits under the page's scaffold, which sheets open in.
+  void _onPanel(
+    PlayerPanel panel,
+    MediaItem metadata,
+    BuildContext sheetContext,
+  ) {
     if (_isWide(MediaQuery.sizeOf(context))) {
       setState(() => _panel = _panel == panel ? null : panel);
       return;
     }
     showCustomBottomSheet(
-      context,
+      sheetContext,
       panel == PlayerPanel.queue
           ? const QueueWidget(isBottomSheet: true)
           : SizedBox(
@@ -105,7 +110,8 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
           final actions = PlayerActions(
             metadata: metadata,
             panel: _panel,
-            onPanel: (panel) => _onPanel(panel, metadata),
+            onPanel: (panel, sheetContext) =>
+                _onPanel(panel, metadata, sheetContext),
           );
           return Stack(
             children: [

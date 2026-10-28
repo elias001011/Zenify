@@ -47,8 +47,9 @@ void main() {
     );
 
     // A full-screen page covers the dock: the host floats the notice.
-    final navigator = tester.state<NavigatorState>(find.byType(Navigator));
-    navigator.push(MaterialPageRoute<void>(builder: (_) => const Scaffold()));
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .push(MaterialPageRoute<void>(builder: (_) => const Scaffold()));
     await tester.pumpAndSettle();
     expect(find.text('Saved'), findsOneWidget);
     expect(
