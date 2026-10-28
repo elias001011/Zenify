@@ -30,8 +30,8 @@ moving your library between devices.
 | Platforms | Android, desktop builds | Android, Linux and Windows, with `.deb`, installer and portable builds |
 | Interface | Material app bars and bottom navigation | Floating island, dock and desktop rail; solid, translucent or blurred |
 | Background | Plain | Optional dynamic background in your albums' colours |
-| Player | Flip card with lyrics | Full-stage player: lyrics, queue and volume in one bar, sound waves, 3D artwork on desktop |
-| Library | Sections | Filters (custom, YouTube, albums, artists, offline) and search, merged into the global search |
+| Player | Flip card with lyrics | Song and playback under the artwork; lyrics beside it on desktop and in its place on phones; sound waves that follow the music |
+| Library | Sections | Filters (custom, YouTube, albums, artists, offline) and its own search, songs included; global search lists what you own first |
 | Listening recap | Minutes and top songs | Cards with minutes, top artists and top songs, shareable per month |
 | Downloads | In the background | Download manager with progress, failures and retry |
 | Devices | Backup and restore | Local Sync between Android, Linux and Windows over Wi-Fi, plus backup |
@@ -66,10 +66,14 @@ New in Zenify:
 - **A new look**: floating navigation and player, a floating title island with
   quick search, a neutral theme with pure black, and an optional dynamic
   background that glows with the colours of your albums.
-- **A new player**: the artwork takes the stage, lyrics and queue open beside
-  it or as sheets, and tapping the artwork shows sound waves.
-- **Library search and filters**, with library results first in search and
-  search that keeps working offline.
+- **A new player**: the artwork with the song and playback under it. Lyrics
+  and queue open beside it on desktop; on phones the lyrics take the
+  artwork's place. Tapping the artwork flips it to sound waves that follow
+  the music's loudness, beats and treble (on Android, once you allow audio
+  access).
+- **Library search and filters**: the library searches its own playlists,
+  artists and songs, and the global search lists what you already have
+  first. Both keep working offline.
 - **Top artists** in the listening recap, worked out from what you play.
 - **Download manager**: follow downloads in progress, see what failed and why,
   and retry.
