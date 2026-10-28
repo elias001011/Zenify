@@ -17,15 +17,15 @@ enum _Style { color, white }
 
 /// Bar heights of the waveform, by how many bars fit the size.
 const _waveforms = {
-  15: [.14, .28, .44, .3, .6, .84, .62, 1.0, .62, .84, .6, .3, .44, .28, .14],
-  11: [.2, .42, .3, .64, .86, 1.0, .86, .64, .3, .42, .2],
-  7: [.28, .56, .82, 1.0, .82, .56, .28],
+  9: [.3, .56, .4, .8, 1.0, .8, .4, .56, .3],
+  7: [.32, .6, .84, 1.0, .84, .6, .32],
+  5: [.42, .76, 1.0, .76, .42],
 };
 
 /// Paints an audio waveform centred in [rect]. Small sizes get fewer, wider
 /// bars so they stay legible.
 void _paintWaves(Canvas canvas, Rect rect, double pixels, _Style style) {
-  final heights = _waveforms[pixels >= 96 ? 15 : (pixels >= 40 ? 11 : 7)]!;
+  final heights = _waveforms[pixels >= 96 ? 9 : (pixels >= 40 ? 7 : 5)]!;
   // Bar, gap, bar...: bars take 60% of each step.
   final step = rect.width / (heights.length - 0.4);
   final barWidth = step * 0.6;

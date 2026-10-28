@@ -28,7 +28,7 @@ cp -R "${BUNDLE_DIR}/." "${APP_DIR}/"
 rm -f "${APP_DIR}/install-linux-desktop.sh"
 ln -s "/usr/lib/${APP_NAME}/${APP_NAME}" "${PACKAGE_ROOT}/usr/bin/${APP_NAME}"
 install -m 0644 "${ICON}" \
-  "${PACKAGE_ROOT}/usr/share/icons/hicolor/96x96/apps/${APP_NAME}.png"
+  "${PACKAGE_ROOT}/usr/share/icons/hicolor/96x96/apps/${APP_ID}.png"
 
 # Same entry as linux/install-linux-desktop.sh writes for the tarball.
 cat > "${PACKAGE_ROOT}/usr/share/applications/${APP_ID}.desktop" <<DESKTOP
@@ -36,7 +36,7 @@ cat > "${PACKAGE_ROOT}/usr/share/applications/${APP_ID}.desktop" <<DESKTOP
 Name=Zenify
 Comment=Music Streaming app
 Exec=${APP_NAME}
-Icon=${APP_NAME}
+Icon=${APP_ID}
 Terminal=false
 Type=Application
 Categories=AudioVideo;Audio;Player;
