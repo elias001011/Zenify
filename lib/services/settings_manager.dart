@@ -113,6 +113,28 @@ final startMaximized = ValueNotifier<bool>(
   Hive.box('settings').get('startMaximized', defaultValue: false),
 );
 
+/// How wide pages grow on large screens.
+enum ContentWidth {
+  narrow(900),
+  medium(1280),
+  full(double.infinity);
+
+  const ContentWidth(this.maxWidth);
+
+  final double maxWidth;
+}
+
+ContentWidth _readContentWidth() {
+  final stored = Hive.box('settings').get('contentWidth');
+  for (final width in ContentWidth.values) {
+    if (width.name == stored) return width;
+  }
+  return ContentWidth.medium;
+}
+
+// Desktop only.
+final contentWidth = ValueNotifier<ContentWidth>(_readContentWidth());
+
 /// Desktop only: `compact` puts the phone dock (player + navigation) in the
 /// bottom-left corner instead of the side rail.
 final compactDesktopPlayer = ValueNotifier<bool>(
@@ -231,6 +253,7 @@ void reloadSettingsFromStorage() {
     defaultValue: false,
   );
   interfaceScale.value = _readInterfaceScale();
+  contentWidth.value = _readContentWidth();
   startMaximized.value = settings.get('startMaximized', defaultValue: false);
   customTitleBar.value = settings.get('customTitleBar', defaultValue: true);
   compactDesktopPlayer.value = settings.get(

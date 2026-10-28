@@ -128,7 +128,18 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
       data: media.copyWith(
         padding: media.padding.copyWith(bottom: media.padding.bottom + inset),
       ),
-      child: KeyedSubtree(key: _contentKey, child: widget.child),
+      // Pages stop growing at the chosen width (desktop) and stay centred.
+      child: ValueListenableBuilder<ContentWidth>(
+        valueListenable: contentWidth,
+        builder: (context, width, child) => Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: width.maxWidth),
+            child: child,
+          ),
+        ),
+        child: KeyedSubtree(key: _contentKey, child: widget.child),
+      ),
     );
   }
 
