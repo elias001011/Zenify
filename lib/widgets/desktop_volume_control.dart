@@ -28,8 +28,16 @@ import 'package:musify/utilities/platform_utils.dart';
 
 bool get supportsDesktopVolumeControl => isDesktopPlatform;
 
+IconData volumeIcon(double volume) {
+  if (volume <= 0.0) return FluentIcons.speaker_mute_24_regular;
+  if (volume < 0.5) return FluentIcons.speaker_1_24_regular;
+  return FluentIcons.speaker_2_24_regular;
+}
+
 class DesktopVolumeControl extends StatelessWidget {
-  const DesktopVolumeControl({super.key});
+  const DesktopVolumeControl({super.key, this.sliderWidth = 96});
+
+  final double sliderWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -45,10 +53,7 @@ class DesktopVolumeControl extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: Icon(
-                _iconForVolume(volume),
-                color: colors.onSurfaceVariant,
-              ),
+              icon: Icon(volumeIcon(volume), color: colors.onSurfaceVariant),
               iconSize: 22,
               tooltip: context.l10n!.volume,
               style: IconButton.styleFrom(
@@ -63,7 +68,7 @@ class DesktopVolumeControl extends StatelessWidget {
               onPressed: audioHandler.toggleMute,
             ),
             SizedBox(
-              width: 96,
+              width: sliderWidth,
               height: 32,
               child: _buildSlider(context, volume),
             ),
@@ -106,11 +111,5 @@ class DesktopVolumeControl extends StatelessWidget {
       },
       child: slider,
     );
-  }
-
-  IconData _iconForVolume(double volume) {
-    if (volume <= 0.0) return FluentIcons.speaker_mute_24_regular;
-    if (volume < 0.5) return FluentIcons.speaker_1_24_regular;
-    return FluentIcons.speaker_2_24_regular;
   }
 }

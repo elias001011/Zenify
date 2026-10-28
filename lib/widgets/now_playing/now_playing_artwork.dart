@@ -19,204 +19,121 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
-import 'dart:async';
-
 import 'package:audio_service/audio_service.dart';
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/common_services.dart';
-import 'package:musify/services/lyrics/lyrics_models.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/utilities/async_loader.dart';
-import 'package:musify/widgets/flip_card.dart';
-import 'package:musify/widgets/now_playing/synced_lyrics_view.dart';
+import 'package:musify/utilities/platform_utils.dart';
+import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/song_artwork.dart';
 
-class NowPlayingArtwork extends StatelessWidget {
+/// The player's artwork. Tapping it swaps in the sound waves and back; on
+/// desktop it tilts in 3D, the side under the mouse sinking in.
+class NowPlayingArtwork extends StatefulWidget {
   const NowPlayingArtwork({
     super.key,
-    required this.size,
     required this.metadata,
-    required this.lyricsController,
+    required this.size,
   });
-  final Size size;
+
   final MediaItem metadata;
-  final FlipCardController lyricsController;
+  final double size;
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final screenWidth = size.width;
-    final screenHeight = size.height;
-    final isLandscape = screenWidth > screenHeight;
-    final isDesktop = screenWidth > 800;
-    final imageSize = isDesktop
-        ? screenHeight * 0.38
-        : isLandscape
-        ? screenHeight * 0.45
-        : screenWidth < 360
-        ? screenWidth * 0.75
-        : screenWidth < 600
-        ? screenWidth * 0.80
-        : screenWidth * 0.65;
-
-    const borderRadius = 24.0;
-
-    return FlipCard(
-      rotateSide: RotateSide.right,
-      onTapFlipping:
-          !offlineMode.value && !(metadata.extras?['isLive'] ?? false),
-      controller: lyricsController,
-      frontWidget: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(borderRadius),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: 0.15),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(borderRadius),
-              child: SongArtworkWidget(
-                metadata: metadata,
-                size: imageSize,
-                errorWidgetIconSize: size.width / 8,
-                borderRadius: borderRadius,
-              ),
-            ),
-            Positioned(
-              right: 10,
-              bottom: 10,
-              child: _AudioQualityBadge(metadata: metadata),
-            ),
-          ],
-        ),
-      ),
-      backWidget: Container(
-        width: imageSize,
-        height: imageSize,
-        decoration: BoxDecoration(
-          color: colorScheme.secondaryContainer,
-          borderRadius: BorderRadius.circular(borderRadius),
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.shadow.withValues(alpha: 0.15),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
-              spreadRadius: 2,
-            ),
-          ],
-        ),
-        child: _LyricsView(metadata: metadata),
-      ),
-    );
-  }
+  State<NowPlayingArtwork> createState() => _NowPlayingArtworkState();
 }
 
-/// Fetches and caches lyrics lazily per song.
-class _LyricsView extends StatefulWidget {
-  const _LyricsView({required this.metadata});
-  final MediaItem metadata;
+class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
+  static const _radius = 24.0;
 
-  @override
-  State<_LyricsView> createState() => _LyricsViewState();
-}
+  /// -1 to 1 on each axis from the centre, while the mouse is over it.
+  var _tilt = Offset.zero;
+  var _showWaves = false;
 
-class _LyricsViewState extends State<_LyricsView> {
-  String? _resolvedKey;
-  late Future<Lyrics?> _lyricsFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _resolveIfNeeded();
-  }
-
-  @override
-  void didUpdateWidget(_LyricsView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _resolveIfNeeded();
-  }
-
-  void _resolveIfNeeded() {
-    final key = '${widget.metadata.artist} - ${widget.metadata.title}';
-    if (key == _resolvedKey) return;
-    _resolvedKey = key;
-    _lyricsFuture = getSongLyricsResult(
-      widget.metadata.artist,
-      widget.metadata.title,
-      duration: widget.metadata.duration,
-      album: widget.metadata.album,
+  void _onHover(PointerHoverEvent event) {
+    final half = widget.size / 2;
+    setState(
+      () => _tilt = Offset(
+        ((event.localPosition.dx - half) / half).clamp(-1, 1),
+        ((event.localPosition.dy - half) / half).clamp(-1, 1),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final size = widget.size;
 
-    Widget unavailable() => Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            FluentIcons.text_quote_24_regular,
-            size: 48,
-            color: colorScheme.onSecondaryContainer.withValues(alpha: 0.5),
+    final artwork = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(_radius),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 40,
+            offset: const Offset(0, 16),
           ),
-          const SizedBox(height: 16),
-          Text(
-            context.l10n!.lyricsNotAvailable,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-              color: colorScheme.onSecondaryContainer,
-            ),
-            textAlign: TextAlign.center,
+        ],
+      ),
+      child: Stack(
+        children: [
+          SongArtworkWidget(
+            metadata: widget.metadata,
+            size: size,
+            errorWidgetIconSize: size / 6,
+            borderRadius: _radius,
+          ),
+          Positioned(
+            right: 10,
+            bottom: 10,
+            child: _AudioQualityBadge(metadata: widget.metadata),
           ),
         ],
       ),
     );
 
-    return AsyncLoader<Lyrics?>(
-      future: _lyricsFuture,
-      emptyWidget: unavailable(),
-      errorBuilder: (ctx, error, stack) => unavailable(),
-      builder: (context, lyrics) {
-        if (lyrics == null || lyrics.isEmpty) return unavailable();
-
-        // Re-evaluated when the setting changes, so toggling it takes effect
-        // without reloading the lyrics.
-        return ValueListenableBuilder<bool>(
-          valueListenable: syncedLyricsEnabled,
-          builder: (context, syncedEnabled, _) {
-            if (lyrics.isSynced && syncedEnabled) {
-              return SyncedLyricsView(lyrics: lyrics);
-            }
-
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              physics: const BouncingScrollPhysics(),
-              child: Text(
-                formatPlainLyrics(lyrics),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: colorScheme.onSecondaryContainer,
-                  height: 1.6,
+    final content = GestureDetector(
+      onTap: () => setState(() => _showWaves = !_showWaves),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: _showWaves
+            ? Container(
+                key: const ValueKey('waves'),
+                width: size,
+                height: size,
+                padding: EdgeInsets.all(size * 0.12),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(_radius),
                 ),
-                textAlign: TextAlign.center,
-              ),
-            );
-          },
-        );
-      },
+                child: WaveVisualizer(size: size * 0.76),
+              )
+            : KeyedSubtree(key: const ValueKey('artwork'), child: artwork),
+      ),
+    );
+
+    if (!isDesktopPlatform) return content;
+
+    return MouseRegion(
+      onHover: _onHover,
+      onExit: (_) => setState(() => _tilt = Offset.zero),
+      child: TweenAnimationBuilder<Offset>(
+        tween: Tween(end: _tilt),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        builder: (context, tilt, child) => Transform(
+          alignment: Alignment.center,
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.0012)
+            // Signs make the side under the mouse recede.
+            ..rotateX(tilt.dy * 0.16)
+            ..rotateY(-tilt.dx * 0.16),
+          child: child,
+        ),
+        child: content,
+      ),
     );
   }
 }

@@ -13,7 +13,7 @@ import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/mini_player.dart';
-import 'package:musify/widgets/now_playing/bottom_actions_row.dart';
+import 'package:musify/widgets/now_playing/player_actions.dart';
 
 class _Handler extends MusifyAudioHandler {
   final changes = StreamController<double>.broadcast();
@@ -31,11 +31,6 @@ class _Handler extends MusifyAudioHandler {
     value = next;
     changes.add(next);
   }
-}
-
-class _LyricsController {
-  const _LyricsController();
-  void flipcard() {}
 }
 
 class _VolumeLocalizations extends AppLocalizationsEn {
@@ -174,38 +169,32 @@ void main() {
     }, variant: TargetPlatformVariant.only(platform));
   }
   testWidgets(
-    'mobile action buttons keep their original spacing',
+    'a radio station only offers the sleep timer and like',
     (tester) async {
       await tester.pumpWidget(
-        const MaterialApp(
-          localizationsDelegates: [
+        MaterialApp(
+          localizationsDelegates: const [
             AppLocalizations.delegate,
             ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
             body: Center(
-              child: BottomActionsRow(
-                metadata: MediaItem(
+              child: PlayerActions(
+                metadata: const MediaItem(
                   id: 'radio',
                   title: 'Radio',
                   extras: {'isLive': true, 'ytid': 'radio'},
                 ),
-                iconSize: 24,
-                isLargeScreen: true,
-                lyricsController: null,
+                panel: null,
+                onPanel: (_) {},
               ),
             ),
           ),
         ),
       );
       await tester.pump();
-      final buttons = find.byType(IconButton);
-      expect(buttons, findsNWidgets(2));
-      final panel = tester.getRect(find.byType(BottomActionsRow));
-      final first = tester.getRect(buttons.first);
-      final last = tester.getRect(buttons.last);
-      expect(first.left - panel.left, closeTo(panel.right - last.right, 0.01));
+      expect(find.byType(IconButton), findsNWidgets(2));
     },
     variant: const TargetPlatformVariant({
       TargetPlatform.android,
@@ -214,91 +203,63 @@ void main() {
   );
 
   testWidgets(
-    'full-player volume stays small, adjusts and restores mute at 400 px',
+    'the player volume opens above its button, adjusts and restores mute',
     (tester) async {
-      tester.view.physicalSize = const Size(400, 800);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(
-        const MaterialApp(
-          localizationsDelegates: [
+        MaterialApp(
+          localizationsDelegates: const [
             AppLocalizations.delegate,
             ...GlobalMaterialLocalizations.delegates,
           ],
           supportedLocales: AppLocalizations.supportedLocales,
           home: Scaffold(
-            body: Center(
-              child: BottomActionsRow(
-                metadata: MediaItem(
+            body: Align(
+              alignment: Alignment.bottomCenter,
+              child: PlayerActions(
+                metadata: const MediaItem(
                   id: 'test',
                   title: 'Song',
                   extras: {'ytid': 'test'},
                 ),
-                iconSize: 24,
-                isLargeScreen: false,
-                lyricsController: _LyricsController(),
+                panel: null,
+                onPanel: (_) {},
               ),
             ),
           ),
         ),
       );
       await tester.pumpAndSettle();
-      final volume = find.descendant(
+      expect(find.byType(Slider), findsNothing);
+
+      final opener = find.byTooltip('Volume');
+      final openerRect = tester.getRect(opener);
+      await tester.tap(opener);
+      await tester.pumpAndSettle();
+      final slider = find.byType(Slider);
+      expect(slider, findsOneWidget);
+      expect(tester.getRect(slider).width, 180);
+      expect(
+        tester.getRect(slider).bottom,
+        lessThanOrEqualTo(openerRect.bottom),
+      );
+
+      final mute = find.descendant(
         of: find.byType(DesktopVolumeControl),
         matching: find.byType(IconButton),
       );
-      final panel = tester.getRect(find.byType(BottomActionsRow));
-      final buttonBounds = tester.getRect(volume);
-      final button = tester.widget<IconButton>(volume);
-      final colors = Theme.of(tester.element(volume)).colorScheme;
-      expect((button.icon as Icon).color, colors.onSurfaceVariant);
-      expect(button.style!.backgroundColor!.resolve({}), Colors.transparent);
-      expect(find.byType(Slider), findsOneWidget);
-      expect(find.text('50%'), findsNothing);
-      final bounds = tester.getRect(find.byType(Slider));
-      expect(bounds.left, greaterThanOrEqualTo(0));
-      expect(bounds.right, lessThanOrEqualTo(400));
-      expect(bounds.height, 32);
-      expect(bounds.width, 96);
-      final theme = SliderTheme.of(tester.element(find.byType(Slider)));
-      expect(theme.trackHeight, 4);
-      expect(theme.activeTrackColor, colors.onSurfaceVariant);
-      expect(
-        (theme.thumbShape! as RoundSliderThumbShape).enabledThumbRadius,
-        4,
-      );
-      await tester.tap(volume);
+      await tester.tap(mute);
       await tester.pumpAndSettle();
       expect(audioHandler.volume, 0);
-      expect(find.byType(Slider), findsOneWidget);
-      await tester.tap(volume);
+      await tester.tap(mute);
       await tester.pumpAndSettle();
       expect(audioHandler.volume, 0.5);
-      await audioHandler.setVolume(0.75);
-      await tester.pumpAndSettle();
-      expect(tester.widget<Slider>(find.byType(Slider)).value, 0.75);
-      final center = tester.getCenter(find.byType(Slider));
+
+      final center = tester.getCenter(slider);
       await tester.sendEventToBinding(
         PointerScrollEvent(position: center, scrollDelta: const Offset(0, 20)),
       );
       await tester.pumpAndSettle();
-      expect(audioHandler.volume, closeTo(0.7, 0.0001));
-      await tester.tap(volume);
-      await tester.pumpAndSettle();
-      expect(audioHandler.volume, 0);
-      await tester.tap(volume);
-      await tester.pumpAndSettle();
-      expect(audioHandler.volume, closeTo(0.7, 0.0001));
-      final thumb = Offset(
-        bounds.left + 8 + (bounds.width - 16) * 0.7,
-        center.dy,
-      );
-      await tester.dragFrom(thumb, const Offset(15, 0));
-      await tester.pumpAndSettle();
-      expect(audioHandler.volume, greaterThan(0.7));
-      expect(tester.getRect(find.byType(BottomActionsRow)), panel);
-      expect(tester.getRect(volume), buttonBounds);
+      expect(audioHandler.volume, closeTo(0.45, 0.0001));
       expect(tester.takeException(), isNull);
     },
     variant: const TargetPlatformVariant({
