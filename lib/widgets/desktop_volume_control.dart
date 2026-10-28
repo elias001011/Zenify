@@ -62,7 +62,7 @@ class DesktopVolumeControl extends StatelessWidget {
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 side: BorderSide.none,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
               onPressed: audioHandler.toggleMute,
@@ -115,35 +115,60 @@ class DesktopVolumeControl extends StatelessWidget {
 }
 
 /// Shared, anchored popup for both player surfaces. Only desktop gets it.
+/// The button matches the player's other actions: same size, spacing, colour
+/// and rounded shape, tinted while the popup is open.
 class DesktopVolumeButton extends StatelessWidget {
   const DesktopVolumeButton({super.key});
 
   @override
   Widget build(BuildContext context) {
     if (!supportsDesktopVolumeControl) return const SizedBox.shrink();
+    final colors = Theme.of(context).colorScheme;
     return MenuAnchor(
       alignmentOffset: const Offset(0, 8),
       style: const MenuStyle(
-        padding: WidgetStatePropertyAll(EdgeInsets.all(8)),
+        padding: WidgetStatePropertyAll(
+          EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        ),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(20)),
+          ),
+        ),
       ),
       menuChildren: const [
         SizedBox(
           width: 236,
           height: 48,
-          child: DesktopVolumeControl(sliderWidth: 180),
+          child: Center(child: DesktopVolumeControl(sliderWidth: 180)),
         ),
       ],
       builder: (context, controller, child) => StreamBuilder<double>(
         stream: audioHandler.volumeStream,
         initialData: audioHandler.volume,
-        builder: (context, snapshot) => IconButton(
-          constraints: const BoxConstraints.tightFor(width: 48, height: 48),
-          padding: EdgeInsets.zero,
-          iconSize: 24,
-          tooltip: context.l10n!.volume,
-          icon: Icon(volumeIcon(snapshot.data ?? audioHandler.volume)),
-          onPressed: () =>
-              controller.isOpen ? controller.close() : controller.open(),
+        builder: (context, snapshot) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: IconButton(
+            iconSize: 24,
+            tooltip: context.l10n!.volume,
+            icon: Icon(
+              volumeIcon(snapshot.data ?? audioHandler.volume),
+              color: controller.isOpen
+                  ? colors.primary
+                  : colors.onSurfaceVariant,
+            ),
+            style: IconButton.styleFrom(
+              minimumSize: const Size.square(48),
+              backgroundColor: controller.isOpen
+                  ? colors.primary.withValues(alpha: 0.15)
+                  : Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            onPressed: () =>
+                controller.isOpen ? controller.close() : controller.open(),
+          ),
         ),
       ),
     );
