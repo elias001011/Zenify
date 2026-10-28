@@ -302,7 +302,12 @@
   "settings": "Settings",
   "share": "Share",
   "shareRecap": "Share recap",
-  "shareTimeMachineText": "My Zenify recap",
+  "shareRecapText": "My {period} Zenify recap",
+  "@shareRecapText": {
+    "placeholders": {
+      "period": {"type": "String"}
+    }
+  },
   "shortcutConflict": "Already used by {action}.",
   "shortcutCycleRepeat": "Cycle repeat mode",
   "shortcutFocusSearch": "Focus the search field",

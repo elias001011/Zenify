@@ -251,7 +251,7 @@ class _HomePageState extends State<HomePage> {
               title: context.l10n!.timeMachine,
               icon: FluentIcons.data_trending_24_filled,
             ),
-            ListeningRecapCard(
+            ListeningRecapCards(
               periodLabel: periodLabel,
               minutes: displayMinutes,
               songs: previewSongs,
@@ -259,27 +259,12 @@ class _HomePageState extends State<HomePage> {
               topArtist: listeningStatsService
                   .monthTopArtists(currentMonthKey)
                   .firstOrNull,
-              onTopArtistTap: () =>
-                  context.push(NavigationManager.topArtistsPath),
-              onSeeAll: () => context.push(NavigationManager.timeMachinePath),
+              onMinutesTap: () =>
+                  context.push(NavigationManager.timeMachinePath),
+              onArtistTap: () => context.push(NavigationManager.topArtistsPath),
             ),
-            // The wide card has its own "see all".
-            LayoutBuilder(
-              builder: (context, constraints) =>
-                  ListeningRecapCard.isWide(constraints.maxWidth)
-                  ? const SizedBox.shrink()
-                  : Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: FilledButton.tonalIcon(
-                          onPressed: () =>
-                              context.push(NavigationManager.timeMachinePath),
-                          icon: const Icon(FluentIcons.arrow_right_24_regular),
-                          label: Text(context.l10n!.listeningStats),
-                        ),
-                      ),
-                    ),
+            RecapSeeAllButton(
+              onPressed: () => context.push(NavigationManager.timeMachinePath),
             ),
           ],
         );

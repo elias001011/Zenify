@@ -296,7 +296,7 @@
   "settings": "Configurações",
   "share": "Compartilhar",
   "shareRecap": "Compartilhar recap",
-  "shareTimeMachineText": "Meu Recap do Zenify",
+  "shareRecapText": "Meu recap do Zenify de {period}",
   "shortcutConflict": "Já usado por {action}.",
   "shortcutCycleRepeat": "Alternar repetição",
   "shortcutFocusSearch": "Ir para o campo de busca",

@@ -24,6 +24,7 @@ import 'dart:ui' as ui;
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/rendering.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
@@ -31,11 +32,11 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/screens/user_songs_page.dart';
 import 'package:musify/services/listening_stats_service.dart';
+import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
-import 'package:musify/widgets/button_width.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
@@ -208,30 +209,26 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
 
     return _PeriodSection(
       title: monthTitle,
+      shareKey: shareKey,
       onShare: () => _shareRecap(
         context,
         key: shareKey,
+        period: monthTitle,
         fileName: 'zenify-$monthKey-recap.png',
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          RepaintBoundary(
-            key: shareKey,
-            child: ListeningRecapCard(
-              periodLabel: periodLabel,
-              minutes: monthDisplayMinutes(monthStats),
-              songs: previewSongs,
-              onSongTap: (index) => _playSongs(previewSongs, index),
-            ),
-          ),
-          if (songs.length > previewSongs.length)
-            _ViewMoreButton(
-              onPressed: () => _showMoreSongs(context, monthTitle, songs),
-            ),
-          ..._topArtists(listeningStatsService.monthTopArtists(monthKey)),
-        ],
+      cards: ListeningRecapCards(
+        periodLabel: periodLabel,
+        minutes: monthDisplayMinutes(monthStats),
+        songs: previewSongs,
+        onSongTap: (index) => _playSongs(previewSongs, index),
+        topArtist: listeningStatsService.monthTopArtists(monthKey).firstOrNull,
+        onArtistTap: _openTopArtists,
       ),
+      footer: songs.length > previewSongs.length
+          ? RecapSeeAllButton(
+              onPressed: () => _showMoreSongs(context, monthTitle, songs),
+            )
+          : null,
     );
   }
 
@@ -243,50 +240,42 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
 
     return _PeriodSection(
       title: '${context.l10n!.annualRecap} $year',
+      shareKey: _yearShareKey,
       onShare: () => _shareRecap(
         context,
         key: _yearShareKey,
+        period: year,
         fileName: 'zenify-$year-recap.png',
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          RepaintBoundary(
-            key: _yearShareKey,
-            child: ListeningRecapCard(
-              periodLabel: year,
-              minutes: listeningStatsDisplayMinutes(
-                totalSeconds,
-                hasQualifiedSongs: songs.isNotEmpty,
-              ),
-              songs: previewSongs,
-              onSongTap: (index) => _playSongs(previewSongs, index),
-            ),
-          ),
-          if (songs.length > previewSongs.length)
-            _ViewMoreButton(
+      cards: ListeningRecapCards(
+        periodLabel: year,
+        minutes: listeningStatsDisplayMinutes(
+          totalSeconds,
+          hasQualifiedSongs: songs.isNotEmpty,
+        ),
+        songs: previewSongs,
+        onSongTap: (index) => _playSongs(previewSongs, index),
+        topArtist: listeningStatsService.yearTopArtists().firstOrNull,
+        onArtistTap: _openTopArtists,
+      ),
+      footer: songs.length > previewSongs.length
+          ? RecapSeeAllButton(
               onPressed: () => _showMoreSongs(
                 context,
                 '${context.l10n!.annualRecap} $year',
                 songs,
               ),
-            ),
-          ..._topArtists(listeningStatsService.yearTopArtists()),
-        ],
-      ),
+            )
+          : null,
     );
   }
 
-  List<Widget> _topArtists(List<ListeningArtist> artists) => [
-    if (artists.isNotEmpty) ...[
-      const SizedBox(height: 12),
-      TopArtistsCard(artists: artists),
-    ],
-  ];
+  void _openTopArtists() => context.push(NavigationManager.topArtistsPath);
 
   Future<void> _shareRecap(
     BuildContext context, {
     required GlobalKey key,
+    required String period,
     required String fileName,
   }) async {
     try {
@@ -307,9 +296,9 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
 
       final result = await SharePlus.instance.share(
         ShareParams(
-          title: context.l10n!.shareTimeMachineText,
-          subject: context.l10n!.shareTimeMachineText,
-          text: context.l10n!.shareTimeMachineText,
+          title: context.l10n!.shareRecapText(period),
+          subject: context.l10n!.shareRecapText(period),
+          text: context.l10n!.shareRecapText(period),
           files: [XFile(file.path, mimeType: 'image/png')],
           fileNameOverrides: [fileName],
         ),
@@ -427,39 +416,61 @@ String _formatMonthPeriodLabel(BuildContext context, String monthKey) {
       : '${label[0].toUpperCase()}${label.substring(1)}';
 }
 
+/// A period's title and recap cards, which its share button captures as an
+/// image; [footer] stays out of it.
 class _PeriodSection extends StatelessWidget {
   const _PeriodSection({
     required this.title,
-    required this.child,
+    required this.shareKey,
     required this.onShare,
+    required this.cards,
+    this.footer,
   });
 
   final String title;
-  final Widget child;
+  final GlobalKey shareKey;
   final VoidCallback onShare;
+  final Widget cards;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final footer = this.footer;
     return Padding(
       padding: const EdgeInsets.only(top: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: theme.colorScheme.secondary,
-                    ),
+          Stack(
+            children: [
+              RepaintBoundary(
+                key: shareKey,
+                // Opaque, so the shared image has the page behind it.
+                child: ColoredBox(
+                  color: theme.scaffoldBackgroundColor,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(8, 4, 56, 8),
+                        child: Text(
+                          title,
+                          style: theme.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: theme.colorScheme.secondary,
+                          ),
+                        ),
+                      ),
+                      cards,
+                    ],
                   ),
                 ),
-                IconButton(
+              ),
+              PositionedDirectional(
+                top: 0,
+                end: 0,
+                child: IconButton(
                   tooltip: context.l10n!.shareRecap,
                   onPressed: onShare,
                   icon: Icon(
@@ -467,35 +478,11 @@ class _PeriodSection extends StatelessWidget {
                     color: theme.colorScheme.primary,
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          child,
+          ?footer,
         ],
-      ),
-    );
-  }
-}
-
-class _ViewMoreButton extends StatelessWidget {
-  const _ViewMoreButton({required this.onPressed});
-
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
-      child: ButtonWidth(
-        child: SizedBox(
-          width: double.infinity,
-          child: FilledButton.tonalIcon(
-            onPressed: onPressed,
-            icon: const Icon(FluentIcons.more_horizontal_24_regular),
-            label: Text(context.l10n!.tapToView),
-          ),
-        ),
       ),
     );
   }
