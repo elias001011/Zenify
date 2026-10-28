@@ -59,7 +59,22 @@ class MediaKitPlayer extends AudioPlayerPlatform {
     return medias[_player.state.playlist.index];
   }
 
+  /// The newest player, so the app can read and set mpv properties that
+  /// just_audio has no API for (audio filters for a visualizer).
+  static MediaKitPlayer? latest;
+
+  /// Sets an mpv property on this player.
+  Future<void> setMpvProperty(String key, String value) =>
+      setProperty(_player, key, value);
+
+  /// Reads an mpv property of this player as a string ('' when unset).
+  Future<String> getMpvProperty(String key) => getProperty(_player, key);
+
+  /// Runs an mpv input command on this player, e.g. `['af', 'add', ...]`.
+  Future<void> mpvCommand(List<String> args) => command(_player, args);
+
   MediaKitPlayer(super.id) {
+    latest = this;
     _player = Player(
       configuration: PlayerConfiguration(
         pitch: JustAudioMediaKit.pitch,
@@ -404,6 +419,7 @@ class MediaKitPlayer extends AudioPlayerPlatform {
 
   /// Release the resources used by this player.
   Future<void> release() async {
+    if (identical(latest, this)) latest = null;
     _logger.info('releasing player resources');
     _mediaOpened = false;
     await _player.dispose();

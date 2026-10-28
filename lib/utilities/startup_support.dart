@@ -25,6 +25,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
+import 'package:musify/services/data_manager.dart' show validateHiveBackup;
 
 /// Builds the message shown when the desktop audio engine cannot start.
 ///
@@ -187,7 +188,8 @@ Future<HiveCopyReport> copyHiveBoxes({
       }
       if (await staging.exists()) await staging.delete(recursive: true);
       await staging.create(recursive: true);
-      final names = <String>[];
+      final names = <String, String>{};
+      final unlocked = <String>{};
       for (final box in legacyDesktopBoxNames) {
         final name = '${box.toLowerCase()}.hive';
         final source = File('${from.path}/$name');
@@ -195,24 +197,34 @@ Future<HiveCopyReport> copyHiveBoxes({
         // Hive holds this lock while its box is open. Refuse a live source
         // rather than copy a snapshot that is changing underneath us.
         final lockFile = File('${from.path}/${box.toLowerCase()}.lock');
-        {
-          final lock = await lockFile.open(mode: FileMode.append);
-          try {
-            await lock.lock();
-            locks.add(lock);
-          } catch (_) {
-            await lock.close();
-            rethrow;
-          }
+        final RandomAccessFile lock;
+        try {
+          lock = await lockFile.open(mode: FileMode.append);
+        } on FileSystemException catch (error) {
+          // A folder Zenify may only read (read-only, or Documents under
+          // Windows' Controlled Folder Access) can't hold the lock: copy it
+          // anyway and check the copy frame by frame instead.
+          log?.call('Copying $name without its lock', error: error);
+          unlocked.add(name);
+          names[name] = box;
+          continue;
         }
-        names.add(name);
+        try {
+          await lock.lock();
+          locks.add(lock);
+        } catch (_) {
+          await lock.close();
+          rethrow;
+        }
+        names[name] = box;
       }
-      for (final name in names) {
+      for (final MapEntry(key: name, value: box) in names.entries) {
         final bytes = await File('${from.path}/$name').readAsBytes();
+        if (unlocked.contains(name)) await validateHiveBackup(box, bytes);
         await File('${staging.path}/$name').writeAsBytes(bytes, flush: true);
       }
       final pending = File('${journal.path}.tmp');
-      await pending.writeAsString(jsonEncode(names), flush: true);
+      await pending.writeAsString(jsonEncode(names.keys.toList()), flush: true);
       await pending.rename(journal.path);
     }
     final names = (jsonDecode(await journal.readAsString()) as List)
@@ -256,9 +268,10 @@ Future<HiveCopyReport> copyHiveBoxes({
 Future<HiveCopyReport> migrateLegacyDesktopData({
   required Directory target,
   required List<Directory> sources,
+  void Function(String message, {Object? error, StackTrace? stackTrace})? log,
 }) async {
   for (final source in sources) {
-    final report = await copyHiveBoxes(from: source, to: target);
+    final report = await copyHiveBoxes(from: source, to: target, log: log);
     if (report.hasWork) return report;
   }
   return const HiveCopyReport();

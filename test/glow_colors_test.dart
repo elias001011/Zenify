@@ -48,4 +48,42 @@ void main() {
     expect(colors.colorAt(1)!.a, 0);
     expect(colors.colorAt(0), red);
   });
+
+  testWidgets('the glow expands once, not again for new colours', (
+    tester,
+  ) async {
+    final colors = GlowColors(const TestVSync());
+    addTearDown(colors.dispose);
+
+    expect(colors.reveal, 0);
+    colors.update([null], red);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(colors.reveal, inExclusiveRange(0, 1));
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(colors.reveal, 1);
+
+    colors.update([null], blue);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(colors.reveal, 1);
+    await tester.pump(const Duration(milliseconds: 1300));
+  });
+
+  testWidgets('a glow keeps its colour while the next one is read', (
+    tester,
+  ) async {
+    final colors = GlowColors(const TestVSync());
+    addTearDown(colors.dispose);
+
+    colors.update([null], red);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1500));
+    // A file that doesn't exist: reading it takes a while and finds nothing.
+    colors.update(['/nonexistent/artwork.png'], red);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(colors.colorAt(0), red);
+    await tester.pump(const Duration(milliseconds: 1500));
+  });
 }

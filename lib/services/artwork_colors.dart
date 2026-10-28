@@ -58,9 +58,14 @@ class ArtworkColors {
       final provider = source.startsWith('http')
           ? CachedNetworkImageProvider(source) as ImageProvider
           : FileImage(File(source));
-      final image = await _load(
-        ResizeImage(provider, width: _sampleSize, height: _sampleSize),
+      final sample = ResizeImage(
+        provider,
+        width: _sampleSize,
+        height: _sampleSize,
       );
+      final image = await _load(sample);
+      // The tiny sample would only crowd real artworks out of the cache.
+      unawaited(sample.evict());
       final data = await image.toByteData();
       image.dispose();
       return data == null ? null : vividColor(data.buffer.asUint8List());

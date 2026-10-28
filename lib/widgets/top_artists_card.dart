@@ -26,13 +26,17 @@ import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
+import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/song_artwork.dart';
 
 /// The most listened artists of a period, ranked.
 class TopArtistsCard extends StatelessWidget {
-  const TopArtistsCard({required this.artists, super.key});
+  const TopArtistsCard({required this.artists, this.periodLabel, super.key});
 
   final List<ListeningArtist> artists;
+
+  /// Names the period on the card, for sharing it as an image.
+  final String? periodLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +47,10 @@ class TopArtistsCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (periodLabel case final label?) ...[
+              RecapBrandHeader(periodLabel: label),
+              const SizedBox(height: 12),
+            ],
             Text(
               context.l10n!.topArtists,
               style: theme.textTheme.titleMedium?.copyWith(

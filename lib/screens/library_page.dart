@@ -26,8 +26,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
-import 'package:musify/screens/search_page.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/library_search.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
@@ -43,6 +43,7 @@ import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_bar.dart';
 import 'package:musify/widgets/section_header.dart';
+import 'package:musify/widgets/song_bar.dart';
 import 'package:musify/widgets/sort_chips.dart';
 
 class LibraryPage extends StatefulWidget {
@@ -57,6 +58,19 @@ enum _LibraryFilter { all, custom, youtube, albums, artists, offline }
 class _LibraryPageState extends State<LibraryPage> {
   var _filter = _LibraryFilter.all;
   var _query = '';
+  Timer? _filterDebounce;
+
+  void _onFilter(String value) {
+    _filterDebounce?.cancel();
+    final query = value.trim().toLowerCase();
+    // Clearing shows everything at once; typing waits for a pause.
+    _filterDebounce = Timer(
+      query.isEmpty ? Duration.zero : const Duration(milliseconds: 150),
+      () {
+        if (mounted && query != _query) setState(() => _query = query);
+      },
+    );
+  }
 
   Future<List<dynamic>>? _addedPlaylists;
 
@@ -75,6 +89,7 @@ class _LibraryPageState extends State<LibraryPage> {
   void dispose() {
     userPlaylists.removeListener(_invalidateAddedPlaylists);
     userPlaylistFolders.removeListener(_invalidateAddedPlaylists);
+    _filterDebounce?.cancel();
     super.dispose();
   }
 
@@ -173,9 +188,8 @@ class _LibraryPageState extends State<LibraryPage> {
 
     return IslandScaffold(
       title: context.l10n!.library,
-      onFilter: (value) => setState(() => _query = value.trim().toLowerCase()),
-      // Enter searches further: everywhere online, the library offline.
-      onFilterSubmitted: openSearch,
+      // The library's own search: it stays here and finds songs too.
+      onFilter: _onFilter,
       body: AnimatedBuilder(
         animation: Listenable.merge([
           pinnedPlaylistIds,
@@ -187,9 +201,11 @@ class _LibraryPageState extends State<LibraryPage> {
           onlinePlaylists,
           userPlaylists,
           userOfflineSongs,
+          userLikedSongsList,
         ]),
         builder: (context, _) {
           final sections = [
+            ..._buildSongSlivers(),
             ..._buildPinnedSlivers(),
             ..._buildUserPlaylistsSlivers(),
             if (!offlineMode.value) ..._buildLikedPlaylistsSlivers(),
@@ -495,6 +511,38 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
       ),
       _buildSliverPlaylistList(likedPlaylists),
+    ];
+  }
+
+  /// Songs of the library that match the search, offline or not as the
+  /// filter says.
+  List<Widget> _buildSongSlivers() {
+    if (_query.isEmpty || !_shows(_LibraryFilter.offline)) return [];
+    final songs = searchLibrarySongs(
+      _query,
+      offlineOnly: offlineMode.value || _filter == _LibraryFilter.offline,
+    );
+    if (songs.isEmpty) return [];
+    return [
+      SliverToBoxAdapter(
+        child: SectionHeader(
+          title: context.l10n!.songs,
+          icon: FluentIcons.music_note_1_24_filled,
+        ),
+      ),
+      SliverPadding(
+        padding: commonListViewBottomPadding,
+        sliver: SliverList.builder(
+          itemCount: songs.length,
+          itemBuilder: (context, index) => SongBar(
+            songs[index],
+            true,
+            key: listItemKey('library_song', index, songs[index]),
+            showMusicDuration: true,
+            borderRadius: getItemBorderRadius(index, songs.length),
+          ),
+        ),
+      ),
     ];
   }
 

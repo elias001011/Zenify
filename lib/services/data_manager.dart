@@ -281,6 +281,24 @@ Future<({String message, bool success})> backupData(
   }
 }
 
+/// Settings that belong to this device, not to the library: a backup from
+/// Musify (which has none of them) or from another device keeps them as they
+/// are here.
+const _deviceSettings = [
+  'localSyncEnabled',
+  'localSyncAutomatic',
+  'localSyncCategories',
+  'localSyncLastSyncedAt',
+  'customTitleBar',
+  'startMaximized',
+  'interfaceScale',
+  'compactDesktopPlayer',
+  'keyboardShortcuts',
+  'floatingEffect',
+  'equalizerEnabled',
+  'equalizerBandGains',
+];
+
 Future<({String message, bool success})> restoreData(
   BuildContext context,
 ) async {
@@ -335,6 +353,11 @@ Future<({String message, bool success})> restoreData(
   }
 
   final restoredBoxes = <String>[];
+  final settings = Hive.box('settings');
+  final deviceSettings = {
+    for (final key in _deviceSettings)
+      if (settings.containsKey(key)) key: settings.get(key),
+  };
   try {
     // Validate before closing live boxes; recovery must never turn a corrupt
     // backup into an apparently valid empty library.
@@ -375,7 +398,14 @@ Future<({String message, bool success})> restoreData(
   } finally {
     for (final boxName in boxNames) {
       try {
-        await _openBox(boxName);
+        final box = await _openBox(boxName);
+        if (boxName == 'settings' && restoredBoxes.contains(boxName)) {
+          for (final key in _deviceSettings) {
+            deviceSettings.containsKey(key)
+                ? await box.put(key, deviceSettings[key])
+                : await box.delete(key);
+          }
+        }
       } catch (e, stackTrace) {
         logger.log(
           'Failed to reopen box $boxName',

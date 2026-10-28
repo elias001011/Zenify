@@ -162,7 +162,7 @@ class _MinutesContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        _RecapBrandHeader(periodLabel: periodLabel),
+        RecapBrandHeader(periodLabel: periodLabel),
         const SizedBox(height: 14),
         FittedBox(
           fit: BoxFit.scaleDown,
@@ -246,8 +246,9 @@ class _ArtistContent extends StatelessWidget {
   }
 }
 
-class _RecapBrandHeader extends StatelessWidget {
-  const _RecapBrandHeader({required this.periodLabel});
+/// The app and the period, so a shared card says where and when it is from.
+class RecapBrandHeader extends StatelessWidget {
+  const RecapBrandHeader({required this.periodLabel, super.key});
 
   final String periodLabel;
 

@@ -22,7 +22,6 @@
 import 'dart:math' as math;
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
-import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
@@ -49,17 +48,37 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
       .map((mediaItem) => mediaItem != null)
       .distinct();
 
-  bool? _previousOfflineMode;
-
   /// Keeps the branch navigators and their state when the layout switches
   /// between the dock and the rail, which moves them in the tree.
   final _contentKey = GlobalKey();
 
-  /// Track the previously selected shell branch to detect reselects.
-  int? _previousShellIndex;
+  @override
+  void initState() {
+    super.initState();
+    offlineMode.addListener(_onOfflineModeChanged);
+  }
+
+  @override
+  void dispose() {
+    offlineMode.removeListener(_onOfflineModeChanged);
+    super.dispose();
+  }
+
+  /// Search needs YouTube: going offline there returns home.
+  void _onOfflineModeChanged() {
+    if (offlineMode.value && widget.child.currentIndex == 1) {
+      widget.child.goBranch(0);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isLargeScreen = MediaQuery.sizeOf(context).width >= 600;
+    final items = _navigationItems;
+    final selected = items.indexWhere(
+      (item) => item.shellIndex == widget.child.currentIndex,
+    );
+
     return PopScope(
       canPop: widget.child.currentIndex == 0,
       onPopInvokedWithResult: (didPop, _) {
@@ -72,46 +91,29 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
           SystemNavigator.pop();
         }
       },
-      child: ValueListenableBuilder<bool>(
-        valueListenable: offlineMode,
-        builder: (context, isOfflineMode, _) {
-          if (_previousOfflineMode != null &&
-              _previousOfflineMode != isOfflineMode) {
-            SchedulerBinding.instance.addPostFrameCallback((_) {
-              _handleOfflineModeChange(isOfflineMode);
-            });
-          }
-          _previousOfflineMode = isOfflineMode;
-
-          final isLargeScreen = MediaQuery.sizeOf(context).width >= 600;
-          final items = _getNavigationItems(isOfflineMode);
-          final selected = _getCurrentIndex(items, isOfflineMode);
-
-          return Scaffold(
-            body: SafeArea(
-              bottom: false,
-              child: StreamBuilder<bool>(
-                initialData: audioHandler.mediaItem.value != null,
-                stream: _miniPlayerVisibilityStream,
-                builder: (context, snapshot) {
-                  final playing = snapshot.data ?? false;
-                  return ValueListenableBuilder<bool>(
-                    valueListenable: compactDesktopPlayer,
-                    builder: (context, compact, _) => isLargeScreen && !compact
-                        ? _buildDesktop(context, items, selected, playing)
-                        : _buildMobile(
-                            context,
-                            items,
-                            selected,
-                            playing,
-                            maxDockWidth: isLargeScreen ? 420 : null,
-                          ),
-                  );
-                },
-              ),
-            ),
-          );
-        },
+      child: Scaffold(
+        body: SafeArea(
+          bottom: false,
+          child: StreamBuilder<bool>(
+            initialData: audioHandler.mediaItem.value != null,
+            stream: _miniPlayerVisibilityStream,
+            builder: (context, snapshot) {
+              final playing = snapshot.data ?? false;
+              return ValueListenableBuilder<bool>(
+                valueListenable: compactDesktopPlayer,
+                builder: (context, compact, _) => isLargeScreen && !compact
+                    ? _buildDesktop(context, items, selected, playing)
+                    : _buildMobile(
+                        context,
+                        items,
+                        selected,
+                        playing,
+                        maxDockWidth: isLargeScreen ? 420 : null,
+                      ),
+              );
+            },
+          ),
+        ),
       ),
     );
   }
@@ -120,13 +122,22 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
   static const _dockPadding = 6.0;
   static const _dockBarHeight = 44.0;
 
-  /// Pages scroll under the floating elements; this is the space they keep
-  /// free at the end so nothing stays hidden behind them.
-  Widget _withBottomInset(BuildContext context, double inset) {
+  static const _railWidth = 72.0;
+
+  /// Pages extend under the floating elements, their backgrounds included;
+  /// this is the space they keep free so no content stays hidden behind them.
+  Widget _withInsets(
+    BuildContext context, {
+    required double bottom,
+    double left = 0,
+  }) {
     final media = MediaQuery.of(context);
     return MediaQuery(
       data: media.copyWith(
-        padding: media.padding.copyWith(bottom: media.padding.bottom + inset),
+        padding: media.padding.copyWith(
+          bottom: media.padding.bottom + bottom,
+          left: media.padding.left + left,
+        ),
       ),
       child: KeyedSubtree(key: _contentKey, child: widget.child),
     );
@@ -147,7 +158,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
 
     return Stack(
       children: [
-        _withBottomInset(context, _margin * 2 + dockHeight),
+        _withInsets(context, bottom: _margin * 2 + dockHeight),
         Positioned(
           left: _margin,
           right: maxDockWidth == null ? _margin : null,
@@ -165,7 +176,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const NoticeSlot(),
-                  if (playing) const MiniPlayer(embedded: true),
+                  if (playing) const MiniPlayer(),
                   SizedBox(
                     height: _dockBarHeight,
                     child: Row(
@@ -205,62 +216,66 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
       onTap: () => _onTabTapped(index, items),
     );
 
-    return Row(
+    // The rail floats over the page like the dock on phones, so the page's
+    // background reaches the window's edge behind it.
+    return Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(_margin, _margin, 0, _margin),
-          child: FloatingSurface(
-            borderRadius: const BorderRadius.all(Radius.circular(24)),
-            child: SizedBox(
-              width: 72,
-              child: Column(
-                children: [
-                  const SizedBox(height: 18),
-                  Image.asset(
-                    'assets/icons/app_logo.png',
-                    width: 34,
-                    height: 34,
-                    color: colorScheme.primary,
-                  ),
-                  const SizedBox(height: 22),
-                  for (var i = 0; i < items.length; i++)
-                    if (i != settingsIndex) railButton(i),
-                  const Spacer(),
-                  if (settingsIndex != -1) railButton(settingsIndex),
-                  const SizedBox(height: 12),
-                ],
+        _withInsets(
+          context,
+          bottom: playing ? MiniPlayer.playerHeight + _margin * 2 : 0,
+          left: _margin + _railWidth,
+        ),
+        Positioned(
+          left: _margin,
+          top: _margin,
+          bottom: _margin,
+          child: RepaintBoundary(
+            child: FloatingSurface(
+              borderRadius: const BorderRadius.all(Radius.circular(24)),
+              child: SizedBox(
+                width: _railWidth,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 18),
+                    Image.asset(
+                      'assets/icons/app_logo.png',
+                      width: 34,
+                      height: 34,
+                      color: colorScheme.primary,
+                    ),
+                    const SizedBox(height: 22),
+                    for (var i = 0; i < items.length; i++)
+                      if (i != settingsIndex) railButton(i),
+                    const Spacer(),
+                    if (settingsIndex != -1) railButton(settingsIndex),
+                    const SizedBox(height: 12),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-        Expanded(
-          child: Stack(
-            alignment: Alignment.bottomCenter,
-            children: [
-              _withBottomInset(
-                context,
-                playing ? MiniPlayer.playerHeight + _margin * 2 : 0,
-              ),
-              if (playing)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(_margin, 0, _margin, _margin),
-                  child: FloatingSurface(
-                    borderRadius: BorderRadius.all(Radius.circular(24)),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [NoticeSlot(), MiniPlayer(embedded: true)],
-                    ),
-                  ),
+        if (playing)
+          const Positioned(
+            left: _margin * 2 + _railWidth,
+            right: _margin,
+            bottom: _margin,
+            child: RepaintBoundary(
+              child: FloatingSurface(
+                borderRadius: BorderRadius.all(Radius.circular(24)),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [NoticeSlot(), MiniPlayer()],
                 ),
-            ],
+              ),
+            ),
           ),
-        ),
       ],
     );
   }
 
   // Search opens from the island, so it has no tab of its own.
-  List<_NavigationItem> _getNavigationItems(bool isOfflineMode) => [
+  List<_NavigationItem> get _navigationItems => [
     _NavigationItem(
       icon: FluentIcons.home_24_regular,
       selectedIcon: FluentIcons.home_24_filled,
@@ -287,49 +302,14 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     ),
   ];
 
-  void _handleOfflineModeChange(bool isOfflineMode) {
-    if (!mounted) return;
-
-    final currentRoute = GoRouterState.of(context).matchedLocation;
-
-    // If we're switching to offline mode and currently on search tab
-    if (isOfflineMode && currentRoute.startsWith('/search')) {
-      // Navigate to home
-      widget.child.goBranch(0);
-    }
-  }
-
   void _onTabTapped(int index, List<_NavigationItem> items) {
-    if (index < items.length) {
-      final item = items[index];
-      final isReselect = _previousShellIndex == item.shellIndex;
-
-      // Close any open bottom sheet before switching tabs
-      closeCurrentBottomSheet();
-
-      // If user taps the same tab again, reset it to initial state.
-      // Otherwise, preserve the branch state.
-      if (isReselect) {
-        widget.child.goBranch(item.shellIndex, initialLocation: true);
-      } else {
-        widget.child.goBranch(item.shellIndex);
-      }
-
-      _previousShellIndex = item.shellIndex;
-    }
-  }
-
-  int _getCurrentIndex(List<_NavigationItem> items, bool isOfflineMode) {
-    final currentShellIndex = widget.child.currentIndex;
-
-    if (items.isEmpty) return 0;
-
-    // Try to find the current shell index in the available items
-    final matchedIndex = items.indexWhere(
-      (item) => item.shellIndex == currentShellIndex,
+    final shellIndex = items[index].shellIndex;
+    closeCurrentBottomSheet();
+    // Tapping the open tab again takes it back to its start.
+    widget.child.goBranch(
+      shellIndex,
+      initialLocation: shellIndex == widget.child.currentIndex,
     );
-    // The search page (branch 1) opens from the island and has no tab.
-    return matchedIndex;
   }
 }
 

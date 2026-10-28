@@ -31,7 +31,10 @@ PositionData _positionData = PositionData(
 );
 
 class PositionSlider extends StatefulWidget {
-  const PositionSlider({super.key});
+  const PositionSlider({super.key, this.flush = false});
+
+  /// Track and times reach the edges, to line up with an artwork above.
+  final bool flush;
 
   @override
   State<PositionSlider> createState() => _PositionSliderState();
@@ -73,24 +76,29 @@ class _PositionSliderState extends State<PositionSlider> {
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Slider(
-              value: currentValue.clamp(0.0, maxDuration),
-              onChanged: (value) {
-                setState(() {
-                  _isDragging = true;
-                  _dragValue = value;
-                });
-              },
-              onChangeEnd: (value) {
-                audioHandler.seek(Duration(seconds: value.toInt()));
-                setState(() {
-                  _isDragging = false;
-                });
-              },
-              max: maxDuration,
-              semanticFormatterCallback: (value) =>
-                  formatDuration(value.toInt()),
+            SliderTheme(
+              data: SliderTheme.of(context)
+                  .copyWith(padding: widget.flush ? EdgeInsets.zero : null),
+              child: Slider(
+                value: currentValue.clamp(0.0, maxDuration),
+                onChanged: (value) {
+                  setState(() {
+                    _isDragging = true;
+                    _dragValue = value;
+                  });
+                },
+                onChangeEnd: (value) {
+                  audioHandler.seek(Duration(seconds: value.toInt()));
+                  setState(() {
+                    _isDragging = false;
+                  });
+                },
+                max: maxDuration,
+                semanticFormatterCallback: (value) =>
+                    formatDuration(value.toInt()),
+              ),
             ),
+            if (widget.flush) const SizedBox(height: 8),
             _buildPositionRow(context, _positionData),
           ],
         );
@@ -107,7 +115,7 @@ class _PositionSliderState extends State<PositionSlider> {
     final durationText = formatDuration(positionData.duration.inSeconds);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 22),
+      padding: EdgeInsets.symmetric(horizontal: widget.flush ? 0 : 22),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [

@@ -45,7 +45,6 @@ class IslandScaffold extends StatefulWidget {
     this.actions = const [],
     this.onBack,
     this.onFilter,
-    this.onFilterSubmitted,
     this.globalSearch = true,
     this.background,
   });
@@ -58,9 +57,6 @@ class IslandScaffold extends StatefulWidget {
 
   /// Turns the search shortcut into a live filter of this page (playlists).
   final ValueChanged<String>? onFilter;
-
-  /// Enter in the filter, e.g. to search further than the page.
-  final ValueChanged<String>? onFilterSubmitted;
 
   /// Offer the search shortcut, which opens the search page on Enter.
   final bool globalSearch;
@@ -102,6 +98,8 @@ class _IslandScaffoldState extends State<IslandScaffold> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    // Room for the desktop rail, which floats over the page's background.
+    final left = media.padding.left;
 
     return Scaffold(
       body: Stack(
@@ -110,27 +108,30 @@ class _IslandScaffoldState extends State<IslandScaffold> {
             Positioned.fill(child: IgnorePointer(child: background)),
           NotificationListener<ScrollUpdateNotification>(
             onNotification: _onScroll,
-            child: MediaQuery(
-              data: media.copyWith(
-                padding: media.padding.copyWith(
-                  top: media.padding.top + IslandScaffold.inset,
+            child: Padding(
+              padding: EdgeInsets.only(left: left),
+              child: MediaQuery(
+                data: media.copyWith(
+                  padding: media.padding.copyWith(
+                    top: media.padding.top + IslandScaffold.inset,
+                    left: 0,
+                  ),
                 ),
+                child: widget.body,
               ),
-              child: widget.body,
             ),
           ),
           Positioned(
             top: media.padding.top + _islandMargin,
-            left: _islandMargin,
+            left: left + _islandMargin,
             child: _Island(
               title: widget.title,
               titleShown: _titleShown,
               actions: widget.actions,
               onBack: widget.onBack,
               onFilter: widget.onFilter,
-              onFilterSubmitted: widget.onFilterSubmitted,
               globalSearch: widget.globalSearch,
-              maxWidth: media.size.width - _islandMargin * 2,
+              maxWidth: media.size.width - left - _islandMargin * 2,
             ),
           ),
         ],
@@ -146,7 +147,6 @@ class _Island extends StatefulWidget {
     required this.actions,
     required this.onBack,
     required this.onFilter,
-    required this.onFilterSubmitted,
     required this.globalSearch,
     required this.maxWidth,
   });
@@ -156,7 +156,6 @@ class _Island extends StatefulWidget {
   final List<Widget> actions;
   final VoidCallback? onBack;
   final ValueChanged<String>? onFilter;
-  final ValueChanged<String>? onFilterSubmitted;
   final bool globalSearch;
   final double maxWidth;
 
@@ -193,12 +192,11 @@ class _IslandState extends State<_Island> {
   }
 
   void _submit(String query) {
-    final trimmed = query.trim();
     if (widget.onFilter != null) {
       _focusNode.unfocus();
-      if (trimmed.isNotEmpty) widget.onFilterSubmitted?.call(trimmed);
       return;
     }
+    final trimmed = query.trim();
     if (trimmed.isEmpty || offlineMode.value) return;
     _closeSearch();
     openSearch(trimmed);
@@ -368,6 +366,44 @@ class _IslandState extends State<_Island> {
 /// takes the system inset, so the island's own height is all that is added.
 EdgeInsets withIslandInset(BuildContext context, EdgeInsets padding) =>
     padding.copyWith(top: padding.top + IslandScaffold.inset);
+
+/// Settings and other pages of controls and text keep to this width on wide
+/// windows, centred, as desktop players do; music lists use the whole window.
+const double readableWidth = 860;
+
+/// Builds a page's scroll view with [padding], the island's space on top and
+/// whatever room either side centres the content within [readableWidth]. The
+/// margins stay part of the scroll view, so it scrolls from anywhere and its
+/// scrollbar keeps to the window's edge.
+class ReadablePadding extends StatelessWidget {
+  const ReadablePadding({
+    super.key,
+    required this.padding,
+    required this.builder,
+  });
+
+  final EdgeInsets padding;
+  final Widget Function(BuildContext context, EdgeInsets padding) builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final side = (constraints.maxWidth - readableWidth) / 2;
+        final inset = withIslandInset(context, padding);
+        return builder(
+          context,
+          side <= 0
+              ? inset
+              : inset.copyWith(
+                  left: inset.left + side,
+                  right: inset.right + side,
+                ),
+        );
+      },
+    );
+  }
+}
 
 /// The island's space as the first sliver of a [CustomScrollView].
 class SliverIslandTopSpace extends StatelessWidget {

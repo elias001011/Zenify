@@ -101,8 +101,13 @@ bool isSponsorshipAnnouncementUrl(String url) {
 }
 
 /// Formats a [monthKey] (e.g. "2026-06") into a locale-aware month label
-/// such as "June 2026". Falls back to [monthKey] if parsing fails.
-String formatMonthPeriodLabel(Locale locale, String monthKey) {
+/// such as "June 2026", or just "June" without [withYear]. Falls back to
+/// [monthKey] if parsing fails.
+String formatMonthPeriodLabel(
+  Locale locale,
+  String monthKey, {
+  bool withYear = true,
+}) {
   final parts = monthKey.split('-');
   if (parts.length != 2) return monthKey;
 
@@ -110,8 +115,10 @@ String formatMonthPeriodLabel(Locale locale, String monthKey) {
   final month = int.tryParse(parts[1]);
   if (year == null || month == null) return monthKey;
 
-  final label = DateFormat.yMMMM(locale.toString())
-      .format(DateTime(year, month));
+  final format = withYear
+      ? DateFormat.yMMMM(locale.toString())
+      : DateFormat.MMMM(locale.toString());
+  final label = format.format(DateTime(year, month));
   return label.isEmpty
       ? monthKey
       : '${label[0].toUpperCase()}${label.substring(1)}';

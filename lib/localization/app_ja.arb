@@ -36,7 +36,6 @@
   "backedupSuccess": "データを正常にバックアップしました",
   "backupError": "データのバックアップ中にエラーが発生しました",
   "backupUserData": "ユーザーデータをバックアップ",
-  "becomeSponsor": "スポンサーになる",
   "cacheMsg": "キャッシュを削除しました",
   "cancel": "キャンセル",
   "cancellingDownload": "ダウンロードをキャンセルしています...",
