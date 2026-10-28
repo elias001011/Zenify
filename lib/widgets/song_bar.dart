@@ -309,6 +309,7 @@ class SongBar extends StatefulWidget {
     this.playCount,
     this.barPadding,
     this.onAdd,
+    this.trailing,
     super.key,
   });
 
@@ -334,6 +335,9 @@ class SongBar extends StatefulWidget {
 
   /// Replaces the trailing overflow menu with an add button when set.
   final VoidCallback? onAdd;
+
+  /// Shown before the menu, e.g. a download's status.
+  final Widget? trailing;
 
   @override
   State<SongBar> createState() => _SongBarState();
@@ -476,6 +480,7 @@ class _SongBarState extends State<SongBar> {
                 ),
               ),
 
+              ?widget.trailing,
               if (widget.onAdd != null)
                 IconButton(
                   padding: EdgeInsets.zero,

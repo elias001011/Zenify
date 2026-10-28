@@ -24,14 +24,14 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/localization/app_localizations.dart';
+import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/download_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
-import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/section_header.dart';
-import 'package:musify/widgets/song_artwork.dart';
+import 'package:musify/widgets/song_bar.dart';
 
 /// The download manager: what is downloading, what failed and what finished.
 class DownloadsPage extends StatelessWidget {
@@ -123,7 +123,7 @@ class DownloadsPage extends StatelessWidget {
     );
   }
 
-  /// Built lazily, like playlist songs, so a long history stays smooth.
+  /// Built lazily, like playlist songs, with the app's own song rows.
   List<Widget> _section(
     String title,
     IconData icon,
@@ -137,13 +137,25 @@ class DownloadsPage extends StatelessWidget {
       ),
       SliverList.builder(
         itemCount: entries.length,
-        itemBuilder: (context, index) => RepaintBoundary(
-          key: ValueKey(entries[index]),
-          child: _DownloadRow(
-            entry: entries[index],
-            borderRadius: getItemBorderRadius(index, entries.length),
-          ),
-        ),
+        itemBuilder: (context, index) {
+          final entry = entries[index];
+          return RepaintBoundary(
+            key: ValueKey(entry),
+            child: SongBar(
+              entry.song,
+              true,
+              borderRadius: getItemBorderRadius(index, entries.length),
+              onPlay: () => audioHandler.playPlaylistSong(
+                playlist: {
+                  'title': title,
+                  'list': [for (final entry in entries) entry.song],
+                },
+                songIndex: index,
+              ),
+              trailing: _DownloadStatus(entry),
+            ),
+          );
+        },
       ),
     ];
   }
@@ -192,13 +204,14 @@ Future<void> _retryAll(List<DownloadEntry> failed) async {
   }
 }
 
-class _DownloadRow extends StatelessWidget {
-  const _DownloadRow({required this.entry, required this.borderRadius});
+/// A download's state beside its song: progress, a retry button that tells
+/// why it failed, or a check with the time it finished.
+class _DownloadStatus extends StatelessWidget {
+  const _DownloadStatus(this.entry);
 
   final DownloadEntry entry;
-  final BorderRadius borderRadius;
 
-  static String failureText(AppLocalizations l10n, DownloadFailure? failure) =>
+  static String _failureText(AppLocalizations l10n, DownloadFailure? failure) =>
       switch (failure) {
         DownloadFailure.unavailable => l10n.downloadFailedUnavailable,
         DownloadFailure.network => l10n.downloadFailedNetwork,
@@ -209,80 +222,42 @@ class _DownloadRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n!;
     final colorScheme = Theme.of(context).colorScheme;
-    final song = entry.song;
+
+    return switch (entry.status) {
+      DownloadStatus.downloading => Padding(
+        padding: const EdgeInsets.all(10),
+        child: ValueListenableBuilder<double?>(
+          valueListenable: entry.progress,
+          builder: (context, progress, _) => SizedBox.square(
+            dimension: 24,
+            child: CircularProgressIndicator(value: progress, strokeWidth: 3),
+          ),
+        ),
+      ),
+      DownloadStatus.failed => IconButton(
+        icon: Icon(
+          FluentIcons.arrow_clockwise_24_regular,
+          color: colorScheme.error,
+        ),
+        tooltip: '${_failureText(l10n, entry.failure)}\n${l10n.downloadsRetry}',
+        onPressed: () => makeSongOffline(entry.song),
+      ),
+      DownloadStatus.done => Tooltip(
+        message: _finishedAt(context),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(
+            FluentIcons.checkmark_circle_24_regular,
+            color: colorScheme.primary,
+          ),
+        ),
+      ),
+    };
+  }
+
+  String _finishedAt(BuildContext context) {
     final material = MaterialLocalizations.of(context);
-    final time =
-        '${material.formatShortDate(entry.time)} '
+    return '${material.formatShortDate(entry.time)} '
         '${material.formatTimeOfDay(TimeOfDay.fromDateTime(entry.time))}';
-
-    final subtitle = switch (entry.status) {
-      DownloadStatus.downloading => song['artist']?.toString() ?? '',
-      DownloadStatus.failed => failureText(l10n, entry.failure),
-      DownloadStatus.done => '${song['artist'] ?? ''} · $time',
-    };
-
-    final trailing = switch (entry.status) {
-      DownloadStatus.downloading => ValueListenableBuilder<double?>(
-        valueListenable: entry.progress,
-        builder: (context, progress, _) => SizedBox(
-          width: 28,
-          height: 28,
-          child: CircularProgressIndicator(value: progress, strokeWidth: 3),
-        ),
-      ),
-      DownloadStatus.failed => FilledButton.tonal(
-        onPressed: () => makeSongOffline(song),
-        child: Text(l10n.downloadsRetry),
-      ),
-      DownloadStatus.done => Icon(
-        FluentIcons.checkmark_circle_24_regular,
-        color: colorScheme.primary,
-      ),
-    };
-
-    return Material(
-      color: colorScheme.surfaceContainerLow,
-      borderRadius: borderRadius,
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-        child: Row(
-          children: [
-            SongArtworkWidget(size: 48, metadata: mapToMediaItem(song)),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    song['title']?.toString() ?? '',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: entry.status == DownloadStatus.failed
-                          ? colorScheme.error
-                          : colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            trailing,
-          ],
-        ),
-      ),
-    );
   }
 }
