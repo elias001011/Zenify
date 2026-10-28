@@ -60,6 +60,7 @@ import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/sharing_intent.dart';
 import 'package:musify/utilities/startup_support.dart';
+import 'package:musify/widgets/app_notice.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
@@ -287,13 +288,16 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
             supportedLocales: appSupportedLocales,
             locale: languageSetting,
             routerConfig: NavigationManager.router,
-            builder: isDesktopPlatform
-                ? (context, child) => DesktopTitleBarTheme(
-                    child: DesktopInterfaceScale(
-                      child: GlobalShortcuts(child: child!),
-                    ),
-                  )
-                : null,
+            builder: (context, child) {
+              final app = NoticeHost(child: child!);
+              return isDesktopPlatform
+                  ? DesktopTitleBarTheme(
+                      child: DesktopInterfaceScale(
+                        child: GlobalShortcuts(child: app),
+                      ),
+                    )
+                  : app;
+            },
           ),
         );
       },

@@ -31,6 +31,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart'
     show closeCurrentBottomSheet;
+import 'package:musify/widgets/app_notice.dart';
 import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/mini_player.dart';
 
@@ -163,6 +164,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  const NoticeSlot(),
                   if (playing) const MiniPlayer(embedded: true),
                   SizedBox(
                     height: _dockBarHeight,
@@ -244,7 +246,10 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                   padding: EdgeInsets.fromLTRB(_margin, 0, _margin, _margin),
                   child: FloatingSurface(
                     borderRadius: BorderRadius.all(Radius.circular(24)),
-                    child: MiniPlayer(embedded: true),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [NoticeSlot(), MiniPlayer(embedded: true)],
+                    ),
                   ),
                 ),
             ],
