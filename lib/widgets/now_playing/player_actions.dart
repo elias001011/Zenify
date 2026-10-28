@@ -139,7 +139,6 @@ class _PlayerActionsState extends State<PlayerActions> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final l10n = context.l10n!;
     final online = !offlineMode.value;
     final actionAudioId = audioId;
@@ -152,14 +151,14 @@ class _PlayerActionsState extends State<PlayerActions> {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (online && !isRadioStation)
-              _ActionButton(
+              PlayerActionButton(
                 icon: FluentIcons.text_quote_24_regular,
                 tooltip: l10n.lyrics,
                 active: widget.panel == PlayerPanel.lyrics,
                 onPressed: () => widget.onPanel(PlayerPanel.lyrics, context),
               ),
             if (queue.isNotEmpty && !isRadioStation)
-              _ActionButton(
+              PlayerActionButton(
                 icon: FluentIcons.apps_list_24_regular,
                 tooltip: l10n.queue,
                 active: widget.panel == PlayerPanel.queue,
@@ -168,7 +167,7 @@ class _PlayerActionsState extends State<PlayerActions> {
             if (supportsDesktopVolumeControl) const DesktopVolumeButton(),
             ValueListenableBuilder<Duration?>(
               valueListenable: sleepTimerNotifier,
-              builder: (context, timer, _) => _ActionButton(
+              builder: (context, timer, _) => PlayerActionButton(
                 icon: FluentIcons.timer_24_regular,
                 activeIcon: FluentIcons.timer_24_filled,
                 tooltip: l10n.sleepTimer,
@@ -179,7 +178,7 @@ class _PlayerActionsState extends State<PlayerActions> {
             if (!isRadioStation)
               ValueListenableBuilder<bool>(
                 valueListenable: _songOfflineStatus,
-                builder: (context, offline, _) => _ActionButton(
+                builder: (context, offline, _) => PlayerActionButton(
                   icon: FluentIcons.cloud_arrow_down_24_regular,
                   activeIcon: FluentIcons.cloud_off_24_filled,
                   tooltip: l10n.makeOffline,
@@ -195,7 +194,7 @@ class _PlayerActionsState extends State<PlayerActions> {
                 ),
               ),
             if (online && !isRadioStation)
-              _ActionButton(
+              PlayerActionButton(
                 icon: FluentIcons.album_add_24_regular,
                 tooltip: l10n.addToPlaylist,
                 onPressed: () => showAddToPlaylistDialog(
@@ -206,12 +205,11 @@ class _PlayerActionsState extends State<PlayerActions> {
             if (online)
               ValueListenableBuilder<bool>(
                 valueListenable: _songLikeStatus,
-                builder: (context, liked, _) => _ActionButton(
+                builder: (context, liked, _) => PlayerActionButton(
                   icon: FluentIcons.heart_24_regular,
                   activeIcon: FluentIcons.heart_24_filled,
                   tooltip: l10n.likedSongs,
                   active: liked,
-                  activeColor: colorScheme.primary,
                   onPressed: _toggleLike,
                 ),
               ),
@@ -287,14 +285,15 @@ class PlayerActionBar extends StatelessWidget {
   }
 }
 
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
+/// One of the player's action buttons, tinted while [active].
+class PlayerActionButton extends StatelessWidget {
+  const PlayerActionButton({
+    super.key,
     required this.icon,
     required this.tooltip,
     required this.onPressed,
     this.activeIcon,
     this.active = false,
-    this.activeColor,
   });
 
   final IconData icon;
@@ -302,12 +301,11 @@ class _ActionButton extends StatelessWidget {
   final String tooltip;
   final VoidCallback? onPressed;
   final bool active;
-  final Color? activeColor;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final color = activeColor ?? colorScheme.primary;
+    final color = colorScheme.primary;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: IconButton(

@@ -33,9 +33,17 @@ import 'package:musify/services/audio_levels.dart';
 /// treble, when [AudioLevels] can read it; otherwise, and on a phone until
 /// the user allows it, they keep a calm motion of their own.
 class WaveVisualizer extends StatefulWidget {
-  const WaveVisualizer({super.key, required this.size});
+  const WaveVisualizer({
+    super.key,
+    required this.size,
+    this.offerAccess = false,
+  });
 
   final double size;
+
+  /// Offers to ask for the access the levels need (the player, not the
+  /// mini player's thumbnail).
+  final bool offerAccess;
 
   @override
   State<WaveVisualizer> createState() => _WaveVisualizerState();
@@ -47,6 +55,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   static const _rest = 0.08;
 
   late final Ticker _ticker = createTicker(_tick);
+
   /// Bumped every frame the bars move, to repaint them.
   final _repaint = ValueNotifier<int>(0);
   final _heights = List<double>.filled(_bars, _rest);
@@ -75,7 +84,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     if (await AudioLevels.available) {
       if (!mounted) return;
       _levels = AudioLevels.listen().listen((level) => _level = level);
-    } else if (AudioLevels.canAsk && mounted) {
+    } else if (widget.offerAccess && AudioLevels.canAsk && mounted) {
       setState(() => _canAsk = true);
     }
   }

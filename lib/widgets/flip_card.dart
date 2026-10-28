@@ -23,8 +23,6 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-enum RotateSide { right, left, top, bottom }
-
 /// Shows [frontWidget] or, when [flipped], [backWidget], turning round like
 /// a card between them (the player's artwork flip from the original Musify).
 class FlipCard extends StatefulWidget {
@@ -33,15 +31,11 @@ class FlipCard extends StatefulWidget {
     required this.frontWidget,
     required this.backWidget,
     required this.flipped,
-    this.rotateSide = RotateSide.right,
-    this.animationDuration = const Duration(milliseconds: 800),
   });
 
   final Widget frontWidget;
   final Widget backWidget;
   final bool flipped;
-  final RotateSide rotateSide;
-  final Duration animationDuration;
 
   @override
   State<FlipCard> createState() => _FlipCardState();
@@ -49,8 +43,8 @@ class FlipCard extends StatefulWidget {
 
 class _FlipCardState extends State<FlipCard>
     with SingleTickerProviderStateMixin {
-  late final _animationController = AnimationController(
-    duration: widget.animationDuration,
+  late final _controller = AnimationController(
+    duration: const Duration(milliseconds: 800),
     vsync: this,
     value: widget.flipped ? 1 : 0,
   );
@@ -58,52 +52,34 @@ class _FlipCardState extends State<FlipCard>
   @override
   void didUpdateWidget(FlipCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    _animationController.duration = widget.animationDuration;
     if (widget.flipped != oldWidget.flipped) {
-      widget.flipped
-          ? _animationController.forward()
-          : _animationController.reverse();
+      widget.flipped ? _controller.forward() : _controller.reverse();
     }
   }
 
   @override
   void dispose() {
-    _animationController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _animationController,
+      animation: _controller,
       builder: (context, child) {
-        final angle = _animationController.value * math.pi;
-        final isFrontVisible = angle <= math.pi / 2;
-        final rotateX =
-            widget.rotateSide == RotateSide.top ||
-            widget.rotateSide == RotateSide.bottom;
-        final direction =
-            widget.rotateSide == RotateSide.left ||
-                widget.rotateSide == RotateSide.top
-            ? 1
-            : -1;
-        final transform = Matrix4.identity()..setEntry(3, 2, 0.001);
-        if (rotateX) {
-          transform.rotateX(angle * direction);
-        } else {
-          transform.rotateY(angle * direction);
-        }
-
+        final angle = _controller.value * math.pi;
+        // Only the side in view is built.
         return Transform(
           alignment: Alignment.center,
-          transform: transform,
-          child: isFrontVisible
+          transform: Matrix4.identity()
+            ..setEntry(3, 2, 0.001)
+            ..rotateY(-angle),
+          child: angle <= math.pi / 2
               ? widget.frontWidget
               : Transform(
                   alignment: Alignment.center,
-                  transform: Matrix4.identity()
-                    ..rotateX(rotateX ? math.pi : 0)
-                    ..rotateY(rotateX ? 0 : math.pi),
+                  transform: Matrix4.rotationY(math.pi),
                   child: widget.backWidget,
                 ),
         );

@@ -52,35 +52,34 @@ class GlowRow extends StatefulWidget {
   State<GlowRow> createState() => _GlowRowState();
 }
 
-class _GlowRowState extends State<GlowRow> with TickerProviderStateMixin {
+class _GlowRowState extends State<GlowRow>
+    with TickerProviderStateMixin, GlowColorsHost {
   final _controller = ScrollController();
-  late final _colors = GlowColors(this);
-  late final _repaint = Listenable.merge([_controller, _colors.listenable]);
+  late final _repaint = Listenable.merge([_controller, glowColors.listenable]);
 
   /// Whether there is more to see before and after, for the desktop arrows.
   final _canScroll = ValueNotifier<(bool, bool)>((false, false));
 
-  void _update() =>
-      _colors.update(widget.sources, Theme.of(context).colorScheme.primary);
-
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _update();
-  }
-
-  @override
-  void didUpdateWidget(GlowRow oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _update();
-  }
+  List<String?> get glowSources => widget.sources;
 
   @override
   void dispose() {
     _controller.dispose();
-    _colors.dispose();
     _canScroll.dispose();
     super.dispose();
+  }
+
+  Iterable<(int, double, double)> _slots(double width) sync* {
+    final offset = _controller.hasClients ? _controller.offset : 0.0;
+    final extent = widget.itemExtent;
+    for (final index in glowColors.indices) {
+      // Glows spread past their artwork, so neighbours out of view count.
+      final center = index * extent + extent / 2 - offset;
+      if (center > -extent * 1.5 && center < width + extent * 1.5) {
+        yield (index, center, extent);
+      }
+    }
   }
 
   bool _onMetrics(ScrollMetrics metrics) {
@@ -127,19 +126,9 @@ class _GlowRowState extends State<GlowRow> with TickerProviderStateMixin {
     );
 
     return _RowGlow(
-      colors: _colors,
+      colors: glowColors,
       repaint: _repaint,
-      slots: (width) sync* {
-        final offset = _controller.hasClients ? _controller.offset : 0.0;
-        final extent = widget.itemExtent;
-        for (final index in _colors.indices) {
-          // Glows spread past their artwork, so neighbours out of view count.
-          final center = index * extent + extent / 2 - offset;
-          if (center > -extent * 1.5 && center < width + extent * 1.5) {
-            yield (index, center, extent);
-          }
-        }
-      },
+      slots: _slots,
       child: Stack(
         children: [
           list,
@@ -176,8 +165,7 @@ class _GlowRowState extends State<GlowRow> with TickerProviderStateMixin {
 typedef GlowSlots = Iterable<(int, double, double)> Function(double width);
 
 /// Paints the glows of a row's artworks behind [child], reaching well past
-/// the row above and below, in one layer: they never tint a neighbour and
-/// scrolling repaints only it.
+/// the row above and below, in one layer that scrolling repaints alone.
 class _RowGlow extends StatelessWidget {
   const _RowGlow({
     required this.colors,
@@ -253,13 +241,15 @@ class _RowGlowPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final reveal = colors.reveal;
     if (reveal <= 0) return;
-    final grow = 0.4 + 0.6 * reveal;
+    final grow = colors.grow;
     final centerY = rowTop + rowHeight / 2;
+    // Glows fade out as they reach the row's ends.
+    final edge = size.width * 0.08;
 
-    canvas.saveLayer(Offset.zero & size, Paint());
     for (final (index, centerX, width) in slots(size.width)) {
       final color = colors.colorAt(index);
-      if (color == null || color.a == 0 || width <= 0) continue;
+      final fade = (min(centerX, size.width - centerX) / edge).clamp(0.0, 1.0);
+      if (color == null || color.a == 0 || width <= 0 || fade == 0) continue;
       // Proportional to the artwork, and wide and low enough that
       // neighbouring glows merge into one soft band.
       final hsl = HSLColor.fromColor(color);
@@ -271,26 +261,9 @@ class _RowGlowPainter extends CustomPainter {
           height: min(rowHeight * 2.1, width * 2.1) * grow,
         ),
         hsl.withSaturation(hsl.saturation * 0.8).toColor(),
-        strength * 1.5 * color.a * reveal,
+        strength * 1.5 * color.a * reveal * fade,
       );
     }
-    // Fade the band at the row's ends as well as above and below.
-    canvas
-      ..drawRect(
-        Offset.zero & size,
-        Paint()
-          ..blendMode = BlendMode.dstIn
-          ..shader = const LinearGradient(
-            colors: [
-              Colors.transparent,
-              Colors.white,
-              Colors.white,
-              Colors.transparent,
-            ],
-            stops: [0, 0.05, 0.95, 1],
-          ).createShader(Offset.zero & size),
-      )
-      ..restore();
   }
 
   @override
@@ -352,30 +325,16 @@ class GlowCarousel extends StatefulWidget {
 }
 
 class _GlowCarouselState extends State<GlowCarousel>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, GlowColorsHost {
   final _controller = CarouselController();
-  late final _colors = GlowColors(this);
-  late final _repaint = Listenable.merge([_controller, _colors.listenable]);
-
-  void _update() =>
-      _colors.update(widget.sources, Theme.of(context).colorScheme.primary);
+  late final _repaint = Listenable.merge([_controller, glowColors.listenable]);
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _update();
-  }
-
-  @override
-  void didUpdateWidget(GlowCarousel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _update();
-  }
+  List<String?> get glowSources => widget.sources;
 
   @override
   void dispose() {
     _controller.dispose();
-    _colors.dispose();
     super.dispose();
   }
 
@@ -412,7 +371,7 @@ class _GlowCarouselState extends State<GlowCarousel>
   @override
   Widget build(BuildContext context) {
     return _RowGlow(
-      colors: _colors,
+      colors: glowColors,
       repaint: _repaint,
       slots: _slots,
       child: CarouselView.weighted(

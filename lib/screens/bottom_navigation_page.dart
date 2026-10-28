@@ -174,7 +174,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const NoticeSlot(),
-                  if (playing) const MiniPlayer(embedded: true),
+                  if (playing) const MiniPlayer(),
                   SizedBox(
                     height: _dockBarHeight,
                     child: Row(
@@ -260,7 +260,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
               borderRadius: BorderRadius.all(Radius.circular(24)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [NoticeSlot(), MiniPlayer(embedded: true)],
+                children: [NoticeSlot(), MiniPlayer()],
               ),
             ),
           ),

@@ -79,11 +79,21 @@ class AudioLevels {
     }
   }
 
-  /// Levels while listened to; check [available] first.
+  static StreamController<AudioLevel>? _levels;
+
+  /// Levels while listened to; check [available] first. Every listener (the
+  /// player and the mini player) shares one reader, which stops with the last.
   static Stream<AudioLevel> listen() {
-    final raw = isDesktopPlatform ? _mpvFrames() : _androidFrames();
-    final normalizer = _Normalizer();
-    return raw.map(normalizer.call);
+    StreamSubscription<(double, double, double)>? source;
+    return (_levels ??= StreamController.broadcast(
+      onListen: () {
+        final normalizer = _Normalizer();
+        source = (isDesktopPlatform ? _mpvFrames() : _androidFrames()).listen(
+          (frame) => _levels?.add(normalizer(frame)),
+        );
+      },
+      onCancel: () => source?.cancel(),
+    )).stream;
   }
 
   /// (energy, flux, spectral centroid in Hz) from Android's Visualizer.
@@ -103,7 +113,8 @@ class AudioLevels {
         .handleError((Object _) {});
   }
 
-  /// The same from mpv's audio filters, polled at about the rate they update.
+  /// The same from mpv's audio filters, polled at about the rate they update
+  /// while something plays.
   static Stream<(double, double, double)> _mpvFrames() {
     Timer? timer;
     late final StreamController<(double, double, double)> controller;
@@ -112,15 +123,14 @@ class AudioLevels {
     var frames = 0;
     var silentPolls = 0;
     var fellBack = false;
+    var polling = false;
 
     Future<void> poll(MediaKitPlayer player) async {
       final text = await player.getMpvProperty('af-metadata/$_label');
       // mpv drops a filter that fails to start. Frames without the spectral
       // numbers, or none for seconds of playback, mean it did: fall back to
       // loudness alone, once.
-      if (text.isEmpty && audioHandler.playbackState.value.playing) {
-        silentPolls++;
-      }
+      if (text.isEmpty) silentPolls++;
       if (!fellBack &&
           ((frames == 0 && silentPolls >= 120) ||
               (frames >= 20 && !last.contains('aspectralstats')))) {
@@ -158,8 +168,18 @@ class AudioLevels {
           _filterSet = true;
           await player.setMpvProperty('af', _spectralFilter);
         }
-        timer = Timer.periodic(const Duration(milliseconds: 25), (_) {
-          if (!controller.isClosed) unawaited(poll(player));
+        timer = Timer.periodic(const Duration(milliseconds: 25), (_) async {
+          if (polling ||
+              controller.isClosed ||
+              !audioHandler.playbackState.value.playing) {
+            return;
+          }
+          polling = true;
+          try {
+            await poll(player);
+          } finally {
+            polling = false;
+          }
         });
       },
       onCancel: () => timer?.cancel(),

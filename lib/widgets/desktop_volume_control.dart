@@ -25,6 +25,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/platform_utils.dart';
+import 'package:musify/widgets/now_playing/player_actions.dart';
 
 bool get supportsDesktopVolumeControl => isDesktopPlatform;
 
@@ -34,15 +35,15 @@ IconData volumeIcon(double volume) {
   return FluentIcons.speaker_2_24_regular;
 }
 
+/// Mute and a volume slider, scrolled with the mouse wheel too.
 class DesktopVolumeControl extends StatelessWidget {
-  const DesktopVolumeControl({super.key, this.sliderWidth = 96});
+  const DesktopVolumeControl({super.key});
 
-  final double sliderWidth;
+  static const double _sliderWidth = 180;
 
   @override
   Widget build(BuildContext context) {
     if (!supportsDesktopVolumeControl) return const SizedBox.shrink();
-
     final colors = Theme.of(context).colorScheme;
     return StreamBuilder<double>(
       stream: audioHandler.volumeStream,
@@ -68,7 +69,7 @@ class DesktopVolumeControl extends StatelessWidget {
               onPressed: audioHandler.toggleMute,
             ),
             SizedBox(
-              width: sliderWidth,
+              width: _sliderWidth,
               height: 32,
               child: _buildSlider(context, volume),
             ),
@@ -114,16 +115,14 @@ class DesktopVolumeControl extends StatelessWidget {
   }
 }
 
-/// Shared, anchored popup for both player surfaces. Only desktop gets it.
-/// The button matches the player's other actions: same size, spacing, colour
-/// and rounded shape, tinted while the popup is open.
+/// The volume button of the player and the desktop mini player, opening
+/// [DesktopVolumeControl] above it. Only desktop has it.
 class DesktopVolumeButton extends StatelessWidget {
   const DesktopVolumeButton({super.key});
 
   @override
   Widget build(BuildContext context) {
     if (!supportsDesktopVolumeControl) return const SizedBox.shrink();
-    final colors = Theme.of(context).colorScheme;
     return MenuAnchor(
       alignmentOffset: const Offset(0, 8),
       style: const MenuStyle(
@@ -140,35 +139,18 @@ class DesktopVolumeButton extends StatelessWidget {
         SizedBox(
           width: 236,
           height: 48,
-          child: Center(child: DesktopVolumeControl(sliderWidth: 180)),
+          child: Center(child: DesktopVolumeControl()),
         ),
       ],
       builder: (context, controller, child) => StreamBuilder<double>(
         stream: audioHandler.volumeStream,
         initialData: audioHandler.volume,
-        builder: (context, snapshot) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: IconButton(
-            iconSize: 24,
-            tooltip: context.l10n!.volume,
-            icon: Icon(
-              volumeIcon(snapshot.data ?? audioHandler.volume),
-              color: controller.isOpen
-                  ? colors.primary
-                  : colors.onSurfaceVariant,
-            ),
-            style: IconButton.styleFrom(
-              minimumSize: const Size.square(48),
-              backgroundColor: controller.isOpen
-                  ? colors.primary.withValues(alpha: 0.15)
-                  : Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            onPressed: () =>
-                controller.isOpen ? controller.close() : controller.open(),
-          ),
+        builder: (context, snapshot) => PlayerActionButton(
+          icon: volumeIcon(snapshot.data ?? audioHandler.volume),
+          tooltip: context.l10n!.volume,
+          active: controller.isOpen,
+          onPressed: () =>
+              controller.isOpen ? controller.close() : controller.open(),
         ),
       ),
     );

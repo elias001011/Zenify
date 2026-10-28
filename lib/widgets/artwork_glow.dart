@@ -81,8 +81,11 @@ class GlowColors {
   /// Indices that have a glow now or are easing out of one.
   Iterable<int> get indices => {..._from.keys, ..._to.keys};
 
-  /// 0 to 1 while the glow first expands; painters grow and fade it in.
+  /// 0 to 1 while the glow first expands; painters fade it in with this.
   double get reveal => Curves.easeOutCubic.transform(_reveal.value);
+
+  /// The glow's size against its full size while it expands.
+  double get grow => 0.4 + 0.6 * reveal;
 
   /// The colour of glow [index] now; its alpha carries the fade.
   Color? colorAt(int index) {
@@ -105,6 +108,7 @@ class GlowColors {
     final generation = ++_generation;
 
     final next = <int, Color>{};
+    final pending = <Future<(int, Color?)>>[];
     for (var i = 0; i < sources.length; i++) {
       final source = sources[i];
       if (source == null || source.isEmpty) {
@@ -112,15 +116,17 @@ class GlowColors {
       } else if (ArtworkColors.isCached(source)) {
         next[i] = ArtworkColors.cached(source) ?? appColor;
       } else {
-        ArtworkColors.of(source).then((color) {
-          if (generation == _generation) {
-            _retarget({..._to, i: color ?? appColor});
-          }
-        });
+        pending.add(ArtworkColors.of(source).then((color) => (i, color)));
       }
     }
-
     _retarget(next);
+
+    // Colours still to read arrive together, in one transition.
+    if (pending.isEmpty) return;
+    Future.wait(pending).then((found) {
+      if (generation != _generation) return;
+      _retarget({..._to, for (final (i, color) in found) i: color ?? appColor});
+    });
   }
 
   void _retarget(Map<int, Color> next) {
@@ -140,6 +146,36 @@ class GlowColors {
   }
 }
 
+/// Keeps a widget's [GlowColors] in step with [glowSources] and the app
+/// colour, and disposes them with it.
+mixin GlowColorsHost<T extends StatefulWidget> on TickerProviderStateMixin<T> {
+  late final glowColors = GlowColors(this);
+
+  /// The artworks to glow for, in order.
+  List<String?> get glowSources;
+
+  void _updateGlow() =>
+      glowColors.update(glowSources, Theme.of(context).colorScheme.primary);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _updateGlow();
+  }
+
+  @override
+  void didUpdateWidget(covariant T oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _updateGlow();
+  }
+
+  @override
+  void dispose() {
+    glowColors.dispose();
+    super.dispose();
+  }
+}
+
 /// The page background for an artwork (or the app colour, without one),
 /// when the dynamic background is on: a large light of its colour from the
 /// top, centred on the content (pages put their artwork there), emptying into
@@ -147,39 +183,19 @@ class GlowColors {
 /// sized by the page, so they keep their shape on a tall phone as on a wide
 /// window, and they reach under the desktop rail, which floats over them.
 class PageGlow extends StatefulWidget {
-  const PageGlow({super.key, required this.source, this.strength});
+  const PageGlow({super.key, required this.source});
 
   /// The artwork's network URL or file path.
   final String? source;
-  final double? strength;
 
   @override
   State<PageGlow> createState() => _PageGlowState();
 }
 
-class _PageGlowState extends State<PageGlow> with TickerProviderStateMixin {
-  late final _colors = GlowColors(this);
-
-  void _update() =>
-      _colors.update([widget.source], Theme.of(context).colorScheme.primary);
-
+class _PageGlowState extends State<PageGlow>
+    with TickerProviderStateMixin, GlowColorsHost {
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _update();
-  }
-
-  @override
-  void didUpdateWidget(PageGlow oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _update();
-  }
-
-  @override
-  void dispose() {
-    _colors.dispose();
-    super.dispose();
-  }
+  List<String?> get glowSources => [widget.source];
 
   @override
   Widget build(BuildContext context) {
@@ -191,8 +207,8 @@ class _PageGlowState extends State<PageGlow> with TickerProviderStateMixin {
               child: CustomPaint(
                 size: Size.infinite,
                 painter: _PageGlowPainter(
-                  colors: _colors,
-                  strength: widget.strength ?? artworkGlowStrength(context),
+                  colors: glowColors,
+                  strength: artworkGlowStrength(context),
                   contentLeft: MediaQuery.paddingOf(context).left,
                 ),
               ),
@@ -222,7 +238,7 @@ class _PageGlowPainter extends CustomPainter {
     final alpha = strength * color.a * reveal;
     if (alpha <= 0) return;
     final reach = size.shortestSide + size.longestSide * 0.35;
-    final grow = 0.4 + 0.6 * reveal;
+    final grow = colors.grow;
 
     // A neighbouring hue, as the second light of a stage.
     final hsl = HSLColor.fromColor(color);
