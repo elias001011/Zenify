@@ -345,9 +345,9 @@ class _UprightStageState extends State<_UprightStage>
         Expanded(
           child: LayoutBuilder(
             builder: (context, c) {
-              final artSize = min(
-                c.maxWidth * 0.92,
-                c.maxHeight - _titleHeight - _gap * 2,
+              final artSize = max(
+                _headerSize,
+                min(c.maxWidth * 0.92, c.maxHeight - _titleHeight - _gap * 2),
               );
               // The artwork and the song under it, centred together.
               final artOrigin = Offset(

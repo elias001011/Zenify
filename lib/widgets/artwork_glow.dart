@@ -19,6 +19,8 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/artwork_colors.dart';
@@ -124,12 +126,22 @@ class GlowColors {
     }
     _retarget(next);
 
-    // Colours still to read arrive together, in one transition.
-    if (pending.isEmpty) return;
-    Future.wait(pending).then((found) {
-      if (generation != _generation) return;
-      _retarget({..._to, for (final (i, color) in found) i: color ?? appColor});
-    });
+    // Colours still to read arrive in batches, at most one transition per
+    // 150 ms, so neither a slow artwork nor many quick ones hold the rest.
+    final arrived = <int, Color>{};
+    Timer? flush;
+    for (final read in pending) {
+      read.then((found) {
+        if (generation != _generation) return;
+        arrived[found.$1] = found.$2 ?? appColor;
+        flush ??= Timer(const Duration(milliseconds: 150), () {
+          flush = null;
+          if (generation != _generation || arrived.isEmpty) return;
+          _retarget({..._to, ...arrived});
+          arrived.clear();
+        });
+      });
+    }
   }
 
   void _retarget(Map<int, Color> next) {
