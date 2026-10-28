@@ -148,9 +148,12 @@ class SettingsPage extends StatelessWidget {
           context.l10n!.dynamicBackground,
           FluentIcons.color_24_regular,
           description: context.l10n!.dynamicBackgroundDescription,
-          trailing: Switch(
-            value: dynamicBackground.value,
-            onChanged: (value) => _toggleDynamicBackground(context, value),
+          trailing: ValueListenableBuilder<bool>(
+            valueListenable: dynamicBackground,
+            builder: (context, enabled, _) => Switch(
+              value: enabled,
+              onChanged: (value) => _toggleDynamicBackground(context, value),
+            ),
           ),
         ),
         if (Theme.of(context).brightness == Brightness.dark)
