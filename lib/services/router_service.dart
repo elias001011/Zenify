@@ -83,7 +83,8 @@ class NavigationManager {
         final currentPath = state.matchedLocation;
 
         if (isOffline &&
-            (currentPath == searchPath || currentPath == timeMachinePath)) {
+            (currentPath == searchPath ||
+                currentPath.startsWith(timeMachinePath))) {
           // Redirect unavailable pages to home in offline mode
           return homePath;
         }
@@ -141,6 +142,7 @@ class NavigationManager {
 
   static const String homePath = '/home';
   static const String timeMachinePath = '$homePath/timeMachine';
+  static const String topArtistsPath = '$timeMachinePath/artists';
   static const String settingsPath = '/settings';
   static const String searchPath = '/search';
   static const String libraryPath = '/library';
@@ -179,6 +181,13 @@ class NavigationManager {
                 path: 'timeMachine',
                 pageBuilder: (context, state) =>
                     _pushPage(child: const TimeMachinePage(), state: state),
+                routes: [
+                  GoRoute(
+                    path: 'artists',
+                    pageBuilder: (context, state) =>
+                        _pushPage(child: const TopArtistsPage(), state: state),
+                  ),
+                ],
               ),
               GoRoute(
                 path: 'library',
@@ -378,6 +387,35 @@ class NavigationManager {
   /// Path of the page of an artist, inside the tab [context] belongs to.
   static String artistPath(BuildContext context, String artistId) =>
       '${basePathFor(context)}/artist/${Uri.encodeComponent(artistId)}';
+
+  /// Where an artist known from a song opens: by [artistId] when known, else
+  /// by [name], with [sourceSongId] helping to find the right channel.
+  static ({String path, Map<String, dynamic> extra})? artistDestination(
+    BuildContext context, {
+    required String name,
+    String artistId = '',
+    String sourceSongId = '',
+    String videoAuthor = '',
+  }) {
+    final lookup = artistId.isNotEmpty
+        ? artistId
+        : name.isNotEmpty
+        ? name
+        : sourceSongId;
+    if (lookup.isEmpty) return null;
+    return (
+      path: artistPath(context, lookup),
+      extra: {
+        'ytid': artistId.isNotEmpty ? artistId : lookup,
+        if (name.isNotEmpty) 'title': name,
+        if (sourceSongId.isNotEmpty) 'sourceSongId': sourceSongId,
+        if (videoAuthor.isNotEmpty) 'videoAuthor': videoAuthor,
+        'source': 'youtube-artist',
+        'isArtist': true,
+        'list': [],
+      },
+    );
+  }
 
   /// Path of the songs of an artist, i.e. of its "All songs" playlist.
   static String artistSongsPath(BuildContext context, String artistId) =>

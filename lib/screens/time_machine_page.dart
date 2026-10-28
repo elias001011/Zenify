@@ -39,6 +39,7 @@ import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/song_bar.dart';
+import 'package:musify/widgets/top_artists_card.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -227,6 +228,7 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
             _ViewMoreButton(
               onPressed: () => _showMoreSongs(context, monthTitle, songs),
             ),
+          ..._topArtists(listeningStatsService.monthTopArtists(monthKey)),
         ],
       ),
     );
@@ -268,10 +270,18 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
                 songs,
               ),
             ),
+          ..._topArtists(listeningStatsService.yearTopArtists()),
         ],
       ),
     );
   }
+
+  List<Widget> _topArtists(List<ListeningArtist> artists) => [
+    if (artists.isNotEmpty) ...[
+      const SizedBox(height: 12),
+      TopArtistsCard(artists: artists),
+    ],
+  ];
 
   Future<void> _shareRecap(
     BuildContext context, {
@@ -384,36 +394,36 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
       songIndex: index,
     );
   }
+}
 
-  String _formatMonthTitle(BuildContext context, String monthKey) {
-    final parts = monthKey.split('-');
-    if (parts.length != 2) return monthKey;
+String _formatMonthTitle(BuildContext context, String monthKey) {
+  final parts = monthKey.split('-');
+  if (parts.length != 2) return monthKey;
 
-    final year = int.tryParse(parts[0]);
-    final month = int.tryParse(parts[1]);
-    if (year == null || month == null) return monthKey;
+  final year = int.tryParse(parts[0]);
+  final month = int.tryParse(parts[1]);
+  if (year == null || month == null) return monthKey;
 
-    final locale = Localizations.localeOf(context).toString();
-    final monthName = DateFormat.MMMM(locale).format(DateTime(year, month));
-    return monthName.isEmpty
-        ? monthKey
-        : '${monthName[0].toUpperCase()}${monthName.substring(1)}';
-  }
+  final locale = Localizations.localeOf(context).toString();
+  final monthName = DateFormat.MMMM(locale).format(DateTime(year, month));
+  return monthName.isEmpty
+      ? monthKey
+      : '${monthName[0].toUpperCase()}${monthName.substring(1)}';
+}
 
-  String _formatMonthPeriodLabel(BuildContext context, String monthKey) {
-    final parts = monthKey.split('-');
-    if (parts.length != 2) return monthKey;
+String _formatMonthPeriodLabel(BuildContext context, String monthKey) {
+  final parts = monthKey.split('-');
+  if (parts.length != 2) return monthKey;
 
-    final year = int.tryParse(parts[0]);
-    final month = int.tryParse(parts[1]);
-    if (year == null || month == null) return monthKey;
+  final year = int.tryParse(parts[0]);
+  final month = int.tryParse(parts[1]);
+  if (year == null || month == null) return monthKey;
 
-    final locale = Localizations.localeOf(context).toString();
-    final label = DateFormat.yMMMM(locale).format(DateTime(year, month));
-    return label.isEmpty
-        ? monthKey
-        : '${label[0].toUpperCase()}${label.substring(1)}';
-  }
+  final locale = Localizations.localeOf(context).toString();
+  final label = DateFormat.yMMMM(locale).format(DateTime(year, month));
+  return label.isEmpty
+      ? monthKey
+      : '${label[0].toUpperCase()}${label.substring(1)}';
 }
 
 class _PeriodSection extends StatelessWidget {
@@ -483,6 +493,54 @@ class _ViewMoreButton extends StatelessWidget {
           icon: const Icon(FluentIcons.more_horizontal_24_regular),
           label: Text(context.l10n!.tapToView),
         ),
+      ),
+    );
+  }
+}
+
+/// The top artists of every month with listening stats.
+class TopArtistsPage extends StatelessWidget {
+  const TopArtistsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final months = [
+      for (final monthKey in listeningStatsService.availableMonthKeys)
+        (monthKey, listeningStatsService.monthTopArtists(monthKey)),
+    ].where((month) => month.$2.isNotEmpty).toList();
+
+    return IslandScaffold(
+      title: context.l10n!.topArtists,
+      body: ListView.builder(
+        padding: withIslandInset(
+          context,
+          const EdgeInsets.fromLTRB(10, 0, 10, 24),
+        ),
+        itemCount: months.length + 1,
+        itemBuilder: (context, index) {
+          if (index == months.length) return const MiniPlayerBottomSpace();
+          final (monthKey, artists) = months[index];
+          return Padding(
+            padding: const EdgeInsets.only(top: 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Text(
+                    _formatMonthPeriodLabel(context, monthKey),
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.secondary,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TopArtistsCard(artists: artists),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

@@ -150,28 +150,18 @@ class NowPlayingControls extends StatelessWidget {
 
   void _openArtistPage(BuildContext context, MediaItem metadata) {
     final info = _extractArtistInfo(metadata);
-    final lookup = info.artistId.isNotEmpty
-        ? info.artistId
-        : info.artist.isNotEmpty
-        ? info.artist
-        : info.sourceSongId;
-
-    if (lookup.isEmpty) return;
+    final destination = NavigationManager.artistDestination(
+      context,
+      name: info.artist,
+      artistId: info.artistId,
+      sourceSongId: info.sourceSongId,
+      videoAuthor: info.videoAuthor,
+    );
+    if (destination == null) return;
 
     final router = GoRouter.of(context);
-    final artistPath = NavigationManager.artistPath(context, lookup);
-    final artistData = {
-      'ytid': info.artistId.isNotEmpty ? info.artistId : lookup,
-      if (info.artist.isNotEmpty) 'title': info.artist,
-      if (info.sourceSongId.isNotEmpty) 'sourceSongId': info.sourceSongId,
-      if (info.videoAuthor.isNotEmpty) 'videoAuthor': info.videoAuthor,
-      'source': 'youtube-artist',
-      'isArtist': true,
-      'list': [],
-    };
-
     Navigator.of(context).pop();
-    unawaited(router.push(artistPath, extra: artistData));
+    unawaited(router.push(destination.path, extra: destination.extra));
   }
 
   ({String artist, String artistId, String sourceSongId, String videoAuthor})

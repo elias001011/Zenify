@@ -19,12 +19,15 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:math';
+
 const wrappedListeningStatsSchemaVersion = 2;
 const wrappedCurrentMonthSongsLimit = 250;
 const wrappedMonthlyHistorySongsLimit = 15;
 const wrappedAnnualSongsLimit = 30;
 const wrappedExpandedSongsLimit = wrappedAnnualSongsLimit;
 const wrappedShareSongsLimit = 5;
+const wrappedTopArtistsLimit = 5;
 const wrappedAnnualRecapStartDay = 20;
 
 const qualifiedListeningThreshold = Duration(seconds: 30);
@@ -347,6 +350,48 @@ List<Map<String, dynamic>> sortedListeningSongs(
         ..sort(_compareSongStats);
 
   return values.take(limit).toList();
+}
+
+/// An artist's share of a listening period, worked out from its songs.
+typedef ListeningArtist = ({
+  String name,
+  int seconds,
+  int songCount,
+
+  /// The artist's most played song, for its artwork.
+  Map<String, dynamic> topSong,
+});
+
+/// The most listened artists in [songs] (song stats). Time listened counts,
+/// boosted by how many different songs of the artist were played, so one
+/// song on repeat does not outrank an artist heard across many.
+List<ListeningArtist> topListeningArtists(
+  Iterable<Map<String, dynamic>> songs, {
+  int limit = wrappedTopArtistsLimit,
+}) {
+  final byArtist = <String, List<Map<String, dynamic>>>{};
+  for (final song in songs) {
+    final name = _readString(song['artist']).trim();
+    if (name.isEmpty || _readInt(song['seconds']) <= 0) continue;
+    byArtist.putIfAbsent(name, () => []).add(song);
+  }
+
+  final artists = [
+    for (final MapEntry(key: name, value: songs) in byArtist.entries)
+      (
+        name: name,
+        seconds: songs.fold<int>(
+          0,
+          (sum, song) => sum + _readInt(song['seconds']),
+        ),
+        songCount: songs.length,
+        topSong: (List.of(songs)..sort(_compareSongStats)).first,
+      ),
+  ];
+  double score(ListeningArtist artist) =>
+      artist.seconds * sqrt(artist.songCount);
+  artists.sort((a, b) => score(b).compareTo(score(a)));
+  return artists.take(limit).toList();
 }
 
 int monthTotalSeconds(Map<String, dynamic>? monthStats) {

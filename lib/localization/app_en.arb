@@ -25,6 +25,13 @@
   "artist": "Artist",
   "artistNotFound": "Artist not found. Check logs or try again.",
   "artists": "Artists",
+  "artistListeningSummary": "{minutes} min · {count, plural, =1{1 song} other{{count} songs}}",
+  "@artistListeningSummary": {
+    "placeholders": {
+      "minutes": {"type": "int"},
+      "count": {"type": "int"}
+    }
+  },
   "audioQuality": "Audio quality",
   "audioQualityBadge": "Show audio quality badge",
   "audioQualityBadgeDescription": "Display a small bitrate/codec badge on the now playing artwork.",
@@ -282,6 +289,7 @@
   "restoredSuccess": "Data restored successfully",
   "search": "Search",
   "searchHistoryMsg": "Search history cleared",
+  "seeAll": "See all",
   "selectDuration": "Select duration",
   "setTimer": "Set timer",
   "settingChangedMsg": "Settings updated successfully",
@@ -406,6 +414,8 @@
   "themeModeSystem": "System",
   "timeMachine": "Time Machine",
   "tools": "Tools",
+  "topArtist": "Top artist",
+  "topArtists": "Top artists",
   "topSongs": "Top songs",
   "translate": "Translate",
   "translateDescription": "Help translate Zenify into your language on Crowdin.",

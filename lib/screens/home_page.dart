@@ -28,6 +28,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/async_loader.dart';
@@ -255,17 +256,30 @@ class _HomePageState extends State<HomePage> {
               minutes: displayMinutes,
               songs: previewSongs,
               onSongTap: (index) => _playRecapSongs(previewSongs, index),
+              topArtist: listeningStatsService
+                  .monthTopArtists(currentMonthKey)
+                  .firstOrNull,
+              onTopArtistTap: () =>
+                  context.push(NavigationManager.topArtistsPath),
+              onSeeAll: () => context.push(NavigationManager.timeMachinePath),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
-              child: SizedBox(
-                width: double.infinity,
-                child: FilledButton.tonalIcon(
-                  onPressed: () => context.push('/home/timeMachine'),
-                  icon: const Icon(FluentIcons.arrow_right_24_regular),
-                  label: Text(context.l10n!.listeningStats),
-                ),
-              ),
+            // The wide card has its own "see all".
+            LayoutBuilder(
+              builder: (context, constraints) =>
+                  ListeningRecapCard.isWide(constraints.maxWidth)
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 10, 8, 0),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.tonalIcon(
+                          onPressed: () =>
+                              context.push(NavigationManager.timeMachinePath),
+                          icon: const Icon(FluentIcons.arrow_right_24_regular),
+                          label: Text(context.l10n!.listeningStats),
+                        ),
+                      ),
+                    ),
             ),
           ],
         );
