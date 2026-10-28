@@ -34,6 +34,7 @@ import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
 import 'package:musify/widgets/announcement_box.dart';
 import 'package:musify/widgets/floating_island.dart';
+import 'package:musify/widgets/glow_row.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_cube.dart';
@@ -179,11 +180,11 @@ class _HomePageState extends State<HomePage> {
     int itemCount,
     double height,
   ) {
-    return ListView.builder(
-      scrollDirection: Axis.horizontal,
-      // Lets the artwork glow spill above and below the row.
-      clipBehavior: Clip.none,
-      itemCount: itemCount,
+    return GlowRow(
+      sources: [
+        for (var i = 0; i < itemCount; i++) playlists[i]['image']?.toString(),
+      ],
+      itemExtent: height + 16,
       itemBuilder: (context, index) {
         final playlist = playlists[index];
         return Padding(

@@ -34,7 +34,7 @@ class PlaylistCube extends StatelessWidget {
     this.size = 220,
     this.borderRadius = 16,
     this.showTypeLabel = true,
-    this.glow = true,
+    this.glow = false,
   });
 
   final Map? playlistData;
@@ -44,7 +44,8 @@ class PlaylistCube extends StatelessWidget {
   final double borderRadius;
   final bool showTypeLabel;
 
-  /// Spread the artwork colour behind it (dynamic background).
+  /// Spread the artwork colour behind it (dynamic background). Rows of
+  /// artworks use GlowRow instead, which paints all glows in one layer.
   final bool glow;
 
   static const double typeLabelOffset = 10;

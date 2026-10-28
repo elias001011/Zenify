@@ -49,13 +49,12 @@ class PlaylistHeroArtwork extends StatelessWidget {
           size: size,
           cubeIcon: cubeIcon,
           showTypeLabel: false,
-          glow: false,
         );
 
         // Outside the star clip, which would cut the glow off.
         return ArtworkGlow(
           source: playlist['image']?.toString(),
-          spread: size * 0.5,
+          spread: size * 0.8,
           child: ClipPath(
             clipper: const ShapeBorderClipper(
               shape: StarBorder(
