@@ -113,7 +113,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
 
   static const _margin = 12.0;
   static const _dockPadding = 6.0;
-  static const _dockBarHeight = 60.0;
+  static const _dockBarHeight = 44.0;
 
   /// Pages scroll under the floating elements; this is the space they keep
   /// free at the end so nothing stays hidden behind them.
@@ -138,7 +138,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     final dockHeight =
         _dockPadding * 2 +
         _dockBarHeight +
-        (playing ? MiniPlayer.playerHeight + _dockPadding : 0);
+        (playing ? MiniPlayer.playerHeight : 0);
 
     return Stack(
       children: [
@@ -158,10 +158,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (playing) ...[
-                  const MiniPlayer(),
-                  const SizedBox(height: _dockPadding),
-                ],
+                if (playing) const MiniPlayer(embedded: true),
                 SizedBox(
                   height: _dockBarHeight,
                   child: Row(
@@ -236,10 +233,14 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                 context,
                 playing ? MiniPlayer.playerHeight + _margin * 2 : 0,
               ),
-              const Padding(
-                padding: EdgeInsets.fromLTRB(_margin, 0, _margin, _margin),
-                child: MiniPlayer(),
-              ),
+              if (playing)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(_margin, 0, _margin, _margin),
+                  child: FloatingSurface(
+                    borderRadius: BorderRadius.all(Radius.circular(24)),
+                    child: MiniPlayer(embedded: true),
+                  ),
+                ),
             ],
           ),
         ),
@@ -315,6 +316,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
   }
 }
 
+/// Icon only; the label shows as a tooltip on long press or hover.
 class _DockButton extends StatelessWidget {
   const _DockButton({
     required this.item,
@@ -329,49 +331,38 @@ class _DockButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final color = selected
-        ? colorScheme.onSecondaryContainer
-        : colorScheme.onSurfaceVariant;
 
-    return Semantics(
-      selected: selected,
-      button: true,
-      label: item.label,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            AnimatedContainer(
+    return Tooltip(
+      message: item.label,
+      child: Semantics(
+        selected: selected,
+        button: true,
+        label: item.label,
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Center(
+            child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
               curve: Curves.easeOut,
-              width: selected ? 56 : 40,
-              height: 30,
+              width: selected ? 60 : 44,
+              height: 34,
               decoration: BoxDecoration(
                 color: selected
                     ? colorScheme.secondaryContainer
                     : Colors.transparent,
-                borderRadius: BorderRadius.circular(15),
+                borderRadius: BorderRadius.circular(17),
               ),
               child: Icon(
                 selected ? item.selectedIcon : item.icon,
                 size: 22,
-                color: color,
+                color: selected
+                    ? colorScheme.onSecondaryContainer
+                    : colorScheme.onSurfaceVariant,
               ),
             ),
-            const SizedBox(height: 3),
-            Text(
-              item.label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                color: color,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

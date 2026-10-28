@@ -49,7 +49,10 @@ final Stream<FullPlayerState> _fullPlayerStateStream =
         .asBroadcastStream();
 
 class MiniPlayer extends StatelessWidget {
-  const MiniPlayer({super.key});
+  const MiniPlayer({super.key, this.embedded = false});
+
+  /// Drawn straight on a floating surface: no background or shadow of its own.
+  final bool embedded;
 
   static const double playerHeight = 72;
   static const double _borderRadius = 20;
@@ -81,6 +84,7 @@ class MiniPlayer extends StatelessWidget {
                       state.queue.length - 1;
 
               return _MiniPlayerBody(
+                embedded: embedded,
                 colorScheme: colorScheme,
                 metadata: metadata,
                 state: state,
@@ -96,6 +100,7 @@ class MiniPlayer extends StatelessWidget {
 
 class _MiniPlayerBody extends StatefulWidget {
   const _MiniPlayerBody({
+    required this.embedded,
     required this.colorScheme,
     required this.metadata,
     required this.state,
@@ -106,6 +111,7 @@ class _MiniPlayerBody extends StatefulWidget {
   final MediaItem metadata;
   final FullPlayerState state;
   final bool hasNext;
+  final bool embedded;
 
   @override
   State<_MiniPlayerBody> createState() => _MiniPlayerBodyState();
@@ -175,15 +181,19 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
             child: Container(
               height: MiniPlayer.playerHeight,
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHigh,
+                color: widget.embedded
+                    ? null
+                    : colorScheme.surfaceContainerHigh,
                 borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
-                boxShadow: [
-                  BoxShadow(
-                    color: colorScheme.shadow.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                boxShadow: widget.embedded
+                    ? null
+                    : [
+                        BoxShadow(
+                          color: colorScheme.shadow.withValues(alpha: 0.08),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
