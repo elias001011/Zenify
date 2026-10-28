@@ -45,6 +45,7 @@ import 'package:musify/widgets/playlist_page/like_button.dart';
 import 'package:musify/widgets/playlist_page/playlist_action_buttons.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
+import 'package:musify/widgets/playlist_page/sync_button.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:musify/widgets/spinner.dart';
@@ -334,12 +335,7 @@ class _ArtistPageState extends State<ArtistPage> {
               songs: _catalog?['list'] as List?,
               requireSnapshotMatch: true,
             ),
-            IconButton.filledTonal(
-              icon: const Icon(FluentIcons.arrow_sync_24_filled),
-              iconSize: 24,
-              onPressed: _refresh,
-              tooltip: context.l10n!.update,
-            ),
+            SyncButton(onSync: _refresh),
           ],
         ),
       ],
