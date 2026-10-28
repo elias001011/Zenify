@@ -32,6 +32,7 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/song_filtering.dart';
 import 'package:musify/utilities/sort_utils.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
@@ -83,6 +84,7 @@ class _UserSongsPageState extends State<UserSongsPage> {
     return IslandScaffold(
       title: title,
       fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
+      background: const PageGlow(source: null),
       onFilter: (value) => _searchQueryNotifier.value = value,
       body: Padding(
         padding: commonSingleChildScrollViewPadding,

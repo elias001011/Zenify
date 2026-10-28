@@ -47,10 +47,14 @@ class IslandScaffold extends StatefulWidget {
     this.onFilter,
     this.onFilterSubmitted,
     this.globalSearch = true,
+    this.background,
   });
 
   final String title;
   final Widget body;
+
+  /// Behind the body and the island, e.g. the page glow; it does not scroll.
+  final Widget? background;
 
   /// Turns the search shortcut into a live filter of this page (playlists).
   final ValueChanged<String>? onFilter;
@@ -102,6 +106,8 @@ class _IslandScaffoldState extends State<IslandScaffold> {
     return Scaffold(
       body: Stack(
         children: [
+          if (widget.background case final background?)
+            Positioned.fill(child: IgnorePointer(child: background)),
           NotificationListener<ScrollUpdateNotification>(
             onNotification: _onScroll,
             child: MediaQuery(

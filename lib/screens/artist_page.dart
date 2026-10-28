@@ -36,6 +36,7 @@ import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/artist_shelf.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/button_width.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
@@ -216,6 +217,7 @@ class _ArtistPageState extends State<ArtistPage> {
       builder: (context, _) => IslandScaffold(
         title: _artistTitle,
         fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
+        background: PageGlow(source: _artist?['image']?.toString()),
         body: Padding(
           padding: commonSingleChildScrollViewPadding,
           child: CustomScrollView(

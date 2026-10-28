@@ -210,19 +210,26 @@ class _RowGlowPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final offset = controller.hasClients ? controller.offset : 0.0;
-    final radius = rowHeight * 1.05;
+    // Wide and low: neighbouring glows merge into one soft band.
+    final halfWidth = rowHeight * 1.6;
     final centerY = rowTop + rowHeight / 2;
 
     for (final index in colors.indices) {
       final centerX = index * itemExtent + itemExtent / 2 - offset;
-      if (centerX < -radius || centerX > size.width + radius) continue;
+      if (centerX < -halfWidth || centerX > size.width + halfWidth) continue;
       final color = colors.colorAt(index);
       if (color == null || color.a == 0) continue;
+      // Muted, so a row of covers does not turn into a rainbow.
+      final hsl = HSLColor.fromColor(color);
       paintArtworkGlow(
         canvas,
-        Rect.fromCircle(center: Offset(centerX, centerY), radius: radius),
-        color,
-        strength * color.a,
+        Rect.fromCenter(
+          center: Offset(centerX, centerY),
+          width: halfWidth * 2,
+          height: rowHeight * 2.1,
+        ),
+        hsl.withSaturation(hsl.saturation * 0.6).toColor(),
+        strength * 0.75 * color.a,
       );
     }
   }

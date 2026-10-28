@@ -19,6 +19,8 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/artwork_colors.dart';
@@ -132,21 +134,20 @@ class GlowColors {
   }
 }
 
-/// A wide glow of an artwork's colour (or the app colour, without one)
-/// behind [child], reaching past it into the page, when the dynamic
-/// background is on. Used by page headers.
-class ArtworkGlow extends StatefulWidget {
-  const ArtworkGlow({super.key, required this.source, required this.child});
+/// The page background for an artwork (or the app colour, without one),
+/// when the dynamic background is on: a large soft ball of its colour from
+/// the top, emptying into the page, and a fainter neighbouring hue below.
+class PageGlow extends StatefulWidget {
+  const PageGlow({super.key, required this.source});
 
   /// The artwork's network URL or file path.
   final String? source;
-  final Widget child;
 
   @override
-  State<ArtworkGlow> createState() => _ArtworkGlowState();
+  State<PageGlow> createState() => _PageGlowState();
 }
 
-class _ArtworkGlowState extends State<ArtworkGlow>
+class _PageGlowState extends State<PageGlow>
     with SingleTickerProviderStateMixin {
   late final _colors = GlowColors(this);
 
@@ -160,7 +161,7 @@ class _ArtworkGlowState extends State<ArtworkGlow>
   }
 
   @override
-  void didUpdateWidget(ArtworkGlow oldWidget) {
+  void didUpdateWidget(PageGlow oldWidget) {
     super.didUpdateWidget(oldWidget);
     _update();
   }
@@ -175,22 +176,23 @@ class _ArtworkGlowState extends State<ArtworkGlow>
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: dynamicBackground,
-      builder: (context, enabled, child) => !enabled
-          ? child!
-          : CustomPaint(
-              painter: _GlowPainter(
-                colors: _colors,
-                strength: artworkGlowStrength(context),
+      builder: (context, enabled, _) => !enabled
+          ? const SizedBox.expand()
+          : RepaintBoundary(
+              child: CustomPaint(
+                size: Size.infinite,
+                painter: _PageGlowPainter(
+                  colors: _colors,
+                  strength: artworkGlowStrength(context),
+                ),
               ),
-              child: child,
             ),
-      child: widget.child,
     );
   }
 }
 
-class _GlowPainter extends CustomPainter {
-  _GlowPainter({required this.colors, required this.strength})
+class _PageGlowPainter extends CustomPainter {
+  _PageGlowPainter({required this.colors, required this.strength})
     : super(repaint: colors.listenable);
 
   final GlowColors colors;
@@ -200,16 +202,34 @@ class _GlowPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final color = colors.colorAt(0);
     if (color == null || color.a == 0) return;
-    // Wider than tall and well past the child, so it reads as background.
-    final bounds = Rect.fromCenter(
-      center: size.center(Offset.zero),
-      width: (size.width * 1.1).clamp(0, size.height * 4),
-      height: size.height * 2.0,
+    final alpha = strength * color.a;
+    final extent = max(size.width, size.height);
+
+    // A neighbouring hue, as the second light of a stage.
+    final hsl = HSLColor.fromColor(color);
+    final second = hsl.withHue((hsl.hue + 28) % 360).toColor();
+    paintArtworkGlow(
+      canvas,
+      Rect.fromCircle(
+        center: Offset(size.width * 0.82, size.height * 0.78),
+        radius: extent * 0.5,
+      ),
+      second,
+      alpha * 0.55,
     );
-    paintArtworkGlow(canvas, bounds, color, strength * color.a);
+    paintArtworkGlow(
+      canvas,
+      Rect.fromCenter(
+        center: Offset(size.width * 0.42, size.height * 0.12),
+        width: extent * 1.5,
+        height: extent * 1.1,
+      ),
+      color,
+      alpha,
+    );
   }
 
   @override
-  bool shouldRepaint(_GlowPainter oldDelegate) =>
+  bool shouldRepaint(_PageGlowPainter oldDelegate) =>
       oldDelegate.strength != strength || oldDelegate.colors != colors;
 }
