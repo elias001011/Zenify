@@ -50,6 +50,10 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
 
   bool? _previousOfflineMode;
 
+  /// Keeps the branch navigators and their state when the layout switches
+  /// between the dock and the rail, which moves them in the tree.
+  final _contentKey = GlobalKey();
+
   /// Track the previously selected shell branch to detect reselects.
   int? _previousShellIndex;
 
@@ -123,7 +127,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
       data: media.copyWith(
         padding: media.padding.copyWith(bottom: media.padding.bottom + inset),
       ),
-      child: widget.child,
+      child: KeyedSubtree(key: _contentKey, child: widget.child),
     );
   }
 

@@ -405,12 +405,19 @@ class _PlayerLayoutBar extends StatelessWidget {
   void _choose(BuildContext context) {
     final l10n = context.l10n!;
 
-    Widget option(bool compact, String title, IconData icon) => BottomSheetBar(
+    // The dialog sits on the root navigator; popping the settings context
+    // would close the settings page instead (see gokadzev/Musify#1010).
+    Widget option(
+      BuildContext dialogContext,
+      bool compact,
+      String title,
+      IconData icon,
+    ) => BottomSheetBar(
       title,
       () {
+        Navigator.pop(dialogContext);
         compactDesktopPlayer.value = compact;
         addOrUpdateData<bool>('settings', 'compactDesktopPlayer', compact);
-        Navigator.pop(context);
       },
       compactDesktopPlayer.value == compact,
       icon: icon,
@@ -418,17 +425,19 @@ class _PlayerLayoutBar extends StatelessWidget {
 
     showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(l10n.playerLayout),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             option(
+              dialogContext,
               false,
               l10n.playerLayoutDesktop,
               FluentIcons.panel_left_24_regular,
             ),
             option(
+              dialogContext,
               true,
               l10n.playerLayoutCompact,
               FluentIcons.phone_24_regular,
