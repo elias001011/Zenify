@@ -21,7 +21,10 @@ void main() {
     final color = ArtworkColors.vividColor(pixels)!;
     final hsv = HSVColor.fromColor(color);
 
-    expect(hsv.hue, closeTo(HSVColor.fromColor(const Color(0xFFE53935)).hue, 4));
+    expect(
+      hsv.hue,
+      closeTo(HSVColor.fromColor(const Color(0xFFE53935)).hue, 4),
+    );
     expect(hsv.saturation, greaterThanOrEqualTo(0.45));
     expect(hsv.value, greaterThanOrEqualTo(0.6));
   });

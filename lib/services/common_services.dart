@@ -30,6 +30,7 @@ import 'package:http/http.dart' as http;
 import 'package:musify/constants/clients.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/lyrics_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
@@ -861,6 +862,7 @@ Future<String?> getSongLyrics(
 }
 
 Future<bool> makeSongOffline(dynamic song) async {
+  DownloadEntry? download;
   try {
     final String? ytid = song['ytid'];
 
@@ -882,6 +884,7 @@ Future<bool> makeSongOffline(dynamic song) async {
     }
 
     final offlineSong = Map<String, dynamic>.from(song as Map);
+    download = DownloadManager.instance.started(song);
 
     final audioPath = FilePaths.getAudioPath(ytid);
     final audioFile = File(audioPath);
@@ -896,14 +899,28 @@ Future<bool> makeSongOffline(dynamic song) async {
       final audioManifest = await fetchBestAudioStream(ytid);
       if (audioManifest == null) {
         logger.log('makeSongOffline: audioManifest is null for $ytid');
+        DownloadManager.instance.failed(download, null);
         return false;
       }
       audioBitrateKbps = audioManifest.bitrate.kiloBitsPerSecond.round();
       audioCodec = audioManifest.audioCodec;
 
       final stream = ytClient.videos.streamsClient.get(audioManifest);
+      final total = audioManifest.size.totalBytes;
+      final progress = download.progress;
+      var received = 0;
       fileStream = audioFile.openWrite();
-      await stream.pipe(fileStream);
+      await stream
+          .map((chunk) {
+            received += chunk.length;
+            // Whole percents only, so listeners do not rebuild per chunk.
+            if (total > 0) {
+              final value = (received * 100 ~/ total) / 100;
+              if (value != progress.value) progress.value = value;
+            }
+            return chunk;
+          })
+          .pipe(fileStream);
       await fileStream.flush();
       await fileStream.close();
       fileStream = null;
@@ -919,6 +936,7 @@ Future<bool> makeSongOffline(dynamic song) async {
       if (await audioFile.exists()) {
         await audioFile.delete();
       }
+      DownloadManager.instance.failed(download, e);
       return false;
     }
 
@@ -979,9 +997,13 @@ Future<bool> makeSongOffline(dynamic song) async {
       );
     }
 
+    DownloadManager.instance.finished(download);
     return true;
   } catch (e, stackTrace) {
     logger.log('Error making song offline', error: e, stackTrace: stackTrace);
+    if (download?.status == DownloadStatus.downloading) {
+      DownloadManager.instance.failed(download!, e);
+    }
     return false;
   }
 }
