@@ -42,6 +42,26 @@ import 'package:musify/widgets/auto_format_text.dart';
 const String releasesUrl =
     'https://api.github.com/repos/$appRepository/releases/latest';
 
+/// A link the home page shows as an announcement while it is set. Edit
+/// `announcement.json` on the default branch to post or clear one.
+const String announcementUrl =
+    'https://raw.githubusercontent.com/$appRepository/master/announcement.json';
+
+Future<void> fetchAnnouncement() async {
+  try {
+    final response = await http.get(Uri.parse(announcementUrl));
+    if (response.statusCode != 200) return;
+    final link = (json.decode(response.body) as Map)['announcementurl'];
+    announcementURL.value = link is String && link.isNotEmpty ? link : null;
+  } catch (e, stackTrace) {
+    logger.log(
+      'Error fetching the announcement',
+      error: e,
+      stackTrace: stackTrace,
+    );
+  }
+}
+
 /// [manual] reports "up to date" and failures, for the Settings entry.
 Future<void> checkAppUpdates({bool manual = false}) async {
   void report(String Function(AppLocalizations l10n) message) {

@@ -190,6 +190,8 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
       );
     }
 
+    if (!offlineMode.value) unawaited(fetchAnnouncement());
+
     if (!isFdroidBuild) {
       if (shouldWeCheckUpdates.value == true) {
         if (!isUpdateChecked && kReleaseMode) {

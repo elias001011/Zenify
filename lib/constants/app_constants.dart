@@ -27,7 +27,7 @@ const appName = 'Zenify';
 const appDesktopId = 'io.github.elias001011.zenify';
 
 /// Where this fork's source code and releases live.
-const appRepository = 'elias001011/Musify-Next';
+const appRepository = 'elias001011/Zenify';
 
 const recommendedCubesNumber = 8;
 const suggestedPlaylistsNumber = 16;

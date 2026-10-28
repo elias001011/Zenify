@@ -4,10 +4,12 @@
 
 # Zenify
 
-A calm, modern music app. A community fork of [Musify](https://github.com/gokadzev/Musify) focused on stability, desktop support and syncing between your devices.
+A calm, modern music app: the community edition of
+[Musify](https://github.com/gokadzev/Musify), with first-class desktop support,
+a redesigned interface and syncing between your devices.
 
-[![GitHub release](https://img.shields.io/github/v/release/elias001011/Musify-Next?color=2196F3)](https://github.com/elias001011/Musify-Next/releases)
-[![License](https://img.shields.io/github/license/elias001011/Musify-Next?color=2196F3)](LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/elias001011/Zenify?color=2196F3)](https://github.com/elias001011/Zenify/releases)
+[![License](https://img.shields.io/github/license/elias001011/Zenify?color=2196F3)](LICENSE)
 [![Based on Musify](https://img.shields.io/badge/based%20on-gokadzev%2FMusify-2196F3)](https://github.com/gokadzev/Musify)
 [![Desktop features from Musify Desktop Port](https://img.shields.io/badge/desktop%20features-Musify%20Desktop%20Port-2196F3)](https://github.com/elias001011/Musify-Desktop-Port)
 
@@ -15,21 +17,37 @@ A calm, modern music app. A community fork of [Musify](https://github.com/gokadz
 
 ---
 
-## Why this fork
+## A community edition of Musify
+
+Zenify is a modified version of Musify by Valeri Gokadze, maintained by the
+community since October 2026. It keeps Musify's code, features and license,
+and goes further where Musify stops: the desktop, the look of the app and
+moving your library between devices.
 
 Musify is a great open source music app, but its future is uncertain: the
 original repository received a copyright complaint
 ([gokadzev/Musify#1012](https://github.com/gokadzev/Musify/discussions/1012))
-and it is not clear how long it will stay available.
+and it is not clear how long it will stay available. Zenify keeps the project
+alive under its own name, so it never passes itself off as the original.
 
-Zenify (developed as Musify Next) starts from the original code and keeps its
-infrastructure, while taking a different direction: a more modern app,
-first-class desktop support and stability before new features.
+### How it differs from Musify
 
-- **0.1.0** was the first stable base: upstream Musify plus the desktop
-  features already proven in
-  [Musify Desktop Port](https://github.com/elias001011/Musify-Desktop-Port).
-- **0.1.1** brings the new name and icon and a redesigned interface.
+| | Musify | Zenify |
+|---|---|---|
+| Platforms | Android, desktop builds | Android, Linux and Windows, with `.deb`, installer and portable builds |
+| Interface | Material app bars and bottom navigation | Floating island, dock and desktop rail; solid, translucent or blurred |
+| Background | Plain | Optional dynamic background in your albums' colours |
+| Player | Flip card with lyrics | Full-stage player: lyrics, queue and volume in one bar, sound waves, 3D artwork on desktop |
+| Library | Sections | Filters (custom, YouTube, albums, artists, offline) and search, merged into the global search |
+| Listening recap | Minutes and top songs | Cards with minutes, top artists and top songs, shareable per month |
+| Downloads | In the background | Download manager with progress, failures and retry |
+| Devices | Backup and restore | Local Sync between Android, Linux and Windows over Wi-Fi, plus backup |
+| Desktop | Basic | Interface scale, title bar, remappable shortcuts, downloads folder, volume |
+| Updates | Musify's releases | Zenify's releases, with the right file for each platform |
+
+Zenify installs next to Musify and keeps its own data. On desktop, the first
+run copies an existing Musify library (Musify's own files are never changed);
+elsewhere, use the backup in Settings to bring it over.
 
 ---
 
@@ -55,21 +73,21 @@ New in Zenify:
 - **A new look**: floating navigation and player, a floating title island with
   quick search, a neutral theme with pure black, and an optional dynamic
   background that glows with the colours of your albums.
+- **A new player**: the artwork takes the stage, lyrics and queue open beside
+  it or as sheets, and tapping the artwork shows sound waves.
+- **Library search and filters**, with library results first in search and
+  search that keeps working offline.
+- **Top artists** in the listening recap, worked out from what you play.
 - **Download manager**: follow downloads in progress, see what failed and why,
   and retry.
-- **Floating elements** solid, translucent or blurred, and a compact player
-  layout on desktop.
-
 - **Local Sync**: pair Android, Linux and Windows devices with a PIN and keep
   your liked songs, playlists, history, listening recap, searches and radio
   stations in sync over Wi-Fi. No account or server, encrypted, off by default.
 - **Desktop settings**: interface scale that zooms the whole app, start
-  maximized and a title bar in the app colors.
+  maximized, a title bar in the app colors and a compact player layout.
 - **Keyboard shortcuts** for playback and navigation, all of them remappable.
-- **Volume control** in the player, with mute and mouse wheel support.
 - **Downloads folder** of your choice on desktop.
 - **Built-in updater** for Android, Linux and Windows.
-- **Desktop packages**: `.deb`, Windows installer and portable builds.
 
 New features are translated into English and Portuguese for now.
 
@@ -85,7 +103,7 @@ New features are translated into English and Portuguese for now.
 ## Download
 
 Get the files for your platform from the
-[latest release](https://github.com/elias001011/Musify-Next/releases/latest).
+[latest release](https://github.com/elias001011/Zenify/releases/latest).
 
 | Platform | File | Notes |
 |---|---|---|
@@ -94,10 +112,6 @@ Get the files for your platform from the
 | Linux (other) | `Zenify-linux-x64.tar.gz` | Needs `libmpv`; run `install-linux-desktop.sh` to add it to your menu. |
 | Windows | `Zenify-windows-x64-setup.exe` | Lets you choose where data and downloads go. |
 | Windows (portable) | `Zenify-windows-x64-portable.zip` | No installation. |
-
-Zenify installs next to Musify and keeps its own data. On desktop, the first
-run copies an existing Musify library (Musify's own files are never changed);
-elsewhere, use the backup in Settings to bring it over.
 
 Every release includes `SHA256SUMS.txt` to verify the files. iOS is not
 supported.
@@ -139,14 +153,14 @@ Zenify is developed and maintained by
 ```
 Copyright © 2026 Valeri Gokadze
 Copyright © 2026 Elias Juriatti and Zenify contributors
-
-Zenify is free software licensed under GPL v3.0. You may use, modify, and
-distribute this software freely, but must keep the source code open and publicly
-available, retain all copyright notices, disclose all changes made, and use the
-same GPL v3.0 license.
 ```
 
-See the [GNU General Public License](LICENSE) for full details.
+Zenify is free software under the
+[GNU General Public License v3.0](LICENSE), the same license as Musify. It is
+a modified version of Musify: the changes are listed above and in the commit
+history, and every file keeps its original copyright notice. You may use,
+modify and share it, as long as you keep it under the same license, keep the
+notices and make the source code of what you distribute available.
 
 ---
 
