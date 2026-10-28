@@ -1,5 +1,5 @@
 name: 🐞 Issue Report
-description: Report an issue in Musify
+description: Report an issue in Zenify
 title: '[Bug] <title>'
 labels: "type: bug"
 assignees:
@@ -18,7 +18,7 @@ body:
           required: true
         - label: I have written a short but informative title.
           required: true
-        - label: I have updated the app to the latest version. You can find the latest version [here](https://github.com/gokadzev/Musify/releases).
+        - label: I have updated the app to the latest version. You can find the latest version [here](https://github.com/elias001011/Musify-Next/releases).
           required: true
         - label: I will fill out all the sections in this issue report.
           required: true
@@ -51,8 +51,8 @@ body:
 
   - type: input
     attributes:
-      label: Musify Version
-      description: Mention the version of Musify in which you encountered this bug.
+      label: Zenify Version
+      description: Mention the version of Zenify in which you encountered this bug.
       placeholder: e.g., v9.0.0
     validations:
       required: true

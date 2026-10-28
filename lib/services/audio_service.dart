@@ -26,6 +26,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:hive/hive.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/constants/clients.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
@@ -1617,7 +1618,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
     await playPlaylistSong(
       playlist: {
-        'title': 'Musify',
+        'title': appName,
         'source': 'system-recent',
         'list': [normalisedSong],
       },

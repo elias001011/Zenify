@@ -1,4 +1,4 @@
-"""Verify the actual Windows executable and portable bundle use Musify's icons."""
+"""Verify the actual Windows executable and portable bundle use Zenify's icons."""
 
 import ctypes
 from ctypes import wintypes
@@ -13,7 +13,7 @@ def main():
     resources = root / "windows/runner/resources"
     canonical = root / "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png"
     assert (resources / "app_icon.png").read_bytes() == canonical.read_bytes()
-    assert (executable.parent / "musify-icon.png").read_bytes() == canonical.read_bytes()
+    assert (executable.parent / "zenify-icon.png").read_bytes() == canonical.read_bytes()
 
     ico = (resources / "app_icon.ico").read_bytes()
     reserved, kind, count = struct.unpack_from("<HHH", ico)
@@ -64,7 +64,7 @@ def main():
     finally:
         kernel.FreeLibrary(module)
 
-    print(f"Verified {count} embedded Musify icon sizes and the notification PNG.")
+    print(f"Verified {count} embedded Zenify icon sizes and the notification PNG.")
 
 
 if __name__ == "__main__":

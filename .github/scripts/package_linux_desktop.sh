@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Builds Musify-linux-x64.deb and Musify-linux-x64.tar.gz from the release bundle.
+# Builds Zenify-linux-x64.deb and Zenify-linux-x64.tar.gz from the release bundle.
 set -euo pipefail
 
-APP_NAME="musify"
-APP_ID="com.gokadzev.musify"
+APP_NAME="zenify"
+APP_ID="io.github.elias001011.zenify"
 BUNDLE_DIR="build/linux/x64/release/bundle"
 DIST_DIR="build/desktop-artifacts"
 VERSION="$(sed -n 's/^version: \([^ +]*\).*/\1/p' pubspec.yaml)"
@@ -33,7 +33,7 @@ install -m 0644 "${ICON}" \
 # Same entry as linux/install-linux-desktop.sh writes for the tarball.
 cat > "${PACKAGE_ROOT}/usr/share/applications/${APP_ID}.desktop" <<DESKTOP
 [Desktop Entry]
-Name=Musify
+Name=Zenify
 Comment=Music Streaming app
 Exec=${APP_NAME}
 Icon=${APP_NAME}
@@ -49,12 +49,12 @@ Version: ${PACKAGE_VERSION}
 Section: sound
 Priority: optional
 Architecture: amd64
-Maintainer: Musify Contributors <noreply@github.com>
+Maintainer: Zenify Contributors <noreply@github.com>
 Installed-Size: $(du -sk "${PACKAGE_ROOT}/usr" | cut -f1)
 Depends: libgtk-3-0, libstdc++6, libmpv2 | libmpv1
 Description: Music streaming app made in Flutter
 CONTROL
 
 chmod -R go-w "${PACKAGE_ROOT}"
-dpkg-deb --root-owner-group --build "${PACKAGE_ROOT}" "${DIST_DIR}/Musify-linux-x64.deb"
-tar -C "${BUNDLE_DIR}" -czf "${DIST_DIR}/Musify-linux-x64.tar.gz" .
+dpkg-deb --root-owner-group --build "${PACKAGE_ROOT}" "${DIST_DIR}/Zenify-linux-x64.deb"
+tar -C "${BUNDLE_DIR}" -czf "${DIST_DIR}/Zenify-linux-x64.tar.gz" .

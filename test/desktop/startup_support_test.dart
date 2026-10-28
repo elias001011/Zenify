@@ -32,7 +32,7 @@ void main() {
       const StartupErrorApp(message: 'Something went wrong'),
     );
 
-    expect(find.text('Musify could not start'), findsOneWidget);
+    expect(find.text('Zenify could not start'), findsOneWidget);
     expect(find.text('Something went wrong'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Copy details'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, 'Quit'), findsOneWidget);

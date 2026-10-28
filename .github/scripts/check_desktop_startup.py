@@ -15,7 +15,7 @@ def main():
         except subprocess.TimeoutExpired:
             pass
         else:
-            raise RuntimeError(f"Musify exited during startup: {process.returncode}")
+            raise RuntimeError(f"Zenify exited during startup: {process.returncode}")
         finally:
             if process.poll() is None:
                 process.terminate()
@@ -35,7 +35,7 @@ def main():
             "Could not initialize Windows media controls",
         ):
             assert failure not in logs, f"Startup failed: {failure}"
-    print("Musify remained open without initialization errors.")
+    print("Zenify remained open without initialization errors.")
 
 
 if __name__ == "__main__":

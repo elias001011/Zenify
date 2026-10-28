@@ -1,10 +1,10 @@
 # Project-level configuration.
 cmake_minimum_required(VERSION 3.14)
-project(musify LANGUAGES CXX)
+project(zenify LANGUAGES CXX)
 
 # The name of the executable created for the application. Change this to change
 # the on-disk name of your application.
-set(BINARY_NAME "musify")
+set(BINARY_NAME "zenify")
 
 # Explicitly opt in to modern CMake behaviors to avoid warnings with recent
 # versions of CMake.
@@ -77,7 +77,7 @@ install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
 
 # Provide the shell identity icon alongside the executable.
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/runner/resources/app_icon.png"
-  DESTINATION "${CMAKE_INSTALL_PREFIX}" RENAME "musify-icon.png"
+  DESTINATION "${CMAKE_INSTALL_PREFIX}" RENAME "zenify-icon.png"
   COMPONENT Runtime)
 
 install(FILES "${FLUTTER_ICU_DATA_FILE}" DESTINATION "${INSTALL_BUNDLE_DATA_DIR}"

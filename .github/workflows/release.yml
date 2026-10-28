@@ -87,11 +87,11 @@ jobs:
           flutter build apk --release --flavor github --split-per-abi --target-platform android-arm64
           flutter build apk --release --flavor github
           mkdir -p build/android-artifacts
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-github-release.apk build/android-artifacts/Musify-arm64-v8a.apk
-          cp build/app/outputs/flutter-apk/app-github-release.apk build/android-artifacts/Musify.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-github-release.apk build/android-artifacts/Zenify-arm64-v8a.apk
+          cp build/app/outputs/flutter-apk/app-github-release.apk build/android-artifacts/Zenify.apk
       - uses: actions/upload-artifact@v4
         with:
-          name: musify-android
+          name: zenify-android
           path: build/android-artifacts/*.apk
           if-no-files-found: error
 
@@ -117,15 +117,15 @@ jobs:
       - run: flutter test --concurrency=2
       - run: flutter build linux --release
       - name: Check startup
-        run: dbus-run-session -- xvfb-run -a python .github/scripts/check_desktop_startup.py build/linux/x64/release/bundle/musify
+        run: dbus-run-session -- xvfb-run -a python .github/scripts/check_desktop_startup.py build/linux/x64/release/bundle/zenify
       - name: Package
         env:
           DEB_REVISION: ${{ needs.preflight.outputs.deb_revision || '1' }}
         run: .github/scripts/package_linux_desktop.sh
       - uses: actions/upload-artifact@v4
         with:
-          name: musify-linux-x64
-          path: build/desktop-artifacts/Musify-linux-x64.*
+          name: zenify-linux-x64
+          path: build/desktop-artifacts/Zenify-linux-x64.*
           if-no-files-found: error
 
   build-windows:
@@ -133,7 +133,7 @@ jobs:
     needs: preflight
     runs-on: windows-latest
     env:
-      MUSIFY_VERSION: ${{ needs.preflight.outputs.version }}
+      ZENIFY_VERSION: ${{ needs.preflight.outputs.version }}
     steps:
       - uses: actions/checkout@v5
       - name: Resolve Flutter version
@@ -153,22 +153,22 @@ jobs:
       - run: flutter build windows --release
       - name: Check startup and icons
         run: |
-          python .github/scripts/check_desktop_startup.py build/windows/x64/runner/Release/musify.exe
-          python .github/scripts/check_windows_icons.py build/windows/x64/runner/Release/musify.exe
+          python .github/scripts/check_desktop_startup.py build/windows/x64/runner/Release/zenify.exe
+          python .github/scripts/check_windows_icons.py build/windows/x64/runner/Release/zenify.exe
       - name: Package portable zip
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path build\desktop-artifacts | Out-Null
-          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\desktop-artifacts\Musify-windows-x64-portable.zip -Force
+          Compress-Archive -Path build\windows\x64\runner\Release\* -DestinationPath build\desktop-artifacts\Zenify-windows-x64-portable.zip -Force
       - name: Build installer
         shell: pwsh
         run: |
           choco install innosetup -y --no-progress
-          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" .github\installer\windows\musify.iss
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" .github\installer\windows\zenify.iss
       - uses: actions/upload-artifact@v4
         with:
-          name: musify-windows-x64
-          path: build/desktop-artifacts/Musify-windows-x64-*
+          name: zenify-windows-x64
+          path: build/desktop-artifacts/Zenify-windows-x64-*
           if-no-files-found: error
 
   release:
@@ -189,6 +189,6 @@ jobs:
           gh release create "${TAG}" dist/* \
             --repo "${{ github.repository }}" \
             --target "${{ github.sha }}" \
-            --title "Musify ${TAG#v}" \
+            --title "Zenify ${TAG#v}" \
             --draft \
             --generate-notes

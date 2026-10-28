@@ -14,14 +14,14 @@ void SetString(HKEY key, const wchar_t* name, const std::wstring& value) {
       key, name, 0, REG_SZ, reinterpret_cast<const BYTE*>(value.c_str()),
       static_cast<DWORD>((value.size() + 1) * sizeof(wchar_t)));
   if (result != ERROR_SUCCESS) {
-    std::cerr << "Could not update Musify shell identity: " << result << '\n';
+    std::cerr << "Could not update Zenify shell identity: " << result << '\n';
   }
 }
 }  // namespace
 
 void ConfigureAppIdentity() {
-  if (FAILED(SetCurrentProcessExplicitAppUserModelID(kMusifyAppId))) {
-    std::cerr << "Could not set Musify AppUserModelID\n";
+  if (FAILED(SetCurrentProcessExplicitAppUserModelID(kAppUserModelId))) {
+    std::cerr << "Could not set Zenify AppUserModelID\n";
   }
 
   // Resolve the shell icon relative to the executable for portable bundles.
@@ -30,23 +30,23 @@ void ConfigureAppIdentity() {
       nullptr, filename.data(), static_cast<DWORD>(filename.size()));
   if (length == 0 || length >= filename.size()) return;
   const auto icon = std::filesystem::path(std::wstring(filename.data(), length))
-                        .parent_path() / L"musify-icon.png";
+                        .parent_path() / L"zenify-icon.png";
   if (GetFileAttributesW(icon.c_str()) == INVALID_FILE_ATTRIBUTES) {
-    std::cerr << "Musify shell icon is missing from the app bundle\n";
+    std::cerr << "Zenify shell icon is missing from the app bundle\n";
     return;
   }
 
   const std::wstring subkey =
-      std::wstring(L"Software\\Classes\\AppUserModelId\\") + kMusifyAppId;
+      std::wstring(L"Software\\Classes\\AppUserModelId\\") + kAppUserModelId;
   HKEY key = nullptr;
   const auto result = RegCreateKeyExW(
       HKEY_CURRENT_USER, subkey.c_str(), 0, nullptr, REG_OPTION_NON_VOLATILE,
       KEY_SET_VALUE, nullptr, &key, nullptr);
   if (result != ERROR_SUCCESS) {
-    std::cerr << "Could not register Musify shell identity: " << result << '\n';
+    std::cerr << "Could not register Zenify shell identity: " << result << '\n';
     return;
   }
-  SetString(key, L"DisplayName", L"Musify");
+  SetString(key, L"DisplayName", L"Zenify");
   SetString(key, L"IconUri", icon.wstring());
   RegCloseKey(key);
 }

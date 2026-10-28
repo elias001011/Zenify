@@ -2,7 +2,7 @@
 #define RUNNER_APP_IDENTITY_H_
 
 // Identify Musify consistently in the Windows shell.
-inline constexpr wchar_t kMusifyAppId[] = L"com.gokadzev.musify";
+inline constexpr wchar_t kAppUserModelId[] = L"io.github.elias001011.zenify";
 
 // Register the shell identity before creating any windows.
 void ConfigureAppIdentity();

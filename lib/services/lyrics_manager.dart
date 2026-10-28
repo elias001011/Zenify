@@ -49,7 +49,7 @@ class LyricsManager {
   final http.Client? _client;
 
   static const _timeout = Duration(seconds: 8);
-  static const _userAgent = 'Musify (https://github.com/$appRepository)';
+  static const _userAgent = '$appName (https://github.com/$appRepository)';
   static const _maxCacheEntries = 50;
   static const _hitTtl = Duration(hours: 6);
   static const _missTtl = Duration(minutes: 5);

@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.gokadzev" "\0"
-            VALUE "FileDescription", "Musify" "\0"
+            VALUE "CompanyName", "io.github.elias001011" "\0"
+            VALUE "FileDescription", "Zenify" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "musify" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.gokadzev. All rights reserved." "\0"
-            VALUE "OriginalFilename", "musify.exe" "\0"
-            VALUE "ProductName", "Musify" "\0"
+            VALUE "InternalName", "zenify" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Zenify contributors. GPL-3.0." "\0"
+            VALUE "OriginalFilename", "zenify.exe" "\0"
+            VALUE "ProductName", "Zenify" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

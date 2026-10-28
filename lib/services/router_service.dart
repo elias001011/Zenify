@@ -23,6 +23,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/constants/version.dart';
 import 'package:musify/screens/about_page.dart';
 import 'package:musify/screens/artist_page.dart';
@@ -276,7 +277,7 @@ class NavigationManager {
                 path: 'license',
                 pageBuilder: (context, state) => _pushPage(
                   child: const LicensePage(
-                    applicationName: 'Musify',
+                    applicationName: appName,
                     applicationVersion: appVersion,
                   ),
                   state: state,

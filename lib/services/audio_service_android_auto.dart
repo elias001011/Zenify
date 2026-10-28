@@ -1,5 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -112,7 +113,7 @@ class AndroidAutoBrowser {
       id: mediaId,
       playable: playable,
       displayTitle: song['title']?.toString(),
-      displaySubtitle: artist.isEmpty ? 'Musify' : artist,
+      displaySubtitle: artist.isEmpty ? appName : artist,
     );
   }
 

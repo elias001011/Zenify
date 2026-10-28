@@ -31,6 +31,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_multicast_lock/flutter_multicast_lock.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/library_merge_service.dart';
 import 'package:musify/services/local_sync/sync_data.dart';
@@ -64,7 +65,7 @@ class PairedSyncDevice {
 
   factory PairedSyncDevice.fromMap(Map map) => PairedSyncDevice(
     deviceId: map['deviceId']?.toString() ?? '',
-    name: map['name']?.toString() ?? 'Musify',
+    name: map['name']?.toString() ?? appName,
     secret: map['secret']?.toString() ?? '',
   );
 
@@ -243,8 +244,8 @@ class LocalSyncService {
   int? get serverPort => _httpServer?.port;
 
   String get deviceName => isAndroidPlatform
-      ? 'Musify (Android)'
-      : 'Musify (${Platform.localHostname})';
+      ? '$appName (Android)'
+      : '$appName (${Platform.localHostname})';
 
   Future<void> initialise() async {
     if (_initialised || !isSupportedPlatform) return;
@@ -518,7 +519,7 @@ class LocalSyncService {
       }
       _lastPairingRequest = now;
       _pendingClientId = id;
-      final name = data['clientName']?.toString() ?? 'Musify';
+      final name = data['clientName']?.toString() ?? appName;
       _pendingClientName = name.substring(0, min(100, name.length));
       final session = SyncSecurity.randomToken(16);
       _pendingSession = session;

@@ -21,6 +21,8 @@
 
 import 'package:material_ui/material_ui.dart';
 
+const appName = 'Zenify';
+
 /// Where this fork's source code and releases live.
 const appRepository = 'elias001011/Musify-Next';
 

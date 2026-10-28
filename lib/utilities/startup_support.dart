@@ -23,6 +23,7 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/app_constants.dart';
 
 /// Builds the message shown when the desktop audio engine cannot start.
 ///
@@ -31,14 +32,14 @@ import 'package:material_ui/material_ui.dart';
 String desktopAudioErrorMessage(Object error) {
   final details = error.toString();
   if (details.toLowerCase().contains('libmpv')) {
-    return 'Musify could not start playback because libmpv is not installed.\n\n'
+    return '$appName could not start playback because libmpv is not installed.\n\n'
         'Install the libmpv runtime library and restart Musify:\n'
         '  Fedora:         sudo dnf install mpv-libs\n'
         '  Debian/Ubuntu:  sudo apt install libmpv2 (libmpv1 on older releases)\n'
         '  Arch:           sudo pacman -S mpv\n\n'
         'Details: $details';
   }
-  return 'Musify could not start the audio engine.\n\n$details';
+  return '$appName could not start the audio engine.\n\n$details';
 }
 
 /// Shown instead of the app when initialization fails before the router and
@@ -90,7 +91,7 @@ class _StartupErrorAppState extends State<StartupErrorApp> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Musify could not start',
+                        '$appName could not start',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(fontWeight: FontWeight.w600),

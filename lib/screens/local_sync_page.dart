@@ -556,7 +556,7 @@ class _LocalSyncPageState extends State<LocalSyncPage> {
   Widget _buildStatus(BuildContext context, LocalSyncState state) {
     final theme = Theme.of(context);
     final l10n = context.l10n!;
-    final name = state.activeDevice?.name ?? 'Musify';
+    final name = state.activeDevice?.name ?? appName;
 
     switch (state.status) {
       case LocalSyncStatus.idle:

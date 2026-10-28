@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:dbus/dbus.dart';
 import 'package:flutter/foundation.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/services/desktop_media_artwork.dart';
 
 /// Exposes the existing audio handler to Linux desktops and media keys.
@@ -117,7 +118,7 @@ class LinuxMediaControls extends DBusObject {
     'CanQuit': const DBusBoolean(false),
     'CanRaise': DBusBoolean(raise != null),
     'HasTrackList': const DBusBoolean(false),
-    'Identity': const DBusString('Musify'),
+    'Identity': const DBusString(appName),
     'DesktopEntry': const DBusString('musify'),
     'SupportedUriSchemes': DBusArray.string([]),
     'SupportedMimeTypes': DBusArray.string([]),

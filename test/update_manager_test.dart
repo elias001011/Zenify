@@ -15,21 +15,21 @@ void main() {
     final release = {
       'html_url': 'https://github.com/o/r/releases/tag/v0.1.0',
       'assets': [
-        {'name': 'Musify.apk', 'browser_download_url': 'https://x/universal'},
+        {'name': 'Zenify.apk', 'browser_download_url': 'https://x/universal'},
         {
-          'name': 'Musify-arm64-v8a.apk',
+          'name': 'Zenify-arm64-v8a.apk',
           'browser_download_url': 'https://x/arm64',
         },
       ],
     };
 
     expect(
-      pickUpdateAsset(release, ['Musify-arm64-v8a.apk', 'Musify.apk']),
+      pickUpdateAsset(release, ['Zenify-arm64-v8a.apk', 'Zenify.apk']),
       'https://x/arm64',
     );
-    expect(pickUpdateAsset(release, ['Musify.apk']), 'https://x/universal');
+    expect(pickUpdateAsset(release, ['Zenify.apk']), 'https://x/universal');
     expect(
-      pickUpdateAsset(release, ['Musify-linux-x64.deb']),
+      pickUpdateAsset(release, ['Zenify-linux-x64.deb']),
       release['html_url'],
     );
   });

@@ -136,7 +136,7 @@ void main() {
     });
 
     test(
-      'exports Musify identity, artwork, valid track ID and playback state',
+      'exports the app identity, artwork, valid track ID and playback state',
       () async {
         expect(
           (await remote.getProperty(root, 'DesktopEntry')).asString(),
@@ -144,7 +144,7 @@ void main() {
         );
         expect(
           (await remote.getProperty(root, 'Identity')).asString(),
-          'Musify',
+          'Zenify',
         );
         expect((await property('PlaybackStatus')).asString(), 'Playing');
         final metadata = (await property('Metadata')).asStringVariantDict();

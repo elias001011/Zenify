@@ -215,7 +215,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                 children: [
                   const SizedBox(height: 18),
                   Image.asset(
-                    'assets/icons/musify_icon.png',
+                    'assets/icons/app_logo.png',
                     width: 34,
                     height: 34,
                     color: colorScheme.primary,

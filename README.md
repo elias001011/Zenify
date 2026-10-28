@@ -1,8 +1,10 @@
 <div align="center">
 
-# Musify Next
+<img src="assets/icons/ic_launcher.png" width="120" alt="Zenify icon">
 
-A community fork of [Musify](https://github.com/gokadzev/Musify) focused on stability, desktop support and syncing between your devices.
+# Zenify
+
+A calm, modern music app. A community fork of [Musify](https://github.com/gokadzev/Musify) focused on stability, desktop support and syncing between your devices.
 
 [![GitHub release](https://img.shields.io/github/v/release/elias001011/Musify-Next?color=2196F3)](https://github.com/elias001011/Musify-Next/releases)
 [![License](https://img.shields.io/github/license/elias001011/Musify-Next?color=2196F3)](LICENSE)
@@ -20,14 +22,14 @@ original repository received a copyright complaint
 ([gokadzev/Musify#1012](https://github.com/gokadzev/Musify/discussions/1012))
 and it is not clear how long it will stay available.
 
-Musify Next starts from the original code and keeps its infrastructure, while
-taking a different direction: a more modern app, first-class desktop support
-and stability before new features. The app will get its own name and icon in a
-future release; for now it is still Musify.
+Zenify (developed as Musify Next) starts from the original code and keeps its
+infrastructure, while taking a different direction: a more modern app,
+first-class desktop support and stability before new features.
 
-Version 0.1.0 is the first stable base: upstream Musify plus the desktop
-features that were already proven in
-[Musify Desktop Port](https://github.com/elias001011/Musify-Desktop-Port).
+- **0.1.0** was the first stable base: upstream Musify plus the desktop
+  features already proven in
+  [Musify Desktop Port](https://github.com/elias001011/Musify-Desktop-Port).
+- **0.1.1** brings the new name and icon and a redesigned interface.
 
 ---
 
@@ -48,7 +50,15 @@ Everything from Musify:
 - Material UI, accent colors and dynamic colors (Android 12+)
 - 21 languages
 
-New in Musify Next:
+New in Zenify:
+
+- **A new look**: floating navigation and player, a floating title island with
+  quick search, a neutral theme with pure black, and an optional dynamic
+  background that glows with the colours of your albums.
+- **Download manager**: follow downloads in progress, see what failed and why,
+  and retry.
+- **Floating elements** solid, translucent or blurred, and a compact player
+  layout on desktop.
 
 - **Local Sync**: pair Android, Linux and Windows devices with a PIN and keep
   your liked songs, playlists, history, listening recap, searches and radio
@@ -79,11 +89,14 @@ Get the files for your platform from the
 
 | Platform | File | Notes |
 |---|---|---|
-| Android | `Musify-arm64-v8a.apk` | Most phones. `Musify.apk` works on every device. |
-| Linux (Debian, Ubuntu) | `Musify-linux-x64.deb` | Installs `libmpv` for you. |
-| Linux (other) | `Musify-linux-x64.tar.gz` | Needs `libmpv`; run `install-linux-desktop.sh` to add it to your menu. |
-| Windows | `Musify-windows-x64-setup.exe` | Lets you choose where data and downloads go. |
-| Windows (portable) | `Musify-windows-x64-portable.zip` | No installation. |
+| Android | `Zenify-arm64-v8a.apk` | Most phones. `Zenify.apk` works on every device. |
+| Linux (Debian, Ubuntu) | `Zenify-linux-x64.deb` | Installs `libmpv` for you. |
+| Linux (other) | `Zenify-linux-x64.tar.gz` | Needs `libmpv`; run `install-linux-desktop.sh` to add it to your menu. |
+| Windows | `Zenify-windows-x64-setup.exe` | Lets you choose where data and downloads go. |
+| Windows (portable) | `Zenify-windows-x64-portable.zip` | No installation. |
+
+Zenify installs next to Musify and keeps its own data; use the backup in
+Settings to bring your library over.
 
 Every release includes `SHA256SUMS.txt` to verify the files. iOS is not
 supported.
@@ -92,9 +105,8 @@ supported.
 
 ## Roadmap
 
-- Own name and icon
 - Translations through Crowdin
-- A modernized interface
+- More of the interface following the dynamic background
 
 ---
 
@@ -109,15 +121,14 @@ Contributions are welcome. Please read the
 
 - [Musify](https://github.com/gokadzev/Musify) by **Valeri Gokadze** and its
   [contributors](https://github.com/gokadzev/Musify/graphs/contributors): the
-  original project this fork is built on. Musify Next would not exist without
-  it.
+  original project this fork is built on. Zenify would not exist without it.
 - [Musify Desktop Port](https://github.com/elias001011/Musify-Desktop-Port):
   where the desktop features, Local Sync and packaging of this fork were first
   built and tested.
 - [Musify](https://github.com/Harsh-23/Musify) by Harsh-23: the original
   inspiration for the concept and name of Musify.
 
-Musify Next is developed and maintained by
+Zenify is developed and maintained by
 [Elias Juriatti](https://github.com/elias001011).
 
 ---
@@ -126,9 +137,9 @@ Musify Next is developed and maintained by
 
 ```
 Copyright © 2026 Valeri Gokadze
-Copyright © 2026 Elias Juriatti and Musify Next contributors
+Copyright © 2026 Elias Juriatti and Zenify contributors
 
-Musify Next is free software licensed under GPL v3.0. You may use, modify, and
+Zenify is free software licensed under GPL v3.0. You may use, modify, and
 distribute this software freely, but must keep the source code open and publicly
 available, retain all copyright notices, disclose all changes made, and use the
 same GPL v3.0 license.
@@ -141,14 +152,14 @@ See the [GNU General Public License](LICENSE) for full details.
 ## Disclaimer
 
 ```
-Musify Next and its contributors do not host, own, or distribute any copyrighted
+Zenify and its contributors do not host, own, or distribute any copyrighted
 audio content. The app provides access to content through plugins and external
 sources. All trademarks, songs, audio files, and related content remain the
 property of their respective owners and are protected by applicable copyright laws.
 Included plugins are provided for interoperability and educational purposes only.
 Users are solely responsible for ensuring that their use of the app complies with
 local laws, copyright regulations, and the terms of service of the respective
-content providers. The developers of Musify Next do not encourage or endorse
+content providers. The developers of Zenify do not encourage or endorse
 copyright infringement and assume no liability for misuse of the software or
 third-party plugins.
 ```

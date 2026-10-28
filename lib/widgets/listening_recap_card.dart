@@ -20,10 +20,11 @@
  */
 
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/widgets/song_bar.dart';
 
-const _musifyIconAsset = 'assets/icons/musify_icon.png';
+const _logoAsset = 'assets/icons/app_logo.png';
 
 class ListeningRecapCard extends StatelessWidget {
   const ListeningRecapCard({
@@ -154,13 +155,13 @@ class _RecapBrandHeader extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     ImageIcon(
-                      const AssetImage(_musifyIconAsset),
+                      const AssetImage(_logoAsset),
                       size: 16,
                       color: colorScheme.onSecondaryContainer,
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'Musify',
+                      appName,
                       maxLines: 1,
                       style: TextStyle(
                         color: colorScheme.onSecondaryContainer,

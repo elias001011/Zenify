@@ -31,6 +31,7 @@ import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/screens/local_sync_page.dart';
@@ -275,6 +276,7 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
                 : Brightness.dark,
           ),
           child: MaterialApp.router(
+            title: appName,
             themeMode: themeMode,
             darkTheme: getAppTheme(colorScheme),
             theme: getAppTheme(colorScheme),
@@ -367,7 +369,7 @@ Future<String?> initialisation() async {
         builder: MusifyAudioHandler.new,
         config: const AudioServiceConfig(
           androidNotificationChannelId: 'com.gokadzev.musify',
-          androidNotificationChannelName: 'Musify',
+          androidNotificationChannelName: appName,
           androidNotificationIcon: 'drawable/ic_launcher_foreground',
           androidShowNotificationBadge: true,
           androidStopForegroundOnPause: false,
@@ -391,7 +393,7 @@ Future<String?> initialisation() async {
       NavigationManager.instance;
       try {
         // Use the desktop audio backend without mobile service plugins.
-        JustAudioMediaKit.title = 'Musify';
+        JustAudioMediaKit.title = appName;
         JustAudioMediaKit.ensureInitialized();
         audioHandler = MusifyAudioHandler();
       } catch (e, stackTrace) {
@@ -495,7 +497,7 @@ Future<String?> initialisation() async {
   } catch (e, stackTrace) {
     logger.log('Initialization Error', error: e, stackTrace: stackTrace);
     if (isDesktopPlatform) {
-      startupError ??= 'Musify could not complete initialization.\n\n$e';
+      startupError ??= '$appName could not complete initialization.\n\n$e';
     }
   }
 

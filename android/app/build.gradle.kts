@@ -48,7 +48,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.gokadzev.musify"
+        applicationId = "io.github.elias001011.zenify"
         minSdk = 24
         targetSdk = 36
         versionCode = flutter.versionCode

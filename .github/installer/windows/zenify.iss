@@ -1,8 +1,8 @@
-#define MyAppName "Musify"
-#define MyAppPublisher "Musify Contributors"
-#define MyAppExeName "musify.exe"
-#define MyAppUserModelID "com.gokadzev.musify"
-#define MyAppVersion GetEnv("MUSIFY_VERSION")
+#define MyAppName "Zenify"
+#define MyAppPublisher "Zenify Contributors"
+#define MyAppExeName "zenify.exe"
+#define MyAppUserModelID "io.github.elias001011.zenify"
+#define MyAppVersion GetEnv("ZENIFY_VERSION")
 #define RepoRoot "..\..\.."
 
 [Setup]
@@ -14,7 +14,7 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 OutputDir={#RepoRoot}\build\desktop-artifacts
-OutputBaseFilename=Musify-windows-x64-setup
+OutputBaseFilename=Zenify-windows-x64-setup
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -74,7 +74,7 @@ procedure InitializeWizard;
 begin
   LocationsPage := CreateInputDirPage(wpSelectDir,
     'Data locations',
-    'Where should Musify keep your data?',
+    'Where should Zenify keep your data?',
     'Application data holds playlists, liked songs, history and settings. ' +
     'Downloads holds saved music and artwork. Leave a field empty to use the default. ' +
     'Avoid folders synced by OneDrive or similar services. ' +
@@ -109,7 +109,7 @@ begin
       LocationsPage.Values[I] := Trim(LocationsPage.Values[I]);
       if (LocationsPage.Values[I] <> '') and not IsAbsolutePath(LocationsPage.Values[I]) then
       begin
-        MsgBox('Enter a full folder path such as D:\Musify, or leave the field empty.', mbError, MB_OK);
+        MsgBox('Enter a full folder path such as D:\Zenify, or leave the field empty.', mbError, MB_OK);
         Result := False;
         Exit;
       end;

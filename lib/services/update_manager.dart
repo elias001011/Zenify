@@ -260,21 +260,21 @@ Future<String> getCPUArchitecture() async {
 Future<List<String>> preferredUpdateAssets() async {
   if (isAndroidPlatform) {
     final arm64 = await getCPUArchitecture() == 'aarch64';
-    return [if (arm64) 'Musify-arm64-v8a.apk', 'Musify.apk'];
+    return [if (arm64) '$appName-arm64-v8a.apk', '$appName.apk'];
   }
   final executable = Platform.resolvedExecutable;
   if (Platform.isLinux) {
     // The .deb installs under /usr/lib; anything else is the tarball.
     return executable.startsWith('/usr/lib/')
-        ? ['Musify-linux-x64.deb']
-        : ['Musify-linux-x64.tar.gz'];
+        ? ['$appName-linux-x64.deb']
+        : ['$appName-linux-x64.tar.gz'];
   }
   if (Platform.isWindows) {
     final installed = File('${File(executable).parent.path}\\unins000.exe')
         .existsSync();
     return installed
-        ? ['Musify-windows-x64-setup.exe']
-        : ['Musify-windows-x64-portable.zip'];
+        ? ['$appName-windows-x64-setup.exe']
+        : ['$appName-windows-x64-portable.zip'];
   }
   return const [];
 }

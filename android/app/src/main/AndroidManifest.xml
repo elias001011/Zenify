@@ -33,7 +33,7 @@
     </queries>
 
     <application
-        android:label="Musify"
+        android:label="Zenify"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
