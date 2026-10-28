@@ -150,6 +150,7 @@ class SettingsPage extends StatelessWidget {
             FluentIcons.data_histogram_24_regular,
             onTap: () => context.push('/settings/equalizer'),
           ),
+        const FloatingEffectBar(),
         CustomBar(
           context.l10n!.dynamicBackground,
           FluentIcons.color_24_regular,
@@ -159,7 +160,6 @@ class SettingsPage extends StatelessWidget {
             onChanged: (value) => _toggleDynamicBackground(context, value),
           ),
         ),
-        const FloatingEffectBar(),
         if (Theme.of(context).brightness == Brightness.dark &&
             !dynamicBackground.value)
           CustomBar(

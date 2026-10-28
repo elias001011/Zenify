@@ -230,7 +230,9 @@ class _IslandState extends State<_Island> {
 
   Widget _buildBar(BuildContext context, bool showSearch) {
     final colorScheme = Theme.of(context).colorScheme;
-    final canPop = Navigator.of(context).canPop();
+    // Only pages pushed over another one in their own navigator: a tab's
+    // first page has nowhere to go back to.
+    final canPop = !(ModalRoute.of(context)?.isFirst ?? true);
 
     final titleText = Padding(
       padding: EdgeInsets.only(left: canPop ? 2 : 14, right: 10),
