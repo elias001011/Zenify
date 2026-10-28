@@ -23,9 +23,9 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/services/artwork_colors.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/floating_surface.dart';
 
 /// A horizontal row of artworks of the same size, with:
@@ -51,62 +51,33 @@ class GlowRow extends StatefulWidget {
   State<GlowRow> createState() => _GlowRowState();
 }
 
-class _GlowRowState extends State<GlowRow> with SingleTickerProviderStateMixin {
+class _GlowRowState extends State<GlowRow>
+    with SingleTickerProviderStateMixin, ArtworkGlowColors {
   final _controller = ScrollController();
-  final _colors = <int, Color>{};
-  final _colorsChanged = ValueNotifier<int>(0);
 
   /// Whether there is more to see before and after, for the desktop arrows.
   final _canScroll = ValueNotifier<(bool, bool)>((false, false));
-  late final _fadeIn = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
+  late final Listenable _repaint = Listenable.merge([_controller, glowRepaint]);
 
   @override
   void initState() {
     super.initState();
-    _resolveColors();
+    resolveGlowColors(widget.sources);
   }
 
   @override
   void didUpdateWidget(GlowRow oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!listEquals(oldWidget.sources, widget.sources)) {
-      _colors.clear();
-      _resolveColors();
+      resolveGlowColors(widget.sources);
     }
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    _colorsChanged.dispose();
     _canScroll.dispose();
-    _fadeIn.dispose();
     super.dispose();
-  }
-
-  void _resolveColors() {
-    var allCached = true;
-    for (var i = 0; i < widget.sources.length; i++) {
-      final source = widget.sources[i];
-      if (source == null || source.isEmpty) continue;
-      if (ArtworkColors.isCached(source)) {
-        final color = ArtworkColors.cached(source);
-        if (color != null) _colors[i] = color;
-        continue;
-      }
-      allCached = false;
-      ArtworkColors.of(source).then((color) {
-        if (!mounted || color == null) return;
-        _colors[i] = color;
-        _colorsChanged.value++;
-        if (!_fadeIn.isAnimating && !_fadeIn.isCompleted) _fadeIn.forward();
-      });
-    }
-    // Colours already known (coming back to the page) show without fading.
-    if (allCached) _fadeIn.value = 1;
   }
 
   bool _onMetrics(ScrollMetrics metrics) {
@@ -133,8 +104,6 @@ class _GlowRowState extends State<GlowRow> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    final dark = Theme.of(context).brightness == Brightness.dark;
-
     final list = ScrollConfiguration(
       // Mouse and trackpad can drag the row on desktop.
       behavior: ScrollConfiguration.of(context)
@@ -177,17 +146,14 @@ class _GlowRowState extends State<GlowRow> with SingleTickerProviderStateMixin {
                           child: CustomPaint(
                             painter: _RowGlowPainter(
                               controller: _controller,
-                              colors: _colors,
+                              colors: glowColors,
+                              appColor: Theme.of(context).colorScheme.primary,
                               itemExtent: widget.itemExtent,
                               rowTop: reach,
                               rowHeight: height,
-                              strength: dark ? 0.5 : 0.35,
-                              fade: _fadeIn,
-                              repaint: Listenable.merge([
-                                _controller,
-                                _colorsChanged,
-                                _fadeIn,
-                              ]),
+                              strength: artworkGlowStrength(context),
+                              fade: glowFade,
+                              repaint: _repaint,
                             ),
                           ),
                         ),
@@ -228,6 +194,7 @@ class _RowGlowPainter extends CustomPainter {
   _RowGlowPainter({
     required this.controller,
     required this.colors,
+    required this.appColor,
     required this.itemExtent,
     required this.rowTop,
     required this.rowHeight,
@@ -237,7 +204,8 @@ class _RowGlowPainter extends CustomPainter {
   }) : super(repaint: repaint);
 
   final ScrollController controller;
-  final Map<int, Color> colors;
+  final Map<int, Color?> colors;
+  final Color appColor;
   final double itemExtent;
   final double rowTop;
   final double rowHeight;
@@ -255,24 +223,19 @@ class _RowGlowPainter extends CustomPainter {
     for (final entry in colors.entries) {
       final centerX = entry.key * itemExtent + itemExtent / 2 - offset;
       if (centerX < -radius || centerX > size.width + radius) continue;
-      final center = Offset(centerX, centerY);
-      final color = entry.value;
-      final paint = Paint()
-        ..shader = RadialGradient(
-          colors: [
-            color.withValues(alpha: alpha),
-            color.withValues(alpha: alpha * 0.45),
-            color.withValues(alpha: 0),
-          ],
-          stops: const [0, 0.5, 1],
-        ).createShader(Rect.fromCircle(center: center, radius: radius));
-      canvas.drawCircle(center, radius, paint);
+      paintArtworkGlow(
+        canvas,
+        Rect.fromCircle(center: Offset(centerX, centerY), radius: radius),
+        entry.value ?? appColor,
+        alpha,
+      );
     }
   }
 
   @override
   bool shouldRepaint(_RowGlowPainter oldDelegate) =>
       oldDelegate.strength != strength ||
+      oldDelegate.appColor != appColor ||
       oldDelegate.itemExtent != itemExtent ||
       oldDelegate.rowHeight != rowHeight;
 }

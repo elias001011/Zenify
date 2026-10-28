@@ -22,7 +22,6 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
-import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/playlist_artwork.dart';
 
 class PlaylistCube extends StatelessWidget {
@@ -34,7 +33,6 @@ class PlaylistCube extends StatelessWidget {
     this.size = 220,
     this.borderRadius = 16,
     this.showTypeLabel = true,
-    this.glow = false,
   });
 
   final Map? playlistData;
@@ -44,24 +42,10 @@ class PlaylistCube extends StatelessWidget {
   final double borderRadius;
   final bool showTypeLabel;
 
-  /// Spread the artwork colour behind it (dynamic background). Rows of
-  /// artworks use GlowRow instead, which paints all glows in one layer.
-  final bool glow;
-
   static const double typeLabelOffset = 10;
 
   @override
   Widget build(BuildContext context) {
-    final cube = _buildCube(context);
-    if (!glow) return cube;
-    return ArtworkGlow(
-      source: playlist['image']?.toString(),
-      spread: size * 0.22,
-      child: cube,
-    );
-  }
-
-  Widget _buildCube(BuildContext context) {
     return Material(
       borderRadius: BorderRadius.circular(borderRadius),
       clipBehavior: Clip.antiAlias,

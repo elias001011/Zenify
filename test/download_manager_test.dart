@@ -32,7 +32,9 @@ void main() {
     final entry = manager.started(song('a'));
     expect(manager.active.single.ytid, 'a');
 
-    manager.finished(entry);
+    manager
+      ..finished(entry)
+      ..flush();
 
     expect(manager.active, isEmpty);
     expect(entry.status, DownloadStatus.done);
@@ -66,7 +68,9 @@ void main() {
 
   test('history round-trips through storage', () {
     final entry = manager.started(song('c'));
-    manager.failed(entry, null);
+    manager
+      ..failed(entry, null)
+      ..flush();
 
     final restored = DownloadEntry.fromMap(
       (Hive.box('userNoBackup').get('downloadHistory') as List).first as Map,
@@ -74,6 +78,23 @@ void main() {
     expect(restored.ytid, 'c');
     expect(restored.status, DownloadStatus.failed);
     expect(restored.failure, DownloadFailure.unavailable);
+  });
+
+  test('history keeps only the latest finished downloads', () {
+    for (var i = 0; i < 250; i++) {
+      manager.finished(manager.started(song('h$i')));
+    }
+    manager.flush();
+
+    final history = manager.entries.value.where(
+      (e) => e.status != DownloadStatus.downloading,
+    );
+    expect(history, hasLength(200));
+    expect(history.first.ytid, 'h249');
+    expect(
+      Hive.box('userNoBackup').get('downloadHistory') as List,
+      hasLength(200),
+    );
   });
 
   test('clearing history keeps downloads in progress', () {

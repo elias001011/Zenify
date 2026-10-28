@@ -28,6 +28,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/playlist_utils.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/dialog_item.dart';
 import 'package:musify/widgets/floating_island.dart';
@@ -123,9 +124,12 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
             slivers: [
               const SliverIslandTopSpace(),
               SliverToBoxAdapter(
-                child: SizedBox(
-                  height: _headerHeight,
-                  child: _buildHeader(context, playlists.length),
+                child: ArtworkGlow(
+                  source: null,
+                  child: SizedBox(
+                    height: _headerHeight,
+                    child: _buildHeader(context, playlists.length),
+                  ),
                 ),
               ),
               if (playlists.isEmpty)

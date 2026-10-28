@@ -19,6 +19,7 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:hive/hive.dart';
@@ -77,18 +78,17 @@ class DownloadManager {
 
   static const _storageKey = 'downloadHistory';
   static const _maxHistory = 200;
+  static const _persistDelay = Duration(seconds: 1);
 
-  /// Newest first.
-  final entries = ValueNotifier<List<DownloadEntry>>([]);
-  bool _loaded = false;
+  /// Newest first: downloads in progress plus the last [_maxHistory] others.
+  late final entries = ValueNotifier<List<DownloadEntry>>(_load());
+  Timer? _persistTimer;
 
-  void _ensureLoaded() {
-    if (_loaded) return;
-    _loaded = true;
+  static List<DownloadEntry> _load() {
     try {
       final raw = Hive.box('userNoBackup').get(_storageKey);
       if (raw is List) {
-        entries.value = [
+        return [
           for (final item in raw)
             if (item is Map) DownloadEntry.fromMap(item),
         ];
@@ -96,6 +96,7 @@ class DownloadManager {
     } catch (_) {
       // A broken history is dropped, not fatal.
     }
+    return [];
   }
 
   List<DownloadEntry> get active => entries.value
@@ -103,7 +104,6 @@ class DownloadManager {
       .toList();
 
   DownloadEntry started(Map song) {
-    _ensureLoaded();
     final entry = DownloadEntry(
       song: Map<String, dynamic>.from(song),
       status: DownloadStatus.downloading,
@@ -128,22 +128,32 @@ class DownloadManager {
       ..status = status
       ..time = DateTime.now()
       ..progress.value = null;
-    entries.value = [...entries.value];
-    _persist();
+    // A playlist download settles many songs; keep the history bounded.
+    var kept = 0;
+    entries.value = [
+      for (final other in entries.value)
+        if (other.status == DownloadStatus.downloading || kept++ < _maxHistory)
+          other,
+    ];
+    _schedulePersist();
   }
 
   void clearHistory() {
-    _ensureLoaded();
     entries.value = active;
-    _persist();
+    _schedulePersist();
   }
 
-  void _persist() {
-    final history = entries.value
-        .where((entry) => entry.status != DownloadStatus.downloading)
-        .take(_maxHistory)
-        .map((entry) => entry.toMap())
-        .toList();
+  /// Batches the writes of a playlist download into one per [_persistDelay].
+  void _schedulePersist() => _persistTimer ??= Timer(_persistDelay, flush);
+
+  /// Writes the history now.
+  void flush() {
+    _persistTimer?.cancel();
+    _persistTimer = null;
+    final history = [
+      for (final entry in entries.value)
+        if (entry.status != DownloadStatus.downloading) entry.toMap(),
+    ];
     Hive.box('userNoBackup').put(_storageKey, history);
   }
 

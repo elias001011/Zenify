@@ -15,19 +15,24 @@
  *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
  */
 
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/widgets/artwork_glow.dart';
+import 'package:musify/widgets/playlist_hero_artwork.dart';
 
-/// The top of a playlist, album or artist page: the artwork and the title,
-/// which stays in place; the island shows it once it scrolls away.
+/// The top of a playlist, album or artist page: the artwork, glowing into
+/// the page, and the title, which the island shows once it scrolls away.
 class PlaylistSliverAppBar extends StatelessWidget {
   const PlaylistSliverAppBar({
     super.key,
     required this.title,
-    required this.artwork,
+    required this.playlist,
+    this.cubeIcon = FluentIcons.text_bullet_list_24_filled,
   });
 
   final String title;
-  final Widget artwork;
+  final Map playlist;
+  final IconData cubeIcon;
 
   static double _artworkHeight(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
@@ -46,9 +51,15 @@ class PlaylistSliverAppBar extends StatelessWidget {
       child: Column(
         children: [
           SizedBox(height: MediaQuery.paddingOf(context).top),
-          SizedBox(
-            height: _artworkHeight(context),
-            child: Center(child: artwork),
+          ArtworkGlow(
+            source: playlist['image']?.toString(),
+            child: SizedBox(
+              height: _artworkHeight(context),
+              width: double.infinity,
+              child: Center(
+                child: PlaylistHeroArtwork(playlist, cubeIcon: cubeIcon),
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           Padding(

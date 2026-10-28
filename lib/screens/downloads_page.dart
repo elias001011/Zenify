@@ -37,6 +37,8 @@ import 'package:musify/widgets/song_artwork.dart';
 class DownloadsPage extends StatelessWidget {
   const DownloadsPage({super.key});
 
+  static const double _maxWidth = 880;
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n!;
@@ -45,18 +47,25 @@ class DownloadsPage extends StatelessWidget {
     return ValueListenableBuilder<List<DownloadEntry>>(
       valueListenable: manager.entries,
       builder: (context, entries, _) {
-        List<DownloadEntry> withStatus(DownloadStatus status) =>
-            entries.where((entry) => entry.status == status).toList();
-        final downloading = withStatus(DownloadStatus.downloading);
-        final failed = withStatus(DownloadStatus.failed);
-        final done = withStatus(DownloadStatus.done);
-        final hasHistory = failed.isNotEmpty || done.isNotEmpty;
+        final downloading = <DownloadEntry>[];
+        final failed = <DownloadEntry>[];
+        final done = <DownloadEntry>[];
+        for (final entry in entries) {
+          switch (entry.status) {
+            case DownloadStatus.downloading:
+              downloading.add(entry);
+            case DownloadStatus.failed:
+              failed.add(entry);
+            case DownloadStatus.done:
+              done.add(entry);
+          }
+        }
 
         return IslandScaffold(
           title: l10n.downloads,
           globalSearch: false,
           actions: [
-            if (hasHistory)
+            if (failed.isNotEmpty || done.isNotEmpty)
               IconButton(
                 icon: const Icon(FluentIcons.delete_24_regular),
                 tooltip: l10n.downloadsClearHistory,
@@ -65,52 +74,78 @@ class DownloadsPage extends StatelessWidget {
           ],
           body: entries.isEmpty
               ? _buildEmpty(context)
-              : SingleChildScrollView(
-                  padding: withIslandInset(
-                    context,
-                    commonSingleChildScrollViewPadding,
-                  ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 880),
-                      child: Column(
-                        children: [
-                          if (downloading.isNotEmpty)
-                            _Section(
-                              title: l10n.downloadsActive,
-                              icon: FluentIcons.arrow_download_24_filled,
-                              entries: downloading,
-                            ),
-                          if (failed.isNotEmpty)
-                            _Section(
-                              title: l10n.downloadsFailed,
-                              icon: FluentIcons.error_circle_24_filled,
-                              entries: failed,
-                              action: TextButton(
-                                onPressed: () {
-                                  for (final entry in failed) {
-                                    makeSongOffline(entry.song);
-                                  }
-                                },
-                                child: Text(l10n.downloadsRetryAll),
+              : LayoutBuilder(
+                  builder: (context, constraints) {
+                    final side =
+                        (constraints.maxWidth - _maxWidth).clamp(
+                              0.0,
+                              double.infinity,
+                            ) /
+                            2 +
+                        commonSingleChildScrollViewPadding.left;
+                    return CustomScrollView(
+                      slivers: [
+                        const SliverIslandTopSpace(),
+                        SliverPadding(
+                          padding: EdgeInsets.symmetric(horizontal: side),
+                          sliver: SliverMainAxisGroup(
+                            slivers: [
+                              ..._section(
+                                l10n.downloadsActive,
+                                FluentIcons.arrow_download_24_filled,
+                                downloading,
                               ),
-                            ),
-                          if (done.isNotEmpty)
-                            _Section(
-                              title: l10n.downloadsDone,
-                              icon: FluentIcons.checkmark_circle_24_filled,
-                              entries: done,
-                            ),
-                          const SizedBox(height: 20),
-                          const MiniPlayerBottomSpace(),
-                        ],
-                      ),
-                    ),
-                  ),
+                              ..._section(
+                                l10n.downloadsFailed,
+                                FluentIcons.error_circle_24_filled,
+                                failed,
+                                action: TextButton(
+                                  onPressed: () => _retryAll(failed),
+                                  child: Text(l10n.downloadsRetryAll),
+                                ),
+                              ),
+                              ..._section(
+                                l10n.downloadsDone,
+                                FluentIcons.checkmark_circle_24_filled,
+                                done,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                        const SliverMiniPlayerBottomSpace(),
+                      ],
+                    );
+                  },
                 ),
         );
       },
     );
+  }
+
+  /// Built lazily, like playlist songs, so a long history stays smooth.
+  List<Widget> _section(
+    String title,
+    IconData icon,
+    List<DownloadEntry> entries, {
+    Widget? action,
+  }) {
+    if (entries.isEmpty) return const [];
+    return [
+      SliverToBoxAdapter(
+        child: SectionHeader(title: title, icon: icon, actionButton: action),
+      ),
+      SliverList.builder(
+        itemCount: entries.length,
+        itemBuilder: (context, index) => RepaintBoundary(
+          key: ValueKey(entries[index]),
+          child: _DownloadRow(
+            entry: entries[index],
+            borderRadius: getItemBorderRadius(index, entries.length),
+          ),
+        ),
+      ),
+    ];
   }
 
   Widget _buildEmpty(BuildContext context) {
@@ -139,31 +174,21 @@ class DownloadsPage extends StatelessWidget {
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({
-    required this.title,
-    required this.icon,
-    required this.entries,
-    this.action,
-  });
+bool _retryingAll = false;
 
-  final String title;
-  final IconData icon;
-  final List<DownloadEntry> entries;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        SectionHeader(title: title, icon: icon, actionButton: action),
-        for (var i = 0; i < entries.length; i++)
-          _DownloadRow(
-            entry: entries[i],
-            borderRadius: getItemBorderRadius(i, entries.length),
-          ),
-      ],
-    );
+/// One at a time, like a playlist download, however many failed.
+Future<void> _retryAll(List<DownloadEntry> failed) async {
+  if (_retryingAll) return;
+  _retryingAll = true;
+  try {
+    for (final entry in failed) {
+      // Skips songs retried on their own meanwhile (a new entry replaced it).
+      if (DownloadManager.instance.entries.value.contains(entry)) {
+        await makeSongOffline(entry.song);
+      }
+    }
+  } finally {
+    _retryingAll = false;
   }
 }
 

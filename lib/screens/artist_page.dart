@@ -38,7 +38,6 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/artist_shelf.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
-import 'package:musify/widgets/playlist_hero_artwork.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
 import 'package:musify/widgets/playlist_page/download_button.dart';
 import 'package:musify/widgets/playlist_page/empty_playlist_state.dart';
@@ -221,10 +220,8 @@ class _ArtistPageState extends State<ArtistPage> {
             slivers: [
               PlaylistSliverAppBar(
                 title: _artistTitle,
-                artwork: PlaylistHeroArtwork(
-                  _artist!,
-                  cubeIcon: FluentIcons.person_24_filled,
-                ),
+                playlist: _artist!,
+                cubeIcon: FluentIcons.person_24_filled,
               ),
               SliverToBoxAdapter(child: _buildHeaderSection()),
               SliverToBoxAdapter(child: _buildTopSongsSection()),

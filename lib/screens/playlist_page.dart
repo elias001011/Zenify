@@ -43,7 +43,6 @@ import 'package:musify/utilities/sort_utils.dart';
 import 'package:musify/widgets/edit_playlist_dialog.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
-import 'package:musify/widgets/playlist_hero_artwork.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
 import 'package:musify/widgets/playlist_page/download_button.dart';
 import 'package:musify/widgets/playlist_page/empty_playlist_state.dart';
@@ -203,10 +202,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 slivers: [
                   PlaylistSliverAppBar(
                     title: _playlistTitle,
-                    artwork: PlaylistHeroArtwork(
-                      _playlist,
-                      cubeIcon: widget.cubeIcon,
-                    ),
+                    playlist: _playlist,
+                    cubeIcon: widget.cubeIcon,
                   ),
                   SliverToBoxAdapter(child: _buildHeaderSection()),
                   if ((_playlist['list'] as List? ?? const []).isNotEmpty) ...[
