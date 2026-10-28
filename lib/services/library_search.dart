@@ -57,14 +57,8 @@ LibraryMatches searchLibrary(String query, {bool offlineOnly = false}) {
     ],
   ]).where((playlist) => matches(playlist['title'])).toList();
 
-  final songs = _uniqueByYtid([
-    ...userOfflineSongs.value.whereType<Map>(),
-    if (!offlineOnly) ...[
-      ...userLikedSongsList.value.whereType<Map>(),
-      for (final playlist in getUserCustomPlaylists())
-        ...(playlist['list'] as List? ?? const []).whereType<Map>(),
-    ],
-  ]).where((song) => matches(song['title']) || matches(song['artist']));
+  final songs = _librarySongs(offlineOnly)
+      .where((song) => matches(song['title']) || matches(song['artist']));
 
   final artists = getLikedArtistItems(offlineOnly: offlineOnly)
       .where((artist) => matches(artist['title']));
@@ -74,6 +68,50 @@ LibraryMatches searchLibrary(String query, {bool offlineOnly = false}) {
     playlists: playlists,
     songs: songs.toList(),
   );
+}
+
+/// Every song of the library once: downloaded first, so a song plays from
+/// its file wherever it shows.
+List<Map> _librarySongs(bool offlineOnly) => _uniqueByYtid([
+  ...userOfflineSongs.value.whereType<Map>(),
+  if (!offlineOnly) ...[
+    ...userLikedSongsList.value.whereType<Map>(),
+    for (final playlist in getUserCustomPlaylists())
+      ...(playlist['list'] as List? ?? const []).whereType<Map>(),
+  ],
+]);
+
+/// The library's songs by YouTube id, to recognise them among online results.
+Map<String, Map> librarySongsById() => {
+  for (final song in _librarySongs(false))
+    if (song['ytid']?.toString() case final id?) id: song,
+};
+
+/// Search results with what the library holds first: [library] matches, then
+/// [online] results the library has under another title (shown as the
+/// library's copy, from [known]), then the rest. Each part keeps to [limit].
+List<Map> libraryFirst(
+  List<Map> library,
+  Iterable<dynamic> online, {
+  Map<String, Map> known = const {},
+  int limit = 15,
+}) {
+  final seen = {for (final item in library) item['ytid']?.toString()};
+  final owned = <Map>[];
+  final rest = <Map>[];
+  for (final item in online.whereType<Map>()) {
+    final id = item['ytid']?.toString();
+    if (id != null && !seen.add(id)) continue;
+    if (known[id] case final mine?) {
+      owned.add(mine);
+    } else {
+      rest.add(item);
+    }
+  }
+  return [
+    ...library.take(limit),
+    ...[...owned, ...rest].take(limit),
+  ];
 }
 
 List<Map> _uniqueByYtid(Iterable<Map> items) {

@@ -19,6 +19,8 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:math';
+
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
@@ -50,7 +52,7 @@ class GlowRow extends StatefulWidget {
   State<GlowRow> createState() => _GlowRowState();
 }
 
-class _GlowRowState extends State<GlowRow> with SingleTickerProviderStateMixin {
+class _GlowRowState extends State<GlowRow> with TickerProviderStateMixin {
   final _controller = ScrollController();
   late final _colors = GlowColors(this);
   late final _repaint = Listenable.merge([_controller, _colors.listenable]);
@@ -124,12 +126,77 @@ class _GlowRowState extends State<GlowRow> with SingleTickerProviderStateMixin {
       ),
     );
 
+    return _RowGlow(
+      colors: _colors,
+      repaint: _repaint,
+      slots: (width) sync* {
+        final offset = _controller.hasClients ? _controller.offset : 0.0;
+        final extent = widget.itemExtent;
+        for (final index in _colors.indices) {
+          // Glows spread past their artwork, so neighbours out of view count.
+          final center = index * extent + extent / 2 - offset;
+          if (center > -extent * 1.5 && center < width + extent * 1.5) {
+            yield (index, center, extent);
+          }
+        }
+      },
+      child: Stack(
+        children: [
+          list,
+          if (isDesktopPlatform)
+            Positioned.fill(
+              child: ValueListenableBuilder<(bool, bool)>(
+                valueListenable: _canScroll,
+                builder: (context, canScroll, _) => Stack(
+                  children: [
+                    if (canScroll.$1)
+                      _ArrowButton(
+                        alignment: Alignment.centerLeft,
+                        icon: FluentIcons.chevron_left_24_regular,
+                        onPressed: () => _page(-1),
+                      ),
+                    if (canScroll.$2)
+                      _ArrowButton(
+                        alignment: Alignment.centerRight,
+                        icon: FluentIcons.chevron_right_24_regular,
+                        onPressed: () => _page(1),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Where each artwork of a row sits: its index, horizontal centre and width,
+/// for a row [width] wide. Only artworks in view need a slot.
+typedef GlowSlots = Iterable<(int, double, double)> Function(double width);
+
+/// Paints the glows of a row's artworks behind [child], reaching well past
+/// the row above and below, in one layer: they never tint a neighbour and
+/// scrolling repaints only it.
+class _RowGlow extends StatelessWidget {
+  const _RowGlow({
+    required this.colors,
+    required this.repaint,
+    required this.slots,
+    required this.child,
+  });
+
+  final GlowColors colors;
+  final Listenable repaint;
+  final GlowSlots slots;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final height = constraints.maxHeight;
-        // The glow reaches well past the row, above and below it.
         final reach = height * 0.55;
-
         return Stack(
           clipBehavior: Clip.none,
           children: [
@@ -146,42 +213,19 @@ class _GlowRowState extends State<GlowRow> with SingleTickerProviderStateMixin {
                         child: RepaintBoundary(
                           child: CustomPaint(
                             painter: _RowGlowPainter(
-                              controller: _controller,
-                              colors: _colors,
-                              itemExtent: widget.itemExtent,
+                              colors: colors,
+                              slots: slots,
                               rowTop: reach,
                               rowHeight: height,
                               strength: artworkGlowStrength(context),
-                              repaint: _repaint,
+                              repaint: repaint,
                             ),
                           ),
                         ),
                       ),
               ),
             ),
-            list,
-            if (isDesktopPlatform)
-              Positioned.fill(
-                child: ValueListenableBuilder<(bool, bool)>(
-                  valueListenable: _canScroll,
-                  builder: (context, canScroll, _) => Stack(
-                    children: [
-                      if (canScroll.$1)
-                        _ArrowButton(
-                          alignment: Alignment.centerLeft,
-                          icon: FluentIcons.chevron_left_24_regular,
-                          onPressed: () => _page(-1),
-                        ),
-                      if (canScroll.$2)
-                        _ArrowButton(
-                          alignment: Alignment.centerRight,
-                          icon: FluentIcons.chevron_right_24_regular,
-                          onPressed: () => _page(1),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
+            child,
           ],
         );
       },
@@ -191,48 +235,46 @@ class _GlowRowState extends State<GlowRow> with SingleTickerProviderStateMixin {
 
 class _RowGlowPainter extends CustomPainter {
   _RowGlowPainter({
-    required this.controller,
     required this.colors,
-    required this.itemExtent,
+    required this.slots,
     required this.rowTop,
     required this.rowHeight,
     required this.strength,
     required Listenable repaint,
   }) : super(repaint: repaint);
 
-  final ScrollController controller;
   final GlowColors colors;
-  final double itemExtent;
+  final GlowSlots slots;
   final double rowTop;
   final double rowHeight;
   final double strength;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final offset = controller.hasClients ? controller.offset : 0.0;
-    // Wide and low: neighbouring glows merge into one soft band.
-    final halfWidth = rowHeight * 1.6;
+    final reveal = colors.reveal;
+    if (reveal <= 0) return;
+    final grow = 0.4 + 0.6 * reveal;
     final centerY = rowTop + rowHeight / 2;
 
     canvas.saveLayer(Offset.zero & size, Paint());
-    for (final index in colors.indices) {
-      final centerX = index * itemExtent + itemExtent / 2 - offset;
-      if (centerX < -halfWidth || centerX > size.width + halfWidth) continue;
+    for (final (index, centerX, width) in slots(size.width)) {
       final color = colors.colorAt(index);
-      if (color == null || color.a == 0) continue;
-      // Fade the complete band at the viewport edges as well as vertically.
+      if (color == null || color.a == 0 || width <= 0) continue;
+      // Proportional to the artwork, and wide and low enough that
+      // neighbouring glows merge into one soft band.
       final hsl = HSLColor.fromColor(color);
       paintArtworkGlow(
         canvas,
         Rect.fromCenter(
           center: Offset(centerX, centerY),
-          width: halfWidth * 2,
-          height: rowHeight * 2.1,
+          width: width * 2.6 * grow,
+          height: min(rowHeight * 2.1, width * 2.1) * grow,
         ),
-        hsl.withSaturation(hsl.saturation * 0.6).toColor(),
-        strength * 0.9 * color.a,
+        hsl.withSaturation(hsl.saturation * 0.8).toColor(),
+        strength * 1.5 * color.a * reveal,
       );
     }
+    // Fade the band at the row's ends as well as above and below.
     canvas
       ..drawRect(
         Offset.zero & size,
@@ -245,7 +287,7 @@ class _RowGlowPainter extends CustomPainter {
               Colors.white,
               Colors.transparent,
             ],
-            stops: [0, 0.12, 0.88, 1],
+            stops: [0, 0.05, 0.95, 1],
           ).createShader(Offset.zero & size),
       )
       ..restore();
@@ -255,7 +297,7 @@ class _RowGlowPainter extends CustomPainter {
   bool shouldRepaint(_RowGlowPainter oldDelegate) =>
       oldDelegate.strength != strength ||
       oldDelegate.colors != colors ||
-      oldDelegate.itemExtent != itemExtent ||
+      oldDelegate.slots != slots ||
       oldDelegate.rowHeight != rowHeight;
 }
 
@@ -288,57 +330,101 @@ class _ArrowButton extends StatelessWidget {
   }
 }
 
-/// Mobile's weighted carousel has its own viewport: paint the halo outside
-/// its clipping layer, with room to fade to the page above and below.
-class CarouselGlow extends StatefulWidget {
-  const CarouselGlow({super.key, required this.sources, required this.child});
+/// The phones' weighted carousel (3 : 2 : 1), with a glow under each
+/// artwork that follows it as it grows and shrinks.
+class GlowCarousel extends StatefulWidget {
+  const GlowCarousel({
+    super.key,
+    required this.sources,
+    required this.itemBuilder,
+    required this.onTap,
+  });
+
+  /// Artwork URL or file path for each item, in order.
   final List<String?> sources;
-  final Widget child;
+  final IndexedWidgetBuilder itemBuilder;
+  final ValueChanged<int> onTap;
+
+  static const weights = [3, 2, 1];
+
   @override
-  State<CarouselGlow> createState() => _CarouselGlowState();
+  State<GlowCarousel> createState() => _GlowCarouselState();
 }
 
-class _CarouselGlowState extends State<CarouselGlow> {
-  int _index = 0;
+class _GlowCarouselState extends State<GlowCarousel>
+    with TickerProviderStateMixin {
+  final _controller = CarouselController();
+  late final _colors = GlowColors(this);
+  late final _repaint = Listenable.merge([_controller, _colors.listenable]);
+
+  void _update() =>
+      _colors.update(widget.sources, Theme.of(context).colorScheme.primary);
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (context, constraints) {
-      final width = constraints.maxWidth;
-      final source = widget.sources.isEmpty
-          ? null
-          : widget.sources[_index.clamp(0, widget.sources.length - 1)];
-      return Stack(
-        clipBehavior: Clip.none,
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _update();
+  }
+
+  @override
+  void didUpdateWidget(GlowCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _update();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _colors.dispose();
+    super.dispose();
+  }
+
+  /// The visible items as the carousel lays them out: the leading one gives
+  /// up its room as it scrolls away and the others grow into it.
+  Iterable<(int, double, double)> _slots(double width) sync* {
+    const weights = GlowCarousel.weights;
+    final unit = width / weights.reduce((a, b) => a + b);
+    final leadExtent = weights.first * unit;
+    if (leadExtent <= 0) return;
+    final offset = _controller.hasClients ? _controller.offset : 0.0;
+    final lead = (offset / leadExtent).floor();
+    final progress = offset / leadExtent - lead;
+
+    var start = 0.0;
+    for (var i = 0; i <= weights.length; i++) {
+      final index = lead + i;
+      final extent = i == 0
+          ? leadExtent * (1 - progress)
+          : i < weights.length
+          ? unit * weights[i] +
+                (weights[i - 1] - weights[i]) /
+                    weights.first *
+                    progress *
+                    leadExtent
+          : width - start;
+      if (index >= 0 && index < widget.sources.length && extent > 0) {
+        yield (index, start + extent / 2, extent);
+      }
+      start += extent;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _RowGlow(
+      colors: _colors,
+      repaint: _repaint,
+      slots: _slots,
+      child: CarouselView.weighted(
+        controller: _controller,
+        flexWeights: GlowCarousel.weights,
+        itemSnapping: true,
+        onTap: widget.onTap,
         children: [
-          Positioned(
-            left: 0,
-            right: 0,
-            top: -constraints.maxHeight * 0.7,
-            bottom: -constraints.maxHeight * 0.7,
-            child: IgnorePointer(
-              child: PageGlow(source: source, strength: 0.5),
-            ),
-          ),
-          NotificationListener<ScrollUpdateNotification>(
-            onNotification: (notification) {
-              if (notification.depth == 0 &&
-                  notification.metrics.axis == Axis.horizontal &&
-                  width > 0) {
-                final index = (notification.metrics.pixels / (width / 2))
-                    .round()
-                    .clamp(
-                      0,
-                      widget.sources.isEmpty ? 0 : widget.sources.length - 1,
-                    );
-                if (index != _index) setState(() => _index = index);
-              }
-              return false;
-            },
-            child: widget.child,
-          ),
+          for (var i = 0; i < widget.sources.length; i++)
+            widget.itemBuilder(context, i),
         ],
-      );
-    },
-  );
+      ),
+    );
+  }
 }

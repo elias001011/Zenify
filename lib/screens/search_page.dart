@@ -176,10 +176,11 @@ class _SearchPageState extends State<SearchPage> {
 
     final offline = offlineMode.value;
     _libraryResult = searchLibrary(query, offlineOnly: offline);
-    _songsSearchResult = [];
+    // What the library holds shows at once and stays first in each section.
+    _songsSearchResult = libraryFirst(_libraryResult.songs, const []);
     _artistsSearchResult = [];
-    _albumsSearchResult = [];
-    _playlistsSearchResult = [];
+    _albumsSearchResult = libraryFirst(_libraryAlbums(true), const []);
+    _playlistsSearchResult = libraryFirst(_libraryAlbums(false), const []);
     _radioStationsSearchResult = offline
         ? []
         : radioStationsDB
@@ -231,7 +232,13 @@ class _SearchPageState extends State<SearchPage> {
           }
 
           if (!mounted || requestId != _latestSearchRequest) return;
-          setState(() => _songsSearchResult = _notInLibrary(songs));
+          setState(
+            () => _songsSearchResult = libraryFirst(
+              _libraryResult.songs,
+              songs,
+              known: librarySongsById(),
+            ),
+          );
         } catch (e, stackTrace) {
           logger.log(
             'Error while searching online songs',
@@ -246,10 +253,9 @@ class _SearchPageState extends State<SearchPage> {
           final artists = await artistsFuture;
           if (!mounted || requestId != _latestSearchRequest) return;
           setState(() {
-            _artistsSearchResult = _notInLibrary(
-              artists,
-              _libraryResult.artists,
-            ).map(Map<String, dynamic>.from).toList();
+            _artistsSearchResult = _newArtists(artists)
+                .map(Map<String, dynamic>.from)
+                .toList();
           });
         } catch (e, stackTrace) {
           logger.log(
@@ -265,9 +271,9 @@ class _SearchPageState extends State<SearchPage> {
           final albums = await getPlaylists(query: query, type: 'album');
           if (!mounted || requestId != _latestSearchRequest) return;
           setState(
-            () => _albumsSearchResult = _notInLibrary(
+            () => _albumsSearchResult = libraryFirst(
+              _libraryAlbums(true),
               albums,
-              _libraryResult.playlists,
             ),
           );
         } catch (e, stackTrace) {
@@ -284,9 +290,9 @@ class _SearchPageState extends State<SearchPage> {
           final playlists = await getPlaylists(query: query, type: 'playlist');
           if (!mounted || requestId != _latestSearchRequest) return;
           setState(
-            () => _playlistsSearchResult = _notInLibrary(
+            () => _playlistsSearchResult = libraryFirst(
+              _libraryAlbums(false),
               playlists,
-              _libraryResult.playlists,
             ),
           );
         } catch (e, stackTrace) {
@@ -318,20 +324,28 @@ class _SearchPageState extends State<SearchPage> {
     }
   }
 
-  /// [results] without what the library section already shows (by id, or
-  /// by name for artists).
-  List<Map> _notInLibrary(List results, [List<Map>? library]) {
-    final shown = library ?? _libraryResult.songs;
+  /// The library's matching albums, or its other playlists.
+  List<Map> _libraryAlbums(bool albums) => [
+    for (final playlist in _libraryResult.playlists)
+      if ((playlist['isAlbum'] == true) == albums) playlist,
+  ];
+
+  /// Whether [playlist] came from the library, which opens it as it is there.
+  bool _inLibrary(Map playlist) =>
+      _libraryResult.playlists.any((item) => identical(item, playlist));
+
+  /// Online [artists] the library section does not already show, by id or
+  /// name.
+  List<Map> _newArtists(List artists) {
+    final shown = _libraryResult.artists;
     final ids = {for (final item in shown) item['ytid']?.toString()};
-    final titles = {
+    final names = {
       for (final item in shown) item['title']?.toString().toLowerCase(),
     };
-    final isArtist = identical(shown, _libraryResult.artists);
     return [
-      for (final item in results.whereType<Map>())
+      for (final item in artists.whereType<Map>())
         if (!ids.contains(item['ytid']?.toString()) &&
-            !(isArtist &&
-                titles.contains(item['title']?.toString().toLowerCase())))
+            !names.contains(item['title']?.toString().toLowerCase()))
           item,
     ];
   }
@@ -434,8 +448,6 @@ class _SearchPageState extends State<SearchPage> {
               child:
                   (_suggestionsList.isNotEmpty ||
                       (_songsSearchResult.isEmpty &&
-                          _libraryResult.songs.isEmpty &&
-                          _libraryResult.playlists.isEmpty &&
                           _libraryResult.artists.isEmpty &&
                           _artistsSearchResult.isEmpty &&
                           _albumsSearchResult.isEmpty &&
@@ -564,51 +576,6 @@ class _SearchPageState extends State<SearchPage> {
       }
     }
 
-    // Library section, right after the artists.
-    final librarySongs = _libraryResult.songs.take(maxSongsInList).toList();
-    final libraryPlaylists = _libraryResult.playlists
-        .take(maxSongsInList)
-        .toList();
-    if (librarySongs.isNotEmpty || libraryPlaylists.isNotEmpty) {
-      widgets.add(
-        SectionTitle(
-          context.l10n!.inYourLibrary,
-          primaryColor,
-          icon: FluentIcons.library_24_filled,
-        ),
-      );
-      final count = librarySongs.length + libraryPlaylists.length;
-      for (var index = 0; index < librarySongs.length; index++) {
-        final song = librarySongs[index];
-        widgets.add(
-          SongBar(
-            song,
-            true,
-            key: listItemKey('search_library_song', index, song),
-            showMusicDuration: true,
-            borderRadius: getItemBorderRadius(index, count),
-          ),
-        );
-      }
-      for (var index = 0; index < libraryPlaylists.length; index++) {
-        final playlist = libraryPlaylists[index];
-        widgets.add(
-          PlaylistBar(
-            key: listItemKey('search_library_playlist', index, playlist),
-            playlist['title'],
-            playlistId: playlist['ytid'],
-            playlistArtwork: playlist['image'],
-            playlistData: playlist,
-            isAlbum: playlist['isAlbum'],
-            borderRadius: getItemBorderRadius(
-              librarySongs.length + index,
-              count,
-            ),
-          ),
-        );
-      }
-    }
-
     // Songs section
     if (_songsSearchResult.isNotEmpty) {
       widgets.add(
@@ -619,10 +586,7 @@ class _SearchPageState extends State<SearchPage> {
         ),
       );
 
-      final songsCount = _songsSearchResult.length > maxSongsInList
-          ? maxSongsInList
-          : _songsSearchResult.length;
-
+      final songsCount = _songsSearchResult.length;
       for (var index = 0; index < songsCount; index++) {
         final song = _songsSearchResult[index];
         final borderRadius = getItemBorderRadius(index, songsCount);
@@ -648,9 +612,7 @@ class _SearchPageState extends State<SearchPage> {
         ),
       );
 
-      final albumsCount = _albumsSearchResult.length > maxSongsInList
-          ? maxSongsInList
-          : _albumsSearchResult.length;
+      final albumsCount = _albumsSearchResult.length;
 
       for (var index = 0; index < albumsCount; index++) {
         final playlist = _albumsSearchResult[index];
@@ -662,6 +624,7 @@ class _SearchPageState extends State<SearchPage> {
             playlist['title'],
             playlistId: playlist['ytid'],
             playlistArtwork: playlist['image'],
+            playlistData: _inLibrary(playlist) ? playlist : null,
             cubeIcon: FluentIcons.cd_16_filled,
             isAlbum: true,
             borderRadius: borderRadius,
@@ -680,9 +643,7 @@ class _SearchPageState extends State<SearchPage> {
         ),
       );
 
-      final playlistsCount = _playlistsSearchResult.length > maxSongsInList
-          ? maxSongsInList
-          : _playlistsSearchResult.length;
+      final playlistsCount = _playlistsSearchResult.length;
 
       for (var index = 0; index < playlistsCount; index++) {
         final playlist = _playlistsSearchResult[index];
@@ -697,6 +658,7 @@ class _SearchPageState extends State<SearchPage> {
               playlist['title'],
               playlistId: playlist['ytid'],
               playlistArtwork: playlist['image'],
+              playlistData: _inLibrary(playlist) ? playlist : null,
               cubeIcon: FluentIcons.apps_list_24_filled,
               borderRadius: borderRadius,
             ),

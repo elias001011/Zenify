@@ -71,9 +71,6 @@ class _TimeMachineSection {
 }
 
 class _TimeMachinePageState extends State<TimeMachinePage> {
-  final Map<String, GlobalKey> _monthShareKeys = {};
-  final GlobalKey _yearShareKey = GlobalKey();
-
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
@@ -132,28 +129,28 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
 
     return IslandScaffold(
       title: context.l10n!.timeMachine,
-      body: ListView.builder(
-        padding: withIslandInset(
-          context,
-          const EdgeInsets.fromLTRB(10, 0, 10, 24),
+      body: ReadablePadding(
+        padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
+        builder: (context, padding) => ListView.builder(
+          padding: padding,
+          scrollCacheExtent: const ScrollCacheExtent.pixels(500),
+          itemCount: sections.length,
+          itemBuilder: (context, index) {
+            final section = sections[index];
+            return switch (section.kind) {
+              _TimeMachineSectionKind.annual => KeyedSubtree(
+                key: const ValueKey('annual-recap'),
+                child: _buildAnnualSection(context),
+              ),
+              _TimeMachineSectionKind.month => KeyedSubtree(
+                key: ValueKey('month-${section.monthKey}'),
+                child: _buildMonthSection(context, section.monthKey!),
+              ),
+              _TimeMachineSectionKind.bottomSpace =>
+                const MiniPlayerBottomSpace(),
+            };
+          },
         ),
-        scrollCacheExtent: const ScrollCacheExtent.pixels(500),
-        itemCount: sections.length,
-        itemBuilder: (context, index) {
-          final section = sections[index];
-          return switch (section.kind) {
-            _TimeMachineSectionKind.annual => KeyedSubtree(
-              key: const ValueKey('annual-recap'),
-              child: _buildAnnualSection(context),
-            ),
-            _TimeMachineSectionKind.month => KeyedSubtree(
-              key: ValueKey('month-${section.monthKey}'),
-              child: _buildMonthSection(context, section.monthKey!),
-            ),
-            _TimeMachineSectionKind.bottomSpace =>
-              const MiniPlayerBottomSpace(),
-          };
-        },
       ),
     );
   }
@@ -203,19 +200,13 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
       limit: wrappedExpandedSongsLimit,
     );
     final previewSongs = songs.take(wrappedShareSongsLimit).toList();
-    final shareKey = _monthShareKeys.putIfAbsent(monthKey, GlobalKey.new);
     final monthTitle = _formatMonthTitle(context, monthKey);
     final periodLabel = _formatMonthPeriodLabel(context, monthKey);
 
     return _PeriodSection(
       title: monthTitle,
-      shareKey: shareKey,
-      onShare: () => _shareRecap(
-        context,
-        key: shareKey,
-        period: monthTitle,
-        fileName: 'zenify-$monthKey-recap.png',
-      ),
+      shareText: context.l10n!.shareRecapText(monthTitle),
+      fileName: 'zenify-$monthKey-recap.png',
       cards: ListeningRecapCards(
         periodLabel: periodLabel,
         minutes: monthDisplayMinutes(monthStats),
@@ -240,13 +231,8 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
 
     return _PeriodSection(
       title: '${context.l10n!.annualRecap} $year',
-      shareKey: _yearShareKey,
-      onShare: () => _shareRecap(
-        context,
-        key: _yearShareKey,
-        period: year,
-        fileName: 'zenify-$year-recap.png',
-      ),
+      shareText: context.l10n!.shareRecapText(year),
+      fileName: 'zenify-$year-recap.png',
       cards: ListeningRecapCards(
         periodLabel: year,
         minutes: listeningStatsDisplayMinutes(
@@ -271,51 +257,6 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
   }
 
   void _openTopArtists() => context.push(NavigationManager.topArtistsPath);
-
-  Future<void> _shareRecap(
-    BuildContext context, {
-    required GlobalKey key,
-    required String period,
-    required String fileName,
-  }) async {
-    try {
-      final boundary =
-          key.currentContext?.findRenderObject() as RenderRepaintBoundary?;
-      if (boundary == null) return;
-
-      await WidgetsBinding.instance.endOfFrame;
-      final image = await boundary.toImage(pixelRatio: 3);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      final bytes = byteData?.buffer.asUint8List();
-      if (bytes == null) return;
-
-      final directory = await getTemporaryDirectory();
-      final file = File('${directory.path}/$fileName');
-      await file.writeAsBytes(bytes);
-
-      final result = await SharePlus.instance.share(
-        ShareParams(
-          title: context.l10n!.shareRecapText(period),
-          subject: context.l10n!.shareRecapText(period),
-          text: context.l10n!.shareRecapText(period),
-          files: [XFile(file.path, mimeType: 'image/png')],
-          fileNameOverrides: [fileName],
-        ),
-      );
-
-      if (result.status == ShareResultStatus.unavailable && context.mounted) {
-        showToast(context, context.l10n!.error);
-      }
-    } catch (e, stackTrace) {
-      logger.log(
-        'Error sharing Time Machine recap',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      if (context.mounted) showToast(context, context.l10n!.error);
-    }
-  }
 
   void _showMoreSongs(
     BuildContext context,
@@ -416,70 +357,111 @@ String _formatMonthPeriodLabel(BuildContext context, String monthKey) {
       : '${label[0].toUpperCase()}${label.substring(1)}';
 }
 
-/// A period's title and recap cards, which its share button captures as an
-/// image; [footer] stays out of it.
-class _PeriodSection extends StatelessWidget {
+/// A period's title and its cards, which the share button sends as an image.
+/// The cards name the period themselves, so the title and [footer] stay out.
+class _PeriodSection extends StatefulWidget {
   const _PeriodSection({
     required this.title,
-    required this.shareKey,
-    required this.onShare,
+    required this.shareText,
+    required this.fileName,
     required this.cards,
     this.footer,
   });
 
   final String title;
-  final GlobalKey shareKey;
-  final VoidCallback onShare;
+  final String shareText;
+  final String fileName;
   final Widget cards;
   final Widget? footer;
 
   @override
+  State<_PeriodSection> createState() => _PeriodSectionState();
+}
+
+class _PeriodSectionState extends State<_PeriodSection> {
+  final _cardsKey = GlobalKey();
+
+  Future<void> _share() async {
+    try {
+      final boundary =
+          _cardsKey.currentContext?.findRenderObject()
+              as RenderRepaintBoundary?;
+      if (boundary == null) return;
+
+      await WidgetsBinding.instance.endOfFrame;
+      final image = await boundary.toImage(pixelRatio: 3);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      final bytes = byteData?.buffer.asUint8List();
+      if (bytes == null) return;
+
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/${widget.fileName}');
+      await file.writeAsBytes(bytes);
+
+      final result = await SharePlus.instance.share(
+        ShareParams(
+          title: widget.shareText,
+          subject: widget.shareText,
+          text: widget.shareText,
+          files: [XFile(file.path, mimeType: 'image/png')],
+          fileNameOverrides: [widget.fileName],
+        ),
+      );
+
+      if (result.status == ShareResultStatus.unavailable && mounted) {
+        showToast(context, context.l10n!.error);
+      }
+    } catch (e, stackTrace) {
+      logger.log(
+        'Error sharing Time Machine recap',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      if (mounted) showToast(context, context.l10n!.error);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final footer = this.footer;
+    final footer = widget.footer;
     return Padding(
       padding: const EdgeInsets.only(top: 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Stack(
+          Row(
             children: [
-              RepaintBoundary(
-                key: shareKey,
-                // Opaque, so the shared image has the page behind it.
-                child: ColoredBox(
-                  color: theme.scaffoldBackgroundColor,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(8, 4, 56, 8),
-                        child: Text(
-                          title,
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: theme.colorScheme.secondary,
-                          ),
-                        ),
-                      ),
-                      cards,
-                    ],
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                  child: Text(
+                    widget.title,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: theme.colorScheme.secondary,
+                    ),
                   ),
                 ),
               ),
-              PositionedDirectional(
-                top: 0,
-                end: 0,
-                child: IconButton(
-                  tooltip: context.l10n!.shareRecap,
-                  onPressed: onShare,
-                  icon: Icon(
-                    FluentIcons.share_24_regular,
-                    color: theme.colorScheme.primary,
-                  ),
+              IconButton(
+                tooltip: context.l10n!.shareRecap,
+                onPressed: _share,
+                icon: Icon(
+                  FluentIcons.share_24_regular,
+                  color: theme.colorScheme.primary,
                 ),
               ),
             ],
+          ),
+          RepaintBoundary(
+            key: _cardsKey,
+            // Opaque, so the shared image has the page behind it.
+            child: ColoredBox(
+              color: theme.scaffoldBackgroundColor,
+              child: widget.cards,
+            ),
           ),
           ?footer,
         ],
@@ -501,36 +483,23 @@ class TopArtistsPage extends StatelessWidget {
 
     return IslandScaffold(
       title: context.l10n!.topArtists,
-      body: ListView.builder(
-        padding: withIslandInset(
-          context,
-          const EdgeInsets.fromLTRB(10, 0, 10, 24),
+      body: ReadablePadding(
+        padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
+        builder: (context, padding) => ListView.builder(
+          padding: padding,
+          itemCount: months.length + 1,
+          itemBuilder: (context, index) {
+            if (index == months.length) return const MiniPlayerBottomSpace();
+            final (monthKey, artists) = months[index];
+            final period = _formatMonthPeriodLabel(context, monthKey);
+            return _PeriodSection(
+              title: period,
+              shareText: context.l10n!.shareRecapText(period),
+              fileName: 'zenify-$monthKey-top-artists.png',
+              cards: TopArtistsCard(artists: artists, periodLabel: period),
+            );
+          },
         ),
-        itemCount: months.length + 1,
-        itemBuilder: (context, index) {
-          if (index == months.length) return const MiniPlayerBottomSpace();
-          final (monthKey, artists) = months[index];
-          return Padding(
-            padding: const EdgeInsets.only(top: 18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    _formatMonthPeriodLabel(context, monthKey),
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: Theme.of(context).colorScheme.secondary,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                TopArtistsCard(artists: artists),
-              ],
-            ),
-          );
-        },
       ),
     );
   }

@@ -168,7 +168,6 @@
   "interfaceScale": "Escala da interface",
   "interfaceScaleDescription": "Aumente ou diminua toda a interface.",
   "invalidYouTubePlaylist": "Playlist do YouTube inválida",
-  "inYourLibrary": "Na sua biblioteca",
   "keyboardShortcuts": "Atalhos de teclado",
   "keyboardShortcutsDescription": "Veja e altere os atalhos de teclado.",
   "keyboardShortcutsResetConfirm": "Restaurar todos os atalhos de teclado para o padrão?",
@@ -429,5 +428,6 @@
   "userPlaylists": "Playlists do usuário",
   "volume": "Volume",
   "yes": "Sim",
-  "youtubePlaylistLinkOrId": "Link ou ID da playlist do YouTube"
+  "youtubePlaylistLinkOrId": "Link ou ID da playlist do YouTube",
+  "wavesFollowMusic": "Seguir a música (pede acesso ao áudio)"
 }

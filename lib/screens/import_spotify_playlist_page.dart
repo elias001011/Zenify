@@ -321,98 +321,100 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
     final colorScheme = Theme.of(context).colorScheme;
     return IslandScaffold(
       title: context.l10n!.importSpotifyPlaylistTitle,
-      body: SingleChildScrollView(
-        padding: withIslandInset(
-          context,
-          const EdgeInsets.fromLTRB(16, 16, 16, 32),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(context.l10n!.importSpotifyPlaylistInstructions),
-            const SizedBox(height: 16),
-            OutlinedButton.icon(
-              onPressed: () => launchURL(
-                Uri.parse('https://www.chosic.com/spotify-playlist-exporter/'),
-              ),
-              icon: const Icon(FluentIcons.open_24_regular),
-              label: Text(context.l10n!.openChosicExporter),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _isImporting ? null : _chooseFile,
-              icon: const Icon(FluentIcons.document_add_24_regular),
-              label: Text(_fileName ?? context.l10n!.chooseCsvFile),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _playlistNameController,
-              enabled: !_isImporting,
-              decoration: InputDecoration(
-                labelText: '${context.l10n!.playlistName} *',
-                hintText: context.l10n!.spotifyPlaylistNameHint,
-                filled: true,
-                fillColor: colorScheme.surfaceContainerHigh,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
+      body: ReadablePadding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        builder: (context, padding) => SingleChildScrollView(
+          padding: padding,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(context.l10n!.importSpotifyPlaylistInstructions),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () => launchURL(
+                  Uri.parse(
+                    'https://www.chosic.com/spotify-playlist-exporter/',
+                  ),
                 ),
+                icon: const Icon(FluentIcons.open_24_regular),
+                label: Text(context.l10n!.openChosicExporter),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _csvController,
-              enabled: !_isImporting,
-              minLines: 10,
-              maxLines: 18,
-              decoration: InputDecoration(
-                labelText: context.l10n!.pasteCsv,
-                hintText: context.l10n!.spotifyCsvHint,
-                alignLabelWithHint: true,
-                filled: true,
-                fillColor: colorScheme.surfaceContainerHigh,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            FilledButton.icon(
-              onPressed: _isImporting ? null : _importPlaylist,
-              icon: _isImporting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(FluentIcons.arrow_upload_24_regular),
-              label: Text(
-                _isImporting
-                    ? context.l10n!.spotifyPlaylistImporting
-                    : context.l10n!.importPlaylist,
-              ),
-            ),
-            if (_isImporting && _totalCount > 0) ...[
               const SizedBox(height: 12),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  value: _processedCount / _totalCount,
+              OutlinedButton.icon(
+                onPressed: _isImporting ? null : _chooseFile,
+                icon: const Icon(FluentIcons.document_add_24_regular),
+                label: Text(_fileName ?? context.l10n!.chooseCsvFile),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _playlistNameController,
+                enabled: !_isImporting,
+                decoration: InputDecoration(
+                  labelText: '${context.l10n!.playlistName} *',
+                  hintText: context.l10n!.spotifyPlaylistNameHint,
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHigh,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                context.l10n!.spotifyPlaylistProgress(
-                  _processedCount,
-                  _totalCount,
+              const SizedBox(height: 12),
+              TextField(
+                controller: _csvController,
+                enabled: !_isImporting,
+                minLines: 10,
+                maxLines: 18,
+                decoration: InputDecoration(
+                  labelText: context.l10n!.pasteCsv,
+                  hintText: context.l10n!.spotifyCsvHint,
+                  alignLabelWithHint: true,
+                  filled: true,
+                  fillColor: colorScheme.surfaceContainerHigh,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
               ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _isImporting ? null : _importPlaylist,
+                icon: _isImporting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(FluentIcons.arrow_upload_24_regular),
+                label: Text(
+                  _isImporting
+                      ? context.l10n!.spotifyPlaylistImporting
+                      : context.l10n!.importPlaylist,
+                ),
+              ),
+              if (_isImporting && _totalCount > 0) ...[
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: _processedCount / _totalCount,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  context.l10n!.spotifyPlaylistProgress(
+                    _processedCount,
+                    _totalCount,
+                  ),
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+              const SizedBox(height: MiniPlayer.playerHeight + 24),
             ],
-            const SizedBox(height: MiniPlayer.playerHeight + 24),
-          ],
+          ),
         ),
       ),
     );

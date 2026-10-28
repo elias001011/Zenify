@@ -34,7 +34,7 @@ void main() {
     await dir.delete(recursive: true);
   });
 
-  testWidgets('on a phone, lyrics and queue open as sheets', (tester) async {
+  testWidgets('on a phone, lyrics take the artwork\'s place and the queue opens as a sheet', (tester) async {
     tester.view.physicalSize = const Size(420, 860);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -58,10 +58,13 @@ void main() {
     await tester.tap(find.byTooltip('Lyrics'));
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(LyricsPanel), findsOneWidget);
+    expect(find.byType(BottomSheet), findsNothing);
     expect(tester.takeException(), isNull);
 
-    Navigator.of(tester.element(find.byType(LyricsPanel))).pop();
+    await tester.tap(find.byTooltip('Lyrics'));
     await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(LyricsPanel), findsNothing);
 
     await tester.tap(find.byTooltip('Queue'));
     await tester.pump(const Duration(milliseconds: 500));

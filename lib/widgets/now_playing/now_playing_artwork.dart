@@ -25,11 +25,12 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
+import 'package:musify/widgets/flip_card.dart';
 import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/song_artwork.dart';
 
-/// The player's artwork. Tapping it flips it round to sound waves on the
-/// page itself, and back; on desktop it tilts gently after the mouse, the side
+/// The player's artwork. Tapping it flips it round, as in the original
+/// Musify, to sound waves on the page itself, and back; on desktop it tilts gently after the mouse, the side
 /// under it sinking in.
 class NowPlayingArtwork extends StatefulWidget {
   const NowPlayingArtwork({
@@ -101,15 +102,15 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       valueListenable: showPlayerVisualizer,
       builder: (context, visualizer, _) => GestureDetector(
         onTap: () => setPlayerVisualizer(!visualizer),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 350),
-          child: visualizer
-              ? SizedBox.square(
-                  key: const ValueKey('visualizer'),
-                  dimension: size,
-                  child: Center(child: WaveVisualizer(size: size * 0.8)),
-                )
-              : KeyedSubtree(key: const ValueKey('artwork'), child: artwork),
+        child: FlipCard(
+          flipped: visualizer,
+          frontWidget: artwork,
+          backWidget: SizedBox.square(
+            dimension: size,
+            // The card builds only the side in view, so the waves listen
+            // to playback only while they show.
+            child: Center(child: WaveVisualizer(size: size * 0.8)),
+          ),
         ),
       ),
     );

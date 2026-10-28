@@ -36,83 +36,86 @@ class AboutPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return IslandScaffold(
       title: context.l10n!.about,
-      body: SingleChildScrollView(
-        padding: withIslandInset(context, commonSingleChildScrollViewPadding),
-        child: Column(
-          children: <Widget>[
-            const SizedBox(height: 14),
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    appName,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.primary,
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      fontFamily: 'paytoneOne',
-                      letterSpacing: -1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 40,
-                    height: 3,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.secondaryContainer,
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    child: Text(
-                      'v$appVersion',
+      body: ReadablePadding(
+        padding: commonSingleChildScrollViewPadding,
+        builder: (context, padding) => SingleChildScrollView(
+          padding: padding,
+          child: Column(
+            children: <Widget>[
+              const SizedBox(height: 14),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      appName,
                       style: TextStyle(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .onSecondaryContainer,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.2,
+                        color: Theme.of(context).colorScheme.primary,
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'paytoneOne',
+                        letterSpacing: -1.2,
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 40,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.secondaryContainer,
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Text(
+                        'v$appVersion',
+                        style: TextStyle(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSecondaryContainer,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 32),
+              _PersonCard(
+                name: 'Elias Juriatti',
+                role: context.l10n!.aboutForkMaintainer,
+                avatarUrl: 'https://avatars.githubusercontent.com/elias001011',
+                links: [
+                  (
+                    icon: FluentIcons.code_24_filled,
+                    tooltip: 'GitHub',
+                    url: 'https://github.com/elias001011',
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 32),
-            _PersonCard(
-              name: 'Elias Juriatti',
-              role: context.l10n!.aboutForkMaintainer,
-              avatarUrl: 'https://avatars.githubusercontent.com/elias001011',
-              links: [
-                (
-                  icon: FluentIcons.code_24_filled,
-                  tooltip: 'GitHub',
-                  url: 'https://github.com/elias001011',
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            CustomBar(
-              context.l10n!.aboutSourceCode,
-              FluentIcons.code_24_regular,
-              description: 'github.com/$appRepository',
-              borderRadius: commonCustomBarRadius,
-              onTap: () =>
-                  launchURL(Uri.parse('https://github.com/$appRepository')),
-            ),
-            const MiniPlayerBottomSpace(),
-          ],
+              const SizedBox(height: 24),
+              CustomBar(
+                context.l10n!.aboutSourceCode,
+                FluentIcons.code_24_regular,
+                description: 'github.com/$appRepository',
+                borderRadius: commonCustomBarRadius,
+                onTap: () =>
+                    launchURL(Uri.parse('https://github.com/$appRepository')),
+              ),
+              const MiniPlayerBottomSpace(),
+            ],
+          ),
         ),
       ),
     );

@@ -25,29 +25,21 @@ import 'package:material_ui/material_ui.dart';
 
 enum RotateSide { right, left, top, bottom }
 
-class FlipCardController {
-  _FlipCardState? _state;
-
-  Future<void> flipcard() async {
-    await _state?.flipCard();
-  }
-}
-
+/// Shows [frontWidget] or, when [flipped], [backWidget], turning round like
+/// a card between them (the player's artwork flip from the original Musify).
 class FlipCard extends StatefulWidget {
   const FlipCard({
     super.key,
     required this.frontWidget,
     required this.backWidget,
-    required this.controller,
-    required this.rotateSide,
-    this.onTapFlipping = false,
+    required this.flipped,
+    this.rotateSide = RotateSide.right,
     this.animationDuration = const Duration(milliseconds: 800),
   });
 
   final Widget frontWidget;
   final Widget backWidget;
-  final FlipCardController controller;
-  final bool onTapFlipping;
+  final bool flipped;
   final RotateSide rotateSide;
   final Duration animationDuration;
 
@@ -57,48 +49,27 @@ class FlipCard extends StatefulWidget {
 
 class _FlipCardState extends State<FlipCard>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _animationController;
-  double _startAngle = 0;
-  double _targetAngle = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: widget.animationDuration,
-      vsync: this,
-    );
-    widget.controller._state = this;
-  }
+  late final _animationController = AnimationController(
+    duration: widget.animationDuration,
+    vsync: this,
+    value: widget.flipped ? 1 : 0,
+  );
 
   @override
   void didUpdateWidget(FlipCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
-      if (oldWidget.controller._state == this) {
-        oldWidget.controller._state = null;
-      }
-      widget.controller._state = this;
-    }
-    if (oldWidget.animationDuration != widget.animationDuration) {
-      _animationController.duration = widget.animationDuration;
+    _animationController.duration = widget.animationDuration;
+    if (widget.flipped != oldWidget.flipped) {
+      widget.flipped
+          ? _animationController.forward()
+          : _animationController.reverse();
     }
   }
 
   @override
   void dispose() {
-    if (widget.controller._state == this) {
-      widget.controller._state = null;
-    }
     _animationController.dispose();
     super.dispose();
-  }
-
-  Future<void> flipCard() async {
-    if (_animationController.isAnimating) return;
-    _startAngle = _targetAngle;
-    _targetAngle = _targetAngle == 0 ? math.pi : 0;
-    await _animationController.forward(from: 0);
   }
 
   @override
@@ -106,8 +77,7 @@ class _FlipCardState extends State<FlipCard>
     return AnimatedBuilder(
       animation: _animationController,
       builder: (context, child) {
-        final progress = _animationController.value;
-        final angle = _startAngle + (_targetAngle - _startAngle) * progress;
+        final angle = _animationController.value * math.pi;
         final isFrontVisible = angle <= math.pi / 2;
         final rotateX =
             widget.rotateSide == RotateSide.top ||
@@ -124,21 +94,18 @@ class _FlipCardState extends State<FlipCard>
           transform.rotateY(angle * direction);
         }
 
-        return GestureDetector(
-          onTap: widget.onTapFlipping ? flipCard : null,
-          child: Transform(
-            alignment: Alignment.center,
-            transform: transform,
-            child: isFrontVisible
-                ? widget.frontWidget
-                : Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.identity()
-                      ..rotateX(rotateX ? math.pi : 0)
-                      ..rotateY(rotateX ? 0 : math.pi),
-                    child: widget.backWidget,
-                  ),
-          ),
+        return Transform(
+          alignment: Alignment.center,
+          transform: transform,
+          child: isFrontVisible
+              ? widget.frontWidget
+              : Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..rotateX(rotateX ? math.pi : 0)
+                    ..rotateY(rotateX ? 0 : math.pi),
+                  child: widget.backWidget,
+                ),
         );
       },
     );

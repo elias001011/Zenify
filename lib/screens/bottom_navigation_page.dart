@@ -120,13 +120,22 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
   static const _dockPadding = 6.0;
   static const _dockBarHeight = 44.0;
 
-  /// Pages scroll under the floating elements; this is the space they keep
-  /// free at the end so nothing stays hidden behind them.
-  Widget _withBottomInset(BuildContext context, double inset) {
+  static const _railWidth = 72.0;
+
+  /// Pages extend under the floating elements, their backgrounds included;
+  /// this is the space they keep free so no content stays hidden behind them.
+  Widget _withInsets(
+    BuildContext context, {
+    required double bottom,
+    double left = 0,
+  }) {
     final media = MediaQuery.of(context);
     return MediaQuery(
       data: media.copyWith(
-        padding: media.padding.copyWith(bottom: media.padding.bottom + inset),
+        padding: media.padding.copyWith(
+          bottom: media.padding.bottom + bottom,
+          left: media.padding.left + left,
+        ),
       ),
       child: KeyedSubtree(key: _contentKey, child: widget.child),
     );
@@ -147,7 +156,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
 
     return Stack(
       children: [
-        _withBottomInset(context, _margin * 2 + dockHeight),
+        _withInsets(context, bottom: _margin * 2 + dockHeight),
         Positioned(
           left: _margin,
           right: maxDockWidth == null ? _margin : null,
@@ -205,14 +214,23 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
       onTap: () => _onTabTapped(index, items),
     );
 
-    return Row(
+    // The rail floats over the page like the dock on phones, so the page's
+    // background reaches the window's edge behind it.
+    return Stack(
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(_margin, _margin, 0, _margin),
+        _withInsets(
+          context,
+          bottom: playing ? MiniPlayer.playerHeight + _margin * 2 : 0,
+          left: _margin + _railWidth,
+        ),
+        Positioned(
+          left: _margin,
+          top: _margin,
+          bottom: _margin,
           child: FloatingSurface(
             borderRadius: const BorderRadius.all(Radius.circular(24)),
             child: SizedBox(
-              width: 72,
+              width: _railWidth,
               child: Column(
                 children: [
                   const SizedBox(height: 18),
@@ -233,28 +251,19 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
             ),
           ),
         ),
-        Expanded(
-          child: Stack(
-            alignment: Alignment.bottomCenter,
-            children: [
-              _withBottomInset(
-                context,
-                playing ? MiniPlayer.playerHeight + _margin * 2 : 0,
+        if (playing)
+          const Positioned(
+            left: _margin * 2 + _railWidth,
+            right: _margin,
+            bottom: _margin,
+            child: FloatingSurface(
+              borderRadius: BorderRadius.all(Radius.circular(24)),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [NoticeSlot(), MiniPlayer(embedded: true)],
               ),
-              if (playing)
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(_margin, 0, _margin, _margin),
-                  child: FloatingSurface(
-                    borderRadius: BorderRadius.all(Radius.circular(24)),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [NoticeSlot(), MiniPlayer(embedded: true)],
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
-        ),
       ],
     );
   }

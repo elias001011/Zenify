@@ -174,7 +174,6 @@
   "interfaceScale": "Interface scale",
   "interfaceScaleDescription": "Make the whole interface larger or smaller.",
   "invalidYouTubePlaylist": "Invalid YouTube playlist",
-  "inYourLibrary": "In your library",
   "keyboardShortcuts": "Keyboard shortcuts",
   "keyboardShortcutsDescription": "View and change the keyboard shortcuts.",
   "keyboardShortcutsResetConfirm": "Restore every keyboard shortcut to its default?",
@@ -440,5 +439,6 @@
   "userPlaylists": "User playlists",
   "volume": "Volume",
   "yes": "Yes",
-  "youtubePlaylistLinkOrId": "YouTube playlist link or ID"
+  "youtubePlaylistLinkOrId": "YouTube playlist link or ID",
+  "wavesFollowMusic": "Follow the music (asks for audio access)"
 }

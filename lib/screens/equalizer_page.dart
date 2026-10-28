@@ -225,213 +225,216 @@ class _EqualizerPageState extends State<EqualizerPage> {
                 ),
               ),
             )
-          : ListView(
-              padding: withIslandInset(
-                context,
-                commonSingleChildScrollViewPadding,
-              ),
-              children: [
-                // Enable/Disable Section
-                Card.filled(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                context.l10n!.equalizerEnable,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(color: colorScheme.onSurface),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                _enabled
-                                    ? context.l10n!.equalizerEnabledHint
-                                    : context.l10n!.equalizerDisabledHint,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
+          : ReadablePadding(
+              padding: commonSingleChildScrollViewPadding,
+              builder: (context, padding) => ListView(
+                padding: padding,
+                children: [
+                  // Enable/Disable Section
+                  Card.filled(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  context.l10n!.equalizerEnable,
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(color: colorScheme.onSurface),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  _enabled
+                                      ? context.l10n!.equalizerEnabledHint
+                                      : context.l10n!.equalizerDisabledHint,
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ),
                           ),
+                          Switch.adaptive(
+                            value: _enabled,
+                            onChanged: (value) async {
+                              await audioHandler.setEqualizerEnabled(value);
+                              if (!mounted) return;
+                              setState(() => _enabled = value);
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Presets Section
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          context.l10n!.equalizerPresets,
+                          style: Theme.of(context).textTheme.titleMedium,
                         ),
-                        Switch.adaptive(
-                          value: _enabled,
-                          onChanged: (value) async {
-                            await audioHandler.setEqualizerEnabled(value);
-                            if (!mounted) return;
-                            setState(() => _enabled = value);
-                          },
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _presetIds.map((presetId) {
+                            final isActive = _activePreset == presetId;
+                            return FilledButton(
+                              onPressed: () => _applyPreset(presetId),
+                              style: FilledButton.styleFrom(
+                                backgroundColor: isActive
+                                    ? colorScheme.primary
+                                    : colorScheme.surfaceContainerHighest,
+                                foregroundColor: isActive
+                                    ? colorScheme.onPrimary
+                                    : colorScheme.onSurface,
+                                elevation: isActive ? 2 : 0,
+                              ),
+                              child: Text(
+                                _getPresetLocalizedName(context, presetId),
+                              ),
+                            );
+                          }).toList(),
                         ),
                       ],
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
+                  const SizedBox(height: 28),
 
-                // Presets Section
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        context.l10n!.equalizerPresets,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 12),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: _presetIds.map((presetId) {
-                          final isActive = _activePreset == presetId;
-                          return FilledButton(
-                            onPressed: () => _applyPreset(presetId),
-                            style: FilledButton.styleFrom(
-                              backgroundColor: isActive
-                                  ? colorScheme.primary
-                                  : colorScheme.surfaceContainerHighest,
-                              foregroundColor: isActive
-                                  ? colorScheme.onPrimary
-                                  : colorScheme.onSurface,
-                              elevation: isActive ? 2 : 0,
-                            ),
+                  // Bands Section
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                          child: Align(
+                            alignment: Alignment.centerLeft,
                             child: Text(
-                              _getPresetLocalizedName(context, presetId),
+                              context.l10n!.equalizerBands,
+                              style: Theme.of(context).textTheme.titleMedium,
                             ),
-                          );
-                        }).toList(),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 28),
-
-                // Bands Section
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            context.l10n!.equalizerBands,
-                            style: Theme.of(context).textTheme.titleMedium,
                           ),
                         ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Column(
-                          children: List.generate(_params!.bands.length, (
-                            index,
-                          ) {
-                            final band = _params!.bands[index];
-                            final gain = _gains[index];
-                            final min = _params!.minDecibels;
-                            final max = _params!.maxDecibels;
-                            final isLast = index == _params!.bands.length - 1;
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Column(
+                            children: List.generate(_params!.bands.length, (
+                              index,
+                            ) {
+                              final band = _params!.bands[index];
+                              final gain = _gains[index];
+                              final min = _params!.minDecibels;
+                              final max = _params!.maxDecibels;
+                              final isLast = index == _params!.bands.length - 1;
 
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                bottom: isLast ? 16 : 12,
-                              ),
-                              child: Card.filled(
-                                color: colorScheme.surface,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text(
-                                            _formatFrequency(
-                                              band.centerFrequency,
-                                            ),
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .titleSmall
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                          ),
-                                          Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color:
-                                                  colorScheme.primaryContainer,
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                            ),
-                                            child: Text(
-                                              '${gain.toStringAsFixed(1)} dB',
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: isLast ? 16 : 12,
+                                ),
+                                child: Card.filled(
+                                  color: colorScheme.surface,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 12,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              _formatFrequency(
+                                                band.centerFrequency,
+                                              ),
                                               style: Theme.of(context)
                                                   .textTheme
-                                                  .labelSmall
+                                                  .titleSmall
                                                   ?.copyWith(
-                                                    color: colorScheme
-                                                        .onPrimaryContainer,
                                                     fontWeight: FontWeight.w600,
                                                   ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 12),
-                                      Slider.adaptive(
-                                        value: gain.clamp(min, max),
-                                        min: min,
-                                        max: max,
-                                        divisions: ((max - min) * 2).round(),
-                                        label: '${gain.toStringAsFixed(1)} dB',
-                                        onChanged: (value) {
-                                          setState(() {
-                                            _gains[index] = value;
-                                            _activePreset = null;
-                                          });
-                                        },
-                                        onChangeEnd: (value) async {
-                                          await audioHandler
-                                              .setEqualizerBandGain(
-                                                index,
-                                                value,
-                                              );
-                                        },
-                                      ),
-                                    ],
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              decoration: BoxDecoration(
+                                                color: colorScheme
+                                                    .primaryContainer,
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                              ),
+                                              child: Text(
+                                                '${gain.toStringAsFixed(1)} dB',
+                                                style: Theme.of(context)
+                                                    .textTheme
+                                                    .labelSmall
+                                                    ?.copyWith(
+                                                      color: colorScheme
+                                                          .onPrimaryContainer,
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                    ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 12),
+                                        Slider.adaptive(
+                                          value: gain.clamp(min, max),
+                                          min: min,
+                                          max: max,
+                                          divisions: ((max - min) * 2).round(),
+                                          label:
+                                              '${gain.toStringAsFixed(1)} dB',
+                                          onChanged: (value) {
+                                            setState(() {
+                                              _gains[index] = value;
+                                              _activePreset = null;
+                                            });
+                                          },
+                                          onChangeEnd: (value) async {
+                                            await audioHandler
+                                                .setEqualizerBandGain(
+                                                  index,
+                                                  value,
+                                                );
+                                          },
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
-                              ),
-                            );
-                          }),
+                              );
+                            }),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                const MiniPlayerBottomSpace(),
-              ],
+                  const SizedBox(height: 12),
+                  const MiniPlayerBottomSpace(),
+                ],
+              ),
             ),
     );
   }

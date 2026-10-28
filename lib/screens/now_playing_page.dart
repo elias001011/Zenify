@@ -34,6 +34,7 @@ import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
 import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/queue_list_view.dart';
+import 'package:musify/widgets/song_artwork.dart';
 
 class NowPlayingPage extends StatefulWidget {
   const NowPlayingPage({super.key});
@@ -99,7 +100,11 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     MediaItem metadata,
     BuildContext sheetContext,
   ) {
-    if (_isWide(MediaQuery.sizeOf(context))) {
+    final size = MediaQuery.sizeOf(context);
+    // Wide players open panels beside the artwork; upright phones show the
+    // lyrics in place of it, as Tidal does.
+    if (_isWide(size) ||
+        (panel == PlayerPanel.lyrics && size.height > size.width)) {
       setState(() => _panel = _panel == panel ? null : panel);
       return;
     }
@@ -156,7 +161,12 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                         actions: actions,
                         panel: _panel,
                       )
-                    : _CompactLayout(metadata: metadata, actions: actions),
+                    : _CompactLayout(
+                        metadata: metadata,
+                        actions: actions,
+                        lyrics: _panel == PlayerPanel.lyrics,
+                        onCloseLyrics: () => setState(() => _panel = null),
+                      ),
               ),
             ],
           );
@@ -186,12 +196,21 @@ class _CloseButton extends StatelessWidget {
   }
 }
 
-/// Phones: the artwork, the song and playback, then the action bar.
+/// Phones: the artwork, the song and playback, then the action bar. With
+/// [lyrics] on, the song moves up to a small header and the lyrics take the
+/// artwork's place.
 class _CompactLayout extends StatelessWidget {
-  const _CompactLayout({required this.metadata, required this.actions});
+  const _CompactLayout({
+    required this.metadata,
+    required this.actions,
+    required this.lyrics,
+    required this.onCloseLyrics,
+  });
 
   final MediaItem metadata;
   final Widget actions;
+  final bool lyrics;
+  final VoidCallback onCloseLyrics;
 
   @override
   Widget build(BuildContext context) {
@@ -216,35 +235,62 @@ class _CompactLayout extends StatelessWidget {
       ),
     );
 
+    final Widget stage;
+    if (size.width > size.height) {
+      stage = Row(
+        children: [
+          Expanded(
+            child: LayoutBuilder(builder: (context, c) => artwork(c, 1)),
+          ),
+          const SizedBox(width: 24),
+          Expanded(child: controls),
+        ],
+      );
+    } else {
+      stage = AnimatedSwitcher(
+        duration: const Duration(milliseconds: 450),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween(
+              begin: const Offset(0, 0.08),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        ),
+        child: lyrics
+            ? _LyricsStage(
+                key: const ValueKey('lyrics'),
+                metadata: metadata,
+                onClose: onCloseLyrics,
+                iconSize: iconSize * 0.85,
+                miniIconSize: miniIconSize,
+              )
+            : Column(
+                key: const ValueKey('artwork'),
+                children: [
+                  Expanded(
+                    flex: 5,
+                    child: LayoutBuilder(
+                      builder: (context, c) => artwork(c, 0.92),
+                    ),
+                  ),
+                  Expanded(flex: 4, child: controls),
+                ],
+              ),
+      );
+    }
+
     return Column(
       children: [
         const _CloseButton(),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: size.width > size.height
-                ? Row(
-                    children: [
-                      Expanded(
-                        child: LayoutBuilder(
-                          builder: (context, c) => artwork(c, 1),
-                        ),
-                      ),
-                      const SizedBox(width: 24),
-                      Expanded(child: controls),
-                    ],
-                  )
-                : Column(
-                    children: [
-                      Expanded(
-                        flex: 5,
-                        child: LayoutBuilder(
-                          builder: (context, c) => artwork(c, 0.92),
-                        ),
-                      ),
-                      Expanded(flex: 4, child: controls),
-                    ],
-                  ),
+            child: stage,
           ),
         ),
         Padding(
@@ -256,8 +302,65 @@ class _CompactLayout extends StatelessWidget {
   }
 }
 
-/// Desktop and tablets: the artwork takes the stage, with a bar below for
-/// the song, playback and actions. Queue and lyrics open beside it.
+/// The phone player with lyrics: the song small on top, the lyrics, then
+/// playback. Tapping the song goes back to the artwork.
+class _LyricsStage extends StatelessWidget {
+  const _LyricsStage({
+    super.key,
+    required this.metadata,
+    required this.onClose,
+    required this.iconSize,
+    required this.miniIconSize,
+  });
+
+  final MediaItem metadata;
+  final VoidCallback onClose;
+  final double iconSize;
+  final double miniIconSize;
+
+  static const double _artworkSize = 56;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLive = metadata.extras?['isLive'] ?? false;
+    return Column(
+      children: [
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onClose,
+          child: Row(
+            children: [
+              SongArtworkWidget(metadata: metadata, size: _artworkSize),
+              const SizedBox(width: 14),
+              Expanded(
+                child: NowPlayingTitle(
+                  metadata: metadata,
+                  titleSize: 17,
+                  artistSize: 14,
+                  spacing: 2,
+                  alignment: CrossAxisAlignment.start,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(child: LyricsPanel(metadata: metadata)),
+        if (!isLive) ...[
+          const PositionSlider(),
+          PlayerControlButtons(
+            metadata: metadata,
+            iconSize: iconSize,
+            miniIconSize: miniIconSize,
+          ),
+          const SizedBox(height: 8),
+        ],
+      ],
+    );
+  }
+}
+
+/// Desktop and tablets, as Tidal: the artwork with the song, playback and
+/// actions under it in one column, centred; queue and lyrics open beside it.
 class _WideLayout extends StatelessWidget {
   const _WideLayout({
     required this.metadata,
@@ -268,6 +371,9 @@ class _WideLayout extends StatelessWidget {
   final MediaItem metadata;
   final Widget actions;
   final PlayerPanel? panel;
+
+  /// Height the song, playback and actions take under the artwork.
+  static const double _below = 344;
 
   @override
   Widget build(BuildContext context) {
@@ -283,12 +389,43 @@ class _WideLayout extends StatelessWidget {
             children: [
               Expanded(
                 child: LayoutBuilder(
-                  builder: (context, c) => Center(
-                    child: NowPlayingArtwork(
-                      metadata: metadata,
-                      size: min(min(c.maxHeight * 0.86, c.maxWidth * 0.7), 620),
-                    ),
-                  ),
+                  builder: (context, c) {
+                    final size = min(
+                      c.maxHeight - _below,
+                      c.maxWidth - 64,
+                    ).clamp(160.0, 560.0);
+                    return Center(
+                      child: SizedBox(
+                        width: size,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            NowPlayingArtwork(metadata: metadata, size: size),
+                            const SizedBox(height: 28),
+                            NowPlayingTitle(
+                              metadata: metadata,
+                              titleSize: 24,
+                              artistSize: 16,
+                              spacing: 4,
+                              alignment: CrossAxisAlignment.start,
+                            ),
+                            const SizedBox(height: 12),
+                            if (!isLive) ...[
+                              const PositionSlider(),
+                              PlayerControlButtons(
+                                metadata: metadata,
+                                iconSize: 40,
+                                miniIconSize: 20,
+                              ),
+                            ],
+                            const SizedBox(height: 16),
+                            PlayerActionBar(child: actions),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
               AnimatedSize(
@@ -305,52 +442,6 @@ class _WideLayout extends StatelessWidget {
                       ),
               ),
             ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          child: FloatingSurface(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 3,
-                  child: NowPlayingTitle(
-                    metadata: metadata,
-                    titleSize: 18,
-                    artistSize: 14,
-                    spacing: 2,
-                    alignment: CrossAxisAlignment.start,
-                  ),
-                ),
-                Expanded(
-                  flex: 4,
-                  child: isLive
-                      ? const SizedBox.shrink()
-                      : Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            PlayerControlButtons(
-                              metadata: metadata,
-                              iconSize: 36,
-                              miniIconSize: 20,
-                            ),
-                            const PositionSlider(),
-                          ],
-                        ),
-                ),
-                Expanded(
-                  flex: 3,
-                  child: Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: actions,
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ),
         ),
       ],

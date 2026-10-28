@@ -53,26 +53,36 @@ void paintArtworkGlow(Canvas canvas, Rect bounds, Color color, double alpha) {
 
 /// The glow colours of a set of artworks, by index. They ease from one set
 /// to the next, and each fades in when its artwork's colour arrives.
+///
+/// The first colours also open [reveal]: the glow expanding into the page,
+/// once per widget, so it plays when a page or the player opens and never
+/// again for a song or playlist change.
 class GlowColors {
   GlowColors(TickerProvider vsync)
     : _transition = AnimationController(
         vsync: vsync,
         duration: const Duration(milliseconds: 1200),
         value: 1,
+      ),
+      _reveal = AnimationController(
+        vsync: vsync,
+        duration: const Duration(milliseconds: 1400),
       );
 
   final AnimationController _transition;
+  final AnimationController _reveal;
+  late final Listenable listenable = Listenable.merge([_transition, _reveal]);
   var _from = <int, Color>{};
   var _to = <int, Color>{};
   List<String?>? _sources;
   Color? _appColor;
   int _generation = 0;
 
-  /// What a glow painter repaints on.
-  Listenable get listenable => _transition;
-
   /// Indices that have a glow now or are easing out of one.
   Iterable<int> get indices => {..._from.keys, ..._to.keys};
+
+  /// 0 to 1 while the glow first expands; painters grow and fade it in.
+  double get reveal => Curves.easeOutCubic.transform(_reveal.value);
 
   /// The colour of glow [index] now; its alpha carries the fade.
   Color? colorAt(int index) {
@@ -120,17 +130,22 @@ class GlowColors {
     };
     _to = next;
     _transition.forward(from: 0);
+    if (next.isNotEmpty && _reveal.isDismissed) _reveal.forward();
   }
 
   void dispose() {
     _generation++;
     _transition.dispose();
+    _reveal.dispose();
   }
 }
 
 /// The page background for an artwork (or the app colour, without one),
-/// when the dynamic background is on: a large soft ball of its colour from
-/// the top, emptying into the page, and a fainter neighbouring hue below.
+/// when the dynamic background is on: a large light of its colour from the
+/// top, centred on the content (pages put their artwork there), emptying into
+/// the page, and a fainter neighbouring hue low on one side. Both are circles
+/// sized by the page, so they keep their shape on a tall phone as on a wide
+/// window, and they reach under the desktop rail, which floats over them.
 class PageGlow extends StatefulWidget {
   const PageGlow({super.key, required this.source, this.strength});
 
@@ -142,8 +157,7 @@ class PageGlow extends StatefulWidget {
   State<PageGlow> createState() => _PageGlowState();
 }
 
-class _PageGlowState extends State<PageGlow>
-    with SingleTickerProviderStateMixin {
+class _PageGlowState extends State<PageGlow> with TickerProviderStateMixin {
   late final _colors = GlowColors(this);
 
   void _update() =>
@@ -179,6 +193,7 @@ class _PageGlowState extends State<PageGlow>
                 painter: _PageGlowPainter(
                   colors: _colors,
                   strength: widget.strength ?? artworkGlowStrength(context),
+                  contentLeft: MediaQuery.paddingOf(context).left,
                 ),
               ),
             ),
@@ -187,37 +202,44 @@ class _PageGlowState extends State<PageGlow>
 }
 
 class _PageGlowPainter extends CustomPainter {
-  _PageGlowPainter({required this.colors, required this.strength})
-    : super(repaint: colors.listenable);
+  _PageGlowPainter({
+    required this.colors,
+    required this.strength,
+    required this.contentLeft,
+  }) : super(repaint: colors.listenable);
 
   final GlowColors colors;
   final double strength;
+
+  /// Where the content starts, past the desktop rail.
+  final double contentLeft;
 
   @override
   void paint(Canvas canvas, Size size) {
     final color = colors.colorAt(0);
     if (color == null || color.a == 0) return;
-    final alpha = strength * color.a;
+    final reveal = colors.reveal;
+    final alpha = strength * color.a * reveal;
+    if (alpha <= 0) return;
+    final reach = size.shortestSide + size.longestSide * 0.35;
+    final grow = 0.4 + 0.6 * reveal;
 
     // A neighbouring hue, as the second light of a stage.
     final hsl = HSLColor.fromColor(color);
-    final second = hsl.withHue((hsl.hue + 28) % 360).toColor();
     paintArtworkGlow(
       canvas,
-      Rect.fromCenter(
-        center: Offset(size.width * 0.65, size.height * 0.65),
-        width: size.width * 0.7,
-        height: size.height * 0.7,
+      Rect.fromCircle(
+        center: Offset(size.width * 0.85, size.height * 0.82),
+        radius: reach * 0.48 * grow,
       ),
-      second,
-      alpha * 0.55,
+      hsl.withHue((hsl.hue + 28) % 360).toColor(),
+      alpha * 0.5,
     );
     paintArtworkGlow(
       canvas,
-      Rect.fromCenter(
-        center: Offset(size.width * 0.5, size.height * 0.5),
-        width: size.width,
-        height: size.height,
+      Rect.fromCircle(
+        center: Offset((contentLeft + size.width) / 2, 0),
+        radius: reach * 0.85 * grow,
       ),
       color,
       alpha,
@@ -226,5 +248,7 @@ class _PageGlowPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_PageGlowPainter oldDelegate) =>
-      oldDelegate.strength != strength || oldDelegate.colors != colors;
+      oldDelegate.strength != strength ||
+      oldDelegate.colors != colors ||
+      oldDelegate.contentLeft != contentLeft;
 }

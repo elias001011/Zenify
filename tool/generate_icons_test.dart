@@ -70,23 +70,27 @@ void _paintGlow(Canvas canvas, Offset center, double radius) {
   );
 }
 
-/// The launcher icon: black, with rounded corners unless [square].
+/// The launcher icon: black, with rounded corners and a transparent margin
+/// unless [square], so it sits among other apps' icons at their size.
 void _icon(Canvas canvas, double size, {bool square = false}) {
   final bounds = Offset.zero & Size(size, size);
-  final shape = square ? bounds : bounds.deflate(size * 0.04);
+  final shape = square ? bounds : bounds.deflate(size * 0.09);
   canvas
     ..save()
     ..clipRRect(
-      RRect.fromRectAndRadius(shape, Radius.circular(square ? 0 : size * 0.2)),
+      RRect.fromRectAndRadius(
+        shape,
+        Radius.circular(square ? 0 : shape.width * 0.22),
+      ),
     )
     ..drawRect(shape, Paint()..color = Colors.black);
-  _paintGlow(canvas, bounds.center, size * 0.42);
+  _paintGlow(canvas, bounds.center, size * 0.38);
   _paintWaves(
     canvas,
     Rect.fromCenter(
       center: bounds.center,
-      width: size * 0.64,
-      height: size * 0.64,
+      width: size * 0.54,
+      height: size * 0.54,
     ),
     size,
     _Style.color,
@@ -97,11 +101,11 @@ void _icon(Canvas canvas, double size, {bool square = false}) {
 /// Android adaptive layers: the art inside the 66dp safe zone of 108dp.
 void _adaptive(Canvas canvas, double size, _Style style) {
   final center = Offset(size / 2, size / 2);
-  if (style == _Style.color) _paintGlow(canvas, center, size * 0.3);
+  if (style == _Style.color) _paintGlow(canvas, center, size * 0.27);
   _paintWaves(
     canvas,
-    Rect.fromCenter(center: center, width: size * 0.56, height: size * 0.56),
-    size * 0.56,
+    Rect.fromCenter(center: center, width: size * 0.48, height: size * 0.48),
+    size * 0.48,
     style,
   );
 }

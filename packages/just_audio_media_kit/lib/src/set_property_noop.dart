@@ -6,3 +6,8 @@ Future<void> setProperty(Player player, String key, dynamic value) {
   // noop
   return Future.value();
 }
+
+Future<String> getProperty(Player player, String key) {
+  // noop
+  return Future.value('');
+}

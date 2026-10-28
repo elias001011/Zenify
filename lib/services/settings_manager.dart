@@ -75,10 +75,9 @@ FloatingEffect _readFloatingEffect() {
   for (final effect in FloatingEffect.values) {
     if (effect.name == stored) return effect;
   }
-  // Blur costs GPU time; phones get the cheap tint by default.
-  return isDesktopPlatform
-      ? FloatingEffect.blurred
-      : FloatingEffect.translucent;
+  // Blur and translucency cost GPU time on every scrolled frame: phones
+  // default to solid.
+  return isDesktopPlatform ? FloatingEffect.blurred : FloatingEffect.solid;
 }
 
 /// How the floating island, dock and rail let the content behind show.

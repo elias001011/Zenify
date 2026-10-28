@@ -82,4 +82,20 @@ void main() {
   test('an empty query matches nothing', () {
     expect(searchLibrary('  ').songs, isEmpty);
   });
+
+  test('search results put what the library holds first, as its copy', () {
+    final mine = song('s1', 'Blue Hour (renamed)', 'Calm');
+    final result = libraryFirst(
+      [song('s2', 'Blue', 'Calm')],
+      [
+        song('s3', 'Blue Moon', 'Other'),
+        song('s1', 'Blue Hour', 'Calm'),
+        song('s2', 'Blue', 'Calm'),
+      ],
+      known: {'s1': mine},
+    );
+
+    expect(result.map((s) => s['ytid']), ['s2', 's1', 's3']);
+    expect(result[1], same(mine));
+  });
 }
