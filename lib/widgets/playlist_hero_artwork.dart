@@ -20,6 +20,7 @@ import 'dart:math';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/playlist_cube.dart';
 
 class PlaylistHeroArtwork extends StatelessWidget {
@@ -48,18 +49,24 @@ class PlaylistHeroArtwork extends StatelessWidget {
           size: size,
           cubeIcon: cubeIcon,
           showTypeLabel: false,
+          glow: false,
         );
 
-        return ClipPath(
-          clipper: const ShapeBorderClipper(
-            shape: StarBorder(
-              points: 8,
-              pointRounding: 0.8,
-              valleyRounding: 0.2,
-              innerRadiusRatio: 0.6,
+        // Outside the star clip, which would cut the glow off.
+        return ArtworkGlow(
+          source: playlist['image']?.toString(),
+          spread: size * 0.5,
+          child: ClipPath(
+            clipper: const ShapeBorderClipper(
+              shape: StarBorder(
+                points: 8,
+                pointRounding: 0.8,
+                valleyRounding: 0.2,
+                innerRadiusRatio: 0.6,
+              ),
             ),
+            child: artwork,
           ),
-          child: artwork,
         );
       },
     );

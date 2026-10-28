@@ -181,6 +181,8 @@ class _HomePageState extends State<HomePage> {
   ) {
     return ListView.builder(
       scrollDirection: Axis.horizontal,
+      // Lets the artwork glow spill above and below the row.
+      clipBehavior: Clip.none,
       itemCount: itemCount,
       itemBuilder: (context, index) {
         final playlist = playlists[index];
