@@ -26,7 +26,7 @@ import 'package:musify/services/settings_manager.dart';
 
 /// Glow strength at the centre, by theme.
 double artworkGlowStrength(BuildContext context) =>
-    Theme.of(context).brightness == Brightness.dark ? 0.42 : 0.3;
+    Theme.of(context).brightness == Brightness.dark ? 0.3 : 0.22;
 
 // (1 - x²)³ from the centre (x = 0) to the edge (x = 1): no visible rim.
 const _falloffStops = [0.0, 0.25, 0.5, 0.75, 1.0];
@@ -203,8 +203,8 @@ class _GlowPainter extends CustomPainter {
     // Wider than tall and well past the child, so it reads as background.
     final bounds = Rect.fromCenter(
       center: size.center(Offset.zero),
-      width: (size.width * 1.3).clamp(0, size.height * 5),
-      height: size.height * 2.8,
+      width: (size.width * 1.1).clamp(0, size.height * 4),
+      height: size.height * 2.0,
     );
     paintArtworkGlow(canvas, bounds, color, strength * color.a);
   }

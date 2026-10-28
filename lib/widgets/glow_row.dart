@@ -128,7 +128,7 @@ class _GlowRowState extends State<GlowRow> with SingleTickerProviderStateMixin {
       builder: (context, constraints) {
         final height = constraints.maxHeight;
         // The glow reaches well past the row, above and below it.
-        final reach = height * 0.9;
+        final reach = height * 0.55;
 
         return Stack(
           clipBehavior: Clip.none,
@@ -210,7 +210,7 @@ class _RowGlowPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final offset = controller.hasClients ? controller.offset : 0.0;
-    final radius = rowHeight * 1.35;
+    final radius = rowHeight * 1.05;
     final centerY = rowTop + rowHeight / 2;
 
     for (final index in colors.indices) {
