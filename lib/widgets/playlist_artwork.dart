@@ -45,6 +45,8 @@ class PlaylistArtwork extends StatelessWidget {
     iconSize: iconSize ?? (size * 0.3), // Default to 30% of container size
     size: size,
     title: playlistTitle,
+    // The cube clips the corners.
+    borderRadius: 0,
   );
 
   @override
