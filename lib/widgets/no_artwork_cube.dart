@@ -19,6 +19,8 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:math';
+
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -43,8 +45,13 @@ class NullArtworkWidget extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
-    final badgeSize = size * 0.4;
-    final calculatedIconSize = iconSize ?? (badgeSize * 0.5);
+    // Small artworks (song rows) get a larger share, to stay readable.
+    final badgeSize = size * (size < 80 ? 0.62 : 0.4);
+    // Never wider than the badge, or the glyph overflows off-centre.
+    final calculatedIconSize = min(
+      iconSize ?? badgeSize * 0.5,
+      badgeSize * 0.6,
+    );
 
     return SizedBox(
       width: size,
