@@ -57,8 +57,8 @@ class IslandScaffold extends StatefulWidget {
   /// Offer the search shortcut, which opens the search page on Enter.
   final bool globalSearch;
 
-  /// Scroll offset after which the title fades in, for pages that show their
-  /// own big title (playlists) until it scrolls under the island.
+  /// Scroll offset after which the title appears, for pages that show their
+  /// own big title (playlists). Until then the island stays compact.
   final double? fadeTitleAfter;
   final List<Widget> actions;
 
@@ -73,15 +73,11 @@ class IslandScaffold extends StatefulWidget {
 }
 
 class _IslandScaffoldState extends State<IslandScaffold> {
-  static const _fadeDistance = 32.0;
-
-  late final _titleOpacity = ValueNotifier<double>(
-    widget.fadeTitleAfter == null ? 1 : 0,
-  );
+  late final _titleShown = ValueNotifier<bool>(widget.fadeTitleAfter == null);
 
   @override
   void dispose() {
-    _titleOpacity.dispose();
+    _titleShown.dispose();
     super.dispose();
   }
 
@@ -90,11 +86,7 @@ class _IslandScaffoldState extends State<IslandScaffold> {
     if (start != null &&
         notification.depth == 0 &&
         notification.metrics.axis == Axis.vertical) {
-      _titleOpacity.value =
-          ((notification.metrics.pixels - start) / _fadeDistance).clamp(
-            0.0,
-            1.0,
-          );
+      _titleShown.value = notification.metrics.pixels > start;
     }
     return false;
   }
@@ -122,9 +114,7 @@ class _IslandScaffoldState extends State<IslandScaffold> {
             left: _islandMargin,
             child: _Island(
               title: widget.title,
-              titleOpacity: widget.fadeTitleAfter == null
-                  ? null
-                  : _titleOpacity,
+              titleShown: _titleShown,
               actions: widget.actions,
               onBack: widget.onBack,
               onFilter: widget.onFilter,
@@ -141,7 +131,7 @@ class _IslandScaffoldState extends State<IslandScaffold> {
 class _Island extends StatefulWidget {
   const _Island({
     required this.title,
-    required this.titleOpacity,
+    required this.titleShown,
     required this.actions,
     required this.onBack,
     required this.onFilter,
@@ -150,7 +140,7 @@ class _Island extends StatefulWidget {
   });
 
   final String title;
-  final ValueListenable<double>? titleOpacity;
+  final ValueListenable<bool> titleShown;
   final List<Widget> actions;
   final VoidCallback? onBack;
   final ValueChanged<String>? onFilter;
@@ -242,7 +232,7 @@ class _IslandState extends State<_Island> {
     final colorScheme = Theme.of(context).colorScheme;
     final canPop = Navigator.of(context).canPop();
 
-    Widget titleText = Padding(
+    final titleText = Padding(
       padding: EdgeInsets.only(left: canPop ? 2 : 14, right: 10),
       child: Text(
         widget.title,
@@ -258,34 +248,39 @@ class _IslandState extends State<_Island> {
         ),
       ),
     );
-    if (widget.titleOpacity != null) {
-      titleText = ValueListenableBuilder<double>(
-        valueListenable: widget.titleOpacity!,
-        builder: (context, opacity, child) =>
-            Opacity(opacity: opacity.clamp(0.0, 1.0), child: child),
-        child: titleText,
-      );
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (canPop)
-          IconButton(
-            icon: const Icon(FluentIcons.arrow_left_24_regular),
-            tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-            onPressed: widget.onBack ?? () => Navigator.of(context).maybePop(),
-          ),
-        if (widget.title.isNotEmpty) Flexible(child: titleText),
-        ...widget.actions,
-        if (showSearch)
-          IconButton(
-            icon: const Icon(FluentIcons.search_24_regular),
-            tooltip: context.l10n!.search,
-            onPressed: _openSearch,
-          ),
-        const SizedBox(width: 2),
-      ],
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.titleShown,
+      builder: (context, titleShown, _) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (canPop)
+            IconButton(
+              icon: const Icon(FluentIcons.arrow_left_24_regular),
+              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+              onPressed:
+                  widget.onBack ?? () => Navigator.of(context).maybePop(),
+            ),
+          // Left out while hidden, so the island stays compact.
+          if (widget.title.isNotEmpty && titleShown)
+            Flexible(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0, end: 1),
+                duration: const Duration(milliseconds: 220),
+                builder: (context, opacity, child) =>
+                    Opacity(opacity: opacity, child: child),
+                child: titleText,
+              ),
+            ),
+          ...widget.actions,
+          if (showSearch)
+            IconButton(
+              icon: const Icon(FluentIcons.search_24_regular),
+              tooltip: context.l10n!.search,
+              onPressed: _openSearch,
+            ),
+          const SizedBox(width: 2),
+        ],
+      ),
     );
   }
 
