@@ -25,6 +25,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
+import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/floating_surface.dart';
@@ -34,7 +35,6 @@ import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
 import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/queue_list_view.dart';
-import 'package:musify/widgets/song_artwork.dart';
 
 class NowPlayingPage extends StatefulWidget {
   const NowPlayingPage({super.key});
@@ -235,54 +235,23 @@ class _CompactLayout extends StatelessWidget {
       ),
     );
 
-    final Widget stage;
-    if (size.width > size.height) {
-      stage = Row(
-        children: [
-          Expanded(
-            child: LayoutBuilder(builder: (context, c) => artwork(c, 1)),
-          ),
-          const SizedBox(width: 24),
-          Expanded(child: controls),
-        ],
-      );
-    } else {
-      stage = AnimatedSwitcher(
-        duration: const Duration(milliseconds: 450),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) => FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween(
-              begin: const Offset(0, 0.08),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          ),
-        ),
-        child: lyrics
-            ? _LyricsStage(
-                key: const ValueKey('lyrics'),
-                metadata: metadata,
-                onClose: onCloseLyrics,
-                iconSize: iconSize * 0.85,
-                miniIconSize: miniIconSize,
-              )
-            : Column(
-                key: const ValueKey('artwork'),
-                children: [
-                  Expanded(
-                    flex: 5,
-                    child: LayoutBuilder(
-                      builder: (context, c) => artwork(c, 0.92),
-                    ),
-                  ),
-                  Expanded(flex: 4, child: controls),
-                ],
+    final stage = size.width > size.height
+        ? Row(
+            children: [
+              Expanded(
+                child: LayoutBuilder(builder: (context, c) => artwork(c, 1)),
               ),
-      );
-    }
+              const SizedBox(width: 24),
+              Expanded(child: controls),
+            ],
+          )
+        : _UprightStage(
+            metadata: metadata,
+            lyrics: lyrics,
+            onCloseLyrics: onCloseLyrics,
+            iconSize: iconSize,
+            miniIconSize: miniIconSize,
+          );
 
     return Column(
       children: [
@@ -302,55 +271,175 @@ class _CompactLayout extends StatelessWidget {
   }
 }
 
-/// The phone player with lyrics: the song small on top, the lyrics, then
-/// playback. Tapping the song goes back to the artwork.
-class _LyricsStage extends StatelessWidget {
-  const _LyricsStage({
-    super.key,
+/// The upright phone player. Playback stays at the bottom; above it the
+/// artwork and the song take the room, or, with [lyrics], the same artwork
+/// shrinks into a header beside the song and the lyrics fill the rest, as
+/// Tidal does. One layout that moves, not a second page over the first.
+class _UprightStage extends StatefulWidget {
+  const _UprightStage({
     required this.metadata,
-    required this.onClose,
+    required this.lyrics,
+    required this.onCloseLyrics,
     required this.iconSize,
     required this.miniIconSize,
   });
 
   final MediaItem metadata;
-  final VoidCallback onClose;
+  final bool lyrics;
+  final VoidCallback onCloseLyrics;
   final double iconSize;
   final double miniIconSize;
 
-  static const double _artworkSize = 56;
+  @override
+  State<_UprightStage> createState() => _UprightStageState();
+}
+
+class _UprightStageState extends State<_UprightStage>
+    with SingleTickerProviderStateMixin {
+  static const _headerSize = 56.0;
+  static const _titleHeight = 72.0;
+
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 500),
+    value: widget.lyrics ? 1 : 0,
+  );
+  late final _progress = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOutCubic,
+  );
+
+  @override
+  void didUpdateWidget(_UprightStage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.lyrics != oldWidget.lyrics) {
+      widget.lyrics ? _controller.forward() : _controller.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final metadata = widget.metadata;
+    final screen = MediaQuery.sizeOf(context);
     final isLive = metadata.extras?['isLive'] ?? false;
+
     return Column(
       children: [
-        GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: onClose,
-          child: Row(
-            children: [
-              SongArtworkWidget(metadata: metadata, size: _artworkSize),
-              const SizedBox(width: 14),
-              Expanded(
-                child: NowPlayingTitle(
-                  metadata: metadata,
-                  titleSize: 17,
-                  artistSize: 14,
-                  spacing: 2,
-                  alignment: CrossAxisAlignment.start,
-                ),
-              ),
-            ],
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final artSize = min(
+                c.maxWidth * 0.92,
+                c.maxHeight - _titleHeight - 16,
+              );
+              final artOrigin = Offset(
+                (c.maxWidth - artSize) / 2,
+                (c.maxHeight - _titleHeight - artSize) / 2,
+              );
+              // Laid out once at full size and scaled, so the artwork keeps
+              // its decoded image while it moves.
+              final artwork = NowPlayingArtwork(
+                metadata: metadata,
+                size: artSize,
+              );
+
+              return AnimatedBuilder(
+                animation: _progress,
+                child: artwork,
+                builder: (context, artwork) {
+                  final t = _progress.value;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      if (t > 0)
+                        Positioned.fill(
+                          top: _headerSize + 12,
+                          child: Opacity(
+                            opacity: Curves.easeIn.transform(t),
+                            child: IgnorePointer(
+                              ignoring: t < 1,
+                              child: LyricsPanel(metadata: metadata),
+                            ),
+                          ),
+                        ),
+                      // The song under the artwork, leaving as it shrinks...
+                      if (t < 1)
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          height: _titleHeight,
+                          child: Opacity(
+                            opacity: 1 - t,
+                            child: Center(
+                              child: NowPlayingTitle(
+                                metadata: metadata,
+                                titleSize: getResponsiveTitleFontSize(screen),
+                                artistSize: getResponsiveArtistFontSize(screen),
+                                spacing: 6,
+                              ),
+                            ),
+                          ),
+                        ),
+                      // ...and beside it once it is the header.
+                      if (t > 0)
+                        Positioned(
+                          left: _headerSize + 14,
+                          right: 0,
+                          top: 0,
+                          height: _headerSize,
+                          child: Opacity(
+                            opacity: t,
+                            child: Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: NowPlayingTitle(
+                                metadata: metadata,
+                                titleSize: 17,
+                                artistSize: 14,
+                                spacing: 2,
+                                alignment: CrossAxisAlignment.start,
+                              ),
+                            ),
+                          ),
+                        ),
+                      Positioned(
+                        left: artOrigin.dx * (1 - t),
+                        top: artOrigin.dy * (1 - t),
+                        child: Transform.scale(
+                          scale: 1 + (_headerSize / artSize - 1) * t,
+                          alignment: Alignment.topLeft,
+                          // Same tree in both states, so the artwork keeps
+                          // its state; as the header it goes back.
+                          child: GestureDetector(
+                            onTap: t > 0 ? widget.onCloseLyrics : null,
+                            child: AbsorbPointer(
+                              absorbing: t > 0,
+                              child: artwork,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              );
+            },
           ),
         ),
-        Expanded(child: LyricsPanel(metadata: metadata)),
         if (!isLive) ...[
+          const SizedBox(height: 8),
           const PositionSlider(),
           PlayerControlButtons(
             metadata: metadata,
-            iconSize: iconSize,
-            miniIconSize: miniIconSize,
+            iconSize: widget.iconSize,
+            miniIconSize: widget.miniIconSize,
           ),
           const SizedBox(height: 8),
         ],
