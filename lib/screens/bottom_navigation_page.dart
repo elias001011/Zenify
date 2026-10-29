@@ -30,6 +30,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart'
     show closeCurrentBottomSheet;
+import 'package:musify/widgets/app_logo.dart';
 import 'package:musify/widgets/app_notice.dart';
 import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/mini_player.dart';
@@ -246,12 +247,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                 child: Column(
                   children: [
                     const SizedBox(height: 18),
-                    Image.asset(
-                      'assets/icons/app_logo.png',
-                      width: 34,
-                      height: 34,
-                      color: colorScheme.primary,
-                    ),
+                    AppLogo(size: 34, color: colorScheme.primary),
                     const SizedBox(height: 22),
                     for (var i = 0; i < items.length; i++)
                       if (i != settingsIndex) railButton(i),
