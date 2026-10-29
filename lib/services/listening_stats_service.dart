@@ -33,6 +33,10 @@ import 'package:musify/utilities/map_utils.dart';
 final listeningStatsService = ListeningStatsService();
 
 class ListeningStatsService {
+  ListeningStatsService({DateTime Function()? now})
+    : _now = now ?? DateTime.now;
+
+  final DateTime Function() _now;
   static const storageKey = 'wrappedListeningStats';
 
   Map<String, dynamic>? _stats;
@@ -54,7 +58,7 @@ class ListeningStatsService {
   bool _sessionLastAudioPlayerPlaying = false;
 
   bool get hasStats {
-    final now = DateTime.now();
+    final now = _now();
     final stats = _readStats(now);
     final history = stats['history'] as Map<String, dynamic>;
     return hasDisplayableListeningStats(_asMap(stats['currentMonth'])) ||
@@ -66,21 +70,21 @@ class ListeningStatsService {
   }
 
   bool get isAnnualRecapAvailable {
-    final now = DateTime.now();
+    final now = _now();
     if (!isListeningStatsAnnualWindow(now)) return false;
 
     return hasDisplayableAnnualListeningStats(_readStats(now), now);
   }
 
-  int get year => listeningStatsAnnualYear(DateTime.now());
+  int get year => listeningStatsAnnualYear(_now());
 
   int get yearTotalSeconds {
-    final now = DateTime.now();
+    final now = _now();
     return annualTotalSecondsFromStats(_readStats(now), now);
   }
 
   List<String> get availableMonthKeys {
-    final now = DateTime.now();
+    final now = _now();
     return visibleListeningStatsMonthKeys(_readStats(now), now);
   }
 
@@ -108,7 +112,7 @@ class ListeningStatsService {
   List<Map<String, dynamic>> yearTopSongs({
     int limit = wrappedAnnualSongsLimit,
   }) {
-    final now = DateTime.now();
+    final now = _now();
     final months = annualListeningMonthsFromStats(_readStats(now), now);
     return annualListeningSongsFromMonths(months, limit: limit);
   }
@@ -130,7 +134,7 @@ class ListeningStatsService {
     if (wholeSeconds <= 0) return;
     _listeningTimeRemainder -= Duration(seconds: wholeSeconds);
 
-    final now = listenedAt ?? DateTime.now();
+    final now = listenedAt ?? _now();
     _stats = applyListeningTimeDelta(
       _readStats(now),
       listenedDuration: Duration(seconds: wholeSeconds),
@@ -148,7 +152,7 @@ class ListeningStatsService {
   }) {
     if (!wrappedEnabled.value) return;
 
-    final now = listenedAt ?? DateTime.now();
+    final now = listenedAt ?? _now();
     _stats = applyListeningStatsDelta(
       _readStats(now),
       song: song,
@@ -175,6 +179,7 @@ class ListeningStatsService {
     Map song, {
     Duration? duration,
     DateTime? startedAt,
+    bool isPlaying = true,
   }) {
     if (!wrappedEnabled.value) return;
 
@@ -186,10 +191,8 @@ class ListeningStatsService {
     _sessionDuration = duration ?? _durationFromSong(song);
     _sessionListened = Duration.zero;
     _sessionQualified = false;
-    _sessionLastTick = startedAt ?? DateTime.now();
-    // A session is started only once playback has begun, so mark it playing now;
-    // otherwise ticks before the next playerState transition would be dropped.
-    _sessionLastAudioPlayerPlaying = true;
+    _sessionLastTick = startedAt ?? _now();
+    _sessionLastAudioPlayerPlaying = isPlaying;
   }
 
   void resumeListeningSession({Map? currentSong}) {
@@ -202,17 +205,12 @@ class ListeningStatsService {
     if (ytid == null || ytid.isEmpty) return;
 
     if (_sessionSongId != ytid) {
-      // Reached from handlePlayerStateForListeningStats before
-      // _sessionLastAudioPlayerPlaying is updated, so the flag still holds the
-      // pre-transition value (false). We just got a "playing" event for a
-      // different song, meaning the previous one was playing up to this tick;
-      // pass wasPlaying: true explicitly so its final tick isn't dropped.
-      finishListeningSession(countCurrentTick: true, wasPlaying: true);
+      finishListeningSession(countCurrentTick: true);
       startListeningSession(song);
       return;
     }
 
-    _sessionLastTick = DateTime.now();
+    _sessionLastTick = _now();
     _sessionLastAudioPlayerPlaying = true;
   }
 
@@ -220,12 +218,12 @@ class ListeningStatsService {
     final song = _sessionSong;
     if (song == null) return;
 
-    final now = DateTime.now();
+    final now = _now();
     final lastTick = _sessionLastTick;
     _sessionLastTick = now;
     if (lastTick == null) return;
 
-    final shouldCount = wasPlaying ?? _sessionLastAudioPlayerPlaying;
+    final shouldCount = _sessionLastAudioPlayerPlaying && (wasPlaying ?? true);
     if (!shouldCount) return;
 
     final listenedDuration = now.difference(lastTick);
@@ -264,11 +262,10 @@ class ListeningStatsService {
     PlayerState state, {
     Map? currentSong,
   }) {
-    // just_audio keeps `playing` true after completion, so treat it as paused.
+    // `playing` is the intent to play; it also stays true during buffering
+    // and after completion. Count only a ready output, not these silent gaps.
     final playing =
-        state.playing &&
-        state.processingState != ProcessingState.completed &&
-        state.processingState != ProcessingState.idle;
+        state.playing && state.processingState == ProcessingState.ready;
     if (playing == _sessionLastAudioPlayerPlaying) return;
 
     if (playing) {
@@ -360,7 +357,7 @@ class ListeningStatsService {
   Future<void> clearStats() async {
     _dirty = false;
     _listeningTimeRemainder = Duration.zero;
-    final now = DateTime.now();
+    final now = _now();
     final cleared = createEmptyListeningStats(
       now.year,
       currentMonthKey: listeningStatsMonthKey(now),
@@ -392,7 +389,7 @@ class ListeningStatsService {
   }
 
   Map<String, dynamic> _readStats([DateTime? now]) {
-    final currentDate = now ?? DateTime.now();
+    final currentDate = now ?? _now();
     final cached = _stats;
     if (cached != null) {
       final previousMonthKey = cached['currentMonthKey']?.toString();
