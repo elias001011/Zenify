@@ -326,6 +326,7 @@ void main() async {
 
 Future<String?> initialisation() async {
   String? startupError;
+  var importedLibrary = false;
   // Folders chosen in the Windows installer, if any.
   final installConfig = isDesktopPlatform
       ? await InstallConfig.load()
@@ -349,7 +350,7 @@ Future<String?> initialisation() async {
           defaultSupportPath,
           log: logger.log,
         );
-        await _copyLegacyDesktopDataIfNeeded(
+        importedLibrary = await _copyLegacyDesktopDataIfNeeded(
           applicationDirPath,
           defaultSupportPath,
         );
@@ -365,6 +366,7 @@ Future<String?> initialisation() async {
       Hive.openBox('userNoBackup'),
       Hive.openBox('cache'),
     ]);
+    if (importedLibrary) await forgetImportedSyncIdentity();
 
     try {
       await LocalSyncService.instance.initialise();
@@ -555,7 +557,8 @@ Future<({String path, bool isFallback})> _resolveApplicationDirPath() async {
   }
 }
 
-Future<void> _copyLegacyDesktopDataIfNeeded(
+/// Whether the library was copied from Musify; returns true when it was.
+Future<bool> _copyLegacyDesktopDataIfNeeded(
   String targetPath,
   String defaultSupportPath,
 ) async {
@@ -578,6 +581,7 @@ Future<void> _copyLegacyDesktopDataIfNeeded(
   }
   if (report.hasWork)
     logger.log('Desktop data migration: ${report.describe()}');
+  return report.copied.isNotEmpty;
 }
 
 void handleIncomingLink(Uri? uri) async {

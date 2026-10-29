@@ -23,6 +23,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/services/data_manager.dart' show validateHiveBackup;
@@ -220,7 +221,15 @@ Future<HiveCopyReport> copyHiveBoxes({
       }
       for (final MapEntry(key: name, value: box) in names.entries) {
         final bytes = await File('${from.path}/$name').readAsBytes();
-        if (unlocked.contains(name)) await validateHiveBackup(box, bytes);
+        if (unlocked.contains(name)) {
+          try {
+            await validateHiveBackup(box, bytes);
+          } on FormatException catch (error) {
+            // A damaged frame must not keep Zenify from starting: Hive
+            // recovers the box on opening, as Musify itself would.
+            log?.call('Copying $name with a damaged frame', error: error);
+          }
+        }
         await File('${staging.path}/$name').writeAsBytes(bytes, flush: true);
       }
       final pending = File('${journal.path}.tmp');
@@ -261,6 +270,20 @@ Future<HiveCopyReport> copyHiveBoxes({
       await lock.close();
     }
   }
+}
+
+/// A library copied from another Musify install (such as the Desktop Port)
+/// carries that install's Local Sync identity and pairings; two apps sharing
+/// them would pose as one device. Zenify keeps the library, starts its own
+/// identity and leaves Local Sync off until turned on here.
+Future<void> forgetImportedSyncIdentity() async {
+  final store = Hive.box('userNoBackup');
+  await store.deleteAll([
+    for (final key in store.keys)
+      if (key is String && key.startsWith('localSync')) key,
+  ]);
+  await Hive.box('settings')
+      .deleteAll(['localSyncEnabled', 'localSyncLastSyncedAt']);
 }
 
 /// Modern Musify data precedes the old Documents layout. Existing Zenify
