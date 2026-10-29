@@ -210,107 +210,53 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     try {
-      final known = librarySongsById();
       final artistsFuture = searchArtists(query);
-
-      Future<void> publishSongs() async {
+      Future<List> guarded(String what, Future<List> Function() fetch) async {
         try {
-          var songs = await fetchSongsList(query);
-          if (!mounted || requestId != _latestSearchRequest) return;
-
-          if (songs.isEmpty) {
-            final artists = await artistsFuture;
-            if (!mounted || requestId != _latestSearchRequest) return;
-            if (_artistsSearchResult.isEmpty) {
-              _artistsSearchResult = artists
-                  .whereType<Map>()
-                  .map(Map<String, dynamic>.from)
-                  .toList();
-            }
-            if (_artistsSearchResult.isNotEmpty) {
-              songs = await _fetchSongsForResolvedArtist(query);
-            }
-          }
-
-          if (!mounted || requestId != _latestSearchRequest) return;
-          setState(
-            () => _songsSearchResult = libraryFirst(
-              _libraryResult.songs,
-              songs,
-              known: known,
-            ),
-          );
+          return await fetch().timeout(const Duration(seconds: 15));
         } catch (e, stackTrace) {
           logger.log(
-            'Error while searching online songs',
+            'Error while searching online $what',
             error: e,
             stackTrace: stackTrace,
           );
+          return const [];
         }
       }
 
-      Future<void> publishArtists() async {
-        try {
-          final artists = await artistsFuture;
-          if (!mounted || requestId != _latestSearchRequest) return;
-          setState(() {
-            _artistsSearchResult = _newArtists(artists)
-                .map(Map<String, dynamic>.from)
-                .toList();
-          });
-        } catch (e, stackTrace) {
-          logger.log(
-            'Error while searching online artists',
-            error: e,
-            stackTrace: stackTrace,
-          );
-        }
-      }
-
-      Future<void> publishAlbums() async {
-        try {
-          final albums = await getPlaylists(query: query, type: 'album');
-          if (!mounted || requestId != _latestSearchRequest) return;
-          setState(
-            () => _albumsSearchResult = libraryFirst(
-              _libraryAlbums(true),
-              albums,
-            ),
-          );
-        } catch (e, stackTrace) {
-          logger.log(
-            'Error while searching online albums',
-            error: e,
-            stackTrace: stackTrace,
-          );
-        }
-      }
-
-      Future<void> publishPlaylists() async {
-        try {
-          final playlists = await getPlaylists(query: query, type: 'playlist');
-          if (!mounted || requestId != _latestSearchRequest) return;
-          setState(
-            () => _playlistsSearchResult = libraryFirst(
-              _libraryAlbums(false),
-              playlists,
-            ),
-          );
-        } catch (e, stackTrace) {
-          logger.log(
-            'Error while searching online playlists',
-            error: e,
-            stackTrace: stackTrace,
-          );
-        }
-      }
-
-      await Future.wait([
-        publishSongs(),
-        publishArtists(),
-        publishAlbums(),
-        publishPlaylists(),
+      // Two steps, each at once: songs and artists, the top of the page,
+      // then albums and playlists below them, which moves nothing above.
+      final top = Future.wait([
+        guarded('songs', () => _fetchSongs(query, artistsFuture)),
+        guarded('artists', () => artistsFuture),
       ]);
+      final rest = Future.wait([
+        guarded('albums', () => getPlaylists(query: query, type: 'album')),
+        guarded(
+          'playlists',
+          () => getPlaylists(query: query, type: 'playlist'),
+        ),
+      ]);
+
+      final [songs, artists] = await top;
+      if (!mounted || requestId != _latestSearchRequest) return;
+      setState(() {
+        _songsSearchResult = libraryFirst(
+          _libraryResult.songs,
+          songs,
+          known: librarySongsById(),
+        );
+        _artistsSearchResult = _newArtists(artists)
+            .map(Map<String, dynamic>.from)
+            .toList();
+      });
+
+      final [albums, playlists] = await rest;
+      if (!mounted || requestId != _latestSearchRequest) return;
+      setState(() {
+        _albumsSearchResult = libraryFirst(_libraryAlbums(true), albums);
+        _playlistsSearchResult = libraryFirst(_libraryAlbums(false), playlists);
+      });
     } catch (e, stackTrace) {
       logger.log(
         'Error while searching online songs',
@@ -351,9 +297,17 @@ class _SearchPageState extends State<SearchPage> {
     ];
   }
 
-  Future<List<dynamic>> _fetchSongsForResolvedArtist(String query) async {
-    final artistName = _artistsSearchResult.first['title']?.toString().trim();
-    if (artistName == null || artistName.isEmpty) return [];
+  /// Songs for [query]; when it finds none but names an artist, that
+  /// artist's songs.
+  Future<List> _fetchSongs(
+    String query,
+    Future<List<Map<String, dynamic>>> artistsFuture,
+  ) async {
+    final songs = await fetchSongsList(query);
+    if (songs.isNotEmpty) return songs;
+    final artists = await artistsFuture;
+    final artistName = artists.firstOrNull?['title']?.toString().trim();
+    if (artistName == null || artistName.isEmpty) return const [];
 
     final fallbackQueries = <String>{
       if (artistName.toLowerCase() != query.trim().toLowerCase()) artistName,
@@ -462,9 +416,7 @@ class _SearchPageState extends State<SearchPage> {
                             : _suggestionsList;
 
                         return Column(
-                          key: ValueKey(
-                            'history-${_suggestionsList.length}-${_searchBar.text}-${searchHistory.length}',
-                          ),
+                          key: const ValueKey('history'),
                           children: [
                             for (int index = 0; index < items.length; index++)
                               Builder(
@@ -710,12 +662,7 @@ class _SearchPageState extends State<SearchPage> {
       }
     }
 
-    return Column(
-      key: ValueKey(
-        'results-${_songsSearchResult.length}-${_artistsSearchResult.length}-${_albumsSearchResult.length}-${_playlistsSearchResult.length}',
-      ),
-      children: widgets,
-    );
+    return Column(key: const ValueKey('results'), children: widgets);
   }
 
   Future<bool?> _showConfirmationDialog(BuildContext context) {

@@ -427,16 +427,27 @@ class _LibraryPageState extends State<LibraryPage> {
               .toList()
         : const [];
 
+    // While searching, the matching songs are listed instead.
     if (_filter == _LibraryFilter.offline &&
+        _query.isEmpty &&
         userOfflineSongs.value.isNotEmpty) {
       slivers.add(
         SliverToBoxAdapter(
-          child: PlaylistBar(
-            context.l10n!.offlineSongs,
-            onPressed: () =>
-                NavigationManager.router.go('/library/userSongs/offline'),
-            cubeIcon: FluentIcons.cloud_off_24_regular,
-            showBuildActions: false,
+          child: Column(
+            children: [
+              SectionHeader(
+                title: context.l10n!.songs,
+                icon: FluentIcons.music_note_1_24_filled,
+              ),
+              PlaylistBar(
+                context.l10n!.offlineSongs,
+                onPressed: () =>
+                    NavigationManager.router.go('/library/userSongs/offline'),
+                cubeIcon: FluentIcons.cloud_off_24_regular,
+                borderRadius: commonCustomBarRadius,
+                showBuildActions: false,
+              ),
+            ],
           ),
         ),
       );

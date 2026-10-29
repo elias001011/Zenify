@@ -5,7 +5,7 @@ repository: https://github.com/elias001011/Zenify
 issue_tracker: https://github.com/elias001011/Zenify/issues
 
 publish_to: 'none'
-version: 0.1.4+5 # run update.sh after changing the version
+version: 0.1.5+6 # run update.sh after changing the version
 
 environment:
   sdk: '>=3.13.0 <4.0.0'
@@ -66,7 +66,6 @@ flutter:
   # To add assets to your application, add an assets section, like this:
   assets:
     - assets/licenses/
-    - assets/icons/app_logo.png
     - assets/icons/ic_launcher.png
 
   fonts:

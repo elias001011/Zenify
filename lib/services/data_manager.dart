@@ -362,6 +362,10 @@ Future<({String message, bool success})> restoreData(
     // Validate before closing live boxes; recovery must never turn a corrupt
     // backup into an apparently valid empty library.
     for (final boxName in boxNames) {
+      // An empty library is no backup, most likely a cut-off copy.
+      if (boxName == 'user' && backupBytes[boxName]!.isEmpty) {
+        throw const FormatException('Empty backup: user');
+      }
       await validateHiveBackup(boxName, backupBytes[boxName]!);
     }
     for (final boxName in boxNames) {

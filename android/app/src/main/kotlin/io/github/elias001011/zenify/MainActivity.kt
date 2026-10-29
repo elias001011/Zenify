@@ -12,7 +12,6 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
-import kotlin.math.max
 import kotlin.math.sqrt
 
 class MainActivity : FlutterActivity() {
@@ -98,11 +97,11 @@ class MainActivity : FlutterActivity() {
     ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
       PackageManager.PERMISSION_GRANTED
 
-  /// Sends [energy, flux, spectral centroid in Hz] for every FFT capture.
+  /// Sends [overall level, then the level of each band in BAND_EDGES_HZ] for
+  /// every FFT capture: the same five bands the desktop measures with mpv.
   private fun startVisualizer(session: Int, events: EventChannel.EventSink) {
     stopVisualizer()
     val captureSize = minOf(1024, Visualizer.getCaptureSizeRange()[1])
-    var previous = FloatArray(captureSize / 2)
     visualizer = Visualizer(session).apply {
       this.captureSize = captureSize
       val binHz = samplingRate / 1000.0 / captureSize
@@ -113,28 +112,28 @@ class MainActivity : FlutterActivity() {
           override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, rate: Int) {
             if (fft == null) return
             val bins = fft.size / 2
-            if (previous.size != bins) previous = FloatArray(bins)
+            val bandEnergy = DoubleArray(BAND_EDGES_HZ.size - 1)
+            val bandBins = IntArray(BAND_EDGES_HZ.size - 1)
             var energy = 0.0
-            var flux = 0.0
-            var weighted = 0.0
-            var total = 0.0
+            var band = 0
             for (k in 1 until bins) {
               val re = fft[2 * k].toDouble()
               val im = fft[2 * k + 1].toDouble()
-              val magnitude = sqrt(re * re + im * im)
-              energy += magnitude * magnitude
-              flux += max(0.0, magnitude - previous[k])
-              weighted += magnitude * k * binHz
-              total += magnitude
-              previous[k] = magnitude.toFloat()
+              val power = re * re + im * im
+              energy += power
+              val hz = k * binHz
+              while (band < bandEnergy.size - 1 && hz >= BAND_EDGES_HZ[band + 1]) band++
+              if (hz >= BAND_EDGES_HZ[0]) {
+                bandEnergy[band] += power
+                bandBins[band]++
+              }
             }
-            events.success(
-              doubleArrayOf(
-                sqrt(energy / bins) / 128.0,
-                flux / bins / 128.0,
-                if (total > 0) weighted / total else 0.0,
-              ),
-            )
+            val levels = DoubleArray(bandEnergy.size + 1)
+            levels[0] = sqrt(energy / bins) / 128.0
+            for (b in bandEnergy.indices) {
+              levels[b + 1] = if (bandBins[b] > 0) sqrt(bandEnergy[b] / bandBins[b]) / 128.0 else 0.0
+            }
+            events.success(levels)
           }
         },
         Visualizer.getMaxCaptureRate(),
@@ -155,5 +154,8 @@ class MainActivity : FlutterActivity() {
 
   private companion object {
     const val AUDIO_PERMISSION_REQUEST = 4108
+
+    /// Sub-bass, bass, low mids, mids and treble, as on desktop.
+    val BAND_EDGES_HZ = doubleArrayOf(20.0, 90.0, 280.0, 1000.0, 4000.0, 20000.0)
   }
 }

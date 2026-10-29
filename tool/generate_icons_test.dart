@@ -1,72 +1,32 @@
-// Draws the Zenify icon (a blue audio waveform on black) in every size the
+// Draws the Zenify icon (five flat blue bars on black, as the in-app logo) in every size the
 // platforms need. Run from the repository root:
 //   flutter test tool/generate_icons_test.dart
 
 import 'dart:io';
-import 'dart:math';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/widgets/app_logo.dart';
 
-const _gradient = [Color(0xFF34E0FF), Color(0xFF2F7BFF), Color(0xFF4A4DFF)];
-const _glow = Color(0xFF2F7BFF);
+/// The logo's blue: the app's own accent in the dark theme, as the in-app
+/// logo shows it.
+final _blue = ColorScheme.fromSeed(
+  seedColor: const Color(0xff91cef4),
+  brightness: Brightness.dark,
+).primary;
 
 enum _Style { color, white }
 
-/// Bar heights of the waveform, by how many bars fit the size.
-const _waveforms = {
-  9: [.3, .56, .4, .8, 1.0, .8, .4, .56, .3],
-  7: [.32, .6, .84, 1.0, .84, .6, .32],
-  5: [.42, .76, 1.0, .76, .42],
-};
-
-/// Paints an audio waveform centred in [rect]. Small sizes get fewer, wider
-/// bars so they stay legible.
-void _paintWaves(Canvas canvas, Rect rect, double pixels, _Style style) {
-  final heights = _waveforms[pixels >= 96 ? 9 : (pixels >= 40 ? 7 : 5)]!;
-  // Bar, gap, bar...: bars take 60% of each step.
-  final step = rect.width / (heights.length - 0.4);
-  final barWidth = step * 0.6;
-
-  final paint = Paint();
-  if (style == _Style.color) {
-    paint.shader = ui.Gradient.linear(
-      rect.topLeft,
-      rect.bottomRight,
-      _gradient,
-      const [0, 0.5, 1],
-    );
-  } else {
-    paint.color = Colors.white;
-  }
-
-  for (var i = 0; i < heights.length; i++) {
-    final height = max(barWidth, rect.height * heights[i]);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(rect.left + i * step + barWidth / 2, rect.center.dy),
-          width: barWidth,
-          height: height,
-        ),
-        Radius.circular(barWidth / 2),
-      ),
-      paint,
-    );
-  }
-}
-
-void _paintGlow(Canvas canvas, Offset center, double radius) {
-  canvas.drawCircle(
-    center,
-    radius,
-    Paint()
-      ..shader = ui.Gradient.radial(center, radius, [
-        _glow.withValues(alpha: 0.3),
-        _glow.withValues(alpha: 0),
-      ]),
+/// Five flat bars in [rect], blue or white, the same in every size.
+void _paintWaves(Canvas canvas, Rect rect, _Style style) {
+  paintZenifyWaves(
+    canvas,
+    rect,
+    rect.width,
+    Paint()..color = style == _Style.color ? _blue : Colors.white,
+    bars: 5,
   );
 }
 
@@ -84,15 +44,13 @@ void _icon(Canvas canvas, double size, {bool square = false}) {
       ),
     )
     ..drawRect(shape, Paint()..color = Colors.black);
-  _paintGlow(canvas, bounds.center, size * 0.38);
   _paintWaves(
     canvas,
     Rect.fromCenter(
       center: bounds.center,
-      width: size * 0.54,
-      height: size * 0.54,
+      width: size * 0.5,
+      height: size * 0.5,
     ),
-    size,
     _Style.color,
   );
   canvas.restore();
@@ -101,22 +59,19 @@ void _icon(Canvas canvas, double size, {bool square = false}) {
 /// Android adaptive layers: the art inside the 66dp safe zone of 108dp.
 void _adaptive(Canvas canvas, double size, _Style style) {
   final center = Offset(size / 2, size / 2);
-  if (style == _Style.color) _paintGlow(canvas, center, size * 0.27);
   _paintWaves(
     canvas,
-    Rect.fromCenter(center: center, width: size * 0.48, height: size * 0.48),
-    size * 0.48,
+    Rect.fromCenter(center: center, width: size * 0.44, height: size * 0.44),
     style,
   );
 }
 
-/// White silhouette for the notification and tinted in-app logos.
+/// White silhouette for the notification icon.
 void _glyph(Canvas canvas, double size) {
   final center = Offset(size / 2, size / 2);
   _paintWaves(
     canvas,
     Rect.fromCenter(center: center, width: size * 0.92, height: size * 0.92),
-    size,
     _Style.white,
   );
 }
@@ -208,7 +163,6 @@ void main() {
         .readAsBytesSync();
     File('assets/icons/ic_launcher.png').writeAsBytesSync(launcher);
     File('windows/runner/resources/app_icon.png').writeAsBytesSync(launcher);
-    await _write('assets/icons/app_logo.png', 96, _glyph);
     await _write(
       'fastlane/metadata/android/en-US/images/icon.png',
       512,

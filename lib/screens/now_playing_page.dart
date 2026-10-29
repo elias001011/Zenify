@@ -65,6 +65,9 @@ Route<void> buildNowPlayingRoute() {
 class _NowPlayingPageState extends State<NowPlayingPage> {
   /// Open beside the player (wide layout only). Closed by default.
   PlayerPanel? _panel;
+
+  /// Shared by this screen's blurred surfaces, kept across rebuilds.
+  final _backdropKey = BackdropKey();
   Animation<double>? _routeAnimation;
   bool _backgroundVisible = false;
 
@@ -99,9 +102,15 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     MediaItem metadata,
     BuildContext sheetContext,
   ) {
-    if (_PlayerLayout.of(MediaQuery.sizeOf(context)).showsInline(panel)) {
+    final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
+    if (layout.showsInline(panel)) {
       setState(() => _panel = _panel == panel ? null : panel);
       return;
+    }
+    // A sheet replaces a panel left from another layout, not one in view
+    // (the upright lyrics stay while the queue sheet is open).
+    if (_panel case final open? when !layout.showsInline(open)) {
+      setState(() => _panel = null);
     }
     showCustomBottomSheet(
       sheetContext,
@@ -125,39 +134,46 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
           if (metadata == null) {
             return const Center(child: CircularProgressIndicator());
           }
+          final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
+          // What shows depends on the layout now: a phone turned sideways
+          // with the lyrics open shows none, and gets them back upright.
+          final panel = _panel != null && layout.showsInline(_panel!)
+              ? _panel
+              : null;
           final actions = PlayerActions(
             metadata: metadata,
-            panel: _panel,
+            panel: panel,
             onPanel: (panel, sheetContext) =>
                 _onPanel(panel, metadata, sheetContext),
           );
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: AnimatedOpacity(
-                  opacity: _backgroundVisible ? 1 : 0,
-                  duration: const Duration(milliseconds: 700),
-                  curve: Curves.easeOutCubic,
-                  child: PageGlow(source: mediaItemArtworkSource(metadata)),
+          // Its own group: during the slide its surfaces sit over the shell's.
+          return BackdropGroup(
+            backdropKey: _backdropKey,
+            child: Stack(
+              children: [
+                // Expands once the player has slid up.
+                Positioned.fill(
+                  child: PageGlow(
+                    source: mediaItemArtworkSource(metadata),
+                    waiting: !_backgroundVisible,
+                  ),
                 ),
-              ),
-              SafeArea(
-                child:
-                    _PlayerLayout.of(MediaQuery.sizeOf(context)) ==
-                        _PlayerLayout.wide
-                    ? _WideLayout(
-                        metadata: metadata,
-                        actions: actions,
-                        panel: _panel,
-                      )
-                    : _CompactLayout(
-                        metadata: metadata,
-                        actions: actions,
-                        lyrics: _panel == PlayerPanel.lyrics,
-                        onCloseLyrics: () => setState(() => _panel = null),
-                      ),
-              ),
-            ],
+                SafeArea(
+                  child: layout == _PlayerLayout.wide
+                      ? _WideLayout(
+                          metadata: metadata,
+                          actions: actions,
+                          panel: panel,
+                        )
+                      : _CompactLayout(
+                          metadata: metadata,
+                          actions: actions,
+                          lyrics: panel == PlayerPanel.lyrics,
+                          onCloseLyrics: () => setState(() => _panel = null),
+                        ),
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -318,17 +334,35 @@ class _UprightStageState extends State<_UprightStage>
     parent: _controller,
     curve: Curves.easeInOutCubic,
   );
+  late final _lyricsFade = CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0.4, 1, curve: Curves.easeIn),
+  );
+
+  /// The lyrics stay built from the tap until they have faded out.
+  late bool _lyricsBuilt = widget.lyrics;
 
   @override
   void didUpdateWidget(_UprightStage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.lyrics != oldWidget.lyrics) {
-      widget.lyrics ? _controller.forward() : _controller.reverse();
+    if (widget.lyrics == oldWidget.lyrics) return;
+    if (widget.lyrics) {
+      // Build the lyrics in this frame and move from the next, so building
+      // them never stalls the move.
+      _lyricsBuilt = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.lyrics) _controller.forward();
+      });
+    } else {
+      _controller.reverse().whenCompleteOrCancel(() {
+        if (mounted && !widget.lyrics) setState(() => _lyricsBuilt = false);
+      });
     }
   }
 
   @override
   void dispose() {
+    _lyricsFade.dispose();
     _progress.dispose();
     _controller.dispose();
     super.dispose();
@@ -401,11 +435,14 @@ class _UprightStageState extends State<_UprightStage>
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      if (t > 0)
+                      // Keyed, so the artwork keeps its state (image, waves)
+                      // while the others come and go before it.
+                      if (_lyricsBuilt)
                         Positioned.fill(
+                          key: const ValueKey('lyrics'),
                           top: _headerSize + 12,
-                          child: Opacity(
-                            opacity: Curves.easeIn.transform(t),
+                          child: FadeTransition(
+                            opacity: _lyricsFade,
                             child: IgnorePointer(
                               ignoring: t < 1,
                               child: lyrics,
@@ -414,6 +451,7 @@ class _UprightStageState extends State<_UprightStage>
                         ),
                       if (under > 0)
                         Positioned(
+                          key: const ValueKey('title'),
                           left: 0,
                           right: 0,
                           top: art.bottom + _gap,
@@ -422,6 +460,7 @@ class _UprightStageState extends State<_UprightStage>
                         ),
                       if (beside > 0)
                         Positioned(
+                          key: const ValueKey('header'),
                           left: art.right + 14,
                           right: 0,
                           top: art.center.dy - _headerSize / 2,
@@ -429,6 +468,7 @@ class _UprightStageState extends State<_UprightStage>
                           child: Opacity(opacity: beside, child: headerTitle),
                         ),
                       Positioned(
+                        key: const ValueKey('artwork'),
                         left: art.left,
                         top: art.top,
                         child: Transform.scale(
@@ -489,13 +529,19 @@ class _WideLayoutState extends State<_WideLayout> {
 
   /// What the song, playback and actions take under the artwork, measured
   /// after each layout: it changes with the text size and for live radio.
-  /// Starts generous, so the first frame never overflows.
-  double _below = 400;
+  /// The last song's measure starts the next player, so only the first
+  /// opening corrects itself; live radio, shorter, is left out of it, so the
+  /// guess stays on the generous side and the first frame doesn't overflow.
+  static double _lastSongBelow = 400;
+  double _below = _lastSongBelow;
 
   void _measure(Duration _) {
     final height = _belowKey.currentContext?.size?.height;
     if (mounted && height != null && (height - _below).abs() > 0.5) {
       setState(() => _below = height);
+      if (!(widget.metadata.extras?['isLive'] ?? false)) {
+        _lastSongBelow = height;
+      }
     }
   }
 
@@ -591,6 +637,7 @@ class _SidePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FloatingSurface(
+      grouped: true,
       child: panel == PlayerPanel.queue
           ? const QueueWidget()
           : LyricsPanel(metadata: metadata),

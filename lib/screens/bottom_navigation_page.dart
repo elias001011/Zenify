@@ -30,6 +30,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart'
     show closeCurrentBottomSheet;
+import 'package:musify/widgets/app_logo.dart';
 import 'package:musify/widgets/app_notice.dart';
 import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/mini_player.dart';
@@ -51,6 +52,9 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
   /// Keeps the branch navigators and their state when the layout switches
   /// between the dock and the rail, which moves them in the tree.
   final _contentKey = GlobalKey();
+
+  /// Shared by this screen's blurred surfaces, kept across rebuilds.
+  final _backdropKey = BackdropKey();
 
   @override
   void initState() {
@@ -92,26 +96,32 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
         }
       },
       child: Scaffold(
-        body: SafeArea(
-          bottom: false,
-          child: StreamBuilder<bool>(
-            initialData: audioHandler.mediaItem.value != null,
-            stream: _miniPlayerVisibilityStream,
-            builder: (context, snapshot) {
-              final playing = snapshot.data ?? false;
-              return ValueListenableBuilder<bool>(
-                valueListenable: compactDesktopPlayer,
-                builder: (context, compact, _) => isLargeScreen && !compact
-                    ? _buildDesktop(context, items, selected, playing)
-                    : _buildMobile(
-                        context,
-                        items,
-                        selected,
-                        playing,
-                        maxDockWidth: isLargeScreen ? 420 : null,
-                      ),
-              );
-            },
+        body: BackdropGroup(
+          backdropKey: _backdropKey,
+          // Pages reach under the status bar, so their background does too;
+          // each keeps its content and island below it.
+          child: SafeArea(
+            top: false,
+            bottom: false,
+            child: StreamBuilder<bool>(
+              initialData: audioHandler.mediaItem.value != null,
+              stream: _miniPlayerVisibilityStream,
+              builder: (context, snapshot) {
+                final playing = snapshot.data ?? false;
+                return ValueListenableBuilder<bool>(
+                  valueListenable: compactDesktopPlayer,
+                  builder: (context, compact, _) => isLargeScreen && !compact
+                      ? _buildDesktop(context, items, selected, playing)
+                      : _buildMobile(
+                          context,
+                          items,
+                          selected,
+                          playing,
+                          maxDockWidth: isLargeScreen ? 420 : null,
+                        ),
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -171,6 +181,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
           bottom: safeBottom + _margin,
           child: RepaintBoundary(
             child: FloatingSurface(
+              grouped: true,
               padding: const EdgeInsets.all(_dockPadding),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -180,14 +191,14 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                   SizedBox(
                     height: _dockBarHeight,
                     child: Row(
-                      // Even gaps fill the dock; each tap area stays compact.
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         for (var i = 0; i < items.length; i++)
-                          _DockButton(
-                            item: items[i],
-                            selected: i == selected,
-                            onTap: () => _onTabTapped(i, items),
+                          Expanded(
+                            child: _DockButton(
+                              item: items[i],
+                              selected: i == selected,
+                              onTap: () => _onTabTapped(i, items),
+                            ),
                           ),
                       ],
                     ),
@@ -227,22 +238,19 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
         ),
         Positioned(
           left: _margin,
-          top: _margin,
+          // Below the status bar of a tablet or a phone on its side.
+          top: MediaQuery.viewPaddingOf(context).top + _margin,
           bottom: _margin,
           child: RepaintBoundary(
             child: FloatingSurface(
+              grouped: true,
               borderRadius: const BorderRadius.all(Radius.circular(24)),
               child: SizedBox(
                 width: _railWidth,
                 child: Column(
                   children: [
                     const SizedBox(height: 18),
-                    Image.asset(
-                      'assets/icons/app_logo.png',
-                      width: 34,
-                      height: 34,
-                      color: colorScheme.primary,
-                    ),
+                    AppLogo(size: 34, color: colorScheme.primary),
                     const SizedBox(height: 22),
                     for (var i = 0; i < items.length; i++)
                       if (i != settingsIndex) railButton(i),
@@ -262,6 +270,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
             bottom: _margin,
             child: RepaintBoundary(
               child: FloatingSurface(
+                grouped: true,
                 borderRadius: BorderRadius.all(Radius.circular(24)),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -329,17 +338,20 @@ class _DockButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // A fixed slot, so the pill can grow without moving its neighbours.
-    return SizedBox(
-      width: 64,
-      child: Center(
-        child: Tooltip(
-          message: item.label,
-          child: Semantics(
-            selected: selected,
-            button: true,
-            label: item.label,
-            excludeSemantics: true,
+    // The whole slice of the dock answers a tap, not just the pill, so a
+    // thumb slightly off the icon still switches tabs. The fixed slice also
+    // lets the pill grow without moving its neighbours.
+    return Tooltip(
+      message: item.label,
+      child: Semantics(
+        selected: selected,
+        button: true,
+        label: item.label,
+        excludeSemantics: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Center(
             child: Material(
               color: selected
                   ? colorScheme.secondaryContainer

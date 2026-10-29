@@ -271,6 +271,7 @@ class PlayerActionBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FloatingSurface(
+      grouped: true,
       child: SizedBox(
         height: 64,
         child: Center(

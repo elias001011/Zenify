@@ -72,6 +72,12 @@ class IslandScaffold extends StatefulWidget {
   /// Space a page keeps free at the top for the island.
   static const double inset = _islandHeight + _islandMargin * 2;
 
+  /// Space a page keeps free at the top: the status bar, which its background
+  /// reaches under, and the island. The same wherever it is read on the page,
+  /// since it comes from the view padding, which the scaffold leaves alone.
+  static double topSpace(BuildContext context) =>
+      MediaQuery.viewPaddingOf(context).top + inset;
+
   @override
   State<IslandScaffold> createState() => _IslandScaffoldState();
 }
@@ -113,7 +119,7 @@ class _IslandScaffoldState extends State<IslandScaffold> {
               child: MediaQuery(
                 data: media.copyWith(
                   padding: media.padding.copyWith(
-                    top: media.padding.top + IslandScaffold.inset,
+                    top: IslandScaffold.topSpace(context),
                     left: 0,
                   ),
                 ),
@@ -122,7 +128,7 @@ class _IslandScaffoldState extends State<IslandScaffold> {
             ),
           ),
           Positioned(
-            top: media.padding.top + _islandMargin,
+            top: media.viewPadding.top + _islandMargin,
             left: left + _islandMargin,
             child: _Island(
               title: widget.title,
@@ -361,11 +367,10 @@ class _IslandState extends State<_Island> {
   }
 }
 
-/// [padding] plus the island's space, for scroll views that do not read the
-/// top padding themselves (e.g. [SingleChildScrollView]). The shell already
-/// takes the system inset, so the island's own height is all that is added.
+/// [padding] plus [IslandScaffold.topSpace], for scroll views that do not
+/// read the top padding themselves (e.g. [SingleChildScrollView]).
 EdgeInsets withIslandInset(BuildContext context, EdgeInsets padding) =>
-    padding.copyWith(top: padding.top + IslandScaffold.inset);
+    padding.copyWith(top: padding.top + IslandScaffold.topSpace(context));
 
 /// Settings and other pages of controls and text keep to this width on wide
 /// windows, centred, as desktop players do; music lists use the whole window.
@@ -411,6 +416,6 @@ class SliverIslandTopSpace extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SliverToBoxAdapter(
-    child: SizedBox(height: MediaQuery.paddingOf(context).top),
+    child: SizedBox(height: IslandScaffold.topSpace(context)),
   );
 }

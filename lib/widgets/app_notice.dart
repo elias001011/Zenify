@@ -51,7 +51,10 @@ abstract final class AppNotices {
     _timer = Timer(duration, dismiss);
   }
 
-  static void dismiss() {
+  /// Dismisses the current notice, or, given [notice], only if it is still
+  /// the current one.
+  static void dismiss([AppNotice? notice]) {
+    if (notice != null && current.value != notice) return;
     _timer?.cancel();
     current.value = null;
   }
@@ -101,7 +104,7 @@ class _NoticeSlotState extends State<NoticeSlot> {
         alignment: Alignment.bottomCenter,
         child: notice == null || !inFront
             ? const SizedBox(width: double.infinity)
-            : _NoticeContent(notice),
+            : _NoticeContent(notice, key: ObjectKey(notice)),
       ),
     );
   }
@@ -148,7 +151,7 @@ class NoticeHost extends StatelessWidget {
 }
 
 class _NoticeContent extends StatelessWidget {
-  const _NoticeContent(this.notice);
+  const _NoticeContent(this.notice, {super.key});
 
   final AppNotice notice;
 
@@ -156,35 +159,79 @@ class _NoticeContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final actionLabel = notice.actionLabel;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 36),
-        child: Row(
-          children: [
-            Icon(
-              notice.icon ?? FluentIcons.checkmark_circle_20_regular,
-              size: 20,
-              color: colorScheme.primary,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                notice.text,
-                style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
+    return _SwipeDownToDismiss(
+      notice: notice,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 36),
+          child: Row(
+            children: [
+              Icon(
+                notice.icon ?? FluentIcons.checkmark_circle_20_regular,
+                size: 20,
+                color: colorScheme.primary,
               ),
-            ),
-            if (actionLabel != null)
-              TextButton(
-                onPressed: () {
-                  AppNotices.dismiss();
-                  notice.onAction?.call();
-                },
-                child: Text(actionLabel),
-              )
-            else
-              const SizedBox(width: 6),
-          ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  notice.text,
+                  style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
+                ),
+              ),
+              if (actionLabel != null)
+                TextButton(
+                  onPressed: () {
+                    AppNotices.dismiss();
+                    notice.onAction?.call();
+                  },
+                  child: Text(actionLabel),
+                )
+              else
+                const SizedBox(width: 6),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Follows a downward drag and dismisses the notice once dragged or flung
+/// far enough, as Musify's snack bars did; otherwise it springs back.
+/// Clipped, so it doesn't slide over the mini player below it.
+class _SwipeDownToDismiss extends StatefulWidget {
+  const _SwipeDownToDismiss({required this.notice, required this.child});
+
+  final AppNotice notice;
+  final Widget child;
+
+  @override
+  State<_SwipeDownToDismiss> createState() => _SwipeDownToDismissState();
+}
+
+class _SwipeDownToDismissState extends State<_SwipeDownToDismiss> {
+  double _offset = 0;
+
+  void _end(DragEndDetails details) {
+    if (_offset > 24 || (details.primaryVelocity ?? 0) > 300) {
+      AppNotices.dismiss(widget.notice);
+    } else {
+      setState(() => _offset = 0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onVerticalDragUpdate: (details) =>
+          setState(() => _offset = (_offset + details.delta.dy).clamp(0, 80)),
+      onVerticalDragEnd: _end,
+      onVerticalDragCancel: () => setState(() => _offset = 0),
+      child: ClipRect(
+        child: Transform.translate(
+          offset: Offset(0, _offset),
+          child: widget.child,
         ),
       ),
     );

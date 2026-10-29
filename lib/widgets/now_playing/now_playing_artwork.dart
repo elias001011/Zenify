@@ -81,20 +81,11 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          SongArtworkWidget(
-            metadata: widget.metadata,
-            size: size,
-            errorWidgetIconSize: size / 6,
-            borderRadius: _radius,
-          ),
-          Positioned(
-            right: 10,
-            bottom: 10,
-            child: _AudioQualityBadge(metadata: widget.metadata),
-          ),
-        ],
+      child: SongArtworkWidget(
+        metadata: widget.metadata,
+        size: size,
+        errorWidgetIconSize: size / 6,
+        borderRadius: _radius,
       ),
     );
 
@@ -117,8 +108,32 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       ),
     );
 
-    if (!isDesktopPlatform) return content;
+    return Stack(
+      children: [
+        if (isDesktopPlatform) _tilted(content) else content,
+        // Kept flat over the tilt, where small text would shimmer; it leaves
+        // with a fade when the artwork flips to the waves.
+        Positioned(
+          right: 10,
+          bottom: 10,
+          child: ValueListenableBuilder<bool>(
+            valueListenable: showPlayerVisualizer,
+            builder: (context, visualizer, child) => AnimatedOpacity(
+              opacity: visualizer ? 0 : 1,
+              duration: const Duration(milliseconds: 200),
+              child: child,
+            ),
+            child: IgnorePointer(
+              child: _AudioQualityBadge(metadata: widget.metadata),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 
+  /// On desktop, the artwork tilts gently after the mouse.
+  Widget _tilted(Widget content) {
     return MouseRegion(
       onHover: _onHover,
       onExit: (_) => _tilt.value = Offset.zero,

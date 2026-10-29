@@ -101,7 +101,8 @@ class InstallConfig {
         to: directory,
         log: log == null
             ? null
-            : (message, {error, stackTrace}) => log('$message: $error'),
+            : (message, {error, stackTrace}) =>
+                  log(error == null ? message : '$message: $error'),
       );
       if (report.failed.isNotEmpty) {
         log?.call('Could not copy ${report.failed.join(', ')} to $target');

@@ -25,10 +25,9 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
+import 'package:musify/widgets/app_logo.dart';
 import 'package:musify/widgets/song_artwork.dart';
 import 'package:musify/widgets/song_bar.dart';
-
-const _logoAsset = 'assets/icons/app_logo.png';
 
 /// A listening period in cards: minutes and the top artist side by side,
 /// then the top songs.
@@ -274,11 +273,7 @@ class RecapBrandHeader extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              ImageIcon(
-                const AssetImage(_logoAsset),
-                size: 16,
-                color: colorScheme.onSecondaryContainer,
-              ),
+              AppLogo(size: 16, color: colorScheme.onSecondaryContainer),
               const SizedBox(width: 6),
               Text(
                 appName,

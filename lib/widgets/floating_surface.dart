@@ -34,11 +34,19 @@ class FloatingSurface extends StatelessWidget {
     required this.child,
     this.borderRadius = const BorderRadius.all(Radius.circular(28)),
     this.padding = EdgeInsets.zero,
+    this.grouped = false,
   });
 
   final Widget child;
   final BorderRadius borderRadius;
   final EdgeInsetsGeometry padding;
+
+  /// Shares the backdrop read of the nearest [BackdropGroup]. Only for
+  /// surfaces painted over everything else that never overlap each other
+  /// (dock, rail, mini player; the player's bars): the group reads the
+  /// backdrop once, at its first surface, so anything painted after that one
+  /// would be missing behind the rest.
+  final bool grouped;
 
   static const _blurSigma = 18.0;
 
@@ -78,12 +86,12 @@ class FloatingSurface extends StatelessWidget {
     );
 
     if (effect == FloatingEffect.blurred) {
+      final filter = ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma);
       surface = ClipRRect(
         borderRadius: borderRadius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
-          child: surface,
-        ),
+        child: grouped
+            ? BackdropFilter.grouped(filter: filter, child: surface)
+            : BackdropFilter(filter: filter, child: surface),
       );
     }
 

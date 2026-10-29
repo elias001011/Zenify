@@ -29,14 +29,16 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/audio_levels.dart';
 
-/// The player's sound waves. They follow the music, its loudness, beats and
-/// treble, when [AudioLevels] can read it; otherwise, and on a phone until
-/// the user allows it, they keep a calm motion of their own.
+/// The player's sound waves. Each bar follows a band of the music, bass in
+/// the middle and treble at the ends, and beats push the middle, when
+/// [AudioLevels] can read it; otherwise, and on a phone until the user
+/// allows it, they keep a calm motion of their own.
 class WaveVisualizer extends StatefulWidget {
   const WaveVisualizer({
     super.key,
     required this.size,
     this.offerAccess = false,
+    this.compact = false,
   });
 
   final double size;
@@ -44,6 +46,11 @@ class WaveVisualizer extends StatefulWidget {
   /// Offers to ask for the access the levels need (the player, not the
   /// mini player's thumbnail).
   final bool offerAccess;
+
+  /// For the mini player's thumbnail: moves only when a reading arrives, with
+  /// no animation of its own, so it costs no frames between readings, none
+  /// while paused and none while the player covers it.
+  final bool compact;
 
   @override
   State<WaveVisualizer> createState() => _WaveVisualizerState();
@@ -54,9 +61,12 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   static const _bars = 9;
   static const _rest = 0.08;
 
+  /// The logo's shape, where the bars rest with nothing to follow.
+  static const _shape = [.3, .56, .4, .8, 1.0, .8, .4, .56, .3];
+
   late final Ticker _ticker = createTicker(_tick);
 
-  /// Bumped every frame the bars move, to repaint them.
+  /// Bumped every time the bars move, to repaint them.
   final _repaint = ValueNotifier<int>(0);
   final _heights = List<double>.filled(_bars, _rest);
   late final StreamSubscription<bool> _playingSubscription;
@@ -70,23 +80,54 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   @override
   void initState() {
     super.initState();
+    if (widget.compact) _restInShape();
     _playingSubscription = audioHandler.playbackState
         .map((state) => state.playing)
         .distinct()
-        .listen((playing) {
-          _playing = playing;
-          if (playing && !_ticker.isActive) _ticker.start();
-        });
+        .listen(_onPlaying);
     unawaited(_connect());
+  }
+
+  void _restInShape() {
+    for (var i = 0; i < _bars; i++) {
+      _heights[i] = _shape[i] * 0.6;
+    }
+  }
+
+  void _onPlaying(bool playing) {
+    _playing = playing;
+    if (widget.compact) {
+      if (!playing) {
+        _restInShape();
+        _repaint.value++;
+      }
+    } else if (playing && !_ticker.isActive) {
+      _ticker.start();
+    }
   }
 
   Future<void> _connect() async {
     if (await AudioLevels.available) {
       if (!mounted) return;
-      _levels = AudioLevels.listen().listen((level) => _level = level);
+      _levels = AudioLevels.listen().listen(_onLevel);
     } else if (widget.offerAccess && AudioLevels.canAsk && mounted) {
       setState(() => _canAsk = true);
     }
+  }
+
+  void _onLevel(AudioLevel level) {
+    _level = level;
+    // The thumbnail steps once per reading, and not while hidden.
+    if (!widget.compact || !_playing || !TickerMode.valuesOf(context).enabled) {
+      return;
+    }
+    _beat = max(level.onset, _beat * 0.6);
+    for (var i = 0; i < _bars; i++) {
+      final target = _target(i, level, 0);
+      _heights[i] +=
+          (target - _heights[i]) * (target > _heights[i] ? 0.7 : 0.3);
+    }
+    _repaint.value++;
   }
 
   Future<void> _ask() async {
@@ -94,6 +135,18 @@ class _WaveVisualizerState extends State<WaveVisualizer>
       setState(() => _canAsk = false);
       await _connect();
     }
+  }
+
+  /// Where bar [i] heads for [level] at time [t] (seconds).
+  double _target(int i, AudioLevel level, double t) {
+    // 0 in the middle to 4 at the ends: the band the bar follows.
+    final side = (i - (_bars - 1) ~/ 2).abs();
+    final reach = side / ((_bars - 1) / 2);
+    final band = side < level.bands.length ? level.bands[side] : level.loud;
+    return _rest +
+        band * 0.62 * (1 - 0.2 * reach) +
+        _beat * 0.3 * (1 - reach) * (1 - reach) +
+        level.loud * 0.03 * sin(t * 6 + i * 1.7);
   }
 
   void _tick(Duration elapsed) {
@@ -106,19 +159,11 @@ class _WaveVisualizerState extends State<WaveVisualizer>
 
     var settled = true;
     for (var i = 0; i < _bars; i++) {
-      // 0 in the middle, 1 at the ends: beats and bass push the middle, treble
-      // lifts the sides.
-      final side = (i - (_bars - 1) / 2).abs() / ((_bars - 1) / 2);
       final double target;
       if (!_playing) {
         target = _rest;
       } else if (level != null) {
-        target =
-            _rest +
-            level.loud * 0.5 * (1 - 0.45 * side) +
-            _beat * 0.38 * (1 - side * side) +
-            level.loud * level.bright * 0.28 * side +
-            level.loud * 0.05 * sin(t * 6 + i * 1.7);
+        target = _target(i, level, t);
       } else {
         target =
             0.25 +

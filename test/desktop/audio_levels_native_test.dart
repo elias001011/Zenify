@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
@@ -67,6 +68,13 @@ void main() {
       expect(levels.length, greaterThan(10));
       expect(levels.map((level) => level.onset), contains(greaterThan(0.3)));
       expect(levels.map((level) => level.loud), contains(lessThan(0.6)));
+      // The bass hits come and go; the 3 kHz tone in the mids stays put.
+      double spread(int band) {
+        final values = [for (final level in levels) level.bands[band]];
+        return values.reduce(max) - values.reduce(min);
+      }
+
+      expect(spread(0), greaterThan(spread(3) + 0.3));
 
       // A speed change makes media_kit rewrite the filter chain.
       final beforeSpeed = levels.length;
@@ -75,7 +83,7 @@ void main() {
       expect(levels.length, greaterThan(beforeSpeed + 5));
       final chain = await player.getMpvProperty('af');
       expect(chain, contains('scaletempo'));
-      expect(chain, contains('aspectralstats'));
+      expect(chain, contains('amerge'));
 
       await subscription.cancel();
       await Future<void>.delayed(const Duration(milliseconds: 200));
