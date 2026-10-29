@@ -96,6 +96,7 @@ void main() {
         offlineMode.value = true;
         playNextSongAutomatically.value = false;
         repeatNotifier.value = AudioServiceRepeatMode.none;
+        await Hive.box('userNoBackup').clear();
         handler = MusifyAudioHandler();
         await handler.setVolume(0);
         errors = [];

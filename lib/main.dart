@@ -228,6 +228,7 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
         wasPlaying: audioHandler.audioPlayer.playing,
       );
       unawaited(listeningStatsService.flush());
+      unawaited(audioHandler.persistPlaybackState());
     }
   }
 
