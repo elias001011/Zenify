@@ -162,7 +162,7 @@ void showIncomingPairingDialog() {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              SyncPinDigits(request.pin),
+              _PinDigits(request.pin),
             ],
           ),
           actionsAlignment: MainAxisAlignment.center,
@@ -192,9 +192,10 @@ void showIncomingPairingDialog() {
   );
 }
 
-/// The six digits of a pairing PIN, for the device that shows it.
-class SyncPinDigits extends StatelessWidget {
-  const SyncPinDigits(this.pin, {super.key});
+const double _pinSpacing = 10;
+
+class _PinDigits extends StatelessWidget {
+  const _PinDigits(this.pin);
 
   final String pin;
 
@@ -623,7 +624,7 @@ class _LocalSyncPageState extends State<LocalSyncPage> {
                 maxLength: 6,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 style: theme.textTheme.headlineSmall?.copyWith(
-                  letterSpacing: 10,
+                  letterSpacing: _pinSpacing,
                   fontWeight: FontWeight.w600,
                 ),
                 decoration: InputDecoration(
@@ -631,7 +632,12 @@ class _LocalSyncPageState extends State<LocalSyncPage> {
                   counterText: '',
                   // Letter spacing also follows the last digit; the same
                   // space on the left keeps the digits centred.
-                  contentPadding: const EdgeInsets.fromLTRB(22, 14, 12, 14),
+                  contentPadding: const EdgeInsets.fromLTRB(
+                    12 + _pinSpacing,
+                    14,
+                    12,
+                    14,
+                  ),
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainerHighest,
                   border: OutlineInputBorder(

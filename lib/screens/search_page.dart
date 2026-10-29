@@ -213,7 +213,7 @@ class _SearchPageState extends State<SearchPage> {
       final artistsFuture = searchArtists(query);
       Future<List> guarded(String what, Future<List> Function() fetch) async {
         try {
-          return await fetch();
+          return await fetch().timeout(const Duration(seconds: 15));
         } catch (e, stackTrace) {
           logger.log(
             'Error while searching online $what',
@@ -224,29 +224,38 @@ class _SearchPageState extends State<SearchPage> {
         }
       }
 
-      final online = await Future.wait([
+      // Two steps, each at once: songs and artists, the top of the page,
+      // then albums and playlists below them, which moves nothing above.
+      final top = Future.wait([
         guarded('songs', () => _fetchSongs(query, artistsFuture)),
         guarded('artists', () => artistsFuture),
+      ]);
+      final rest = Future.wait([
         guarded('albums', () => getPlaylists(query: query, type: 'album')),
         guarded(
           'playlists',
           () => getPlaylists(query: query, type: 'playlist'),
         ),
       ]);
+
+      final [songs, artists] = await top;
       if (!mounted || requestId != _latestSearchRequest) return;
-      // All at once, below what the library already showed, so the page
-      // moves once instead of with every answer.
       setState(() {
         _songsSearchResult = libraryFirst(
           _libraryResult.songs,
-          online[0],
+          songs,
           known: librarySongsById(),
         );
-        _artistsSearchResult = _newArtists(online[1])
+        _artistsSearchResult = _newArtists(artists)
             .map(Map<String, dynamic>.from)
             .toList();
-        _albumsSearchResult = libraryFirst(_libraryAlbums(true), online[2]);
-        _playlistsSearchResult = libraryFirst(_libraryAlbums(false), online[3]);
+      });
+
+      final [albums, playlists] = await rest;
+      if (!mounted || requestId != _latestSearchRequest) return;
+      setState(() {
+        _albumsSearchResult = libraryFirst(_libraryAlbums(true), albums);
+        _playlistsSearchResult = libraryFirst(_libraryAlbums(false), playlists);
       });
     } catch (e, stackTrace) {
       logger.log(

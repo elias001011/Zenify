@@ -39,16 +39,23 @@ import 'package:rxdart/rxdart.dart';
 /// rebuilds when these change, not on every tick; only the ring follows it.
 typedef _ControlsState = ({PlaybackState playback, bool hasNext});
 
+_ControlsState _controlsState(PlaybackState playback, List<MediaItem> queue) =>
+    (
+      playback: playback,
+      hasNext:
+          queue.length > 1 && (playback.queueIndex ?? 0) < queue.length - 1,
+    );
+
+/// The stream doesn't replay, so a mini player built later (the layout
+/// switching between dock and rail) starts from this.
+_ControlsState _currentControlsState() =>
+    _controlsState(audioHandler.playbackState.value, audioHandler.queue.value);
+
 final Stream<_ControlsState> _controlsStateStream =
     Rx.combineLatest2(
           audioHandler.playbackStateStream,
           audioHandler.queue,
-          (PlaybackState playback, List<MediaItem> queue) => (
-            playback: playback,
-            hasNext:
-                queue.length > 1 &&
-                (playback.queueIndex ?? 0) < queue.length - 1,
-          ),
+          _controlsState,
         )
         .distinct(
           (a, b) =>
@@ -81,6 +88,7 @@ class MiniPlayer extends StatelessWidget {
           if (metadata == null) return const SizedBox.shrink();
 
           return StreamBuilder<_ControlsState>(
+            initialData: _currentControlsState(),
             stream: _controlsStateStream,
             builder: (context, stateSnapshot) {
               final state = stateSnapshot.data;
@@ -391,6 +399,7 @@ class _CircularPlayButton extends StatelessWidget {
         children: [
           RepaintBoundary(
             child: StreamBuilder<PositionData>(
+              initialData: audioHandler.currentPositionData,
               stream: audioHandler.positionDataStream,
               builder: (context, snapshot) {
                 final position = snapshot.data;

@@ -51,7 +51,10 @@ abstract final class AppNotices {
     _timer = Timer(duration, dismiss);
   }
 
-  static void dismiss() {
+  /// Dismisses the current notice, or, given [notice], only if it is still
+  /// the current one.
+  static void dismiss([AppNotice? notice]) {
+    if (notice != null && current.value != notice) return;
     _timer?.cancel();
     current.value = null;
   }
@@ -101,7 +104,7 @@ class _NoticeSlotState extends State<NoticeSlot> {
         alignment: Alignment.bottomCenter,
         child: notice == null || !inFront
             ? const SizedBox(width: double.infinity)
-            : _NoticeContent(notice),
+            : _NoticeContent(notice, key: ObjectKey(notice)),
       ),
     );
   }
@@ -148,7 +151,7 @@ class NoticeHost extends StatelessWidget {
 }
 
 class _NoticeContent extends StatelessWidget {
-  const _NoticeContent(this.notice);
+  const _NoticeContent(this.notice, {super.key});
 
   final AppNotice notice;
 
@@ -157,6 +160,7 @@ class _NoticeContent extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final actionLabel = notice.actionLabel;
     return _SwipeDownToDismiss(
+      notice: notice,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
         child: ConstrainedBox(
@@ -197,8 +201,9 @@ class _NoticeContent extends StatelessWidget {
 /// far enough, as Musify's snack bars did; otherwise it springs back.
 /// Clipped, so it doesn't slide over the mini player below it.
 class _SwipeDownToDismiss extends StatefulWidget {
-  const _SwipeDownToDismiss({required this.child});
+  const _SwipeDownToDismiss({required this.notice, required this.child});
 
+  final AppNotice notice;
   final Widget child;
 
   @override
@@ -210,7 +215,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss> {
 
   void _end(DragEndDetails details) {
     if (_offset > 24 || (details.primaryVelocity ?? 0) > 300) {
-      AppNotices.dismiss();
+      AppNotices.dismiss(widget.notice);
     } else {
       setState(() => _offset = 0);
     }

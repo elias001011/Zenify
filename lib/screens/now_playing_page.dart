@@ -102,12 +102,16 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     MediaItem metadata,
     BuildContext sheetContext,
   ) {
-    if (_PlayerLayout.of(MediaQuery.sizeOf(context)).showsInline(panel)) {
+    final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
+    if (layout.showsInline(panel)) {
       setState(() => _panel = _panel == panel ? null : panel);
       return;
     }
-    // A sheet replaces any panel left from another layout.
-    if (_panel != null) setState(() => _panel = null);
+    // A sheet replaces a panel left from another layout, not one in view
+    // (the upright lyrics stay while the queue sheet is open).
+    if (_panel case final open? when !layout.showsInline(open)) {
+      setState(() => _panel = null);
+    }
     showCustomBottomSheet(
       sheetContext,
       panel == PlayerPanel.queue
@@ -431,8 +435,11 @@ class _UprightStageState extends State<_UprightStage>
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
+                      // Keyed, so the artwork keeps its state (image, waves)
+                      // while the others come and go before it.
                       if (_lyricsBuilt)
                         Positioned.fill(
+                          key: const ValueKey('lyrics'),
                           top: _headerSize + 12,
                           child: FadeTransition(
                             opacity: _lyricsFade,
@@ -444,6 +451,7 @@ class _UprightStageState extends State<_UprightStage>
                         ),
                       if (under > 0)
                         Positioned(
+                          key: const ValueKey('title'),
                           left: 0,
                           right: 0,
                           top: art.bottom + _gap,
@@ -452,6 +460,7 @@ class _UprightStageState extends State<_UprightStage>
                         ),
                       if (beside > 0)
                         Positioned(
+                          key: const ValueKey('header'),
                           left: art.right + 14,
                           right: 0,
                           top: art.center.dy - _headerSize / 2,
@@ -459,6 +468,7 @@ class _UprightStageState extends State<_UprightStage>
                           child: Opacity(opacity: beside, child: headerTitle),
                         ),
                       Positioned(
+                        key: const ValueKey('artwork'),
                         left: art.left,
                         top: art.top,
                         child: Transform.scale(
@@ -519,15 +529,19 @@ class _WideLayoutState extends State<_WideLayout> {
 
   /// What the song, playback and actions take under the artwork, measured
   /// after each layout: it changes with the text size and for live radio.
-  /// The last measure starts the next player, so only the first opening
-  /// corrects itself; that first guess is generous, so it never overflows.
-  static double _lastBelow = 400;
-  double _below = _lastBelow;
+  /// The last song's measure starts the next player, so only the first
+  /// opening corrects itself; live radio, shorter, is left out of it, so the
+  /// guess stays on the generous side and the first frame doesn't overflow.
+  static double _lastSongBelow = 400;
+  double _below = _lastSongBelow;
 
   void _measure(Duration _) {
     final height = _belowKey.currentContext?.size?.height;
     if (mounted && height != null && (height - _below).abs() > 0.5) {
-      setState(() => _below = _lastBelow = height);
+      setState(() => _below = height);
+      if (!(widget.metadata.extras?['isLive'] ?? false)) {
+        _lastSongBelow = height;
+      }
     }
   }
 
@@ -623,6 +637,7 @@ class _SidePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return FloatingSurface(
+      grouped: true,
       child: panel == PlayerPanel.queue
           ? const QueueWidget()
           : LyricsPanel(metadata: metadata),

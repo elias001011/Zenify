@@ -27,6 +27,7 @@ import 'package:flutter/services.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/platform_utils.dart';
+import 'package:rxdart/rxdart.dart';
 
 /// What is playing right now, each from 0 to 1: how loud, how much a beat or
 /// a new note just hit (onset) and how bright (treble against bass).
@@ -97,10 +98,14 @@ class AudioLevels {
   }
 
   /// (energy, flux, spectral centroid in Hz) from Android's Visualizer.
+  /// Follows the player's audio session: none before the first playback
+  /// (session 0, the whole output, needs another permission) and a new one
+  /// when the player recreates it.
   static Stream<(double, double, double)> _androidFrames() {
-    final session = audioHandler.audioPlayer.androidAudioSessionId ?? 0;
-    return _frames
-        .receiveBroadcastStream(session)
+    return audioHandler.audioPlayer.androidAudioSessionIdStream
+        .whereType<int>()
+        .distinct()
+        .switchMap((session) => _frames.receiveBroadcastStream(session))
         .map((event) {
           final values = (event as List).cast<num>();
           return (
@@ -172,11 +177,17 @@ class AudioLevels {
     }
 
     MediaKitPlayer? player;
+    var cancelled = false;
     controller = StreamController(
       onListen: () async {
         final current = player = MediaKitPlayer.latest;
         if (current == null) return;
         await attach(current);
+        // Closed while the filter was being added: take it out again.
+        if (cancelled) {
+          await current.mpvCommand(['af', 'remove', '@$_label']);
+          return;
+        }
         timer = Timer.periodic(const Duration(milliseconds: 25), (_) async {
           if (polling ||
               controller.isClosed ||
@@ -192,6 +203,7 @@ class AudioLevels {
         });
       },
       onCancel: () async {
+        cancelled = true;
         timer?.cancel();
         await player?.mpvCommand(['af', 'remove', '@$_label']);
       },

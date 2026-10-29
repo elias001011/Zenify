@@ -181,6 +181,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
           bottom: safeBottom + _margin,
           child: RepaintBoundary(
             child: FloatingSurface(
+              grouped: true,
               padding: const EdgeInsets.all(_dockPadding),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -237,10 +238,12 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
         ),
         Positioned(
           left: _margin,
-          top: _margin,
+          // Below the status bar of a tablet or a phone on its side.
+          top: MediaQuery.viewPaddingOf(context).top + _margin,
           bottom: _margin,
           child: RepaintBoundary(
             child: FloatingSurface(
+              grouped: true,
               borderRadius: const BorderRadius.all(Radius.circular(24)),
               child: SizedBox(
                 width: _railWidth,
@@ -267,6 +270,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
             bottom: _margin,
             child: RepaintBoundary(
               child: FloatingSurface(
+                grouped: true,
                 borderRadius: BorderRadius.all(Radius.circular(24)),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
