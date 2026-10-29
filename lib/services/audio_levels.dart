@@ -23,8 +23,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart' show AppLifecycleListener;
+import 'package:flutter/widgets.dart'
+    show AppLifecycleListener, AppLifecycleState, WidgetsBinding;
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/platform_utils.dart';
@@ -51,7 +53,7 @@ class AudioLevels {
   static const bandCount = 5;
 
   static const _methods = MethodChannel('zenify/audio_levels');
-  static const _frames = EventChannel('zenify/audio_levels/frames');
+  static const _frames = MethodChannel('zenify/audio_levels/frames');
 
   /// mpv's label for the filters; their numbers land in `af-metadata/zviz`.
   /// They join mpv's filter chain beside media_kit's own (scaletempo for the
@@ -89,17 +91,28 @@ class AudioLevels {
       return await _methods.invokeMethod<bool>('hasPermission') ?? false;
     } on PlatformException {
       return false;
+    } on MissingPluginException {
+      return false;
     }
   }
 
   /// Whether this platform can read levels once the user allows it.
   static bool get canAsk => isAndroidPlatform;
 
+  /// Existing visualizers reconnect when access is granted in the player.
+  static final _accessChanged = ValueNotifier(0);
+  static ValueListenable<int> get accessChanged => _accessChanged;
+
   /// Asks for the audio recording permission (Android); true once granted.
   static Future<bool> requestAccess() async {
     try {
-      return await _methods.invokeMethod<bool>('requestPermission') ?? false;
+      final granted =
+          await _methods.invokeMethod<bool>('requestPermission') ?? false;
+      if (granted) _accessChanged.value++;
+      return granted;
     } on PlatformException {
+      return false;
+    } on MissingPluginException {
       return false;
     }
   }
@@ -113,28 +126,50 @@ class AudioLevels {
     StreamSubscription<_Frame>? source;
     AppLifecycleListener? lifecycle;
 
-    void start() {
-      if (source != null) return;
-      final normalizer = _Normalizer();
-      source = (isDesktopPlatform ? _mpvFrames() : _androidFrames()).listen(
-        (frame) => _levels?.add(normalizer(frame)),
-      );
-    }
+    var listening = false;
+    var visible = true;
+    var transition = Future<void>.value();
 
-    void stop() {
-      source?.cancel();
-      source = null;
+    // EventChannel cancellation is asynchronous. Finish releasing the old
+    // reader before attaching another, including after a surface remount.
+    void update() {
+      transition = transition.then((_) async {
+        if (!listening || !visible) {
+          await source?.cancel();
+          source = null;
+        } else if (source == null) {
+          final normalizer = _Normalizer();
+          source = (isDesktopPlatform ? _mpvFrames() : _androidFrames()).listen(
+            (frame) => _levels?.add(normalizer(frame)),
+          );
+        }
+      });
     }
 
     return (_levels ??= StreamController.broadcast(
       onListen: () {
-        start();
-        lifecycle = AppLifecycleListener(onHide: stop, onShow: start);
+        listening = true;
+        final state = WidgetsBinding.instance.lifecycleState;
+        visible =
+            state != AppLifecycleState.hidden &&
+            state != AppLifecycleState.paused &&
+            state != AppLifecycleState.detached;
+        lifecycle = AppLifecycleListener(
+          onStateChange: (state) {
+            visible =
+                state != AppLifecycleState.hidden &&
+                state != AppLifecycleState.paused &&
+                state != AppLifecycleState.detached;
+            update();
+          },
+        );
+        update();
       },
       onCancel: () {
         lifecycle?.dispose();
         lifecycle = null;
-        stop();
+        listening = false;
+        update();
       },
     )).stream;
   }
@@ -147,7 +182,8 @@ class AudioLevels {
     return audioHandler.audioPlayer.androidAudioSessionIdStream
         .whereType<int>()
         .distinct()
-        .switchMap((session) => _frames.receiveBroadcastStream(session))
+        .where((session) => session > 0)
+        .switchMap(_sessionFrames)
         .map((event) {
           final values = (event as List).cast<num>();
           return (
@@ -157,6 +193,42 @@ class AudioLevels {
         })
         // A failed Visualizer ends the stream; the waves keep their own motion.
         .handleError((Object _) {});
+  }
+
+  /// A single-subscription channel so cancel() waits for the native release.
+  /// EventChannel's broadcast controller discards its async cancellation.
+  static Stream<dynamic> _sessionFrames(int session) {
+    late final StreamController<dynamic> controller;
+    final messenger = ServicesBinding.instance.defaultBinaryMessenger;
+    controller = StreamController<dynamic>(
+      onListen: () {
+        messenger.setMessageHandler(_frames.name, (data) async {
+          if (data == null) {
+            unawaited(controller.close());
+          } else {
+            try {
+              controller.add(_frames.codec.decodeEnvelope(data));
+            } on PlatformException catch (error, stack) {
+              controller.addError(error, stack);
+            }
+          }
+          return null;
+        });
+        unawaited(
+          _frames.invokeMethod<void>('listen', session).catchError((
+            Object error,
+            StackTrace stack,
+          ) {
+            if (!controller.isClosed) controller.addError(error, stack);
+          }),
+        );
+      },
+      onCancel: () async {
+        messenger.setMessageHandler(_frames.name, null);
+        await _frames.invokeMethod<void>('cancel');
+      },
+    );
+    return controller.stream;
   }
 
   /// The same from mpv's audio filters, polled at about the rate they update

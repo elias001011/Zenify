@@ -47,9 +47,8 @@ class WaveVisualizer extends StatefulWidget {
   /// mini player's thumbnail).
   final bool offerAccess;
 
-  /// For the mini player's thumbnail: moves only when a reading arrives, with
-  /// no animation of its own, so it costs no frames between readings, none
-  /// while paused and none while the player covers it.
+  /// The mini player's thumbnail repaints at most 20 times a second, and
+  /// rests while paused. TickerMode suspends it while the player covers it.
   final bool compact;
 
   @override
@@ -72,6 +71,10 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   late final StreamSubscription<bool> _playingSubscription;
   StreamSubscription<AudioLevel>? _levels;
   AudioLevel? _level;
+  final _clock = Stopwatch()..start();
+  Duration? _lastReading;
+  bool _connecting = false;
+  bool _reconnect = false;
   bool _playing = false;
   bool _canAsk = false;
   double _beat = 0;
@@ -85,6 +88,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
         .map((state) => state.playing)
         .distinct()
         .listen(_onPlaying);
+    AudioLevels.accessChanged.addListener(_onAccessChanged);
     unawaited(_connect());
   }
 
@@ -96,38 +100,46 @@ class _WaveVisualizerState extends State<WaveVisualizer>
 
   void _onPlaying(bool playing) {
     _playing = playing;
-    if (widget.compact) {
-      if (!playing) {
-        _restInShape();
-        _repaint.value++;
-      }
+    if (!playing && widget.compact) {
+      _ticker.stop();
+      _last = Duration.zero;
+      _restInShape();
+      _repaint.value++;
     } else if (playing && !_ticker.isActive) {
       _ticker.start();
     }
   }
 
+  void _onAccessChanged() => unawaited(_connect());
+
   Future<void> _connect() async {
-    if (await AudioLevels.available) {
+    if (_levels != null) return;
+    if (_connecting) {
+      _reconnect = true;
+      return;
+    }
+    _connecting = true;
+    try {
+      final available = await AudioLevels.available;
       if (!mounted) return;
-      _levels = AudioLevels.listen().listen(_onLevel);
-    } else if (widget.offerAccess && AudioLevels.canAsk && mounted) {
-      setState(() => _canAsk = true);
+      if (available) {
+        _levels = AudioLevels.listen().listen(_onLevel);
+        if (_canAsk) setState(() => _canAsk = false);
+      } else if (widget.offerAccess && AudioLevels.canAsk) {
+        setState(() => _canAsk = true);
+      }
+    } finally {
+      _connecting = false;
+      if (_reconnect && mounted) {
+        _reconnect = false;
+        unawaited(_connect());
+      }
     }
   }
 
   void _onLevel(AudioLevel level) {
     _level = level;
-    // The thumbnail steps once per reading, and not while hidden.
-    if (!widget.compact || !_playing || !TickerMode.valuesOf(context).enabled) {
-      return;
-    }
-    _beat = max(level.onset, _beat * 0.6);
-    for (var i = 0; i < _bars; i++) {
-      final target = _target(i, level, 0);
-      _heights[i] +=
-          (target - _heights[i]) * (target > _heights[i] ? 0.7 : 0.3);
-    }
-    _repaint.value++;
+    _lastReading = _clock.elapsed;
   }
 
   Future<void> _ask() async {
@@ -150,10 +162,18 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _tick(Duration elapsed) {
-    final dt = (elapsed - _last).inMicroseconds / 1e6;
+    if (widget.compact && elapsed - _last < const Duration(milliseconds: 50)) {
+      return;
+    }
+    final dt = min((elapsed - _last).inMicroseconds / 1e6, 0.1);
     _last = elapsed;
     final t = elapsed.inMicroseconds / 1e6;
-    final level = _level;
+    // Missing or interrupted native capture must not leave a frozen logo.
+    final level =
+        _lastReading != null &&
+            _clock.elapsed - _lastReading! < const Duration(milliseconds: 600)
+        ? _level
+        : null;
     // A beat jumps up at once and fades over a fraction of a second.
     _beat = max(level?.onset ?? 0, _beat * pow(0.02, dt).toDouble());
 
@@ -184,6 +204,8 @@ class _WaveVisualizerState extends State<WaveVisualizer>
 
   @override
   void dispose() {
+    AudioLevels.accessChanged.removeListener(_onAccessChanged);
+    _clock.stop();
     _playingSubscription.cancel();
     _levels?.cancel();
     _ticker.dispose();

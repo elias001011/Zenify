@@ -6,6 +6,7 @@ import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
+import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/widgets/mini_player.dart';
 
@@ -34,9 +35,7 @@ void main() {
     home: Scaffold(body: MiniPlayer(key: key)),
   );
 
-  testWidgets('a mini player built later still shows the song', (
-    tester,
-  ) async {
+  testWidgets('a mini player built later still shows the song', (tester) async {
     audioHandler = MusifyAudioHandler();
     audioHandler.mediaItem.add(
       const MediaItem(id: 'a', title: 'Song', extras: {'ytid': 'a'}),
@@ -52,6 +51,27 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.text('Song'), findsOneWidget);
 
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 30));
+  });
+  testWidgets('the empty space beside the song opens the full player', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    audioHandler = MusifyAudioHandler();
+    audioHandler.mediaItem.add(const MediaItem(id: 'short', title: 'A'));
+    audioHandler.playbackState.add(PlaybackState(playing: true));
+    await tester.pumpWidget(app(const ValueKey('tap-area')));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 400));
+    final rect = tester.getRect(find.byType(MiniPlayer));
+    await tester.tapAt(Offset(rect.left + 200, rect.center.dy));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(NowPlayingPage), findsOneWidget);
+    expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 30));
   });

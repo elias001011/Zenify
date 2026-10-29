@@ -170,6 +170,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
         return Transform.scale(
           scale: _scaleAnimation.value,
           child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTapDown: (_) => _animationController.forward(),
             onTapUp: (_) => _animationController.reverse(),
             onTapCancel: () => _animationController.reverse(),

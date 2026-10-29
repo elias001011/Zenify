@@ -128,7 +128,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     );
   }
 
-  static const _margin = 12.0;
+  static const _margin = FloatingSurface.edgeMargin;
   static const _dockPadding = 6.0;
   static const _dockBarHeight = 44.0;
 

@@ -48,6 +48,8 @@ class FloatingSurface extends StatelessWidget {
   /// would be missing behind the rest.
   final bool grouped;
 
+  /// Shared window-edge spacing for the island, rail and dock.
+  static const edgeMargin = 12.0;
   static const _blurSigma = 18.0;
 
   @override
@@ -68,7 +70,7 @@ class FloatingSurface extends StatelessWidget {
       FloatingEffect.blurred => base.withValues(alpha: dark ? 0.55 : 0.6),
     };
 
-    Widget surface = Material(
+    final surface = Material(
       color: color,
       borderRadius: borderRadius,
       clipBehavior: Clip.antiAlias,
@@ -85,30 +87,36 @@ class FloatingSurface extends StatelessWidget {
       ),
     );
 
-    if (effect == FloatingEffect.blurred) {
-      final filter = ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma);
-      surface = ClipRRect(
-        borderRadius: borderRadius,
-        child: grouped
-            ? BackdropFilter.grouped(filter: filter, child: surface)
-            : BackdropFilter(filter: filter, child: surface),
-      );
-    }
-
-    // A shadow under a see-through surface would darken what shows through.
-    if (effect != FloatingEffect.solid) return surface;
+    // Keep the subtree mounted when changing effects: the mini player's
+    // audio reader and animations must survive solid <-> glass.
+    final filter = ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma);
     return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: borderRadius,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: dark ? 0.5 : 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 6),
-          ),
-        ],
+        boxShadow: effect == FloatingEffect.solid
+            ? [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: dark ? 0.5 : 0.12),
+                  blurRadius: 24,
+                  offset: const Offset(0, 6),
+                ),
+              ]
+            : const [],
       ),
-      child: surface,
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: grouped
+            ? BackdropFilter.grouped(
+                filter: filter,
+                enabled: effect == FloatingEffect.blurred,
+                child: surface,
+              )
+            : BackdropFilter(
+                filter: filter,
+                enabled: effect == FloatingEffect.blurred,
+                child: surface,
+              ),
+      ),
     );
   }
 }
