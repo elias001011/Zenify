@@ -159,6 +159,12 @@ class _QueueWidgetState extends State<QueueWidget> {
     TextTheme textTheme, {
     required bool compact,
   }) {
+    final compactActionStyle = IconButton.styleFrom(
+      fixedSize: const Size.square(40),
+      visualDensity: VisualDensity.standard,
+      tapTargetSize: MaterialTapTargetSize.padded,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    );
     return Padding(
       padding: compact
           ? const EdgeInsets.only(left: 10, right: 8, bottom: 12)
@@ -219,17 +225,26 @@ class _QueueWidgetState extends State<QueueWidget> {
           if (_queue.length > 1)
             IconButton.filledTonal(
               onPressed: _shuffleQueue,
-              icon: const Icon(FluentIcons.arrow_shuffle_24_filled, size: 18),
+              icon: Icon(
+                compact
+                    ? FluentIcons.arrow_shuffle_24_regular
+                    : FluentIcons.arrow_shuffle_24_filled,
+                size: compact ? 20 : 18,
+              ),
               tooltip: context.l10n!.shuffle,
-              visualDensity: VisualDensity.compact,
+              style: compact ? compactActionStyle : null,
+              visualDensity: compact
+                  ? VisualDensity.standard
+                  : VisualDensity.compact,
             ),
           if (_queue.isNotEmpty) ...[
             const SizedBox(width: 8),
             if (compact)
-              IconButton(
+              IconButton.filledTonal(
                 onPressed: () => _confirmClearQueue(context),
                 icon: const Icon(FluentIcons.delete_24_regular, size: 20),
                 tooltip: context.l10n!.clear,
+                style: compactActionStyle,
               )
             else
               FilledButton.tonalIcon(
