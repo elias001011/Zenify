@@ -81,4 +81,38 @@ void main() {
     expect(undone, isTrue);
     expect(find.text('Removed'), findsNothing);
   });
+
+  testWidgets('dragging the notice down dismisses it early', (tester) async {
+    await tester.pumpWidget(app());
+    await tester.pump();
+    AppNotices.show(
+      const AppNotice('Saved'),
+      duration: const Duration(seconds: 30),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.drag(find.text('Saved'), const Offset(0, 10));
+    await tester.pumpAndSettle();
+    expect(find.text('Saved'), findsOneWidget);
+
+    await tester.drag(find.text('Saved'), const Offset(0, 60));
+    await tester.pumpAndSettle();
+    expect(find.text('Saved'), findsNothing);
+    expect(AppNotices.current.value, isNull);
+
+    // The same while the host floats it over a covering page.
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .push(MaterialPageRoute<void>(builder: (_) => const Scaffold()));
+    await tester.pumpAndSettle();
+    AppNotices.show(
+      const AppNotice('Floating'),
+      duration: const Duration(seconds: 30),
+    );
+    await tester.pumpAndSettle();
+    await tester.drag(find.text('Floating'), const Offset(0, 60));
+    await tester.pumpAndSettle();
+    expect(find.text('Floating'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 }

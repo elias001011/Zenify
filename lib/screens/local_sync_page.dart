@@ -162,7 +162,7 @@ void showIncomingPairingDialog() {
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 20),
-              _PinDigits(request.pin),
+              SyncPinDigits(request.pin),
             ],
           ),
           actionsAlignment: MainAxisAlignment.center,
@@ -192,37 +192,43 @@ void showIncomingPairingDialog() {
   );
 }
 
-class _PinDigits extends StatelessWidget {
-  const _PinDigits(this.pin);
+/// The six digits of a pairing PIN, for the device that shows it.
+class SyncPinDigits extends StatelessWidget {
+  const SyncPinDigits(this.pin, {super.key});
 
   final String pin;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        for (var i = 0; i < pin.length; i++)
-          Container(
-            width: 40,
-            height: 52,
-            margin: EdgeInsets.only(left: i == 0 ? 0 : (i == 3 ? 14 : 6)),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: colorScheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              pin[i],
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: colorScheme.onSecondaryContainer,
+    // Narrow dialogs on small phones shrink the digits instead of cutting
+    // them off.
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (var i = 0; i < pin.length; i++)
+            Container(
+              width: 40,
+              height: 52,
+              margin: EdgeInsets.only(left: i == 0 ? 0 : (i == 3 ? 14 : 6)),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: colorScheme.secondaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                pin[i],
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  color: colorScheme.onSecondaryContainer,
+                ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }
@@ -623,6 +629,9 @@ class _LocalSyncPageState extends State<LocalSyncPage> {
                 decoration: InputDecoration(
                   hintText: '······',
                   counterText: '',
+                  // Letter spacing also follows the last digit; the same
+                  // space on the left keeps the digits centred.
+                  contentPadding: const EdgeInsets.fromLTRB(22, 14, 12, 14),
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainerHighest,
                   border: OutlineInputBorder(

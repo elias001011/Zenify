@@ -65,6 +65,9 @@ Route<void> buildNowPlayingRoute() {
 class _NowPlayingPageState extends State<NowPlayingPage> {
   /// Open beside the player (wide layout only). Closed by default.
   PlayerPanel? _panel;
+
+  /// Shared by this screen's blurred surfaces, kept across rebuilds.
+  final _backdropKey = BackdropKey();
   Animation<double>? _routeAnimation;
   bool _backgroundVisible = false;
 
@@ -131,33 +134,36 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
             onPanel: (panel, sheetContext) =>
                 _onPanel(panel, metadata, sheetContext),
           );
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: AnimatedOpacity(
-                  opacity: _backgroundVisible ? 1 : 0,
-                  duration: const Duration(milliseconds: 700),
-                  curve: Curves.easeOutCubic,
-                  child: PageGlow(source: mediaItemArtworkSource(metadata)),
+          // Its own group: during the slide its surfaces sit over the shell's.
+          return BackdropGroup(
+            backdropKey: _backdropKey,
+            child: Stack(
+              children: [
+                // Expands once the player has slid up.
+                Positioned.fill(
+                  child: PageGlow(
+                    source: mediaItemArtworkSource(metadata),
+                    waiting: !_backgroundVisible,
+                  ),
                 ),
-              ),
-              SafeArea(
-                child:
-                    _PlayerLayout.of(MediaQuery.sizeOf(context)) ==
-                        _PlayerLayout.wide
-                    ? _WideLayout(
-                        metadata: metadata,
-                        actions: actions,
-                        panel: _panel,
-                      )
-                    : _CompactLayout(
-                        metadata: metadata,
-                        actions: actions,
-                        lyrics: _panel == PlayerPanel.lyrics,
-                        onCloseLyrics: () => setState(() => _panel = null),
-                      ),
-              ),
-            ],
+                SafeArea(
+                  child:
+                      _PlayerLayout.of(MediaQuery.sizeOf(context)) ==
+                          _PlayerLayout.wide
+                      ? _WideLayout(
+                          metadata: metadata,
+                          actions: actions,
+                          panel: _panel,
+                        )
+                      : _CompactLayout(
+                          metadata: metadata,
+                          actions: actions,
+                          lyrics: _panel == PlayerPanel.lyrics,
+                          onCloseLyrics: () => setState(() => _panel = null),
+                        ),
+                ),
+              ],
+            ),
           );
         },
       ),
@@ -318,17 +324,35 @@ class _UprightStageState extends State<_UprightStage>
     parent: _controller,
     curve: Curves.easeInOutCubic,
   );
+  late final _lyricsFade = CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0.4, 1, curve: Curves.easeIn),
+  );
+
+  /// The lyrics stay built from the tap until they have faded out.
+  late bool _lyricsBuilt = widget.lyrics;
 
   @override
   void didUpdateWidget(_UprightStage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.lyrics != oldWidget.lyrics) {
-      widget.lyrics ? _controller.forward() : _controller.reverse();
+    if (widget.lyrics == oldWidget.lyrics) return;
+    if (widget.lyrics) {
+      // Build the lyrics in this frame and move from the next, so building
+      // them never stalls the move.
+      _lyricsBuilt = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.lyrics) _controller.forward();
+      });
+    } else {
+      _controller.reverse().whenCompleteOrCancel(() {
+        if (mounted && !widget.lyrics) setState(() => _lyricsBuilt = false);
+      });
     }
   }
 
   @override
   void dispose() {
+    _lyricsFade.dispose();
     _progress.dispose();
     _controller.dispose();
     super.dispose();
@@ -401,11 +425,11 @@ class _UprightStageState extends State<_UprightStage>
                   return Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      if (t > 0)
+                      if (_lyricsBuilt)
                         Positioned.fill(
                           top: _headerSize + 12,
-                          child: Opacity(
-                            opacity: Curves.easeIn.transform(t),
+                          child: FadeTransition(
+                            opacity: _lyricsFade,
                             child: IgnorePointer(
                               ignoring: t < 1,
                               child: lyrics,

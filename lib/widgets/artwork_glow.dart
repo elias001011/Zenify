@@ -144,6 +144,19 @@ class GlowColors {
     }
   }
 
+  bool _held = false;
+
+  /// Keeps the glow from expanding, e.g. while its page slides in; it
+  /// expands once released.
+  set held(bool value) {
+    _held = value;
+    _maybeReveal();
+  }
+
+  void _maybeReveal() {
+    if (!_held && _to.isNotEmpty && _reveal.isDismissed) _reveal.forward();
+  }
+
   void _retarget(Map<int, Color> next) {
     _from = {
       for (final i in indices)
@@ -151,7 +164,7 @@ class GlowColors {
     };
     _to = next;
     _transition.forward(from: 0);
-    if (next.isNotEmpty && _reveal.isDismissed) _reveal.forward();
+    _maybeReveal();
   }
 
   void dispose() {
@@ -198,10 +211,13 @@ mixin GlowColorsHost<T extends StatefulWidget> on TickerProviderStateMixin<T> {
 /// sized by the page, so they keep their shape on a tall phone as on a wide
 /// window, and they reach under the desktop rail, which floats over them.
 class PageGlow extends StatefulWidget {
-  const PageGlow({super.key, required this.source});
+  const PageGlow({super.key, required this.source, this.waiting = false});
 
   /// The artwork's network URL or file path.
   final String? source;
+
+  /// Holds the glow back until false, so it expands once its page is in view.
+  final bool waiting;
 
   @override
   State<PageGlow> createState() => _PageGlowState();
@@ -211,6 +227,18 @@ class _PageGlowState extends State<PageGlow>
     with TickerProviderStateMixin, GlowColorsHost {
   @override
   List<String?> get glowSources => [widget.source];
+
+  @override
+  void didChangeDependencies() {
+    glowColors.held = widget.waiting;
+    super.didChangeDependencies();
+  }
+
+  @override
+  void didUpdateWidget(PageGlow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    glowColors.held = widget.waiting;
+  }
 
   @override
   Widget build(BuildContext context) {

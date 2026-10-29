@@ -52,6 +52,9 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
   /// between the dock and the rail, which moves them in the tree.
   final _contentKey = GlobalKey();
 
+  /// Shared by this screen's blurred surfaces, kept across rebuilds.
+  final _backdropKey = BackdropKey();
+
   @override
   void initState() {
     super.initState();
@@ -92,26 +95,32 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
         }
       },
       child: Scaffold(
-        body: SafeArea(
-          bottom: false,
-          child: StreamBuilder<bool>(
-            initialData: audioHandler.mediaItem.value != null,
-            stream: _miniPlayerVisibilityStream,
-            builder: (context, snapshot) {
-              final playing = snapshot.data ?? false;
-              return ValueListenableBuilder<bool>(
-                valueListenable: compactDesktopPlayer,
-                builder: (context, compact, _) => isLargeScreen && !compact
-                    ? _buildDesktop(context, items, selected, playing)
-                    : _buildMobile(
-                        context,
-                        items,
-                        selected,
-                        playing,
-                        maxDockWidth: isLargeScreen ? 420 : null,
-                      ),
-              );
-            },
+        body: BackdropGroup(
+          backdropKey: _backdropKey,
+          // Pages reach under the status bar, so their background does too;
+          // each keeps its content and island below it.
+          child: SafeArea(
+            top: false,
+            bottom: false,
+            child: StreamBuilder<bool>(
+              initialData: audioHandler.mediaItem.value != null,
+              stream: _miniPlayerVisibilityStream,
+              builder: (context, snapshot) {
+                final playing = snapshot.data ?? false;
+                return ValueListenableBuilder<bool>(
+                  valueListenable: compactDesktopPlayer,
+                  builder: (context, compact, _) => isLargeScreen && !compact
+                      ? _buildDesktop(context, items, selected, playing)
+                      : _buildMobile(
+                          context,
+                          items,
+                          selected,
+                          playing,
+                          maxDockWidth: isLargeScreen ? 420 : null,
+                        ),
+                );
+              },
+            ),
           ),
         ),
       ),

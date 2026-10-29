@@ -25,7 +25,6 @@ import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
-import 'package:musify/models/full_player_state.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -35,19 +34,28 @@ import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/song_artwork.dart';
 import 'package:rxdart/rxdart.dart';
 
-final Stream<FullPlayerState> _fullPlayerStateStream =
-    Rx.combineLatest3(
+/// What the mini player's body shows besides the song: the playback state
+/// and whether there is a next song. Position is left out, so the body
+/// rebuilds when these change, not on every tick; only the ring follows it.
+typedef _ControlsState = ({PlaybackState playback, bool hasNext});
+
+final Stream<_ControlsState> _controlsStateStream =
+    Rx.combineLatest2(
           audioHandler.playbackStateStream,
-          audioHandler.queue.distinct(),
-          audioHandler.positionDataStream,
-          (PlaybackState state, List<MediaItem> queue, PositionData pos) =>
-              FullPlayerState(
-                playbackState: state,
-                queue: queue,
-                position: pos,
-              ),
+          audioHandler.queue,
+          (PlaybackState playback, List<MediaItem> queue) => (
+            playback: playback,
+            hasNext:
+                queue.length > 1 &&
+                (playback.queueIndex ?? 0) < queue.length - 1,
+          ),
         )
-        .throttleTime(const Duration(milliseconds: 120), trailing: true)
+        .distinct(
+          (a, b) =>
+              a.hasNext == b.hasNext &&
+              a.playback.playing == b.playback.playing &&
+              a.playback.processingState == b.playback.processingState,
+        )
         .asBroadcastStream();
 
 class MiniPlayer extends StatelessWidget {
@@ -72,22 +80,16 @@ class MiniPlayer extends StatelessWidget {
           final metadata = mediaSnapshot.data;
           if (metadata == null) return const SizedBox.shrink();
 
-          return StreamBuilder<FullPlayerState>(
-            stream: _fullPlayerStateStream,
+          return StreamBuilder<_ControlsState>(
+            stream: _controlsStateStream,
             builder: (context, stateSnapshot) {
               final state = stateSnapshot.data;
               if (state == null) return const SizedBox.shrink();
-
-              final hasNext =
-                  state.queue.length > 1 &&
-                  (state.playbackState.queueIndex ?? 0) <
-                      state.queue.length - 1;
-
               return _MiniPlayerBody(
                 colorScheme: colorScheme,
                 metadata: metadata,
-                state: state,
-                hasNext: hasNext,
+                playbackState: state.playback,
+                hasNext: state.hasNext,
               );
             },
           );
@@ -101,13 +103,13 @@ class _MiniPlayerBody extends StatefulWidget {
   const _MiniPlayerBody({
     required this.colorScheme,
     required this.metadata,
-    required this.state,
+    required this.playbackState,
     required this.hasNext,
   });
 
   final ColorScheme colorScheme;
   final MediaItem metadata;
-  final FullPlayerState state;
+  final PlaybackState playbackState;
   final bool hasNext;
 
   @override
@@ -153,16 +155,6 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
   Widget build(BuildContext context) {
     final colorScheme = widget.colorScheme;
     final metadata = widget.metadata;
-    final state = widget.state;
-
-    final totalDuration = state.position.duration > Duration.zero
-        ? state.position.duration
-        : (metadata.duration ?? Duration.zero);
-    final progress = totalDuration.inMilliseconds == 0
-        ? 0.0
-        : (state.position.position.inMilliseconds /
-                  totalDuration.inMilliseconds)
-              .clamp(0.0, 1.0);
 
     return AnimatedBuilder(
       animation: _scaleAnimation,
@@ -211,9 +203,9 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                       ),
                       _ControlsWidget(
                         colorScheme: colorScheme,
-                        playbackState: state.playbackState,
+                        playbackState: widget.playbackState,
                         hasNext: widget.hasNext,
-                        progress: progress,
+                        duration: metadata.duration,
                       ),
                     ],
                   ),
@@ -328,13 +320,13 @@ class _ControlsWidget extends StatelessWidget {
     required this.colorScheme,
     required this.playbackState,
     required this.hasNext,
-    required this.progress,
+    required this.duration,
   });
 
   final ColorScheme colorScheme;
   final PlaybackState playbackState;
   final bool hasNext;
-  final double progress;
+  final Duration? duration;
 
   @override
   Widget build(BuildContext context) {
@@ -348,7 +340,7 @@ class _ControlsWidget extends StatelessWidget {
         _CircularPlayButton(
           colorScheme: colorScheme,
           playbackState: playbackState,
-          progress: progress,
+          duration: duration,
         ),
         if (hasNext) ...[
           const SizedBox(width: 4),
@@ -373,12 +365,14 @@ class _CircularPlayButton extends StatelessWidget {
   const _CircularPlayButton({
     required this.colorScheme,
     required this.playbackState,
-    required this.progress,
+    required this.duration,
   });
 
   final ColorScheme colorScheme;
   final PlaybackState playbackState;
-  final double progress;
+
+  /// The song's known length, until the player reports its own.
+  final Duration? duration;
 
   @override
   Widget build(BuildContext context) {
@@ -395,13 +389,29 @@ class _CircularPlayButton extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          CustomPaint(
-            size: const Size(48, 48),
-            painter: _CircularProgressPainter(
-              progress: progress,
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              progressColor: colorScheme.primary,
-              strokeWidth: 3,
+          RepaintBoundary(
+            child: StreamBuilder<PositionData>(
+              stream: audioHandler.positionDataStream,
+              builder: (context, snapshot) {
+                final position = snapshot.data;
+                final total =
+                    position != null && position.duration > Duration.zero
+                    ? position.duration
+                    : (duration ?? Duration.zero);
+                return CustomPaint(
+                  size: const Size(48, 48),
+                  painter: _CircularProgressPainter(
+                    progress: position == null || total == Duration.zero
+                        ? 0
+                        : (position.position.inMilliseconds /
+                                  total.inMilliseconds)
+                              .clamp(0.0, 1.0),
+                    backgroundColor: colorScheme.surfaceContainerHighest,
+                    progressColor: colorScheme.primary,
+                    strokeWidth: 3,
+                  ),
+                );
+              },
             ),
           ),
           if (isLoading)

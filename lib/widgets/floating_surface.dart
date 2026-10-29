@@ -28,6 +28,7 @@ import 'package:musify/services/settings_manager.dart';
 /// desktop rail, mini player) sits on, so they share one look.
 ///
 /// [floatingEffect] decides how much of the content behind shows through.
+/// Blurred surfaces that never overlap should sit under one [BackdropGroup].
 class FloatingSurface extends StatelessWidget {
   const FloatingSurface({
     super.key,
@@ -78,9 +79,11 @@ class FloatingSurface extends StatelessWidget {
     );
 
     if (effect == FloatingEffect.blurred) {
+      // Grouped: the surfaces of one screen (island, dock, rail) share a
+      // single read of what is behind them instead of one each.
       surface = ClipRRect(
         borderRadius: borderRadius,
-        child: BackdropFilter(
+        child: BackdropFilter.grouped(
           filter: ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma),
           child: surface,
         ),

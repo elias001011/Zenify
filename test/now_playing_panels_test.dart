@@ -63,8 +63,9 @@ void main() {
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byTooltip('Lyrics'));
-    await tester.pump(const Duration(milliseconds: 500));
-    await tester.pump(const Duration(milliseconds: 500));
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
     expect(find.byType(LyricsPanel), findsNothing);
 
     await tester.tap(find.byTooltip('Queue'));

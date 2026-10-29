@@ -17,6 +17,7 @@
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/playlist_hero_artwork.dart';
 
 /// The top of a playlist, album or artist page: the artwork and the title,
@@ -49,7 +50,7 @@ class PlaylistSliverAppBar extends StatelessWidget {
     return SliverToBoxAdapter(
       child: Column(
         children: [
-          SizedBox(height: MediaQuery.paddingOf(context).top),
+          SizedBox(height: IslandScaffold.topSpace(context)),
           SizedBox(
             height: _artworkHeight(context),
             child: Center(
