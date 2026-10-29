@@ -105,6 +105,11 @@ class FloatingSurface extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: borderRadius,
+        // Only the blur needs it; the Material clips the surface itself, and
+        // a second clip would cost a layer on every frame.
+        clipBehavior: effect == FloatingEffect.blurred
+            ? Clip.antiAlias
+            : Clip.none,
         child: grouped
             ? BackdropFilter.grouped(
                 filter: filter,

@@ -120,27 +120,17 @@ void main() {
     home: Scaffold(body: WaveVisualizer(size: 40, compact: true)),
   );
 
-  testWidgets('compact waves move without capture, pause and resume', (
+  testWidgets('compact waves rest as the logo without audio access', (
     tester,
   ) async {
     await tester.pumpWidget(wave());
     audioHandler.playbackState.add(PlaybackState(playing: true));
-    await advance(tester);
-    final moving = heights(tester);
-    await advance(tester);
-    expect(heights(tester), isNot(moving));
-    expect(listens, 0);
-
-    audioHandler.playbackState.add(PlaybackState());
     await tester.pump();
-    final paused = heights(tester);
+    final resting = heights(tester);
     await advance(tester);
-    expect(heights(tester), paused);
+    expect(heights(tester), resting);
     expect(tester.binding.hasScheduledFrame, isFalse);
-
-    audioHandler.playbackState.add(PlaybackState(playing: true));
-    await advance(tester);
-    expect(heights(tester), isNot(paused));
+    expect(listens, 0);
     await tester.pumpWidget(const SizedBox());
     debugDefaultTargetPlatformOverride = null;
   });

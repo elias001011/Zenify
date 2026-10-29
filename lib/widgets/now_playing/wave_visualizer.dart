@@ -49,8 +49,10 @@ class WaveVisualizer extends StatefulWidget {
   /// mini player's thumbnail).
   final bool offerAccess;
 
-  /// The mini player's thumbnail repaints at most 20 times a second, and
-  /// rests while paused. TickerMode suspends it while the player covers it.
+  /// For the mini player's thumbnail, which is always on screen: it moves
+  /// once per reading and has no animation of its own, so it asks for no
+  /// frames between readings, while paused, without access to the audio or
+  /// while the player covers it.
   final bool compact;
 
   @override
@@ -115,12 +117,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
       _beat = 0;
     }
     _repaint.value++;
-    if (!_playing && widget.compact) {
-      _ticker.stop();
-      _last = Duration.zero;
-    } else if (_playing && !_ticker.isActive) {
-      _ticker.start();
-    }
+    if (!widget.compact && _playing && !_ticker.isActive) _ticker.start();
   }
 
   bool get _freshReading =>
@@ -129,9 +126,12 @@ class _WaveVisualizerState extends State<WaveVisualizer>
       _clock.elapsed - _lastReading! < const Duration(milliseconds: 600);
 
   // Use the same painter as the app logo while loading, paused or waiting
-  // for capture to recover. Synthetic motion is only for unavailable access.
+  // for capture to recover. Synthetic motion is only for the player's waves
+  // without access; the thumbnail shows the logo instead.
   bool get _showLogo =>
-      !_playing || _loading || (_levels != null && !_freshReading);
+      !_playing ||
+      _loading ||
+      ((widget.compact || _levels != null) && !_freshReading);
 
   void _onAccessChanged() => unawaited(_connect());
 
@@ -164,6 +164,30 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     if (_loading || !_playing) return;
     _level = level;
     _lastReading = _clock.elapsed;
+    if (widget.compact) _stepThumbnail(level);
+  }
+
+  Timer? _stale;
+  Duration _lastStep = Duration.zero;
+
+  void _stepThumbnail(AudioLevel level) {
+    // Back to the logo if readings stop coming.
+    _stale?.cancel();
+    _stale = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) _repaint.value++;
+    });
+    if (!TickerMode.valuesOf(context).enabled) return;
+    final now = _clock.elapsed;
+    final dt = min((now - _lastStep).inMicroseconds / 1e6, 0.1);
+    _lastStep = now;
+    final t = now.inMicroseconds / 1e6;
+    _beat = max(level.onset, _beat * pow(0.02, dt).toDouble());
+    for (var i = 0; i < _bars; i++) {
+      final target = _target(i, level, t);
+      final rate = target > _heights[i] ? 30.0 : 7.0;
+      _heights[i] += (target - _heights[i]) * (1 - exp(-rate * dt));
+    }
+    _repaint.value++;
   }
 
   Future<void> _ask() async {
@@ -187,9 +211,6 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _tick(Duration elapsed) {
-    if (widget.compact && elapsed - _last < const Duration(milliseconds: 50)) {
-      return;
-    }
     final dt = min((elapsed - _last).inMicroseconds / 1e6, 0.1);
     _last = elapsed;
     final t = elapsed.inMicroseconds / 1e6;
@@ -225,6 +246,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   @override
   void dispose() {
     AudioLevels.accessChanged.removeListener(_onAccessChanged);
+    _stale?.cancel();
     _clock.stop();
     _playingSubscription.cancel();
     _trackSubscription.cancel();
