@@ -77,4 +77,46 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 30));
   });
+
+  testWidgets('lyrics opened upright hide sideways and come back', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(420, 860);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    audioHandler = _Handler();
+    audioHandler.mediaItem.add(
+      const MediaItem(id: 'test', title: 'Song', extras: {'ytid': 'test'}),
+    );
+    await tester.pumpWidget(
+      const MaterialApp(
+        localizationsDelegates: [
+          AppLocalizations.delegate,
+          ...GlobalMaterialLocalizations.delegates,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: NowPlayingPage(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byTooltip('Lyrics'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(LyricsPanel), findsOneWidget);
+
+    tester.view.physicalSize = const Size(860, 420);
+    for (var i = 0; i < 4; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    expect(find.byType(LyricsPanel), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    tester.view.physicalSize = const Size(420, 860);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(LyricsPanel), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 30));
+  });
 }

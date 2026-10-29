@@ -106,6 +106,8 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
       setState(() => _panel = _panel == panel ? null : panel);
       return;
     }
+    // A sheet replaces any panel left from another layout.
+    if (_panel != null) setState(() => _panel = null);
     showCustomBottomSheet(
       sheetContext,
       panel == PlayerPanel.queue
@@ -128,9 +130,15 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
           if (metadata == null) {
             return const Center(child: CircularProgressIndicator());
           }
+          final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
+          // What shows depends on the layout now: a phone turned sideways
+          // with the lyrics open shows none, and gets them back upright.
+          final panel = _panel != null && layout.showsInline(_panel!)
+              ? _panel
+              : null;
           final actions = PlayerActions(
             metadata: metadata,
-            panel: _panel,
+            panel: panel,
             onPanel: (panel, sheetContext) =>
                 _onPanel(panel, metadata, sheetContext),
           );
@@ -147,18 +155,16 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                   ),
                 ),
                 SafeArea(
-                  child:
-                      _PlayerLayout.of(MediaQuery.sizeOf(context)) ==
-                          _PlayerLayout.wide
+                  child: layout == _PlayerLayout.wide
                       ? _WideLayout(
                           metadata: metadata,
                           actions: actions,
-                          panel: _panel,
+                          panel: panel,
                         )
                       : _CompactLayout(
                           metadata: metadata,
                           actions: actions,
-                          lyrics: _panel == PlayerPanel.lyrics,
+                          lyrics: panel == PlayerPanel.lyrics,
                           onCloseLyrics: () => setState(() => _panel = null),
                         ),
                 ),
@@ -513,13 +519,15 @@ class _WideLayoutState extends State<_WideLayout> {
 
   /// What the song, playback and actions take under the artwork, measured
   /// after each layout: it changes with the text size and for live radio.
-  /// Starts generous, so the first frame never overflows.
-  double _below = 400;
+  /// The last measure starts the next player, so only the first opening
+  /// corrects itself; that first guess is generous, so it never overflows.
+  static double _lastBelow = 400;
+  double _below = _lastBelow;
 
   void _measure(Duration _) {
     final height = _belowKey.currentContext?.size?.height;
     if (mounted && height != null && (height - _below).abs() > 0.5) {
-      setState(() => _below = height);
+      setState(() => _below = _lastBelow = height);
     }
   }
 
