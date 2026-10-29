@@ -159,12 +159,19 @@ void main() {
       await mount(tester);
       expect(find.byType(ReorderableDragStartListener), findsNothing);
       expect(find.byTooltip('Select songs'), findsNothing);
+      expect(
+        tester.widget<IslandScaffold>(find.byType(IslandScaffold)).actions,
+        isEmpty,
+      );
+      await tester.ensureVisible(find.byTooltip('Reorder songs'));
       await tester.tap(find.byTooltip('Reorder songs'));
       await tester.pump();
       expect(find.byType(ReorderableDragStartListener), findsWidgets);
+      await tester.ensureVisible(find.byTooltip('Finish reordering'));
       await tester.tap(find.byTooltip('Finish reordering'));
       await tester.pump();
       expect(find.byType(ReorderableDragStartListener), findsNothing);
+      await tester.ensureVisible(find.byTooltip('Reorder songs'));
       await tester.tap(find.byTooltip('Reorder songs'));
       await tester.pump();
 

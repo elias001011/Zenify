@@ -219,27 +219,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
     return IslandScaffold(
       title: _playlist != null ? _playlistTitle : '',
       fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
-      actions: [
-        if (_playlist?['source'] == 'user-created')
-          IconButton(
-            icon: const Icon(FluentIcons.re_order_24_regular),
-            tooltip: _reorderEnabled
-                ? context.l10n!.finishReordering
-                : context.l10n!.reorderSongs,
-            isSelected: _reorderEnabled,
-            color: _reorderEnabled
-                ? Theme.of(context).colorScheme.primary
-                : null,
-            onPressed: () => setState(() {
-              _reorderEnabled = !_reorderEnabled;
-              if (_reorderEnabled) {
-                _selection.exit();
-                _sortType = PlaylistSortType.default_;
-                _applySort();
-              }
-            }),
-          ),
-      ],
       onFilter: (value) {
         _searchQueryNotifier.value = value;
         if (_reorderEnabled && value.trim().isNotEmpty) {
@@ -383,6 +362,25 @@ class _PlaylistPageState extends State<PlaylistPage> {
       ? normalizeArtistDisplayTitle(_playlist['title']?.toString() ?? '')
       : _playlist['title']?.toString() ?? '';
 
+  Widget _buildReorderButton() {
+    return IconButton(
+      icon: const Icon(FluentIcons.re_order_24_regular),
+      tooltip: _reorderEnabled
+          ? context.l10n!.finishReordering
+          : context.l10n!.reorderSongs,
+      isSelected: _reorderEnabled,
+      color: _reorderEnabled ? Theme.of(context).colorScheme.primary : null,
+      onPressed: () => setState(() {
+        _reorderEnabled = !_reorderEnabled;
+        if (_reorderEnabled) {
+          _selection.exit();
+          _sortType = PlaylistSortType.default_;
+          _applySort();
+        }
+      }),
+    );
+  }
+
   Widget _buildHeaderSection() {
     final songsLength = (_playlist['list'] as List? ?? const []).length;
     final isUserCreated = _playlist['source'] == 'user-created';
@@ -437,7 +435,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 if (!isUserCreated) SyncButton(onSync: _handleSyncPlaylist),
               ],
               if (songsLength > 0) _buildDownloadButton(),
-              if (isUserCreated) ...[_buildShareButton(), _buildEditButton()],
+              if (isUserCreated) ...[
+                _buildReorderButton(),
+                _buildShareButton(),
+                _buildEditButton(),
+              ],
             ],
           ),
         ],

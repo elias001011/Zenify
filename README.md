@@ -78,7 +78,7 @@ New in Zenify:
 - **Multi-selection**: long-press a song to select several tracks in the order
   you tap them. Play next, add to the queue or another playlist, like, download
   or remove a batch. Custom playlists also support moving songs to another
-  playlist. Enable the reorder button in a custom playlist to reveal drag
+  playlist. Enable the reorder button below a custom playlist’s artwork to reveal drag
   handles; they start hidden and use the default, unfiltered order.
   On desktop, arrows and the mouse wheel scroll the batch actions.
 - **Pick up where you stopped**: the queue and playback position survive app
