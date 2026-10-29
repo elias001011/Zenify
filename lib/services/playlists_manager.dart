@@ -356,6 +356,102 @@ String addSongsInCustomPlaylist(
   }
 }
 
+/// Persist the destination before removing anything from the source.
+Future<int> moveSongsToCustomPlaylist(
+  String from,
+  String to,
+  List<Map> songs,
+) async {
+  final source = _findCustomPlaylist(from);
+  final target = _findCustomPlaylist(to);
+  if (from == to ||
+      source == null ||
+      target == null ||
+      source.playlist['source'] != 'user-created' ||
+      target.playlist['source'] != 'user-created')
+    return 0;
+  final wanted = songs.map((song) => song['ytid']).toSet();
+  final original = List<dynamic>.of(source.playlist['list'] as List);
+  final moving = original
+      .where((song) => wanted.contains(song['ytid']))
+      .toList();
+  final destination = List<dynamic>.of(target.playlist['list'] as List);
+  final present = destination.map((song) => song['ytid']).toSet();
+  // Preserve the order of selection, including when the source is sorted.
+  for (final song in songs) {
+    if (moving.any((entry) => entry['ytid'] == song['ytid']) &&
+        present.add(song['ytid']))
+      destination.add(song);
+  }
+  target.playlist['list'] = destination;
+  await _saveCustomPlaylist(target.isFromFolder);
+  source.playlist['list'] = original
+      .where((song) => !wanted.contains(song['ytid']))
+      .toList();
+  try {
+    await _saveCustomPlaylist(source.isFromFolder);
+  } catch (_) {
+    source.playlist['list'] = original;
+    rethrow;
+  }
+  offlinePlaylistService
+    ..checkAndAutoMarkOffline(target.playlist)
+    ..checkAndAutoMarkOffline(source.playlist);
+  return moving.length;
+}
+
+Future<void> _saveCustomPlaylist(bool inFolder) async {
+  if (inFolder) {
+    userPlaylistFolders.value = [...userPlaylistFolders.value];
+    await addOrUpdateData<List>(
+      'user',
+      'playlistFolders',
+      userPlaylistFolders.value,
+    );
+  } else {
+    userCustomPlaylists.value = [...userCustomPlaylists.value];
+    await addOrUpdateData<List>(
+      'user',
+      'customPlaylists',
+      userCustomPlaylists.value,
+    );
+  }
+}
+
+/// Reorder the full stored playlist, refusing a stale or filtered subset.
+bool reorderCustomPlaylist(String playlistId, List<dynamic> orderedSongs) {
+  final found = _findCustomPlaylist(playlistId);
+  if (found == null || found.playlist['source'] != 'user-created') return false;
+  final current = found.playlist['list'] as List? ?? [];
+  final byId = {for (final song in current) song['ytid']: song};
+  final ids = orderedSongs.map((song) => song['ytid']).toList();
+  if (current.length != ids.length ||
+      ids.toSet().length != ids.length ||
+      !ids.every(byId.containsKey))
+    return false;
+  found.playlist['list'] = [for (final id in ids) byId[id]];
+  if (found.isFromFolder) {
+    userPlaylistFolders.value = [...userPlaylistFolders.value];
+    unawaited(
+      addOrUpdateData<List>(
+        'user',
+        'playlistFolders',
+        userPlaylistFolders.value,
+      ),
+    );
+  } else {
+    userCustomPlaylists.value = [...userCustomPlaylists.value];
+    unawaited(
+      addOrUpdateData<List>(
+        'user',
+        'customPlaylists',
+        userCustomPlaylists.value,
+      ),
+    );
+  }
+  return true;
+}
+
 bool removeSongFromPlaylist(
   Map playlist,
   Map songToRemove, {

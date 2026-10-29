@@ -1,6 +1,7 @@
 {
   "about": "Sobre",
   "aboutForkMaintainer": "Desenvolvedor e mantenedor do fork",
+  "aboutOriginalAuthor": "Autor original do Musify",
   "aboutSourceCode": "Código-fonte",
   "accentChangeMsg": "Cor de destaque atualizada com sucesso",
   "accentColor": "Cor de destaque",
@@ -426,5 +427,56 @@
   "yes": "Sim",
   "youtubePlaylistLinkOrId": "Link ou ID da playlist do YouTube",
   "wavesFollowMusic": "Seguir a música (pede acesso ao áudio)",
-  "imageSaved": "Imagem salva"
+  "imageSaved": "Imagem salva",
+  "selectAll": "Selecionar todas",
+  "selectSongs": "Selecionar músicas",
+  "moveToPlaylist": "Mover para playlist",
+  "songsMoved": "{count, plural, =1{1 música movida} other{{count} músicas movidas}}",
+  "songsSelected": "{count, plural, =1{1 música selecionada} other{{count} músicas selecionadas}}",
+  "songsAdded": "{count, plural, =1{1 música adicionada} other{{count} músicas adicionadas}}",
+  "songsRemoved": "{count, plural, =1{1 música removida} other{{count} músicas removidas}}",
+  "songsAddedToOffline": "{count, plural, =1{1 música disponível offline} other{{count} músicas disponíveis offline}}",
+  "removeSelectedSongsQuestion": "{count, plural, =1{Remover esta música?} other{Remover estas {count} músicas?}}",
+  "@songsMoved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@songsSelected": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@songsAdded": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@songsRemoved": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@songsAddedToOffline": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@removeSelectedSongsQuestion": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }
