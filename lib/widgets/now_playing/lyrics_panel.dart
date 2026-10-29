@@ -23,6 +23,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/lyrics/lyrics_models.dart';
 import 'package:musify/services/screen_awake.dart';
@@ -48,7 +49,9 @@ class _LyricsPanelState extends State<LyricsPanel> {
   @override
   void initState() {
     super.initState();
-    _releaseScreen = ScreenAwake.acquire();
+    _releaseScreen = ScreenAwake.acquire(
+      audioHandler.playbackState.map((state) => state.playing),
+    );
     _resolveIfNeeded();
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,8 +26,8 @@ void main() {
     'Android releases the window flag only after the last lyrics panel closes',
     () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      final release = ScreenAwake.acquire();
-      final releaseOther = ScreenAwake.acquire();
+      final release = ScreenAwake.acquire(Stream.value(true));
+      final releaseOther = ScreenAwake.acquire(Stream.value(true));
       await Future<void>.delayed(Duration.zero);
       expect(requests, [true]);
       release();
@@ -37,9 +39,31 @@ void main() {
       expect(requests, [true, false]);
     },
   );
+  test('the screen may sleep while the music is paused', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    final playing = StreamController<bool>();
+    final release = ScreenAwake.acquire(playing.stream);
+    playing.add(false);
+    await Future<void>.delayed(Duration.zero);
+    expect(requests, isEmpty);
+    playing
+      ..add(true)
+      ..add(true);
+    await Future<void>.delayed(Duration.zero);
+    expect(requests, [true]);
+    playing.add(false);
+    await Future<void>.delayed(Duration.zero);
+    expect(requests, [true, false]);
+    playing.add(true);
+    await Future<void>.delayed(Duration.zero);
+    release();
+    await Future<void>.delayed(Duration.zero);
+    expect(requests, [true, false, true, false]);
+    expect(playing.hasListener, isFalse);
+  });
   test('desktop never changes the screen power policy', () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-    ScreenAwake.acquire()();
+    ScreenAwake.acquire(Stream.value(true))();
     await Future<void>.delayed(Duration.zero);
     expect(requests, isEmpty);
   });

@@ -24,24 +24,39 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:musify/utilities/platform_utils.dart';
 
-/// A visible lyrics panel holds this until it leaves the tree. Overlapping
-/// panels during a transition share one Android window flag.
+/// A visible lyrics panel holds this until it leaves the tree, and the screen
+/// stays on while the music plays; paused, the system timeout applies again.
+/// Overlapping panels during a transition share one Android window flag.
 class ScreenAwake {
   static const _channel = MethodChannel('zenify/display');
   static int _readers = 0;
+  static StreamSubscription<bool>? _playing;
+  static bool _awake = false;
 
-  static VoidCallback acquire() {
+  static VoidCallback acquire(Stream<bool> playing) {
     if (!isAndroidPlatform) return () {};
-    if (_readers++ == 0) unawaited(_set(true));
+    if (_readers++ == 0) {
+      _playing = playing.distinct().listen(_set);
+    }
     var released = false;
     return () {
       if (released) return;
       released = true;
-      if (--_readers == 0) unawaited(_set(false));
+      if (--_readers == 0) {
+        unawaited(_playing?.cancel());
+        _playing = null;
+        _set(false);
+      }
     };
   }
 
-  static Future<void> _set(bool enabled) async {
+  static void _set(bool enabled) {
+    if (enabled == _awake) return;
+    _awake = enabled;
+    unawaited(_send(enabled));
+  }
+
+  static Future<void> _send(bool enabled) async {
     try {
       await _channel.invokeMethod<void>('keepScreenAwake', enabled);
     } on PlatformException {

@@ -327,6 +327,9 @@ void main() {
       ),
     );
     await mountQueue(tester);
+    audioHandler.playbackState.add(
+      audioHandler.playbackState.value.copyWith(playing: true),
+    );
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     await tester.tap(find.byTooltip('Lyrics'));
     for (var i = 0; i < 8; i++) {
