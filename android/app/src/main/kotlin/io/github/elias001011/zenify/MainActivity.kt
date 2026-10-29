@@ -9,13 +9,15 @@ import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import kotlin.math.sqrt
 
-class MainActivity : FlutterActivity() {
+// audio_service's activity shares its Flutter engine with the playback
+// service; the manifest launches this one so Zenify's channels exist.
+class MainActivity : AudioServiceActivity() {
   private var visualizer: Visualizer? = null
   private var pendingPermission: MethodChannel.Result? = null
 
