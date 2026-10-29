@@ -55,7 +55,7 @@ class PlaylistArtwork extends StatelessWidget {
     if (image == null) return _nullArtwork();
 
     try {
-      final provider = ArtworkProvider.get(image);
+      final provider = ArtworkProvider.thumbnail(image, size, context);
       return SizedBox(
         width: size,
         height: size,

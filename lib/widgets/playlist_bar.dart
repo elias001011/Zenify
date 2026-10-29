@@ -111,7 +111,7 @@ class PlaylistBar extends StatelessWidget {
               if (isFolder)
                 _buildFolderIcon(colorScheme)
               else
-                _buildPlaylistIcon(colorScheme),
+                _buildPlaylistIcon(context, colorScheme),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -321,7 +321,7 @@ class PlaylistBar extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaylistIcon(ColorScheme colorScheme) {
+  Widget _buildPlaylistIcon(BuildContext context, ColorScheme colorScheme) {
     final artwork = isArtist
         ? normalizeArtistThumbnailUrl(playlistArtwork)
         : playlistArtwork;
@@ -329,7 +329,11 @@ class PlaylistBar extends StatelessWidget {
       return ClipRRect(
         borderRadius: BorderRadius.circular(isArtist ? 26 : 12),
         child: Image(
-          image: ArtworkProvider.get(artwork),
+          image: ArtworkProvider.thumbnail(
+            artwork,
+            commonBarArtworkSize,
+            context,
+          ),
           width: commonBarArtworkSize,
           height: commonBarArtworkSize,
           fit: BoxFit.cover,

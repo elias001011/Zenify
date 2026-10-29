@@ -177,13 +177,24 @@ class GlowColors {
 /// Keeps a widget's [GlowColors] in step with [glowSources] and the app
 /// colour, and disposes them with it.
 mixin GlowColorsHost<T extends StatefulWidget> on TickerProviderStateMixin<T> {
-  late final glowColors = GlowColors(this);
+  GlowColors? _glowColors;
+  GlowColors get glowColors => _glowColors ??= GlowColors(this);
 
   /// The artworks to glow for, in order.
   List<String?> get glowSources;
 
-  void _updateGlow() =>
-      glowColors.update(glowSources, Theme.of(context).colorScheme.primary);
+  // With the dynamic background off nothing is read or animated: no artwork
+  // colours, no transitions asking for frames. Turning it on catches up.
+  void _updateGlow() {
+    if (!dynamicBackground.value) return;
+    glowColors.update(glowSources, Theme.of(context).colorScheme.primary);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    dynamicBackground.addListener(_updateGlow);
+  }
 
   @override
   void didChangeDependencies() {
@@ -199,7 +210,8 @@ mixin GlowColorsHost<T extends StatefulWidget> on TickerProviderStateMixin<T> {
 
   @override
   void dispose() {
-    glowColors.dispose();
+    dynamicBackground.removeListener(_updateGlow);
+    _glowColors?.dispose();
     super.dispose();
   }
 }

@@ -509,6 +509,7 @@ class _ArtworkThumbnail extends StatelessWidget {
           File(artworkPath),
           width: size,
           height: size,
+          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _fallback(),
         ),
@@ -524,6 +525,7 @@ class _ArtworkThumbnail extends StatelessWidget {
     return CachedNetworkImage(
       width: size,
       height: size,
+      memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
       imageUrl: imageUrl,
       imageBuilder: (_, imageProvider) => ClipRRect(
         borderRadius: BorderRadius.circular(radius),

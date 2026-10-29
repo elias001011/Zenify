@@ -62,4 +62,24 @@ class ArtworkProvider {
   }
 
   static void clearCache() => _cache.clear();
+
+  /// [artwork] decoded at the size it is shown, [size] logical pixels wide,
+  /// instead of at full resolution: a list row needs a few dozen pixels, not
+  /// the whole cover in memory.
+  static ImageProvider thumbnail(
+    String artwork,
+    double size,
+    BuildContext context,
+  ) => resized(get(artwork), size, context);
+
+  /// [provider] decoded [size] logical pixels wide; see [thumbnail].
+  static ImageProvider resized(
+    ImageProvider provider,
+    double size,
+    BuildContext context,
+  ) => ResizeImage.resizeIfNeeded(
+    (size * MediaQuery.devicePixelRatioOf(context)).round(),
+    null,
+    provider,
+  );
 }

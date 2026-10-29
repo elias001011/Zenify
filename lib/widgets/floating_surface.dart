@@ -28,7 +28,7 @@ import 'package:musify/services/settings_manager.dart';
 /// desktop rail, mini player) sits on, so they share one look.
 ///
 /// [floatingEffect] decides how much of the content behind shows through.
-class FloatingSurface extends StatelessWidget {
+class FloatingSurface extends StatefulWidget {
   const FloatingSurface({
     super.key,
     required this.child,
@@ -50,7 +50,18 @@ class FloatingSurface extends StatelessWidget {
 
   /// Shared window-edge spacing for the island, rail and dock.
   static const edgeMargin = 12.0;
+
+  @override
+  State<FloatingSurface> createState() => _FloatingSurfaceState();
+}
+
+class _FloatingSurfaceState extends State<FloatingSurface> {
   static const _blurSigma = 18.0;
+
+  /// Moves the content, with its state (the mini player's audio reader and
+  /// animations), when the blur is added or taken away around it, so solid
+  /// and translucent surfaces need no filter or clip of their own.
+  final _contentKey = GlobalKey();
 
   @override
   Widget build(BuildContext context) {
@@ -69,8 +80,10 @@ class FloatingSurface extends StatelessWidget {
       FloatingEffect.translucent => base.withValues(alpha: dark ? 0.78 : 0.82),
       FloatingEffect.blurred => base.withValues(alpha: dark ? 0.55 : 0.6),
     };
+    final borderRadius = widget.borderRadius;
 
-    final surface = Material(
+    final Widget surface = Material(
+      key: _contentKey,
       color: color,
       borderRadius: borderRadius,
       clipBehavior: Clip.antiAlias,
@@ -83,45 +96,36 @@ class FloatingSurface extends StatelessWidget {
             width: 0.8,
           ),
         ),
-        child: Padding(padding: padding, child: child),
+        child: Padding(padding: widget.padding, child: widget.child),
       ),
     );
 
-    // Keep the subtree mounted when changing effects: the mini player's
-    // audio reader and animations must survive solid <-> glass.
-    final filter = ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: borderRadius,
-        boxShadow: effect == FloatingEffect.solid
-            ? [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: dark ? 0.5 : 0.12),
-                  blurRadius: 24,
-                  offset: const Offset(0, 6),
-                ),
-              ]
-            : const [],
-      ),
-      child: ClipRRect(
-        borderRadius: borderRadius,
-        // Only the blur needs it; the Material clips the surface itself, and
-        // a second clip would cost a layer on every frame.
-        clipBehavior: effect == FloatingEffect.blurred
-            ? Clip.antiAlias
-            : Clip.none,
-        child: grouped
-            ? BackdropFilter.grouped(
-                filter: filter,
-                enabled: effect == FloatingEffect.blurred,
-                child: surface,
-              )
-            : BackdropFilter(
-                filter: filter,
-                enabled: effect == FloatingEffect.blurred,
-                child: surface,
+    switch (effect) {
+      case FloatingEffect.blurred:
+        final filter = ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma);
+        return ClipRRect(
+          borderRadius: borderRadius,
+          child: widget.grouped
+              ? BackdropFilter.grouped(filter: filter, child: surface)
+              : BackdropFilter(filter: filter, child: surface),
+        );
+      // A shadow under a see-through surface would darken what shows through.
+      case FloatingEffect.translucent:
+        return surface;
+      case FloatingEffect.solid:
+        return DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: dark ? 0.5 : 0.12),
+                blurRadius: 24,
+                offset: const Offset(0, 6),
               ),
-      ),
-    );
+            ],
+          ),
+          child: surface,
+        );
+    }
   }
 }

@@ -55,6 +55,8 @@ class SongArtworkWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(borderRadius),
               child: Image.file(
                 File(source),
+                cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
+                    .round(),
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => NullArtworkWidget(
                   iconSize: errorWidgetIconSize,

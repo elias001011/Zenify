@@ -785,6 +785,8 @@ class _OfflineArtwork extends StatelessWidget {
               File(artworkPath),
               width: size,
               height: size,
+              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) =>
                   NullArtworkWidget(iconSize: 30, size: size),
