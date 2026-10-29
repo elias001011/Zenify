@@ -31,6 +31,10 @@ import 'package:flutter/foundation.dart';
 /// 3, 2, 6, 1: the batch actions replay [selectedSongs] as it stands.
 class SongSelectionController extends ChangeNotifier {
   final List<Map> _selectedSongs = [];
+
+  /// The ticked songs' keys, so asking whether a row is ticked costs nothing
+  /// on long lists.
+  final Set<String> _selectedKeys = {};
   bool _isActive = false;
 
   /// Whether the list is showing checkboxes instead of playing on tap.
@@ -43,7 +47,7 @@ class SongSelectionController extends ChangeNotifier {
   /// The ticked songs, first ticked first.
   List<Map> get selectedSongs => List<Map>.unmodifiable(_selectedSongs);
 
-  bool isSelected(Map song) => _indexOf(song) != -1;
+  bool isSelected(Map song) => _selectedKeys.contains(_keyOf(song));
 
   /// Enters selection mode on [song], the one that was long pressed.
   void start(Map song) {
@@ -55,16 +59,20 @@ class SongSelectionController extends ChangeNotifier {
     _selectedSongs
       ..clear()
       ..add(song);
+    _selectedKeys
+      ..clear()
+      ..add(_keyOf(song));
     notifyListeners();
   }
 
   /// Ticks [song], or unticks it when it was already ticked.
   void toggle(Map song) {
-    final index = _indexOf(song);
-    if (index == -1) {
+    final key = _keyOf(song);
+    if (_selectedKeys.add(key)) {
       _selectedSongs.add(song);
     } else {
-      _selectedSongs.removeAt(index);
+      _selectedKeys.remove(key);
+      _selectedSongs.removeWhere((selected) => _keyOf(selected) == key);
     }
     notifyListeners();
   }
@@ -73,7 +81,7 @@ class SongSelectionController extends ChangeNotifier {
   void selectAll(Iterable<Map> songs) {
     var changed = false;
     for (final song in songs) {
-      if (_indexOf(song) == -1) {
+      if (_selectedKeys.add(_keyOf(song))) {
         _selectedSongs.add(song);
         changed = true;
       }
@@ -86,12 +94,8 @@ class SongSelectionController extends ChangeNotifier {
     if (!_isActive && _selectedSongs.isEmpty) return;
     _isActive = false;
     _selectedSongs.clear();
+    _selectedKeys.clear();
     notifyListeners();
-  }
-
-  int _indexOf(Map song) {
-    final key = _keyOf(song);
-    return _selectedSongs.indexWhere((selected) => _keyOf(selected) == key);
   }
 
   /// Songs travel as copies between the lists and the queue, so they are

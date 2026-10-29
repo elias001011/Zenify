@@ -697,20 +697,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
   }
 
   Future<void> _removeSongs(List<Map> songs) async {
-    var removed = 0;
-    for (final song in songs) {
-      final index = _originalPlaylistList.indexWhere(
-        (s) => s['ytid'] == song['ytid'],
-      );
-      if (index < 0) continue;
-      if (removeSongFromPlaylist(
-        {..._playlist, 'list': _originalPlaylistList},
-        song,
-        removeOneAtIndex: index,
-      )) {
-        _originalPlaylistList = [..._originalPlaylistList]..removeAt(index);
-        removed++;
-      }
+    // One write for the whole selection, not one per song.
+    final playlist = {..._playlist, 'list': _originalPlaylistList};
+    final removed = removeSongsFromPlaylist(playlist, songs);
+    if (removed > 0) {
+      _originalPlaylistList = List<dynamic>.from(playlist['list'] as List);
     }
     _applySort();
     if (mounted) {
