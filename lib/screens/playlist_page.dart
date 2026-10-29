@@ -363,13 +363,20 @@ class _PlaylistPageState extends State<PlaylistPage> {
       : _playlist['title']?.toString() ?? '';
 
   Widget _buildReorderButton() {
-    return IconButton(
+    final colorScheme = Theme.of(context).colorScheme;
+    return IconButton.filledTonal(
       icon: const Icon(FluentIcons.re_order_24_regular),
+      iconSize: 24,
       tooltip: _reorderEnabled
           ? context.l10n!.finishReordering
           : context.l10n!.reorderSongs,
       isSelected: _reorderEnabled,
-      color: _reorderEnabled ? Theme.of(context).colorScheme.primary : null,
+      color: _reorderEnabled
+          ? colorScheme.primary
+          : colorScheme.onSecondaryContainer,
+      style: IconButton.styleFrom(
+        backgroundColor: colorScheme.secondaryContainer,
+      ),
       onPressed: () => setState(() {
         _reorderEnabled = !_reorderEnabled;
         if (_reorderEnabled) {
@@ -436,9 +443,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
               ],
               if (songsLength > 0) _buildDownloadButton(),
               if (isUserCreated) ...[
-                _buildReorderButton(),
                 _buildShareButton(),
                 _buildEditButton(),
+                _buildReorderButton(),
               ],
             ],
           ),
