@@ -35,6 +35,7 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/screens/local_sync_page.dart';
+import 'package:musify/services/audio_levels.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/desktop_media_artwork.dart';
@@ -404,6 +405,7 @@ Future<String?> initialisation() async {
       NavigationManager.instance;
       try {
         // Use the desktop audio backend without mobile service plugins.
+        AudioLevels.configureDesktop();
         JustAudioMediaKit.title = appName;
         JustAudioMediaKit.ensureInitialized();
         audioHandler = MusifyAudioHandler();

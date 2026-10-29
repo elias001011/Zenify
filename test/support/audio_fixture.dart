@@ -28,9 +28,9 @@ Uint8List silentWav({int size = 32000}) {
 
 /// Two seconds of a bass hit every half second over a faint high tone, at
 /// 22.05 kHz mono, for checks that follow beats.
-Uint8List beatsWav() {
+Uint8List beatsWav({int seconds = 2}) {
   const rate = 22050;
-  const samples = rate * 2;
+  final samples = rate * seconds;
   final bytes = ByteData(44 + samples * 2);
   void text(int offset, String value) {
     for (var i = 0; i < value.length; i++) {

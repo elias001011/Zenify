@@ -22,6 +22,10 @@ class JustAudioMediaKit extends JustAudioPlatform {
   /// Keep buffering in memory unless disk caching is explicitly requested.
   static bool diskCache = false;
 
+  /// Filters prepared once before the first source opens. UI listeners can
+  /// read their metadata without rebuilding the output during playback.
+  static List<String> audioFilters = const [];
+
   /// Sets the name of the underlying window & process for native backend. This is visible inside the Windows' volume mixer.
   static String title = 'JustAudioMediaKit';
 
