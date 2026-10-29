@@ -82,6 +82,7 @@ class MiniPlayer extends StatelessWidget {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
       child: StreamBuilder<MediaItem?>(
+        initialData: audioHandler.mediaItem.value,
         stream: audioHandler.mediaItem,
         builder: (context, mediaSnapshot) {
           final metadata = mediaSnapshot.data;

@@ -122,14 +122,20 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Back closes a panel only when the layout shows it.
+    final open = _panel;
+    final panelShown =
+        open != null &&
+        _PlayerLayout.of(MediaQuery.sizeOf(context)).showsInline(open);
     return PopScope(
-      canPop: _panel == null,
+      canPop: !panelShown,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) setState(() => _panel = null);
       },
       child: Scaffold(
         backgroundColor: Theme.of(context).colorScheme.surface,
         body: StreamBuilder<MediaItem?>(
+          initialData: audioHandler.mediaItem.value,
           stream: audioHandler.mediaItem,
           builder: (context, snapshot) {
             final metadata = snapshot.data;
