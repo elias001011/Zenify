@@ -107,6 +107,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
     orElse: () => PlaylistSortType.default_,
   );
 
+  bool _reorderEnabled = false;
   final _selection = SongSelectionController();
   final _songsRevision = ValueNotifier(0);
 
@@ -219,16 +220,32 @@ class _PlaylistPageState extends State<PlaylistPage> {
       title: _playlist != null ? _playlistTitle : '',
       fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
       actions: [
-        IconButton(
-          icon: const Icon(FluentIcons.checkbox_checked_24_regular),
-          tooltip: context.l10n!.selectSongs,
-          onPressed: () {
-            final songs = _getSourceList(_searchQueryNotifier.value);
-            if (songs.isNotEmpty) _selection.start(songs.first);
-          },
-        ),
+        if (_playlist?['source'] == 'user-created')
+          IconButton(
+            icon: const Icon(FluentIcons.re_order_24_regular),
+            tooltip: _reorderEnabled
+                ? context.l10n!.finishReordering
+                : context.l10n!.reorderSongs,
+            isSelected: _reorderEnabled,
+            color: _reorderEnabled
+                ? Theme.of(context).colorScheme.primary
+                : null,
+            onPressed: () => setState(() {
+              _reorderEnabled = !_reorderEnabled;
+              if (_reorderEnabled) {
+                _selection.exit();
+                _sortType = PlaylistSortType.default_;
+                _applySort();
+              }
+            }),
+          ),
       ],
-      onFilter: (value) => _searchQueryNotifier.value = value,
+      onFilter: (value) {
+        _searchQueryNotifier.value = value;
+        if (_reorderEnabled && value.trim().isNotEmpty) {
+          setState(() => _reorderEnabled = false);
+        }
+      },
       onBack: () {
         if (_selection.isActive) {
           _selection.exit();
@@ -267,6 +284,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                                   _playlist['source'] == 'user-created';
                               final reorderable =
                                   custom &&
+                                  _reorderEnabled &&
                                   searchQuery.trim().isEmpty &&
                                   _sortType == PlaylistSortType.default_;
                               Widget item(BuildContext context, int index) =>
@@ -432,6 +450,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
             onSelected: (type) {
               setState(() {
                 _sortType = type;
+                if (type != PlaylistSortType.default_) _reorderEnabled = false;
                 addOrUpdateData<String>(
                   'settings',
                   'playlistSortType',
@@ -692,7 +711,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
   }
 
   void _reorderSongs(int from, int to) {
-    if (_selection.isActive ||
+    if (!_reorderEnabled ||
+        _selection.isActive ||
         _searchQueryNotifier.value.trim().isNotEmpty ||
         _sortType != PlaylistSortType.default_)
       return;

@@ -72,12 +72,15 @@ New in Zenify:
   and queue open beside it on desktop; on phones they share the artwork's
   space through the same animated transition. Tapping the artwork switches
   to sound waves. They follow the music when audio levels are available and
-  keep a gentle motion otherwise. Android keeps the screen awake while
-  lyrics are open.
+  keep a gentle motion when capture is unavailable. While audio loads or
+  capture recovers, the current Zenify logo appears. Android keeps the
+  screen awake while lyrics are open.
 - **Multi-selection**: long-press a song to select several tracks in the order
   you tap them. Play next, add to the queue or another playlist, like, download
   or remove a batch. Custom playlists also support moving songs to another
-  playlist and dragging to reorder in the default, unfiltered view.
+  playlist. Enable the reorder button in a custom playlist to reveal drag
+  handles; they start hidden and use the default, unfiltered order.
+  On desktop, arrows and the mouse wheel scroll the batch actions.
 - **Pick up where you stopped**: the queue and playback position survive app
   restarts. The app opens paused and loads audio when you press play. This
   stays on the device; queues over 1,000 songs retain a window around the

@@ -489,5 +489,7 @@
         "type": "int"
       }
     }
-  }
+  },
+  "reorderSongs": "Reorder songs",
+  "finishReordering": "Finish reordering"
 }

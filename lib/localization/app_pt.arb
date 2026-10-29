@@ -478,5 +478,7 @@
         "type": "int"
       }
     }
-  }
+  },
+  "reorderSongs": "Reordenar músicas",
+  "finishReordering": "Concluir reordenação"
 }

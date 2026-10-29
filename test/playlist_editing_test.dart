@@ -9,6 +9,7 @@ import 'package:musify/screens/playlist_page.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:musify/widgets/song_selection_bar.dart';
 
@@ -156,6 +157,17 @@ void main() {
     'manual reorder uses final insertion index and search hides handles',
     (tester) async {
       await mount(tester);
+      expect(find.byType(ReorderableDragStartListener), findsNothing);
+      expect(find.byTooltip('Select songs'), findsNothing);
+      await tester.tap(find.byTooltip('Reorder songs'));
+      await tester.pump();
+      expect(find.byType(ReorderableDragStartListener), findsWidgets);
+      await tester.tap(find.byTooltip('Finish reordering'));
+      await tester.pump();
+      expect(find.byType(ReorderableDragStartListener), findsNothing);
+      await tester.tap(find.byTooltip('Reorder songs'));
+      await tester.pump();
+
       await tester.runAsync(() async {
         tester
             .widget<SliverReorderableList>(find.byType(SliverReorderableList))
@@ -170,6 +182,14 @@ void main() {
         ),
         ['b', 'c', 'a'],
       );
+      tester.widget<IslandScaffold>(find.byType(IslandScaffold)).onFilter!(
+        'Track b',
+      );
+      await tester.pump();
+      expect(find.byType(ReorderableDragStartListener), findsNothing);
+      tester.widget<IslandScaffold>(find.byType(IslandScaffold)).onFilter!('');
+      await tester.pump();
+      expect(find.byType(ReorderableDragStartListener), findsNothing);
       await tester.pumpWidget(const SizedBox());
       await tester.pump(const Duration(seconds: 30));
     },

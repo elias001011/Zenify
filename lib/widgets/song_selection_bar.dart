@@ -22,6 +22,7 @@
 import 'dart:async';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
@@ -29,6 +30,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/floating_surface.dart';
@@ -173,9 +175,8 @@ class SongSelectionBar extends StatelessWidget {
                     ),
                   ],
                 ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(children: _buildActions(context, colorScheme)),
+                _SelectionActions(
+                  children: _buildActions(context, colorScheme),
                 ),
               ],
             ),
@@ -364,6 +365,107 @@ class SongSelectionBar extends StatelessWidget {
           controller.exit();
           unawaited(remove(songs));
         },
+      ),
+    );
+  }
+}
+
+/// Explicit paging for mouse users; touch, trackpad, wheel and keyboard focus
+/// can still scroll the same actions without opening a separate menu.
+class _SelectionActions extends StatefulWidget {
+  const _SelectionActions({required this.children});
+  final List<Widget> children;
+
+  @override
+  State<_SelectionActions> createState() => _SelectionActionsState();
+}
+
+class _SelectionActionsState extends State<_SelectionActions> {
+  final _scroll = ScrollController();
+  final _edges = ValueNotifier<(bool, bool)>((false, false));
+
+  bool _metrics(ScrollMetrics metrics) {
+    _edges.value = (metrics.extentBefore > 1, metrics.extentAfter > 1);
+    return false;
+  }
+
+  void _page(int direction) {
+    final position = _scroll.position;
+    unawaited(
+      _scroll.animateTo(
+        (position.pixels + direction * position.viewportDimension * 0.8).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        ),
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutCubic,
+      ),
+    );
+  }
+
+  void _wheel(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent || !_scroll.hasClients) return;
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      final delta = event.scrollDelta.dx != 0
+          ? event.scrollDelta.dx
+          : event.scrollDelta.dy;
+      final position = _scroll.position;
+      _scroll.jumpTo(
+        (position.pixels + delta).clamp(
+          position.minScrollExtent,
+          position.maxScrollExtent,
+        ),
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    _edges.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final actions = Listener(
+      onPointerSignal: isDesktopPlatform ? _wheel : null,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(
+          dragDevices: PointerDeviceKind.values.toSet(),
+          scrollbars: false,
+        ),
+        child: NotificationListener<ScrollMetricsNotification>(
+          onNotification: (n) => _metrics(n.metrics),
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (n) => _metrics(n.metrics),
+            child: SingleChildScrollView(
+              controller: _scroll,
+              scrollDirection: Axis.horizontal,
+              child: Row(children: widget.children),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!isDesktopPlatform) return actions;
+    return ValueListenableBuilder<(bool, bool)>(
+      valueListenable: _edges,
+      child: actions,
+      builder: (context, edges, child) => Row(
+        children: [
+          IconButton(
+            tooltip: MaterialLocalizations.of(context).previousPageTooltip,
+            icon: const Icon(FluentIcons.chevron_left_24_regular),
+            onPressed: edges.$1 ? () => _page(-1) : null,
+          ),
+          Expanded(child: child!),
+          IconButton(
+            tooltip: MaterialLocalizations.of(context).nextPageTooltip,
+            icon: const Icon(FluentIcons.chevron_right_24_regular),
+            onPressed: edges.$2 ? () => _page(1) : null,
+          ),
+        ],
       ),
     );
   }
