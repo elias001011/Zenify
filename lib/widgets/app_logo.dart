@@ -30,11 +30,18 @@ const _waveforms = {
   5: [.42, .76, 1.0, .76, .42],
 };
 
-/// Paints Zenify's waveform centred in [rect], filled with [paint]. Small
-/// sizes get fewer, wider bars so they stay legible; [pixels] is the size
-/// it is drawn at.
-void paintZenifyWaves(Canvas canvas, Rect rect, double pixels, Paint paint) {
-  final heights = _waveforms[pixels >= 96 ? 9 : (pixels >= 40 ? 7 : 5)]!;
+/// Paints Zenify's waveform centred in [rect], filled with [paint]: [bars]
+/// of them, or, without it, fewer and wider the smaller [pixels] (the size
+/// it is drawn at), so they stay legible.
+void paintZenifyWaves(
+  Canvas canvas,
+  Rect rect,
+  double pixels,
+  Paint paint, {
+  int? bars,
+}) {
+  final heights =
+      _waveforms[bars ?? (pixels >= 96 ? 9 : (pixels >= 40 ? 7 : 5))]!;
   // Bar, gap, bar...: bars take 60% of each step.
   final step = rect.width / (heights.length - 0.4);
   final barWidth = step * 0.6;

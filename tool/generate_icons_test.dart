@@ -1,4 +1,4 @@
-// Draws the Zenify icon (a blue audio waveform on black) in every size the
+// Draws the Zenify icon (five flat blue bars on black, as the in-app logo) in every size the
 // platforms need. Run from the repository root:
 //   flutter test tool/generate_icons_test.dart
 
@@ -10,36 +10,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/widgets/app_logo.dart';
 
-const _gradient = [Color(0xFF34E0FF), Color(0xFF2F7BFF), Color(0xFF4A4DFF)];
-const _glow = Color(0xFF2F7BFF);
+/// The logo's blue: the app's own accent in the dark theme, as the in-app
+/// logo shows it.
+final _blue = ColorScheme.fromSeed(
+  seedColor: const Color(0xff91cef4),
+  brightness: Brightness.dark,
+).primary;
 
 enum _Style { color, white }
 
-/// Paints the waveform in [rect]: gradient or white.
-void _paintWaves(Canvas canvas, Rect rect, double pixels, _Style style) {
-  final paint = Paint();
-  if (style == _Style.color) {
-    paint.shader = ui.Gradient.linear(
-      rect.topLeft,
-      rect.bottomRight,
-      _gradient,
-      const [0, 0.5, 1],
-    );
-  } else {
-    paint.color = Colors.white;
-  }
-  paintZenifyWaves(canvas, rect, pixels, paint);
-}
-
-void _paintGlow(Canvas canvas, Offset center, double radius) {
-  canvas.drawCircle(
-    center,
-    radius,
-    Paint()
-      ..shader = ui.Gradient.radial(center, radius, [
-        _glow.withValues(alpha: 0.3),
-        _glow.withValues(alpha: 0),
-      ]),
+/// Five flat bars in [rect], blue or white, the same in every size.
+void _paintWaves(Canvas canvas, Rect rect, _Style style) {
+  paintZenifyWaves(
+    canvas,
+    rect,
+    rect.width,
+    Paint()..color = style == _Style.color ? _blue : Colors.white,
+    bars: 5,
   );
 }
 
@@ -57,15 +44,13 @@ void _icon(Canvas canvas, double size, {bool square = false}) {
       ),
     )
     ..drawRect(shape, Paint()..color = Colors.black);
-  _paintGlow(canvas, bounds.center, size * 0.38);
   _paintWaves(
     canvas,
     Rect.fromCenter(
       center: bounds.center,
-      width: size * 0.54,
-      height: size * 0.54,
+      width: size * 0.5,
+      height: size * 0.5,
     ),
-    size,
     _Style.color,
   );
   canvas.restore();
@@ -74,11 +59,9 @@ void _icon(Canvas canvas, double size, {bool square = false}) {
 /// Android adaptive layers: the art inside the 66dp safe zone of 108dp.
 void _adaptive(Canvas canvas, double size, _Style style) {
   final center = Offset(size / 2, size / 2);
-  if (style == _Style.color) _paintGlow(canvas, center, size * 0.27);
   _paintWaves(
     canvas,
-    Rect.fromCenter(center: center, width: size * 0.48, height: size * 0.48),
-    size * 0.48,
+    Rect.fromCenter(center: center, width: size * 0.44, height: size * 0.44),
     style,
   );
 }
@@ -89,7 +72,6 @@ void _glyph(Canvas canvas, double size) {
   _paintWaves(
     canvas,
     Rect.fromCenter(center: center, width: size * 0.92, height: size * 0.92),
-    size,
     _Style.white,
   );
 }
