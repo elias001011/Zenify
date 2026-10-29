@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.media.audiofx.Visualizer
 import android.os.Build
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
@@ -34,6 +35,19 @@ class MainActivity : FlutterActivity() {
   override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
     super.configureFlutterEngine(flutterEngine)
     val messenger = flutterEngine.dartExecutor.binaryMessenger
+
+    MethodChannel(messenger, "zenify/display").setMethodCallHandler { call, result ->
+      if (call.method == "keepScreenAwake") {
+        if (call.arguments == true) {
+          window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+          window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+        result.success(null)
+      } else {
+        result.notImplemented()
+      }
+    }
 
     // The player's waves follow the music through Android's Visualizer, which
     // needs the audio recording permission even to read Zenify's own output.

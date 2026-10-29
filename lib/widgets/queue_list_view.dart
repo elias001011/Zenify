@@ -32,9 +32,10 @@ import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/no_artwork_cube.dart';
 
 class QueueWidget extends StatefulWidget {
-  const QueueWidget({super.key, this.isBottomSheet = false});
+  const QueueWidget({super.key, this.embedded = false});
 
-  final bool isBottomSheet;
+  /// A compact header for the player's artwork area on phones.
+  final bool embedded;
 
   @override
   State<QueueWidget> createState() => _QueueWidgetState();
@@ -104,19 +105,9 @@ class _QueueWidgetState extends State<QueueWidget> {
     final textTheme = Theme.of(context).textTheme;
     final currentIndex = audioHandler.currentQueueIndex;
 
-    if (widget.isBottomSheet) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildHeader(context, colorScheme, textTheme, compact: true),
-          _buildBottomSheetContent(context, colorScheme, currentIndex),
-        ],
-      );
-    }
-
     return Column(
       children: [
-        _buildHeader(context, colorScheme, textTheme, compact: false),
+        _buildHeader(context, colorScheme, textTheme, compact: widget.embedded),
         Divider(
           height: 1,
           thickness: 1,
@@ -157,7 +148,6 @@ class _QueueWidgetState extends State<QueueWidget> {
         onSubmit: () {
           Navigator.pop(context);
           audioHandler.clearQueue();
-          if (widget.isBottomSheet) Navigator.pop(context);
         },
       ),
     );
@@ -175,25 +165,29 @@ class _QueueWidgetState extends State<QueueWidget> {
           : const EdgeInsets.fromLTRB(8, 8, 8, 16),
       child: Row(
         children: [
-          Container(
-            padding: EdgeInsets.all(compact ? 8 : 10),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
+          if (!compact) ...[
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                FluentIcons.apps_list_24_regular,
+                color: colorScheme.onPrimaryContainer,
+                size: compact ? 20.0 : 22.0,
+              ),
             ),
-            child: Icon(
-              FluentIcons.apps_list_24_regular,
-              color: colorScheme.onPrimaryContainer,
-              size: compact ? 20.0 : 22.0,
-            ),
-          ),
-          SizedBox(width: compact ? 12 : 14),
+            const SizedBox(width: 14),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   context.l10n!.queue,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: compact
                       ? TextStyle(
                           color: colorScheme.onSurface,
@@ -208,6 +202,8 @@ class _QueueWidgetState extends State<QueueWidget> {
                 if (_queue.isNotEmpty)
                   Text(
                     '${_queue.length} ${context.l10n!.songs.toLowerCase()}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: compact
                         ? TextStyle(
                             color: colorScheme.onSurfaceVariant,
@@ -229,41 +225,28 @@ class _QueueWidgetState extends State<QueueWidget> {
             ),
           if (_queue.isNotEmpty) ...[
             const SizedBox(width: 8),
-            FilledButton.tonalIcon(
-              onPressed: () => _confirmClearQueue(context),
-              icon: const Icon(FluentIcons.dismiss_24_regular, size: 18),
-              label: Text(context.l10n!.clear),
-              style: FilledButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 8,
+            if (compact)
+              IconButton(
+                onPressed: () => _confirmClearQueue(context),
+                icon: const Icon(FluentIcons.delete_24_regular, size: 20),
+                tooltip: context.l10n!.clear,
+              )
+            else
+              FilledButton.tonalIcon(
+                onPressed: () => _confirmClearQueue(context),
+                icon: const Icon(FluentIcons.dismiss_24_regular, size: 18),
+                label: Text(context.l10n!.clear),
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  visualDensity: VisualDensity.compact,
                 ),
-                visualDensity: VisualDensity.compact,
               ),
-            ),
           ],
         ],
       ),
-    );
-  }
-
-  Widget _buildBottomSheetContent(
-    BuildContext context,
-    ColorScheme colorScheme,
-    int currentIndex,
-  ) {
-    if (_queue.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Text(
-          context.l10n!.noSongsInQueue,
-          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
-        ),
-      );
-    }
-    return SizedBox(
-      height: MediaQuery.sizeOf(context).height * 0.52,
-      child: _buildList(context, colorScheme, currentIndex, closeOnTap: true),
     );
   }
 
@@ -312,9 +295,8 @@ class _QueueWidgetState extends State<QueueWidget> {
   Widget _buildList(
     BuildContext context,
     ColorScheme colorScheme,
-    int currentIndex, {
-    bool closeOnTap = false,
-  }) {
+    int currentIndex,
+  ) {
     return ReorderableListView.builder(
       scrollController: _scrollController,
       buildDefaultDragHandles: false,
@@ -358,7 +340,6 @@ class _QueueWidgetState extends State<QueueWidget> {
           colorScheme: colorScheme,
           onTap: () {
             audioHandler.skipToSong(index);
-            if (closeOnTap) Navigator.pop(context);
           },
           confirmDismiss: (_) async {
             _isDismissing = true;
