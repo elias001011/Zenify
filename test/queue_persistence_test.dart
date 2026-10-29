@@ -59,16 +59,21 @@ void main() {
     },
   );
 
-  test('another entry and out-of-range positions start from zero', () async {
-    memory
-      ..saveQueue([song(0), song(5)], [], 1)
-      ..savePosition('entry0', const Duration(seconds: 30));
-    await memory.flush();
-    expect(memory.read()!.position, Duration.zero);
-    memory.savePosition('entry5', const Duration(minutes: 5));
-    await memory.flush();
-    expect(memory.read()!.position, Duration.zero);
-  });
+  test(
+    'the song last positioned is current; past its end starts at zero',
+    () async {
+      memory
+        ..saveQueue([song(0), song(5)], [], 1)
+        ..savePosition('entry0', const Duration(seconds: 30));
+      await memory.flush();
+      expect(memory.read()!.index, 0);
+      expect(memory.read()!.position, const Duration(seconds: 30));
+      memory.savePosition('entry5', const Duration(minutes: 5));
+      await memory.flush();
+      expect(memory.read()!.index, 1);
+      expect(memory.read()!.position, Duration.zero);
+    },
+  );
 
   test(
     'large queues keep a bounded window containing the current entry',
@@ -126,4 +131,30 @@ void main() {
       expect(memory.read(), isNull);
     }
   });
+
+  test(
+    'a track change in the same queue only moves the position record',
+    () async {
+      final songs = [for (var i = 0; i < 6; i++) song(i)];
+      memory.saveQueue(songs, songs, 1);
+      await memory.flush();
+      final written = Hive.box('userNoBackup')
+          .get(QueuePersistenceService.queueKey);
+
+      memory.saveQueue(songs, songs, 4);
+      await memory.flush();
+
+      expect(
+        Hive.box('userNoBackup').get(QueuePersistenceService.queueKey),
+        same(written),
+      );
+      final restored = QueuePersistenceService().read()!;
+      expect(restored.index, 4);
+      expect(restored.position, Duration.zero);
+      expect(
+        restored.original.map((s) => s['queueEntryId']),
+        songs.map((s) => s['queueEntryId']),
+      );
+    },
+  );
 }
