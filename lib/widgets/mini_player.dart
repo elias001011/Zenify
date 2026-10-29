@@ -253,7 +253,9 @@ class _ArtworkWidget extends StatelessWidget {
             builder: (context, visualizer, _) => visualizer
                 ? const SizedBox.square(
                     dimension: MiniPlayer._artworkSize,
-                    child: Center(child: WaveVisualizer(size: 40)),
+                    child: Center(
+                      child: WaveVisualizer(size: 40, compact: true),
+                    ),
                   )
                 : SongArtworkWidget(
                     metadata: metadata,

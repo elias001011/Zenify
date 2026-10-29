@@ -191,14 +191,14 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                   SizedBox(
                     height: _dockBarHeight,
                     child: Row(
-                      // Even gaps fill the dock; each tap area stays compact.
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
                         for (var i = 0; i < items.length; i++)
-                          _DockButton(
-                            item: items[i],
-                            selected: i == selected,
-                            onTap: () => _onTabTapped(i, items),
+                          Expanded(
+                            child: _DockButton(
+                              item: items[i],
+                              selected: i == selected,
+                              onTap: () => _onTabTapped(i, items),
+                            ),
                           ),
                       ],
                     ),
@@ -338,17 +338,20 @@ class _DockButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // A fixed slot, so the pill can grow without moving its neighbours.
-    return SizedBox(
-      width: 64,
-      child: Center(
-        child: Tooltip(
-          message: item.label,
-          child: Semantics(
-            selected: selected,
-            button: true,
-            label: item.label,
-            excludeSemantics: true,
+    // The whole slice of the dock answers a tap, not just the pill, so a
+    // thumb slightly off the icon still switches tabs. The fixed slice also
+    // lets the pill grow without moving its neighbours.
+    return Tooltip(
+      message: item.label,
+      child: Semantics(
+        selected: selected,
+        button: true,
+        label: item.label,
+        excludeSemantics: true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Center(
             child: Material(
               color: selected
                   ? colorScheme.secondaryContainer

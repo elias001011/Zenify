@@ -243,6 +243,9 @@ class NavigationManager {
       // Branch 2: Library
       StatefulShellBranch(
         navigatorKey: libraryTabNavigatorKey,
+        // Built with the home page, while the app opens, so the first switch
+        // to it doesn't stall on building the whole library.
+        preload: true,
         routes: [
           GoRoute(
             path: libraryPath,
