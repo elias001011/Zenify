@@ -23,8 +23,10 @@ import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/lyrics/lyrics_models.dart';
+import 'package:musify/services/screen_awake.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/widgets/now_playing/synced_lyrics_view.dart';
@@ -42,11 +44,21 @@ class LyricsPanel extends StatefulWidget {
 class _LyricsPanelState extends State<LyricsPanel> {
   String? _resolvedKey;
   late Future<Lyrics?> _lyricsFuture;
+  late final VoidCallback _releaseScreen;
 
   @override
   void initState() {
     super.initState();
+    _releaseScreen = ScreenAwake.acquire(
+      audioHandler.playbackState.map((state) => state.playing),
+    );
     _resolveIfNeeded();
+  }
+
+  @override
+  void dispose() {
+    _releaseScreen();
+    super.dispose();
   }
 
   @override

@@ -30,7 +30,9 @@ moving your library between devices.
 | Platforms | Android, desktop builds | Android, Linux and Windows, with `.deb`, installer and portable builds |
 | Interface | Material app bars and bottom navigation | Floating island, dock and desktop rail; solid, translucent or blurred |
 | Background | Plain | Optional dynamic background in your albums' colours |
-| Player | Flip card with lyrics | Song and playback under the artwork; lyrics beside it on desktop and in its place on phones; sound waves that follow the music |
+| Player | Flip card with lyrics | Integrated lyrics and queue panels, sound waves and a floating action bar |
+| Playlists | Single-song actions | Multi-selection in tap order, batch actions, moving songs and drag-to-reorder for custom playlists |
+| Resume | Recently played songs | Saved queue, shuffle order and playback position, restored while paused |
 | Library | Sections | Filters (custom, YouTube, albums, artists, offline) and its own search, songs included; global search lists what you own first |
 | Listening recap | Minutes and top songs | Cards with minutes, top artists and top songs, shareable per month |
 | Downloads | In the background | Download manager with progress, failures and retry |
@@ -67,10 +69,24 @@ New in Zenify:
   quick search, a neutral theme with pure black, and an optional dynamic
   background that glows with the colours of your albums.
 - **A new player**: the artwork with the song and playback under it. Lyrics
-  and queue open beside it on desktop; on phones the lyrics take the
-  artwork's place. Tapping the artwork flips it to sound waves that follow
-  the music's loudness, beats and treble (on Android, once you allow audio
-  access).
+  and queue open beside it on desktop; on phones they share the artwork's
+  space through the same animated transition. Tapping the artwork switches
+  to sound waves. They follow the music when audio levels are available and
+  keep a gentle motion when capture is unavailable. While audio loads or
+  capture recovers, the current Zenify logo appears. Android keeps the
+  screen awake while lyrics are open.
+- **Multi-selection**: long-press a song to select several tracks in the order
+  you tap them. Play next, add to the queue or another playlist, like, download
+  or remove a batch. Custom playlists also support moving songs to another
+  playlist. Enable the reorder button below a custom playlist’s artwork to reveal drag
+  handles; they start hidden and use the default, unfiltered order.
+  On desktop, arrows and the mouse wheel scroll the batch actions.
+- **Pick up where you stopped**: the queue and playback position survive app
+  restarts. The app opens paused and loads audio when you press play. This
+  stays on the device; queues over 1,000 songs retain a window around the
+  current track.
+- **Search by YouTube link**: paste a watch, share, Shorts, live or embed link
+  to find that exact video, alongside the regular text search.
 - **Library search and filters**: the library searches its own playlists,
   artists and songs, and the global search lists what you already have
   first. Both keep working offline.
@@ -92,8 +108,36 @@ New features are translated into English and Portuguese for now.
 
 ## Screenshots
 
-| ![Screenshot 1](fastlane/metadata/android/en-US/images/phoneScreenshots/01.jpg) | ![Screenshot 2](fastlane/metadata/android/en-US/images/phoneScreenshots/02.jpg) | ![Screenshot 3](fastlane/metadata/android/en-US/images/phoneScreenshots/03.jpg) | ![Screenshot 4](fastlane/metadata/android/en-US/images/phoneScreenshots/04.jpg) |
-|---|---|---|---|
+### Desktop
+
+Home, album colours and the listening recap on a wide screen:
+
+![Zenify home on a wide desktop](assets/screenshots/desktop-home.png)
+
+| Player and queue | Sound waves and synced lyrics |
+|---|---|
+| ![Zenify desktop player with queue](assets/screenshots/desktop-player-queue.png) | ![Zenify sound waves with synced lyrics](assets/screenshots/desktop-waves-lyrics.png) |
+
+![Zenify playlist and floating dock](assets/screenshots/desktop-playlist.png)
+
+### Compact and mobile layouts
+
+<table>
+  <tr>
+    <th>Compact lyrics</th>
+    <th>Integrated mobile queue</th>
+    <th>Song selection</th>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/compact-lyrics.png" width="260" alt="Zenify lyrics in a compact window"></td>
+    <td><img src="assets/screenshots/mobile-queue.png" width="260" alt="Zenify mobile queue with playback controls"></td>
+    <td><img src="assets/screenshots/mobile-selection.png" width="260" alt="Zenify song selection and floating batch actions"></td>
+  </tr>
+</table>
+
+Desktop and compact captures come from the local Linux app. The mobile queue
+and selection previews are rendered from the current Flutter interface at
+390 × 844 with sample data.
 
 ---
 

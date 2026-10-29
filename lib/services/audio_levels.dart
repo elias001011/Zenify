@@ -23,8 +23,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter/services.dart';
-import 'package:flutter/widgets.dart' show AppLifecycleListener;
+import 'package:flutter/widgets.dart'
+    show AppLifecycleListener, AppLifecycleState, WidgetsBinding;
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/platform_utils.dart';
@@ -51,11 +54,11 @@ class AudioLevels {
   static const bandCount = 5;
 
   static const _methods = MethodChannel('zenify/audio_levels');
-  static const _frames = EventChannel('zenify/audio_levels/frames');
+  static const _frames = MethodChannel('zenify/audio_levels/frames');
 
   /// mpv's label for the filters; their numbers land in `af-metadata/zviz`.
-  /// They join mpv's filter chain beside media_kit's own (scaletempo for the
-  /// speed) and leave it when the waves stop listening.
+  /// They are installed at engine preparation and retained until disposal.
+  /// The widgets only poll their metadata while visible.
   static const _label = 'zviz';
   static const _mono = 'pan=mono|c0=0.5*c0+0.5*c1';
 
@@ -76,10 +79,14 @@ class AudioLevels {
       'measure_perchannel=RMS_level,'
       'pan=stereo|c0=c0|c1=c1]';
 
-  /// Loudness alone, should mpv refuse the bands' graph.
-  static const _loudnessFilter =
-      '@$_label:lavfi=[astats=metadata=1:reset=1:measure_perchannel=none:'
-      'measure_overall=RMS_level]';
+  /// Prepare analysis before any desktop source is opened. Opening/closing
+  /// a visualizer must never add/remove filters on a playing output device.
+  static void configureDesktop() {
+    JustAudioMediaKit.audioFilters = const [_bandsFilter];
+    // Zenify uses speed, not independent pitch control. Native mpv speed
+    // preserves the analysis chain; media_kit's pitch mode replaces `af`.
+    JustAudioMediaKit.pitch = false;
+  }
 
   /// Whether levels can be read without asking the user anything.
   static Future<bool> get available async {
@@ -89,17 +96,28 @@ class AudioLevels {
       return await _methods.invokeMethod<bool>('hasPermission') ?? false;
     } on PlatformException {
       return false;
+    } on MissingPluginException {
+      return false;
     }
   }
 
   /// Whether this platform can read levels once the user allows it.
   static bool get canAsk => isAndroidPlatform;
 
+  /// Existing visualizers reconnect when access is granted in the player.
+  static final _accessChanged = ValueNotifier(0);
+  static ValueListenable<int> get accessChanged => _accessChanged;
+
   /// Asks for the audio recording permission (Android); true once granted.
   static Future<bool> requestAccess() async {
     try {
-      return await _methods.invokeMethod<bool>('requestPermission') ?? false;
+      final granted =
+          await _methods.invokeMethod<bool>('requestPermission') ?? false;
+      if (granted) _accessChanged.value++;
+      return granted;
     } on PlatformException {
+      return false;
+    } on MissingPluginException {
       return false;
     }
   }
@@ -113,28 +131,58 @@ class AudioLevels {
     StreamSubscription<_Frame>? source;
     AppLifecycleListener? lifecycle;
 
-    void start() {
-      if (source != null) return;
-      final normalizer = _Normalizer();
-      source = (isDesktopPlatform ? _mpvFrames() : _androidFrames()).listen(
-        (frame) => _levels?.add(normalizer(frame)),
-      );
-    }
+    var listening = false;
+    var visible = true;
+    var transition = Future<void>.value();
 
-    void stop() {
-      source?.cancel();
-      source = null;
+    // EventChannel cancellation is asynchronous. Finish releasing the old
+    // reader before attaching another, including after a surface remount.
+    void update() {
+      transition = transition.then((_) async {
+        if (!listening || !visible) {
+          await source?.cancel();
+          source = null;
+        } else if (source == null) {
+          var normalizer = _Normalizer();
+          String? track;
+          source = (isDesktopPlatform ? _mpvFrames() : _androidFrames()).listen(
+            (frame) {
+              final current = audioHandler.mediaItem.valueOrNull?.id;
+              if (current != track) {
+                track = current;
+                normalizer = _Normalizer();
+              }
+              _levels?.add(normalizer(frame));
+            },
+          );
+        }
+      });
     }
 
     return (_levels ??= StreamController.broadcast(
       onListen: () {
-        start();
-        lifecycle = AppLifecycleListener(onHide: stop, onShow: start);
+        listening = true;
+        final state = WidgetsBinding.instance.lifecycleState;
+        visible =
+            state != AppLifecycleState.hidden &&
+            state != AppLifecycleState.paused &&
+            state != AppLifecycleState.detached;
+        lifecycle = AppLifecycleListener(
+          onStateChange: (state) {
+            visible =
+                state != AppLifecycleState.hidden &&
+                state != AppLifecycleState.paused &&
+                state != AppLifecycleState.detached;
+            update();
+          },
+        );
+        update();
       },
       onCancel: () {
         lifecycle?.dispose();
         lifecycle = null;
-        stop();
+        listening = false;
+        update();
       },
     )).stream;
   }
@@ -147,7 +195,8 @@ class AudioLevels {
     return audioHandler.audioPlayer.androidAudioSessionIdStream
         .whereType<int>()
         .distinct()
-        .switchMap((session) => _frames.receiveBroadcastStream(session))
+        .where((session) => session > 0)
+        .switchMap(_recoveringSessionFrames)
         .map((event) {
           final values = (event as List).cast<num>();
           return (
@@ -155,100 +204,111 @@ class AudioLevels {
             bands: [for (final v in values.skip(1)) v.toDouble()],
           );
         })
-        // A failed Visualizer ends the stream; the waves keep their own motion.
+        // Malformed native events must not interrupt the other listeners.
         .handleError((Object _) {});
   }
 
-  /// The same from mpv's audio filters, polled at about the rate they update
-  /// while something plays.
+  // Some devices stop delivering Visualizer callbacks without changing the
+  // audio session. Recreate that capture after a stall, without remounting
+  // either visualizer; stream forwarding awaits the old native release first.
+  static Stream<dynamic> _recoveringSessionFrames(int session) async* {
+    while (true) {
+      yield* _sessionFrames(session).timeout(
+        const Duration(seconds: 2),
+        onTimeout: (sink) {
+          if (audioHandler.playbackState.value.playing) sink.close();
+        },
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
+  }
+
+  /// A single-subscription channel so cancel() waits for the native release.
+  /// EventChannel's broadcast controller discards its async cancellation.
+  static Stream<dynamic> _sessionFrames(int session) {
+    late final StreamController<dynamic> controller;
+    final messenger = ServicesBinding.instance.defaultBinaryMessenger;
+    controller = StreamController<dynamic>(
+      onListen: () {
+        messenger.setMessageHandler(_frames.name, (data) async {
+          if (data == null) {
+            unawaited(controller.close());
+          } else {
+            try {
+              controller.add(_frames.codec.decodeEnvelope(data));
+            } on PlatformException catch (error, stack) {
+              controller.addError(error, stack);
+            }
+          }
+          return null;
+        });
+        unawaited(
+          _frames.invokeMethod<void>('listen', session).catchError((
+            Object error,
+            StackTrace stack,
+          ) {
+            if (!controller.isClosed) controller.addError(error, stack);
+          }),
+        );
+      },
+      onCancel: () async {
+        messenger.setMessageHandler(_frames.name, null);
+        await _frames.invokeMethod<void>('cancel');
+      },
+    );
+    return controller.stream;
+  }
+
+  /// Read only: filter ownership belongs to the engine, not either widget.
+  /// Rebinding on every poll also follows native player replacements.
   static Stream<_Frame> _mpvFrames() {
     Timer? timer;
     late final StreamController<_Frame> controller;
-    var last = '';
-    var frames = 0;
-    var silentPolls = 0;
-    var filter = _bandsFilter;
     var polling = false;
-
-    Future<void> attach(MediaKitPlayer player) async {
-      await player.mpvCommand(['af', 'remove', '@$_label']);
-      await player.mpvCommand(['af', 'add', filter]);
-    }
+    var cancelled = false;
 
     double amplitude(Map<String, dynamic> values, String key) {
       final db = double.tryParse('${values[key] ?? ''}') ?? -120;
       return db.isFinite ? pow(10, db / 20).toDouble() : 0;
     }
 
-    Future<void> poll(MediaKitPlayer player) async {
-      final text = await player.getMpvProperty('af-metadata/$_label');
-      // A filter just (re)started reports '{}' until its first frame.
-      final hasFrame = text.contains('lavfi.');
-      if (!hasFrame && ++silentPolls % 40 == 0) {
-        // Nothing for a second of playback: media_kit replaced the chain
-        // (a speed change does), or mpv dropped a filter that failed to
-        // start, which without any frame yet means the bands' graph.
-        if (frames == 0) filter = _loudnessFilter;
-        await attach(player);
-      }
-      if (!hasFrame || text == last) return;
-      silentPolls = 0;
-      last = text;
-      frames++;
-      final Map<String, dynamic> values;
+    Future<void> poll() async {
+      if (polling || cancelled || !audioHandler.playbackState.value.playing)
+        return;
+      final player = MediaKitPlayer.latest;
+      if (player == null) return;
+      polling = true;
       try {
-        values = jsonDecode(text) as Map<String, dynamic>;
-      } on FormatException {
-        return;
+        final text = await player.getMpvProperty('af-metadata/$_label');
+        if (cancelled || !text.contains('lavfi.')) return;
+        final values = jsonDecode(text) as Map<String, dynamic>;
+        controller.add((
+          loud:
+              (amplitude(values, 'lavfi.astats.1.RMS_level') +
+                  amplitude(values, 'lavfi.astats.2.RMS_level')) /
+              2,
+          bands: [
+            for (var channel = 3; channel < 3 + bandCount; channel++)
+              amplitude(values, 'lavfi.astats.$channel.RMS_level'),
+          ],
+        ));
+      } catch (_) {
+        // A source may release its engine while a read is pending. Retry
+        // the current engine next time; never repair filters during playback.
+      } finally {
+        polling = false;
       }
-      if (filter == _loudnessFilter) {
-        final loud = amplitude(values, 'lavfi.astats.Overall.RMS_level');
-        controller.add((loud: loud, bands: List.filled(bandCount, loud)));
-        return;
-      }
-      // Channels 1 and 2 are what plays; 3 to 7 the bands.
-      controller.add((
-        loud:
-            (amplitude(values, 'lavfi.astats.1.RMS_level') +
-                amplitude(values, 'lavfi.astats.2.RMS_level')) /
-            2,
-        bands: [
-          for (var channel = 3; channel < 3 + bandCount; channel++)
-            amplitude(values, 'lavfi.astats.$channel.RMS_level'),
-        ],
-      ));
     }
 
-    MediaKitPlayer? player;
-    var cancelled = false;
     controller = StreamController(
-      onListen: () async {
-        final current = player = MediaKitPlayer.latest;
-        if (current == null) return;
-        await attach(current);
-        // Closed while the filter was being added: take it out again.
-        if (cancelled) {
-          await current.mpvCommand(['af', 'remove', '@$_label']);
-          return;
-        }
-        timer = Timer.periodic(const Duration(milliseconds: 25), (_) async {
-          if (polling ||
-              controller.isClosed ||
-              !audioHandler.playbackState.value.playing) {
-            return;
-          }
-          polling = true;
-          try {
-            await poll(current);
-          } finally {
-            polling = false;
-          }
+      onListen: () {
+        timer = Timer.periodic(const Duration(milliseconds: 25), (_) {
+          unawaited(poll());
         });
       },
-      onCancel: () async {
+      onCancel: () {
         cancelled = true;
         timer?.cancel();
-        await player?.mpvCommand(['af', 'remove', '@$_label']);
       },
     );
     return controller.stream;

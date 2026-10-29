@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
 import 'package:musify/utilities/startup_support.dart';
 
 void main() {
@@ -121,13 +122,36 @@ void main() {
     },
   );
 
-  test('refuses an unlockable library that is not a valid box', () async {
+  test('copies an unlockable library with a damaged frame anyway', () async {
+    // Blocking every start would be worse; Hive recovers the box on opening.
     File('${legacy.path}/user.hive').writeAsStringSync('not hive');
     Directory('${legacy.path}/user.lock').createSync();
 
     final report = await copyHiveBoxes(from: legacy, to: target);
 
-    expect(report.failed, isNotEmpty);
-    expect(File('${target.path}/user.hive').existsSync(), isFalse);
+    expect(report.failed, isEmpty);
+    expect(File('${target.path}/user.hive').existsSync(), isTrue);
   });
+
+  test(
+    'an imported library forgets the other install\'s sync identity',
+    () async {
+      Hive.init(target.path);
+      final store = await Hive.openBox('userNoBackup');
+      final settings = await Hive.openBox('settings');
+      await store.putAll({
+        'localSyncDeviceId': 'desktop-port',
+        'localSyncPairedDevices': ['phone'],
+        'offlineSongs': ['kept'],
+      });
+      await settings.putAll({'localSyncEnabled': true, 'themeMode': 'dark'});
+
+      await forgetImportedSyncIdentity();
+
+      expect(store.keys, ['offlineSongs']);
+      expect(settings.get('localSyncEnabled'), isNull);
+      expect(settings.get('themeMode'), 'dark');
+      await Hive.close();
+    },
+  );
 }

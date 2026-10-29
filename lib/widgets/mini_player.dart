@@ -82,6 +82,7 @@ class MiniPlayer extends StatelessWidget {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
       child: StreamBuilder<MediaItem?>(
+        initialData: audioHandler.mediaItem.value,
         stream: audioHandler.mediaItem,
         builder: (context, mediaSnapshot) {
           final metadata = mediaSnapshot.data;
@@ -170,6 +171,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
         return Transform.scale(
           scale: _scaleAnimation.value,
           child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTapDown: (_) => _animationController.forward(),
             onTapUp: (_) => _animationController.reverse(),
             onTapCancel: () => _animationController.reverse(),

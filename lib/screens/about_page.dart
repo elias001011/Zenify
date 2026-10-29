@@ -104,6 +104,19 @@ class AboutPage extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+              _PersonCard(
+                name: 'Valeri Gokadze',
+                role: context.l10n!.aboutOriginalAuthor,
+                avatarUrl: 'https://avatars.githubusercontent.com/gokadzev',
+                links: [
+                  (
+                    icon: FluentIcons.code_24_filled,
+                    tooltip: 'GitHub',
+                    url: 'https://github.com/gokadzev',
+                  ),
+                ],
+              ),
               const SizedBox(height: 24),
               CustomBar(
                 context.l10n!.aboutSourceCode,

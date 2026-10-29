@@ -63,7 +63,7 @@ Route<void> buildNowPlayingRoute() {
 }
 
 class _NowPlayingPageState extends State<NowPlayingPage> {
-  /// Open beside the player (wide layout only). Closed by default.
+  /// Open in the artwork area on phones, or beside it on wide screens.
   PlayerPanel? _panel;
 
   /// Shared by this screen's blurred surfaces, kept across rebuilds.
@@ -107,75 +107,84 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
       setState(() => _panel = _panel == panel ? null : panel);
       return;
     }
-    // A sheet replaces a panel left from another layout, not one in view
-    // (the upright lyrics stay while the queue sheet is open).
+    // Sideways lyrics still need more vertical space than the stage offers.
     if (_panel case final open? when !layout.showsInline(open)) {
       setState(() => _panel = null);
     }
     showCustomBottomSheet(
       sheetContext,
-      panel == PlayerPanel.queue
-          ? const QueueWidget(isBottomSheet: true)
-          : SizedBox(
-              height: MediaQuery.sizeOf(context).height * 0.6,
-              child: LyricsPanel(metadata: metadata),
-            ),
+      SizedBox(
+        height: MediaQuery.sizeOf(context).height * 0.6,
+        child: LyricsPanel(metadata: metadata),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      body: StreamBuilder<MediaItem?>(
-        stream: audioHandler.mediaItem,
-        builder: (context, snapshot) {
-          final metadata = snapshot.data;
-          if (metadata == null) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
-          // What shows depends on the layout now: a phone turned sideways
-          // with the lyrics open shows none, and gets them back upright.
-          final panel = _panel != null && layout.showsInline(_panel!)
-              ? _panel
-              : null;
-          final actions = PlayerActions(
-            metadata: metadata,
-            panel: panel,
-            onPanel: (panel, sheetContext) =>
-                _onPanel(panel, metadata, sheetContext),
-          );
-          // Its own group: during the slide its surfaces sit over the shell's.
-          return BackdropGroup(
-            backdropKey: _backdropKey,
-            child: Stack(
-              children: [
-                // Expands once the player has slid up.
-                Positioned.fill(
-                  child: PageGlow(
-                    source: mediaItemArtworkSource(metadata),
-                    waiting: !_backgroundVisible,
+    // Back closes a panel only when the layout shows it.
+    final open = _panel;
+    final panelShown =
+        open != null &&
+        _PlayerLayout.of(MediaQuery.sizeOf(context)).showsInline(open);
+    return PopScope(
+      canPop: !panelShown,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) setState(() => _panel = null);
+      },
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        body: StreamBuilder<MediaItem?>(
+          initialData: audioHandler.mediaItem.value,
+          stream: audioHandler.mediaItem,
+          builder: (context, snapshot) {
+            final metadata = snapshot.data;
+            if (metadata == null) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
+            // What shows depends on the layout now: a phone turned sideways
+            // with the lyrics open shows none, and gets them back upright.
+            final panel = _panel != null && layout.showsInline(_panel!)
+                ? _panel
+                : null;
+            final actions = PlayerActions(
+              metadata: metadata,
+              panel: panel,
+              onPanel: (panel, sheetContext) =>
+                  _onPanel(panel, metadata, sheetContext),
+            );
+            // Its own group: during the slide its surfaces sit over the shell's.
+            return BackdropGroup(
+              backdropKey: _backdropKey,
+              child: Stack(
+                children: [
+                  // Expands once the player has slid up.
+                  Positioned.fill(
+                    child: PageGlow(
+                      source: mediaItemArtworkSource(metadata),
+                      waiting: !_backgroundVisible,
+                    ),
                   ),
-                ),
-                SafeArea(
-                  child: layout == _PlayerLayout.wide
-                      ? _WideLayout(
-                          metadata: metadata,
-                          actions: actions,
-                          panel: panel,
-                        )
-                      : _CompactLayout(
-                          metadata: metadata,
-                          actions: actions,
-                          lyrics: panel == PlayerPanel.lyrics,
-                          onCloseLyrics: () => setState(() => _panel = null),
-                        ),
-                ),
-              ],
-            ),
-          );
-        },
+                  SafeArea(
+                    child: layout == _PlayerLayout.wide
+                        ? _WideLayout(
+                            metadata: metadata,
+                            actions: actions,
+                            panel: panel,
+                          )
+                        : _CompactLayout(
+                            metadata: metadata,
+                            actions: actions,
+                            panel: panel,
+                            onClosePanel: () => setState(() => _panel = null),
+                          ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -185,11 +194,10 @@ enum _PlayerLayout {
   /// Desktop and tablets: queue and lyrics open beside the artwork.
   wide,
 
-  /// Upright phones: the lyrics take the artwork's place, the queue is a
-  /// sheet.
+  /// Upright phones: lyrics and queue take the artwork's place.
   upright,
 
-  /// Phones on their side: both open as sheets.
+  /// Phones on their side: queue beside playback; lyrics open as a sheet.
   sideways;
 
   static _PlayerLayout of(Size size) => size.width >= 900 && size.height >= 560
@@ -199,7 +207,7 @@ enum _PlayerLayout {
       : sideways;
 
   bool showsInline(PlayerPanel panel) =>
-      this == wide || (this == upright && panel == PlayerPanel.lyrics);
+      this != sideways || panel == PlayerPanel.queue;
 }
 
 class _CloseButton extends StatelessWidget {
@@ -223,20 +231,20 @@ class _CloseButton extends StatelessWidget {
 }
 
 /// Phones: the artwork, the song and playback, then the action bar. With
-/// [lyrics] on, the song moves up to a small header and the lyrics take the
+/// a panel open, the song moves to a small header and its content takes the
 /// artwork's place.
 class _CompactLayout extends StatelessWidget {
   const _CompactLayout({
     required this.metadata,
     required this.actions,
-    required this.lyrics,
-    required this.onCloseLyrics,
+    required this.panel,
+    required this.onClosePanel,
   });
 
   final MediaItem metadata;
   final Widget actions;
-  final bool lyrics;
-  final VoidCallback onCloseLyrics;
+  final PlayerPanel? panel;
+  final VoidCallback onClosePanel;
 
   @override
   Widget build(BuildContext context) {
@@ -264,7 +272,12 @@ class _CompactLayout extends StatelessWidget {
         ? Row(
             children: [
               Expanded(
-                child: LayoutBuilder(builder: (context, c) => artwork(c, 1)),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: panel == PlayerPanel.queue
+                      ? const QueueWidget(embedded: true)
+                      : LayoutBuilder(builder: (context, c) => artwork(c, 1)),
+                ),
               ),
               const SizedBox(width: 24),
               Expanded(child: controls),
@@ -272,8 +285,8 @@ class _CompactLayout extends StatelessWidget {
           )
         : _UprightStage(
             metadata: metadata,
-            lyrics: lyrics,
-            onCloseLyrics: onCloseLyrics,
+            panel: panel,
+            onClosePanel: onClosePanel,
             iconSize: iconSize,
             miniIconSize: miniIconSize,
           );
@@ -297,21 +310,21 @@ class _CompactLayout extends StatelessWidget {
 }
 
 /// The upright phone player. Playback stays at the bottom; above it the
-/// artwork and the song take the room, or, with [lyrics], the same artwork
-/// shrinks into a header beside the song and the lyrics fill the rest, as
+/// artwork and the song take the room, or, with a panel, the same artwork
+/// shrinks into a header beside the song and the panel fills the rest, as
 /// Tidal does. One layout that moves, not a second page over the first.
 class _UprightStage extends StatefulWidget {
   const _UprightStage({
     required this.metadata,
-    required this.lyrics,
-    required this.onCloseLyrics,
+    required this.panel,
+    required this.onClosePanel,
     required this.iconSize,
     required this.miniIconSize,
   });
 
   final MediaItem metadata;
-  final bool lyrics;
-  final VoidCallback onCloseLyrics;
+  final PlayerPanel? panel;
+  final VoidCallback onClosePanel;
   final double iconSize;
   final double miniIconSize;
 
@@ -328,41 +341,40 @@ class _UprightStageState extends State<_UprightStage>
   late final _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 500),
-    value: widget.lyrics ? 1 : 0,
+    value: widget.panel != null ? 1 : 0,
   );
   late final _progress = CurvedAnimation(
     parent: _controller,
     curve: Curves.easeInOutCubic,
   );
-  late final _lyricsFade = CurvedAnimation(
+  late final _panelFade = CurvedAnimation(
     parent: _controller,
     curve: const Interval(0.4, 1, curve: Curves.easeIn),
   );
 
-  /// The lyrics stay built from the tap until they have faded out.
-  late bool _lyricsBuilt = widget.lyrics;
+  /// Keep the closing panel built until it has faded out.
+  late PlayerPanel? _builtPanel = widget.panel;
 
   @override
   void didUpdateWidget(_UprightStage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.lyrics == oldWidget.lyrics) return;
-    if (widget.lyrics) {
-      // Build the lyrics in this frame and move from the next, so building
-      // them never stalls the move.
-      _lyricsBuilt = true;
+    if (widget.panel == oldWidget.panel) return;
+    if (widget.panel != null) {
+      _builtPanel = widget.panel;
+      // Build the content before moving the artwork.
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && widget.lyrics) _controller.forward();
+        if (mounted && widget.panel != null) _controller.forward();
       });
     } else {
       _controller.reverse().whenCompleteOrCancel(() {
-        if (mounted && !widget.lyrics) setState(() => _lyricsBuilt = false);
+        if (mounted && widget.panel == null) setState(() => _builtPanel = null);
       });
     }
   }
 
   @override
   void dispose() {
-    _lyricsFade.dispose();
+    _panelFade.dispose();
     _progress.dispose();
     _controller.dispose();
     super.dispose();
@@ -396,7 +408,9 @@ class _UprightStageState extends State<_UprightStage>
               );
               // Built once: the frames of the move only reposition and fade
               // them.
-              final lyrics = LyricsPanel(metadata: metadata);
+              final panel = _builtPanel == PlayerPanel.queue
+                  ? const QueueWidget(embedded: true)
+                  : LyricsPanel(metadata: metadata);
               final songTitle = Center(
                 child: NowPlayingTitle(
                   metadata: metadata,
@@ -437,15 +451,21 @@ class _UprightStageState extends State<_UprightStage>
                     children: [
                       // Keyed, so the artwork keeps its state (image, waves)
                       // while the others come and go before it.
-                      if (_lyricsBuilt)
+                      if (_builtPanel != null)
                         Positioned.fill(
-                          key: const ValueKey('lyrics'),
+                          key: const ValueKey('panel'),
                           top: _headerSize + 12,
                           child: FadeTransition(
-                            opacity: _lyricsFade,
+                            opacity: _panelFade,
                             child: IgnorePointer(
                               ignoring: t < 1,
-                              child: lyrics,
+                              child: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                child: KeyedSubtree(
+                                  key: ValueKey(_builtPanel),
+                                  child: panel,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -477,7 +497,7 @@ class _UprightStageState extends State<_UprightStage>
                           // Same tree in both states, so the artwork keeps
                           // its state; as the header it goes back.
                           child: GestureDetector(
-                            onTap: t > 0 ? widget.onCloseLyrics : null,
+                            onTap: t > 0 ? widget.onClosePanel : null,
                             child: AbsorbPointer(
                               absorbing: t > 0,
                               child: artwork,

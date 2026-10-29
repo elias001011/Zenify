@@ -22,14 +22,26 @@ class MediaKitPlayer extends AudioPlayerPlatform {
 
   final _readyCompleter = Completer<void>();
 
-  /// Completes when the player is ready
-  Future<void> ready() async {
+  Future<void>? _preparation;
+
+  /// Completes once the engine and its initial filters are ready.
+  Future<void> ready() => _preparation ??= _prepare();
+
+  Future<void> _prepare() async {
     await _readyCompleter.future;
     await setProperty(
       _player,
       'cache-on-disk',
       JustAudioMediaKit.diskCache ? 'yes' : 'no',
     );
+    for (final filter in JustAudioMediaKit.audioFilters) {
+      try {
+        await command(_player, ['af', 'add', filter]);
+      } catch (error) {
+        // Optional metadata must not prevent the audio engine from starting.
+        _logger.warning('Audio analysis filter unavailable', error);
+      }
+    }
   }
 
   static final _logger = Logger('MediaKitPlayer');
@@ -333,9 +345,8 @@ class MediaKitPlayer extends AudioPlayerPlatform {
 
     _dataController.add(
       PlayerDataMessage(
-        shuffleMode: shuffling
-            ? ShuffleModeMessage.all
-            : ShuffleModeMessage.none,
+        shuffleMode:
+            shuffling ? ShuffleModeMessage.all : ShuffleModeMessage.none,
       ),
     );
     return SetShuffleModeResponse();

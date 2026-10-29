@@ -54,6 +54,8 @@ import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
 import 'package:musify/widgets/playlist_page/sync_button.dart';
 import 'package:musify/widgets/recommended_songs_section.dart';
 import 'package:musify/widgets/song_bar.dart';
+import 'package:musify/widgets/song_selection_bar.dart';
+import 'package:musify/widgets/song_selection_controller.dart';
 import 'package:musify/widgets/sort_chips.dart';
 import 'package:musify/widgets/spinner.dart';
 
@@ -105,6 +107,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
     orElse: () => PlaylistSortType.default_,
   );
 
+  bool _reorderEnabled = false;
+  final _selection = SongSelectionController();
+  final _songsRevision = ValueNotifier(0);
+
   // Search
   final ValueNotifier<String> _searchQueryNotifier = ValueNotifier('');
 
@@ -125,6 +131,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
   @override
   void dispose() {
     _searchQueryNotifier.dispose();
+    _selection.dispose();
+    _songsRevision.dispose();
     super.dispose();
   }
 
@@ -187,11 +195,43 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
   @override
   Widget build(BuildContext context) {
+    return SongSelectionScope(
+      controller: _selection,
+      actionBar: SongSelectionBar(
+        controller: _selection,
+        visibleSongs: () =>
+            _getSourceList(_searchQueryNotifier.value)
+                .whereType<Map>()
+                .toList(),
+        onRemoveSelected: _playlist?['source'] == 'user-created'
+            ? _removeSongs
+            : null,
+        removeLabel: context.l10n!.removeFromPlaylist,
+        onMoveSelected: _playlist?['source'] == 'user-created'
+            ? _moveSongs
+            : null,
+      ),
+      child: _buildScaffold(context),
+    );
+  }
+
+  Widget _buildScaffold(BuildContext context) {
     return IslandScaffold(
       title: _playlist != null ? _playlistTitle : '',
       fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
-      onFilter: (value) => _searchQueryNotifier.value = value,
-      onBack: () => Navigator.pop(context, widget.playlistData == _playlist),
+      onFilter: (value) {
+        _searchQueryNotifier.value = value;
+        if (_reorderEnabled && value.trim().isNotEmpty) {
+          setState(() => _reorderEnabled = false);
+        }
+      },
+      onBack: () {
+        if (_selection.isActive) {
+          _selection.exit();
+        } else {
+          Navigator.pop(context, widget.playlistData == _playlist);
+        }
+      },
       background: _playlist == null
           ? null
           : PageGlow(source: _playlist?['image']?.toString()),
@@ -214,25 +254,41 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   if ((_playlist['list'] as List? ?? const []).isNotEmpty) ...[
                     ValueListenableBuilder<String>(
                       valueListenable: _searchQueryNotifier,
-                      builder: (context, searchQuery, _) {
-                        final sourceList = _getSourceList(searchQuery);
-                        return SliverPadding(
-                          padding: commonListViewBottomPadding,
-                          sliver: SliverList.builder(
-                            itemCount: sourceList.length,
-                            itemBuilder: (context, index) {
-                              final isRemovable =
+                      builder: (context, searchQuery, _) =>
+                          ValueListenableBuilder<int>(
+                            valueListenable: _songsRevision,
+                            builder: (context, _, __) {
+                              final sourceList = _getSourceList(searchQuery);
+                              final custom =
                                   _playlist['source'] == 'user-created';
-                              return _buildSongListItem(
-                                sourceList[index],
-                                index,
-                                isRemovable,
-                                sourceList,
+                              final reorderable =
+                                  custom &&
+                                  _reorderEnabled &&
+                                  searchQuery.trim().isEmpty &&
+                                  _sortType == PlaylistSortType.default_;
+                              Widget item(BuildContext context, int index) =>
+                                  _buildSongListItem(
+                                    sourceList[index],
+                                    index,
+                                    custom,
+                                    sourceList,
+                                    reorderIndex: reorderable ? index : null,
+                                  );
+                              return SliverPadding(
+                                padding: commonListViewBottomPadding,
+                                sliver: reorderable
+                                    ? SliverReorderableList(
+                                        itemCount: sourceList.length,
+                                        itemBuilder: item,
+                                        onReorderItem: _reorderSongs,
+                                      )
+                                    : SliverList.builder(
+                                        itemCount: sourceList.length,
+                                        itemBuilder: item,
+                                      ),
                               );
                             },
                           ),
-                        );
-                      },
                     ),
                   ] else if (_isArtistCatalogFailed)
                     EmptyPlaylistState(message: context.l10n!.error)
@@ -306,6 +362,32 @@ class _PlaylistPageState extends State<PlaylistPage> {
       ? normalizeArtistDisplayTitle(_playlist['title']?.toString() ?? '')
       : _playlist['title']?.toString() ?? '';
 
+  Widget _buildReorderButton() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return IconButton.filledTonal(
+      icon: const Icon(FluentIcons.re_order_24_regular),
+      iconSize: 24,
+      tooltip: _reorderEnabled
+          ? context.l10n!.finishReordering
+          : context.l10n!.reorderSongs,
+      isSelected: _reorderEnabled,
+      color: _reorderEnabled
+          ? colorScheme.primary
+          : colorScheme.onSecondaryContainer,
+      style: IconButton.styleFrom(
+        backgroundColor: colorScheme.secondaryContainer,
+      ),
+      onPressed: () => setState(() {
+        _reorderEnabled = !_reorderEnabled;
+        if (_reorderEnabled) {
+          _selection.exit();
+          _sortType = PlaylistSortType.default_;
+          _applySort();
+        }
+      }),
+    );
+  }
+
   Widget _buildHeaderSection() {
     final songsLength = (_playlist['list'] as List? ?? const []).length;
     final isUserCreated = _playlist['source'] == 'user-created';
@@ -360,7 +442,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 if (!isUserCreated) SyncButton(onSync: _handleSyncPlaylist),
               ],
               if (songsLength > 0) _buildDownloadButton(),
-              if (isUserCreated) ...[_buildShareButton(), _buildEditButton()],
+              if (isUserCreated) ...[
+                _buildShareButton(),
+                _buildEditButton(),
+                _buildReorderButton(),
+              ],
             ],
           ),
         ],
@@ -373,6 +459,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
             onSelected: (type) {
               setState(() {
                 _sortType = type;
+                if (type != PlaylistSortType.default_) _reorderEnabled = false;
                 addOrUpdateData<String>(
                   'settings',
                   'playlistSortType',
@@ -550,7 +637,96 @@ class _PlaylistPageState extends State<PlaylistPage> {
     }
   }
 
-  /// Removes [song] from the canonical list (and storage), then re-derives the view.
+  /// Choose a destination before removing any selected songs from this playlist.
+  Future<void> _moveSongs(List<Map> songs) async {
+    final targets = getUserCustomPlaylists()
+        .where((p) => p['ytid'] != _resolvedPlaylistId)
+        .toList();
+    final target = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.l10n!.moveToPlaylist),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: targets.isEmpty
+              ? Text(context.l10n!.noCustomPlaylists)
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: targets.length,
+                  itemBuilder: (_, index) => ListTile(
+                    leading: const Icon(FluentIcons.album_24_regular),
+                    title: Text(targets[index]['title']?.toString() ?? ''),
+                    onTap: () => Navigator.pop(
+                      dialogContext,
+                      targets[index]['ytid'].toString(),
+                    ),
+                  ),
+                ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(context.l10n!.cancel),
+          ),
+        ],
+      ),
+    );
+    if (target == null || !mounted) return;
+    try {
+      final count = await moveSongsToCustomPlaylist(
+        _resolvedPlaylistId!,
+        target,
+        songs,
+      );
+      if (!mounted) return;
+      if (count == 0) return;
+      _originalPlaylistList.removeWhere(
+        (song) => songs.any((selected) => selected['ytid'] == song['ytid']),
+      );
+      _applySort();
+      setState(() {});
+      showToast(context, context.l10n!.songsMoved(count));
+    } catch (error, stackTrace) {
+      logger.log(
+        'Error moving playlist songs',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) showToast(context, context.l10n!.error);
+    }
+  }
+
+  Future<void> _removeSongs(List<Map> songs) async {
+    // One write for the whole selection, not one per song.
+    final playlist = {..._playlist, 'list': _originalPlaylistList};
+    final removed = removeSongsFromPlaylist(playlist, songs);
+    if (removed > 0) {
+      _originalPlaylistList = List<dynamic>.from(playlist['list'] as List);
+    }
+    _applySort();
+    if (mounted) {
+      setState(() {});
+      showToast(context, context.l10n!.songsRemoved(removed));
+    }
+  }
+
+  void _reorderSongs(int from, int to) {
+    if (!_reorderEnabled ||
+        _selection.isActive ||
+        _searchQueryNotifier.value.trim().isNotEmpty ||
+        _sortType != PlaylistSortType.default_)
+      return;
+    final next = [..._originalPlaylistList];
+    next.insert(to, next.removeAt(from));
+    if (!reorderCustomPlaylist(_resolvedPlaylistId!, next)) {
+      showToast(context, context.l10n!.error);
+      return;
+    }
+    _originalPlaylistList = next;
+    _applySort();
+    _songsRevision.value++;
+  }
+
   void _removeSong(Map song) {
     final canonicalIndex = _originalPlaylistList.indexWhere(
       (s) => s is Map && s['ytid'] == song['ytid'],
@@ -675,8 +851,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
     Map song,
     int index,
     bool isRemovable,
-    List sourceList,
-  ) {
+    List sourceList, {
+    int? reorderIndex,
+  }) {
     final totalItems = sourceList.length;
     final borderRadius = getItemBorderRadius(index, totalItems);
     final isUserCreatedPlaylist = _playlist?['source'] == 'user-created';
@@ -690,20 +867,46 @@ class _PlaylistPageState extends State<PlaylistPage> {
       logger.log('Warning: Song ${song['ytid']} not found in full playlist');
     }
 
-    return SongBar(
-      song,
-      true,
-      key: listItemKey('playlist_song', index, song),
-      onRemove: (isRemovable && !isSearching) ? () => _removeSong(song) : null,
-      onPlay: () {
-        audioHandler.playPlaylistSong(
-          playlist: _playlist,
-          songIndex: fullIndex != -1 ? fullIndex : index,
-        );
-      },
-      borderRadius: borderRadius,
-      playlistId: playlistId,
-      onRenamed: () => setState(() {}),
+    return ListenableBuilder(
+      key: reorderIndex != null
+          ? ValueKey(song['ytid'])
+          : listItemKey('playlist_song', index, song),
+      listenable: _selection,
+      builder: (context, _) => SongBar(
+        song,
+        true,
+        key: ValueKey(song['ytid']),
+        onRemove: (isRemovable && !isSearching)
+            ? () => _removeSong(song)
+            : null,
+        onPlay: () {
+          audioHandler.playPlaylistSong(
+            playlist: _playlist,
+            songIndex: fullIndex != -1 ? fullIndex : index,
+          );
+        },
+        borderRadius: borderRadius,
+        playlistId: playlistId,
+        onRenamed: () => setState(() {}),
+        isSelected: _selection.isActive ? _selection.isSelected(song) : null,
+        onSelectionToggle: () => _selection.toggle(song),
+        onLongPress: () => _selection.start(song),
+        trailing: reorderIndex != null && !_selection.isActive
+            ? ReorderableDragStartListener(
+                index: reorderIndex,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 14,
+                  ),
+                  child: Icon(
+                    FluentIcons.re_order_24_regular,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            : null,
+      ),
     );
   }
 }

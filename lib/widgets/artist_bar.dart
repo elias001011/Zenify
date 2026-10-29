@@ -109,7 +109,11 @@ class _ArtistArtwork extends StatelessWidget {
     if (image != null && image!.isNotEmpty) {
       return ClipOval(
         child: Image(
-          image: ArtworkProvider.get(image!),
+          image: ArtworkProvider.thumbnail(
+            image!,
+            commonBarArtworkSize,
+            context,
+          ),
           width: commonBarArtworkSize,
           height: commonBarArtworkSize,
           fit: BoxFit.cover,

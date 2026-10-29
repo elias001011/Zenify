@@ -38,6 +38,7 @@ import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/utilities/youtube_url.dart';
 import 'package:musify/widgets/artist_bar.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
@@ -159,6 +160,7 @@ class _SearchPageState extends State<SearchPage> {
   Future<void> search() async {
     final query = _searchBar.text.trim();
     final requestId = ++_latestSearchRequest;
+    final videoId = youtubeVideoIdFromUrl(query);
 
     if (query.isEmpty) {
       _songsSearchResult = [];
@@ -175,13 +177,27 @@ class _SearchPageState extends State<SearchPage> {
     _fetchingSongs.value = true;
 
     final offline = offlineMode.value;
-    _libraryResult = searchLibrary(query, offlineOnly: offline);
+    _libraryResult = videoId == null
+        ? searchLibrary(query, offlineOnly: offline)
+        : (
+            songs: [
+              if ((offline
+                          ? userOfflineSongs.value.whereType<Map>()
+                          : librarySongsById().values)
+                      .where((song) => song['ytid'] == videoId)
+                      .firstOrNull
+                  case final song?)
+                song,
+            ],
+            artists: <Map>[],
+            playlists: <Map>[],
+          );
     // What the library holds shows at once and stays first in each section.
     _songsSearchResult = libraryFirst(_libraryResult.songs, const []);
     _artistsSearchResult = [];
     _albumsSearchResult = libraryFirst(_libraryAlbums(true), const []);
     _playlistsSearchResult = libraryFirst(_libraryAlbums(false), const []);
-    _radioStationsSearchResult = offline
+    _radioStationsSearchResult = offline || videoId != null
         ? []
         : radioStationsDB
               .where(
@@ -210,6 +226,19 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     try {
+      if (videoId != null) {
+        final song = await getSongDetails(
+          0,
+          videoId,
+        ).timeout(const Duration(seconds: 15));
+        if (!mounted || requestId != _latestSearchRequest) return;
+        setState(
+          () => _songsSearchResult = libraryFirst(_libraryResult.songs, [
+            song,
+          ], known: librarySongsById()),
+        );
+        return;
+      }
       final artistsFuture = searchArtists(query);
       Future<List> guarded(String what, Future<List> Function() fetch) async {
         try {

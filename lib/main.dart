@@ -35,6 +35,7 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/screens/local_sync_page.dart';
+import 'package:musify/services/audio_levels.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/desktop_media_artwork.dart';
@@ -228,6 +229,7 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
         wasPlaying: audioHandler.audioPlayer.playing,
       );
       unawaited(listeningStatsService.flush());
+      unawaited(audioHandler.persistPlaybackState());
     }
   }
 
@@ -324,6 +326,7 @@ void main() async {
 
 Future<String?> initialisation() async {
   String? startupError;
+  var importedLibrary = false;
   // Folders chosen in the Windows installer, if any.
   final installConfig = isDesktopPlatform
       ? await InstallConfig.load()
@@ -347,7 +350,7 @@ Future<String?> initialisation() async {
           defaultSupportPath,
           log: logger.log,
         );
-        await _copyLegacyDesktopDataIfNeeded(
+        importedLibrary = await _copyLegacyDesktopDataIfNeeded(
           applicationDirPath,
           defaultSupportPath,
         );
@@ -363,6 +366,7 @@ Future<String?> initialisation() async {
       Hive.openBox('userNoBackup'),
       Hive.openBox('cache'),
     ]);
+    if (importedLibrary) await forgetImportedSyncIdentity();
 
     try {
       await LocalSyncService.instance.initialise();
@@ -403,6 +407,7 @@ Future<String?> initialisation() async {
       NavigationManager.instance;
       try {
         // Use the desktop audio backend without mobile service plugins.
+        AudioLevels.configureDesktop();
         JustAudioMediaKit.title = appName;
         JustAudioMediaKit.ensureInitialized();
         audioHandler = MusifyAudioHandler();
@@ -552,7 +557,8 @@ Future<({String path, bool isFallback})> _resolveApplicationDirPath() async {
   }
 }
 
-Future<void> _copyLegacyDesktopDataIfNeeded(
+/// Whether the library was copied from Musify; returns true when it was.
+Future<bool> _copyLegacyDesktopDataIfNeeded(
   String targetPath,
   String defaultSupportPath,
 ) async {
@@ -575,6 +581,7 @@ Future<void> _copyLegacyDesktopDataIfNeeded(
   }
   if (report.hasWork)
     logger.log('Desktop data migration: ${report.describe()}');
+  return report.copied.isNotEmpty;
 }
 
 void handleIncomingLink(Uri? uri) async {

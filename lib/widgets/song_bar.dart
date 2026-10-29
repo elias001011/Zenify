@@ -311,6 +311,9 @@ class SongBar extends StatefulWidget {
     this.barPadding,
     this.onAdd,
     this.trailing,
+    this.isSelected,
+    this.onSelectionToggle,
+    this.onLongPress,
     super.key,
   });
 
@@ -339,6 +342,11 @@ class SongBar extends StatefulWidget {
 
   /// Shown before the menu, e.g. a download's status.
   final Widget? trailing;
+
+  /// Non-null while taps select songs instead of playing them.
+  final bool? isSelected;
+  final VoidCallback? onSelectionToggle;
+  final VoidCallback? onLongPress;
 
   @override
   State<SongBar> createState() => _SongBarState();
@@ -438,12 +446,17 @@ class _SongBarState extends State<SongBar> {
         ? _listeningCountLabel()
         : widget.playCount;
 
+    final isSelecting = widget.isSelected != null;
+    final isSelected = widget.isSelected ?? false;
     return Material(
-      color: widget.backgroundColor ?? colorScheme.surfaceContainerLow,
+      color: isSelected
+          ? colorScheme.secondaryContainer
+          : widget.backgroundColor ?? colorScheme.surfaceContainerLow,
       borderRadius: widget.borderRadius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: _handleSongTap,
+        onTap: isSelecting ? widget.onSelectionToggle : _handleSongTap,
+        onLongPress: widget.onLongPress,
         child: Padding(
           padding: widget.barPadding ?? commonBarPadding,
           child: Row(
@@ -476,8 +489,13 @@ class _SongBarState extends State<SongBar> {
                 ),
               ),
 
-              ?widget.trailing,
-              if (widget.onAdd != null)
+              if (!isSelecting) ?widget.trailing,
+              if (isSelecting)
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (_) => widget.onSelectionToggle?.call(),
+                )
+              else if (widget.onAdd != null)
                 IconButton(
                   padding: EdgeInsets.zero,
                   icon: Icon(
@@ -767,6 +785,8 @@ class _OfflineArtwork extends StatelessWidget {
               File(artworkPath),
               width: size,
               height: size,
+              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
+                  .round(),
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) =>
                   NullArtworkWidget(iconSize: 30, size: size),
@@ -824,68 +844,71 @@ class _OnlineArtwork extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: <Widget>[
-          CachedNetworkImage(
-            imageUrl: lowResImageUrl,
-            width: size,
-            height: size,
-            fit: BoxFit.cover,
-            memCacheWidth: 256,
-            memCacheHeight: 256,
-            imageBuilder: (context, imageProvider) => ClipRRect(
-              borderRadius: BorderRadius.circular(10),
-              child: Stack(
-                children: [
-                  Image(
-                    image: imageProvider,
-                    fit: isImageSmall ? BoxFit.fill : BoxFit.cover,
-                    width: size,
-                    height: size,
-                    centerSlice: isImageSmall
-                        ? const Rect.fromLTRB(1, 1, 1, 1)
-                        : null,
-                  ),
-                  if (isOffline)
-                    Positioned(
-                      top: 3,
-                      right: 3,
-                      child: Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: colorScheme.tertiaryContainer,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          FluentIcons.cloud_off_24_filled,
-                          size: 11,
-                          color: colorScheme.onTertiaryContainer,
-                        ),
-                      ),
-                    )
-                  else if (isLiked)
-                    Positioned(
-                      top: 3,
-                      right: 3,
-                      child: Container(
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: colorScheme.primaryContainer,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          FluentIcons.heart_24_filled,
-                          size: 11,
-                          color: colorScheme.onPrimaryContainer,
-                        ),
-                      ),
+          if (lowResImageUrl.isEmpty)
+            NullArtworkWidget(iconSize: 30, size: size)
+          else
+            CachedNetworkImage(
+              imageUrl: lowResImageUrl,
+              width: size,
+              height: size,
+              fit: BoxFit.cover,
+              memCacheWidth: 256,
+              memCacheHeight: 256,
+              imageBuilder: (context, imageProvider) => ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Stack(
+                  children: [
+                    Image(
+                      image: imageProvider,
+                      fit: isImageSmall ? BoxFit.fill : BoxFit.cover,
+                      width: size,
+                      height: size,
+                      centerSlice: isImageSmall
+                          ? const Rect.fromLTRB(1, 1, 1, 1)
+                          : null,
                     ),
-                ],
+                    if (isOffline)
+                      Positioned(
+                        top: 3,
+                        right: 3,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: colorScheme.tertiaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            FluentIcons.cloud_off_24_filled,
+                            size: 11,
+                            color: colorScheme.onTertiaryContainer,
+                          ),
+                        ),
+                      )
+                    else if (isLiked)
+                      Positioned(
+                        top: 3,
+                        right: 3,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            FluentIcons.heart_24_filled,
+                            size: 11,
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
+              errorWidget: (context, url, error) =>
+                  NullArtworkWidget(iconSize: 30, size: size),
             ),
-            errorWidget: (context, url, error) =>
-                NullArtworkWidget(iconSize: 30, size: size),
-          ),
           if (isDurationAvailable && !isOffline)
             Positioned(
               bottom: 4,

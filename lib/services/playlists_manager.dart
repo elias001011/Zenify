@@ -356,6 +356,102 @@ String addSongsInCustomPlaylist(
   }
 }
 
+/// Persist the destination before removing anything from the source.
+Future<int> moveSongsToCustomPlaylist(
+  String from,
+  String to,
+  List<Map> songs,
+) async {
+  final source = _findCustomPlaylist(from);
+  final target = _findCustomPlaylist(to);
+  if (from == to ||
+      source == null ||
+      target == null ||
+      source.playlist['source'] != 'user-created' ||
+      target.playlist['source'] != 'user-created')
+    return 0;
+  final wanted = songs.map((song) => song['ytid']).toSet();
+  final original = List<dynamic>.of(source.playlist['list'] as List);
+  final moving = original
+      .where((song) => wanted.contains(song['ytid']))
+      .toList();
+  final destination = List<dynamic>.of(target.playlist['list'] as List);
+  final present = destination.map((song) => song['ytid']).toSet();
+  // Preserve the order of selection, including when the source is sorted.
+  for (final song in songs) {
+    if (moving.any((entry) => entry['ytid'] == song['ytid']) &&
+        present.add(song['ytid']))
+      destination.add(song);
+  }
+  target.playlist['list'] = destination;
+  await _saveCustomPlaylist(target.isFromFolder);
+  source.playlist['list'] = original
+      .where((song) => !wanted.contains(song['ytid']))
+      .toList();
+  try {
+    await _saveCustomPlaylist(source.isFromFolder);
+  } catch (_) {
+    source.playlist['list'] = original;
+    rethrow;
+  }
+  offlinePlaylistService
+    ..checkAndAutoMarkOffline(target.playlist)
+    ..checkAndAutoMarkOffline(source.playlist);
+  return moving.length;
+}
+
+Future<void> _saveCustomPlaylist(bool inFolder) async {
+  if (inFolder) {
+    userPlaylistFolders.value = [...userPlaylistFolders.value];
+    await addOrUpdateData<List>(
+      'user',
+      'playlistFolders',
+      userPlaylistFolders.value,
+    );
+  } else {
+    userCustomPlaylists.value = [...userCustomPlaylists.value];
+    await addOrUpdateData<List>(
+      'user',
+      'customPlaylists',
+      userCustomPlaylists.value,
+    );
+  }
+}
+
+/// Reorder the full stored playlist, refusing a stale or filtered subset.
+bool reorderCustomPlaylist(String playlistId, List<dynamic> orderedSongs) {
+  final found = _findCustomPlaylist(playlistId);
+  if (found == null || found.playlist['source'] != 'user-created') return false;
+  final current = found.playlist['list'] as List? ?? [];
+  final byId = {for (final song in current) song['ytid']: song};
+  final ids = orderedSongs.map((song) => song['ytid']).toList();
+  if (current.length != ids.length ||
+      ids.toSet().length != ids.length ||
+      !ids.every(byId.containsKey))
+    return false;
+  found.playlist['list'] = [for (final id in ids) byId[id]];
+  if (found.isFromFolder) {
+    userPlaylistFolders.value = [...userPlaylistFolders.value];
+    unawaited(
+      addOrUpdateData<List>(
+        'user',
+        'playlistFolders',
+        userPlaylistFolders.value,
+      ),
+    );
+  } else {
+    userCustomPlaylists.value = [...userCustomPlaylists.value];
+    unawaited(
+      addOrUpdateData<List>(
+        'user',
+        'customPlaylists',
+        userCustomPlaylists.value,
+      ),
+    );
+  }
+  return true;
+}
+
 bool removeSongFromPlaylist(
   Map playlist,
   Map songToRemove, {
@@ -376,86 +472,7 @@ bool removeSongFromPlaylist(
       if (playlistSongs.length == initialLength) return false;
     }
 
-    playlist['list'] = playlistSongs;
-
-    try {
-      if (playlist['source'] == 'user-created') {
-        final playlistId = playlist['ytid']?.toString();
-        final storedPlaylist = playlistId == null
-            ? null
-            : _findCustomPlaylist(playlistId)?.playlist;
-        storedPlaylist?['list'] = playlistSongs;
-        final isInFolder =
-            playlistId != null &&
-            userPlaylistFolders.value.any((folder) {
-              final folderPlaylists =
-                  folder['playlists'] as List<dynamic>? ?? [];
-              return folderPlaylists.any(
-                (p) => p['ytid']?.toString() == playlistId,
-              );
-            });
-
-        if (isInFolder) {
-          userPlaylistFolders.value = List<Map>.from(userPlaylistFolders.value);
-          unawaited(
-            addOrUpdateData<List>(
-              'user',
-              'playlistFolders',
-              userPlaylistFolders.value,
-            ),
-          );
-        } else {
-          userCustomPlaylists.value = List<Map>.from(userCustomPlaylists.value);
-          unawaited(
-            addOrUpdateData<List>(
-              'user',
-              'customPlaylists',
-              userCustomPlaylists.value,
-            ),
-          );
-        }
-      } else {
-        final playlistId = playlist['ytid']?.toString();
-
-        final likedIndex = userLikedPlaylists.value.indexWhere(
-          (p) => p['ytid']?.toString() == playlistId,
-        );
-        if (likedIndex != -1) {
-          final updatedLiked = List<Map>.from(userLikedPlaylists.value);
-          updatedLiked[likedIndex] = {
-            ...updatedLiked[likedIndex],
-            'list': playlistSongs,
-          };
-          userLikedPlaylists.value = updatedLiked;
-          unawaited(
-            addOrUpdateData<List>(
-              'user',
-              'likedPlaylists',
-              userLikedPlaylists.value,
-            ),
-          );
-        }
-
-        if (playlistId != null && playlistId.isNotEmpty) {
-          unawaited(
-            addOrUpdateData<List>(
-              'cache',
-              'playlistSongs$playlistId',
-              playlistSongs,
-            ),
-          );
-        }
-      }
-    } catch (e, stackTrace) {
-      logger.log(
-        'Error saving playlist changes',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      return false;
-    }
-
-    return true;
+    return _storePlaylistSongs(playlist, playlistSongs);
   } catch (e, stackTrace) {
     logger.log(
       'Error while removing song from playlist: ',
@@ -464,6 +481,102 @@ bool removeSongFromPlaylist(
     );
     return false;
   }
+}
+
+/// Removes [songs] from [playlist] in one write; returns how many went.
+int removeSongsFromPlaylist(Map playlist, Iterable<Map> songs) {
+  final remaining = List<dynamic>.from(playlist['list'] as List? ?? const []);
+  var removed = 0;
+  for (final song in songs) {
+    final index = remaining.indexWhere((s) => s['ytid'] == song['ytid']);
+    if (index < 0) continue;
+    remaining.removeAt(index);
+    removed++;
+  }
+  if (removed == 0 || !_storePlaylistSongs(playlist, remaining)) return 0;
+  return removed;
+}
+
+/// Saves [playlistSongs] as [playlist]'s songs, wherever it is kept.
+bool _storePlaylistSongs(Map playlist, List<dynamic> playlistSongs) {
+  playlist['list'] = playlistSongs;
+  try {
+    if (playlist['source'] == 'user-created') {
+      final playlistId = playlist['ytid']?.toString();
+      final storedPlaylist = playlistId == null
+          ? null
+          : _findCustomPlaylist(playlistId)?.playlist;
+      storedPlaylist?['list'] = playlistSongs;
+      final isInFolder =
+          playlistId != null &&
+          userPlaylistFolders.value.any((folder) {
+            final folderPlaylists = folder['playlists'] as List<dynamic>? ?? [];
+            return folderPlaylists.any(
+              (p) => p['ytid']?.toString() == playlistId,
+            );
+          });
+
+      if (isInFolder) {
+        userPlaylistFolders.value = List<Map>.from(userPlaylistFolders.value);
+        unawaited(
+          addOrUpdateData<List>(
+            'user',
+            'playlistFolders',
+            userPlaylistFolders.value,
+          ),
+        );
+      } else {
+        userCustomPlaylists.value = List<Map>.from(userCustomPlaylists.value);
+        unawaited(
+          addOrUpdateData<List>(
+            'user',
+            'customPlaylists',
+            userCustomPlaylists.value,
+          ),
+        );
+      }
+    } else {
+      final playlistId = playlist['ytid']?.toString();
+
+      final likedIndex = userLikedPlaylists.value.indexWhere(
+        (p) => p['ytid']?.toString() == playlistId,
+      );
+      if (likedIndex != -1) {
+        final updatedLiked = List<Map>.from(userLikedPlaylists.value);
+        updatedLiked[likedIndex] = {
+          ...updatedLiked[likedIndex],
+          'list': playlistSongs,
+        };
+        userLikedPlaylists.value = updatedLiked;
+        unawaited(
+          addOrUpdateData<List>(
+            'user',
+            'likedPlaylists',
+            userLikedPlaylists.value,
+          ),
+        );
+      }
+
+      if (playlistId != null && playlistId.isNotEmpty) {
+        unawaited(
+          addOrUpdateData<List>(
+            'cache',
+            'playlistSongs$playlistId',
+            playlistSongs,
+          ),
+        );
+      }
+    }
+  } catch (e, stackTrace) {
+    logger.log(
+      'Error saving playlist changes',
+      error: e,
+      stackTrace: stackTrace,
+    );
+    return false;
+  }
+
+  return true;
 }
 
 void removeUserPlaylist(String playlistId) {

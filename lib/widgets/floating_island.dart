@@ -29,7 +29,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/floating_surface.dart';
 
 const double _islandHeight = 44;
-const double _islandMargin = 10;
+const double _islandMargin = FloatingSurface.edgeMargin;
 
 /// A page with the floating island in place of an app bar: back (when there
 /// is somewhere to go back to), the page title and optional actions.

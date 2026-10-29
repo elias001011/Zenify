@@ -22,12 +22,14 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/audio_levels.dart';
+import 'package:musify/widgets/app_logo.dart';
 
 /// The player's sound waves. Each bar follows a band of the music, bass in
 /// the middle and treble at the ends, and beats push the middle, when
@@ -47,9 +49,10 @@ class WaveVisualizer extends StatefulWidget {
   /// mini player's thumbnail).
   final bool offerAccess;
 
-  /// For the mini player's thumbnail: moves only when a reading arrives, with
-  /// no animation of its own, so it costs no frames between readings, none
-  /// while paused and none while the player covers it.
+  /// For the mini player's thumbnail, which is always on screen: it moves
+  /// once per reading and has no animation of its own, so it asks for no
+  /// frames between readings, while paused, without access to the audio or
+  /// while the player covers it.
   final bool compact;
 
   @override
@@ -58,21 +61,24 @@ class WaveVisualizer extends StatefulWidget {
 
 class _WaveVisualizerState extends State<WaveVisualizer>
     with SingleTickerProviderStateMixin {
-  static const _bars = 9;
+  late final _bars = widget.compact ? 7 : 9;
   static const _rest = 0.08;
-
-  /// The logo's shape, where the bars rest with nothing to follow.
-  static const _shape = [.3, .56, .4, .8, 1.0, .8, .4, .56, .3];
 
   late final Ticker _ticker = createTicker(_tick);
 
   /// Bumped every time the bars move, to repaint them.
   final _repaint = ValueNotifier<int>(0);
-  final _heights = List<double>.filled(_bars, _rest);
-  late final StreamSubscription<bool> _playingSubscription;
+  late final _heights = List<double>.filled(_bars, _rest);
+  late final StreamSubscription<PlaybackState> _playingSubscription;
+  late final StreamSubscription<String?> _trackSubscription;
   StreamSubscription<AudioLevel>? _levels;
   AudioLevel? _level;
+  final _clock = Stopwatch()..start();
+  Duration? _lastReading;
+  bool _connecting = false;
+  bool _reconnect = false;
   bool _playing = false;
+  bool _loading = false;
   bool _canAsk = false;
   double _beat = 0;
   Duration _last = Duration.zero;
@@ -80,52 +86,106 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   @override
   void initState() {
     super.initState();
-    if (widget.compact) _restInShape();
     _playingSubscription = audioHandler.playbackState
-        .map((state) => state.playing)
+        .distinct(
+          (a, b) =>
+              a.playing == b.playing && a.processingState == b.processingState,
+        )
+        .listen(_onPlayback);
+    _trackSubscription = audioHandler.mediaItem
+        .map((item) => item?.id)
         .distinct()
-        .listen(_onPlaying);
+        .listen((_) {
+          _level = null;
+          _lastReading = null;
+          _beat = 0;
+          _repaint.value++;
+        });
+    AudioLevels.accessChanged.addListener(_onAccessChanged);
     unawaited(_connect());
   }
 
-  void _restInShape() {
-    for (var i = 0; i < _bars; i++) {
-      _heights[i] = _shape[i] * 0.6;
+  void _onPlayback(PlaybackState state) {
+    _playing = state.playing;
+    if (_playing && _levels == null) unawaited(_connect());
+    _loading =
+        state.processingState == AudioProcessingState.loading ||
+        state.processingState == AudioProcessingState.buffering;
+    if (_loading || !_playing) {
+      _level = null;
+      _lastReading = null;
+      _beat = 0;
     }
+    _repaint.value++;
+    if (!widget.compact && _playing && !_ticker.isActive) _ticker.start();
   }
 
-  void _onPlaying(bool playing) {
-    _playing = playing;
-    if (widget.compact) {
-      if (!playing) {
-        _restInShape();
-        _repaint.value++;
-      }
-    } else if (playing && !_ticker.isActive) {
-      _ticker.start();
-    }
-  }
+  bool get _freshReading =>
+      !_loading &&
+      _lastReading != null &&
+      _clock.elapsed - _lastReading! < const Duration(milliseconds: 600);
+
+  // Use the same painter as the app logo while loading, paused or waiting
+  // for capture to recover. Synthetic motion is only for the player's waves
+  // without access; the thumbnail shows the logo instead.
+  bool get _showLogo =>
+      !_playing ||
+      _loading ||
+      ((widget.compact || _levels != null) && !_freshReading);
+
+  void _onAccessChanged() => unawaited(_connect());
 
   Future<void> _connect() async {
-    if (await AudioLevels.available) {
+    if (_levels != null) return;
+    if (_connecting) {
+      _reconnect = true;
+      return;
+    }
+    _connecting = true;
+    try {
+      final available = await AudioLevels.available;
       if (!mounted) return;
-      _levels = AudioLevels.listen().listen(_onLevel);
-    } else if (widget.offerAccess && AudioLevels.canAsk && mounted) {
-      setState(() => _canAsk = true);
+      if (available) {
+        _levels = AudioLevels.listen().listen(_onLevel);
+        if (_canAsk) setState(() => _canAsk = false);
+      } else if (widget.offerAccess && AudioLevels.canAsk) {
+        setState(() => _canAsk = true);
+      }
+    } finally {
+      _connecting = false;
+      if (_reconnect && mounted) {
+        _reconnect = false;
+        unawaited(_connect());
+      }
     }
   }
 
   void _onLevel(AudioLevel level) {
+    if (_loading || !_playing) return;
     _level = level;
-    // The thumbnail steps once per reading, and not while hidden.
-    if (!widget.compact || !_playing || !TickerMode.valuesOf(context).enabled) {
-      return;
-    }
-    _beat = max(level.onset, _beat * 0.6);
+    _lastReading = _clock.elapsed;
+    if (widget.compact) _stepThumbnail(level);
+  }
+
+  Timer? _stale;
+  Duration _lastStep = Duration.zero;
+
+  void _stepThumbnail(AudioLevel level) {
+    // Back to the logo if readings stop coming.
+    _stale?.cancel();
+    _stale = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) _repaint.value++;
+    });
+    if (!TickerMode.valuesOf(context).enabled) return;
+    final now = _clock.elapsed;
+    final dt = min((now - _lastStep).inMicroseconds / 1e6, 0.1);
+    _lastStep = now;
+    final t = now.inMicroseconds / 1e6;
+    _beat = max(level.onset, _beat * pow(0.02, dt).toDouble());
     for (var i = 0; i < _bars; i++) {
-      final target = _target(i, level, 0);
-      _heights[i] +=
-          (target - _heights[i]) * (target > _heights[i] ? 0.7 : 0.3);
+      final target = _target(i, level, t);
+      final rate = target > _heights[i] ? 30.0 : 7.0;
+      _heights[i] += (target - _heights[i]) * (1 - exp(-rate * dt));
     }
     _repaint.value++;
   }
@@ -142,7 +202,8 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     // 0 in the middle to 4 at the ends: the band the bar follows.
     final side = (i - (_bars - 1) ~/ 2).abs();
     final reach = side / ((_bars - 1) / 2);
-    final band = side < level.bands.length ? level.bands[side] : level.loud;
+    final index = (reach * (AudioLevels.bandCount - 1)).round();
+    final band = index < level.bands.length ? level.bands[index] : level.loud;
     return _rest +
         band * 0.62 * (1 - 0.2 * reach) +
         _beat * 0.3 * (1 - reach) * (1 - reach) +
@@ -150,17 +211,17 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _tick(Duration elapsed) {
-    final dt = (elapsed - _last).inMicroseconds / 1e6;
+    final dt = min((elapsed - _last).inMicroseconds / 1e6, 0.1);
     _last = elapsed;
     final t = elapsed.inMicroseconds / 1e6;
-    final level = _level;
+    final level = _freshReading ? _level : null;
     // A beat jumps up at once and fades over a fraction of a second.
     _beat = max(level?.onset ?? 0, _beat * pow(0.02, dt).toDouble());
 
     var settled = true;
     for (var i = 0; i < _bars; i++) {
       final double target;
-      if (!_playing) {
+      if (_showLogo) {
         target = _rest;
       } else if (level != null) {
         target = _target(i, level, t);
@@ -184,7 +245,11 @@ class _WaveVisualizerState extends State<WaveVisualizer>
 
   @override
   void dispose() {
+    AudioLevels.accessChanged.removeListener(_onAccessChanged);
+    _stale?.cancel();
+    _clock.stop();
     _playingSubscription.cancel();
+    _trackSubscription.cancel();
     _levels?.cancel();
     _ticker.dispose();
     _repaint.dispose();
@@ -204,6 +269,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
               size: Size.square(widget.size),
               painter: _WavePainter(
                 heights: _heights,
+                showLogo: () => _showLogo,
                 repaint: _repaint,
                 color: colorScheme.primary,
               ),
@@ -224,24 +290,34 @@ class _WaveVisualizerState extends State<WaveVisualizer>
 class _WavePainter extends CustomPainter {
   _WavePainter({
     required this.heights,
+    required this.showLogo,
     required Listenable repaint,
     required this.color,
   }) : super(repaint: repaint);
 
   final List<double> heights;
+  final bool Function() showLogo;
   final Color color;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final step = size.width / (heights.length + 2);
-    final barWidth = step * 0.35;
+    final rect = (Offset.zero & size).deflate(size.width * 0.04);
+    if (showLogo()) {
+      paintZenifyWaves(canvas, rect, size.width, Paint()..color = color);
+      return;
+    }
+    final step = rect.width / (heights.length - 0.4);
+    final barWidth = step * 0.6;
     final paint = Paint()..color = color;
     for (var i = 0; i < heights.length; i++) {
-      final height = max(barWidth, size.height * 0.8 * heights[i].clamp(0, 1));
+      final height = max(barWidth, rect.height * heights[i].clamp(0, 1));
       canvas.drawRRect(
         RRect.fromRectAndRadius(
           Rect.fromCenter(
-            center: Offset((i + 1.5) * step, size.height / 2),
+            center: Offset(
+              rect.left + i * step + barWidth / 2,
+              size.height / 2,
+            ),
             width: barWidth,
             height: height,
           ),

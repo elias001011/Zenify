@@ -27,12 +27,14 @@ void main() {
     playNextSongAutomatically.value = false;
     offlineMode.value = false;
     repeatNotifier.value = AudioServiceRepeatMode.none;
+    await Hive.box('userNoBackup').clear();
     logCount = logger.getLogCount();
     handler = MusifyAudioHandler();
     await Future<void>.delayed(const Duration(milliseconds: 250));
   });
 
   tearDown(() async {
+    await handler.persistPlaybackState();
     await handler.audioPlayer.dispose();
     await Future<void>.delayed(const Duration(milliseconds: 250));
     expect(logger.getLogCount(), logCount);
