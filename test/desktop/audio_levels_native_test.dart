@@ -45,7 +45,10 @@ void main() {
 
       final wav = File('${dir.path}/beats.wav')..writeAsBytesSync(beatsWav());
       final player = MediaKitPlayer('levels');
-      addTearDown(player.release);
+      var released = false;
+      addTearDown(() async {
+        if (!released) await player.release();
+      });
       await player.ready();
       await player.setMpvProperty('ao', 'null');
       expect(await AudioLevels.available, isTrue);
@@ -85,9 +88,48 @@ void main() {
       expect(chain, contains('scaletempo'));
       expect(chain, contains('amerge'));
 
+      // Identical readings are valid for silence, not a lost stream. Switch
+      // files on the same engine before exercising an engine replacement.
+      final silence = File('${dir.path}/silence.wav')
+        ..writeAsBytesSync(silentWav(size: 64000));
+      await player.load(
+        LoadRequest(
+          audioSourceMessage: ProgressiveAudioSourceMessage(
+            id: 'silence',
+            uri: silence.uri.toString(),
+          ),
+        ),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      final silenceStart = levels.length;
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      expect(levels.length, greaterThan(silenceStart + 10));
+      expect(levels.skip(silenceStart).map((v) => v.loud), everyElement(lessThan(0.01)));
+
+      // just_audio can replace its native player during a source change.
+      // Both visualizers must keep receiving levels through that replacement.
+      await player.release();
+      released = true;
+      final replacement = MediaKitPlayer('replacement');
+      addTearDown(replacement.release);
+      await replacement.ready();
+      await replacement.setMpvProperty('ao', 'null');
+      await replacement.load(
+        LoadRequest(
+          audioSourceMessage: ProgressiveAudioSourceMessage(
+            id: 'replacement-beats',
+            uri: wav.uri.toString(),
+          ),
+        ),
+      );
+      await replacement.play(PlayRequest());
+      final beforeReplacement = levels.length;
+      await Future<void>.delayed(const Duration(milliseconds: 1500));
+      expect(levels.length, greaterThan(beforeReplacement + 10));
+
       await subscription.cancel();
       await Future<void>.delayed(const Duration(milliseconds: 200));
-      expect(await player.getMpvProperty('af'), isNot(contains('zviz')));
+      expect(await replacement.getMpvProperty('af'), isNot(contains('zviz')));
     },
     skip: library == null
         ? 'Set MUSIFY_TEST_LIBMPV to run the native level reader check'

@@ -174,6 +174,55 @@ void main() {
         await advance(tester);
         expect(heights(tester), isNot(before));
       }
+      // A new song must forget the previous capture. Loading/stalled
+      // capture uses the current Zenify logo, then resumes real readings.
+      dynamic painter() => tester
+          .widget<CustomPaint>(
+            find.descendant(
+              of: find.byType(WaveVisualizer),
+              matching: find.byType(CustomPaint),
+            ),
+          )
+          .painter;
+      audioHandler.playbackState.add(
+        PlaybackState(
+          playing: true,
+          processingState: AudioProcessingState.buffering,
+        ),
+      );
+      await tester.pump();
+      expect(painter().showLogo(), isTrue);
+      await frame(tester);
+      expect(painter().showLogo(), isTrue);
+      audioHandler.mediaItem.add(const MediaItem(id: 'next', title: 'Next'));
+      audioHandler.playbackState.add(
+        PlaybackState(
+          playing: true,
+          processingState: AudioProcessingState.ready,
+        ),
+      );
+      await tester.pump();
+      expect(painter().showLogo(), isTrue);
+      await frame(tester);
+      expect(painter().showLogo(), isFalse);
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 650)),
+      );
+      await tester.pump(const Duration(milliseconds: 80));
+      expect(painter().showLogo(), isTrue);
+      // The stub audio player's real timers publish its idle state while
+      // runAsync advances the capture clock. Restore the simulated playback.
+      audioHandler.playbackState.add(
+        PlaybackState(
+          playing: true,
+          processingState: AudioProcessingState.ready,
+        ),
+      );
+      await tester.pump();
+      await frame(tester);
+      await tester.pump(const Duration(milliseconds: 20));
+      expect(painter().showLogo(), isFalse);
+      expect(listens, 1);
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
       await tester.pump();

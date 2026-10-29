@@ -138,9 +138,17 @@ class AudioLevels {
           await source?.cancel();
           source = null;
         } else if (source == null) {
-          final normalizer = _Normalizer();
+          var normalizer = _Normalizer();
+          String? track;
           source = (isDesktopPlatform ? _mpvFrames() : _androidFrames()).listen(
-            (frame) => _levels?.add(normalizer(frame)),
+            (frame) {
+              final current = audioHandler.mediaItem.valueOrNull?.id;
+              if (current != track) {
+                track = current;
+                normalizer = _Normalizer();
+              }
+              _levels?.add(normalizer(frame));
+            },
           );
         }
       });
@@ -183,7 +191,7 @@ class AudioLevels {
         .whereType<int>()
         .distinct()
         .where((session) => session > 0)
-        .switchMap(_sessionFrames)
+        .switchMap(_recoveringSessionFrames)
         .map((event) {
           final values = (event as List).cast<num>();
           return (
@@ -191,8 +199,23 @@ class AudioLevels {
             bands: [for (final v in values.skip(1)) v.toDouble()],
           );
         })
-        // A failed Visualizer ends the stream; the waves keep their own motion.
+        // Malformed native events must not interrupt the other listeners.
         .handleError((Object _) {});
+  }
+
+  // Some devices stop delivering Visualizer callbacks without changing the
+  // audio session. Recreate that capture after a stall, without remounting
+  // either visualizer; stream forwarding awaits the old native release first.
+  static Stream<dynamic> _recoveringSessionFrames(int session) async* {
+    while (true) {
+      yield* _sessionFrames(session).timeout(
+        const Duration(seconds: 2),
+        onTimeout: (sink) {
+          if (audioHandler.playbackState.value.playing) sink.close();
+        },
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 250));
+    }
   }
 
   /// A single-subscription channel so cancel() waits for the native release.
@@ -236,11 +259,13 @@ class AudioLevels {
   static Stream<_Frame> _mpvFrames() {
     Timer? timer;
     late final StreamController<_Frame> controller;
-    var last = '';
     var frames = 0;
     var silentPolls = 0;
+    var polls = 0;
+    var path = '';
     var filter = _bandsFilter;
     var polling = false;
+    var cancelled = false;
 
     Future<void> attach(MediaKitPlayer player) async {
       await player.mpvCommand(['af', 'remove', '@$_label']);
@@ -253,6 +278,20 @@ class AudioLevels {
     }
 
     Future<void> poll(MediaKitPlayer player) async {
+      // A source switch can rebuild mpv's audio chain without replacing the
+      // Dart player. Verify the chain periodically, including when metadata
+      // from the previous file is still present.
+      if (polls++ % 40 == 0) {
+        final currentPath = await player.getMpvProperty('path');
+        final chain = await player.getMpvProperty('af');
+        if (currentPath != path || !chain.contains(_label)) {
+          path = currentPath;
+          frames = silentPolls = 0;
+          filter = _bandsFilter;
+          await attach(player);
+        }
+      }
+      if (cancelled) return;
       final text = await player.getMpvProperty('af-metadata/$_label');
       // A filter just (re)started reports '{}' until its first frame.
       final hasFrame = text.contains('lavfi.');
@@ -263,9 +302,8 @@ class AudioLevels {
         if (frames == 0) filter = _loudnessFilter;
         await attach(player);
       }
-      if (!hasFrame || text == last) return;
+      if (!hasFrame || cancelled) return;
       silentPolls = 0;
-      last = text;
       frames++;
       final Map<String, dynamic> values;
       try {
@@ -292,35 +330,49 @@ class AudioLevels {
     }
 
     MediaKitPlayer? player;
-    var cancelled = false;
-    controller = StreamController(
-      onListen: () async {
-        final current = player = MediaKitPlayer.latest;
-        if (current == null) return;
-        await attach(current);
-        // Closed while the filter was being added: take it out again.
-        if (cancelled) {
-          await current.mpvCommand(['af', 'remove', '@$_label']);
-          return;
+    Future<void> tick() async {
+      if (polling || cancelled || !audioHandler.playbackState.value.playing) {
+        return;
+      }
+      polling = true;
+      try {
+        final current = MediaKitPlayer.latest;
+        if (!identical(player, current)) {
+          // The old engine may already be disposed. Only call commands on
+          // the current engine, and discover replacements on every tick.
+          player = current;
+          frames = silentPolls = polls = 0;
+          path = '';
+          filter = _bandsFilter;
+          if (current != null) await attach(current);
         }
-        timer = Timer.periodic(const Duration(milliseconds: 25), (_) async {
-          if (polling ||
-              controller.isClosed ||
-              !audioHandler.playbackState.value.playing) {
-            return;
-          }
-          polling = true;
-          try {
-            await poll(current);
-          } finally {
-            polling = false;
-          }
+        if (current != null && !cancelled) await poll(current);
+      } catch (_) {
+        // A source can dispose its engine while a property read is pending.
+        // Discover the live engine again instead of ending the shared reader.
+        player = null;
+      } finally {
+        polling = false;
+      }
+    }
+
+    controller = StreamController(
+      onListen: () {
+        timer = Timer.periodic(const Duration(milliseconds: 25), (_) {
+          unawaited(tick());
         });
       },
       onCancel: () async {
         cancelled = true;
         timer?.cancel();
-        await player?.mpvCommand(['af', 'remove', '@$_label']);
+        // Finish a pending add before removing the filter. A new shared
+        // reader waits for this cancellation before attaching its own.
+        while (polling) {
+          await Future<void>.delayed(const Duration(milliseconds: 5));
+        }
+        if (identical(player, MediaKitPlayer.latest)) {
+          await player?.mpvCommand(['af', 'remove', '@$_label']);
+        }
       },
     );
     return controller.stream;

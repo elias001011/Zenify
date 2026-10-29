@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart' show AppLifecycleState;
@@ -19,7 +20,13 @@ class _SessionPlayer extends AudioPlayer {
   Stream<int?> get androidAudioSessionIdStream => sessions.stream;
 }
 
-class _Handler extends MusifyAudioHandler {
+class _Handler implements MusifyAudioHandler {
+  @override
+  final playbackState = BehaviorSubject.seeded(PlaybackState());
+  @override
+  final mediaItem = BehaviorSubject<MediaItem?>.seeded(null);
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
   final _player = _SessionPlayer();
   @override
   AudioPlayer get audioPlayer => _player;
@@ -99,6 +106,12 @@ void main() {
       releasing!.complete();
       await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(listens, 2);
+      // A stalled Visualizer can keep the same audio session. Recover it
+      // without having to close either player UI or change that session.
+      audioHandler.playbackState.add(PlaybackState(playing: true));
+      await Future<void>.delayed(const Duration(milliseconds: 2400));
+      expect(cancels, 2);
+      expect(listens, 3);
       await second.cancel();
       await Future<void>.delayed(const Duration(milliseconds: 30));
     },
