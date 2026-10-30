@@ -602,15 +602,17 @@ class MoodsService {
 
   Map _playlistMap(Map stored) {
     final songs = _maps(stored['list']);
+    // Recap songs may carry an empty artwork.
+    final covers = {
+      for (final song in songs.take(12))
+        if (song['image'] case final String image when image.isNotEmpty) image,
+    }.take(4).toList();
     return {
       ...stored,
       'list': songs,
       'source': 'zenify',
-      'image': songs.isEmpty ? null : songs.first['image'],
-      'covers': {
-        for (final song in songs.take(12))
-          if (song['image'] != null) song['image'],
-      }.take(4).toList(),
+      'image': covers.firstOrNull,
+      'covers': covers,
     };
   }
 

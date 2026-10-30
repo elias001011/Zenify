@@ -37,7 +37,7 @@ class ZenifyCover extends StatelessWidget {
     final theme = Theme.of(context);
     final covers = [
       for (final cover in playlist['covers'] as List? ?? const [])
-        cover.toString(),
+        if (cover is String && cover.isNotEmpty) cover,
     ];
     final tile = covers.length >= 4 ? size / 2 : size;
 

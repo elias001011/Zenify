@@ -53,7 +53,8 @@ class _MoodsTuningPageState extends State<MoodsTuningPage> {
   /// An artwork of one of the user's songs by each artist, for its avatar.
   late final Map<String, String> _artistArt = {
     for (final seed in _taste.seeds.reversed)
-      if (seed.song['lowResImage'] ?? seed.song['image'] case final String art)
+      if (seed.song['lowResImage'] ?? seed.song['image'] case final String art
+          when art.isNotEmpty)
         artistKey(seed.song['artist']): art,
   };
 
