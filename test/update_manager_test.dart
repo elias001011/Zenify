@@ -9,6 +9,10 @@ void main() {
     expect(isLatestVersionHigher('0.1.0', '0.1.0'), isFalse);
     expect(isLatestVersionHigher('0.1.0', '0.1.0-1'), isTrue);
     expect(isLatestVersionHigher('1.0.0', 'unknown'), isFalse);
+    expect(isLatestVersionHigher('0.1.7', '0.1.7.1'), isTrue);
+    expect(isLatestVersionHigher('0.1.7.1', '0.1.8'), isTrue);
+    expect(isLatestVersionHigher('0.1.7.1', '0.1.7.10'), isTrue);
+    expect(isLatestVersionHigher('0.1.7.10', '0.1.7.2'), isFalse);
   });
 
   test('picks the first fitting asset, else the release page', () {

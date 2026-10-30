@@ -1,11 +1,5 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
 
-# Read the version from pubspec.yaml
-version=$(grep version pubspec.yaml | awk -F'[ +]' '{print $2}' | tr -d "'")
-
-# Define the variable name and file name
-variable="appVersion"
-filename="lib/constants/version.dart"
-
-# Write the version to the Dart file
-echo "const $variable = '$version';" > $filename
+version="$(bash scripts/release_version.sh)"
+printf "const appVersion = '%s';\n" "$version" > lib/constants/version.dart
