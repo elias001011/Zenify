@@ -280,17 +280,21 @@ class MoodsService {
   /// shaped like the Mix: the user's discovery, artists spaced out, a queue
   /// that never runs out. An artist's radio passes its top songs, in order,
   /// and lets [perArtist] be higher so the artist comes up more.
+  ///
+  /// YouTube Music has no radio for what isn't music (rain, a talk): then
+  /// the first seed plays and the automatic picker follows it, as it
+  /// follows anything.
   Future<bool> playRadio(
     List<Map> seeds, {
     required String title,
     int perArtist = 3,
   }) async {
+    if (seeds.isEmpty) return false;
     final songs = seeds.where(_isSong).take(4).toList();
     final weights = {
       for (final (i, song) in songs.indexed)
         song['ytid'].toString(): 1.0 - i * 0.15,
     };
-    if (weights.isEmpty) return false;
     final taste = this.taste();
     final seedArtists = {for (final song in songs) artistKey(song['artist'])};
     final queue = assembleQueue(
@@ -306,9 +310,11 @@ class MoodsService {
       // Asking for an artist's radio overrides leaving its genre out.
       excludedArtists: (await _excludedArtists()).difference(seedArtists),
     );
-    if (queue.isEmpty) return false;
     await audioHandler.playPlaylistSong(
-      playlist: {'title': title, 'list': queue},
+      playlist: {
+        'title': title,
+        'list': queue.isEmpty ? [seeds.first] : queue,
+      },
       songIndex: 0,
       shuffle: false,
       keepGoing: true,
