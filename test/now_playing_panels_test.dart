@@ -10,6 +10,8 @@ import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/audio_service.dart';
+import 'package:musify/services/common_services.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart';
 import 'package:musify/widgets/now_playing/lyrics_panel.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
@@ -83,6 +85,87 @@ void main() {
     await Hive.close();
     await dir.delete(recursive: true);
   });
+
+  for (final size in [const Size(420, 860), const Size(1280, 800)]) {
+    testWidgets(
+      'quality badge fades out for panels and returns after closing ($size)',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        audioHandler = _Handler();
+        showAudioQualityBadge.value = true;
+        showPlayerVisualizer.value = false;
+        userOfflineSongs.value = [
+          {'ytid': 'badge', 'audioBitrateKbps': 192, 'audioCodec': 'opus'},
+        ];
+        addTearDown(() {
+          showAudioQualityBadge.value = false;
+          userOfflineSongs.value = [];
+        });
+        audioHandler.mediaItem.add(
+          const MediaItem(
+            id: 'badge',
+            title: 'Song',
+            extras: {'ytid': 'badge'},
+          ),
+        );
+        await tester.pumpWidget(
+          const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              ...GlobalMaterialLocalizations.delegates,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: NowPlayingPage(),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 600));
+        const badgeText = '192 kbps • Opus';
+        final badge = find.text(badgeText);
+        double opacity() => tester
+            .widget<FadeTransition>(
+              find
+                  .ancestor(of: badge, matching: find.byType(FadeTransition))
+                  .first,
+            )
+            .opacity
+            .value;
+        expect(badge, findsOneWidget);
+        expect(opacity(), 1);
+
+        for (final panel in ['Lyrics', 'Queue']) {
+          await tester.tap(find.byTooltip(panel));
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 100));
+          expect(opacity(), lessThan(1));
+          await tester.pump(const Duration(milliseconds: 500));
+          expect(opacity(), 0);
+          await tester.tap(find.byTooltip(panel));
+          await tester.pump();
+          if (size.width < 900) {
+            await tester.pump(const Duration(milliseconds: 200));
+            expect(opacity(), 0);
+          }
+          await tester.pump(const Duration(milliseconds: 600));
+          await tester.pump(const Duration(milliseconds: 250));
+          expect(opacity(), 1);
+        }
+        // Switching directly between panels must never bring the badge back.
+        await tester.tap(find.byTooltip('Lyrics'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 300));
+        await tester.tap(find.byTooltip('Queue'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 600));
+        expect(opacity(), 0);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 30));
+      },
+    );
+  }
 
   testWidgets('on a phone, lyrics and queue share the artwork area', (
     tester,

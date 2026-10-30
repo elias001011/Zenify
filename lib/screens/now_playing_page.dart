@@ -405,6 +405,9 @@ class _UprightStageState extends State<_UprightStage>
               final artwork = NowPlayingArtwork(
                 metadata: metadata,
                 size: artSize,
+                // Keep it hidden until the closing animation has restored
+                // the full-size artwork.
+                showQualityBadge: _builtPanel == null,
               );
               // Built once: the frames of the move only reposition and fade
               // them.
@@ -593,7 +596,11 @@ class _WideLayoutState extends State<_WideLayout> {
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            NowPlayingArtwork(metadata: metadata, size: size),
+                            NowPlayingArtwork(
+                              metadata: metadata,
+                              size: size,
+                              showQualityBadge: panel == null,
+                            ),
                             Column(
                               key: _belowKey,
                               crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -37,10 +37,14 @@ class NowPlayingArtwork extends StatefulWidget {
     super.key,
     required this.metadata,
     required this.size,
+    this.showQualityBadge = true,
   });
 
   final MediaItem metadata;
   final double size;
+
+  /// Hide the overlay while the artwork is a panel's compact header.
+  final bool showQualityBadge;
 
   @override
   State<NowPlayingArtwork> createState() => _NowPlayingArtworkState();
@@ -117,7 +121,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
           child: ValueListenableBuilder<bool>(
             valueListenable: showPlayerVisualizer,
             builder: (context, visualizer, child) => AnimatedOpacity(
-              opacity: visualizer ? 0 : 1,
+              opacity: visualizer || !widget.showQualityBadge ? 0 : 1,
               duration: const Duration(milliseconds: 200),
               child: child,
             ),
