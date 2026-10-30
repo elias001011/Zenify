@@ -82,8 +82,20 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   void initState() {
     super.initState();
+    offlineMode.addListener(_onOfflineModeChanged);
     userPlaylists.addListener(_invalidateAddedPlaylists);
     userPlaylistFolders.addListener(_invalidateAddedPlaylists);
+  }
+
+  void _onOfflineModeChanged() {
+    setState(() {
+      _shownBody = null;
+      if (offlineMode.value &&
+          (_filter == _LibraryFilter.youtube ||
+              _filter == _LibraryFilter.albums)) {
+        _filter = _LibraryFilter.all;
+      }
+    });
   }
 
   void _invalidateAddedPlaylists() {
@@ -92,6 +104,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
   @override
   void dispose() {
+    offlineMode.removeListener(_onOfflineModeChanged);
     userPlaylists.removeListener(_invalidateAddedPlaylists);
     userPlaylistFolders.removeListener(_invalidateAddedPlaylists);
     _filterDebounce?.cancel();
@@ -137,7 +150,12 @@ class _LibraryPageState extends State<LibraryPage> {
           userPlaylists.value.isNotEmpty ||
           userCustomPlaylists.value.isNotEmpty;
       final hasOfflinePlaylists = offlinePlaylistService.offlinePlaylists.value
-          .any((p) => p is Map && !PlaylistUtils.isArtistPlaylist(p));
+          .any(
+            (p) =>
+                p is Map &&
+                !PlaylistUtils.isArtistPlaylist(p) &&
+                !MoodsService.isZenifyPlaylist(p['ytid']),
+          );
       final hasOfflineArtists = getLikedArtistItems(offlineOnly: true)
           .isNotEmpty;
       final hasOfflineSongs = userOfflineSongs.value.isNotEmpty;
@@ -222,7 +240,7 @@ class _LibraryPageState extends State<LibraryPage> {
             ..._buildSongSlivers(),
             ..._buildPinnedSlivers(),
             ..._buildUserPlaylistsSlivers(),
-            if (!offlineMode.value) ..._buildZenifySlivers(),
+            ..._buildZenifySlivers(),
             if (!offlineMode.value) ..._buildLikedPlaylistsSlivers(),
             ..._buildLikedArtistsSlivers(),
           ];
@@ -279,6 +297,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
     final isOff = offlineMode.value;
     final items = resolvePinnedPlaylists(ids).where((p) {
+      if (isOff && MoodsService.isZenifyPlaylist(p['ytid'])) return false;
       return _matches(p) &&
           (!isOff ||
               offlinePlaylistService.isPlaylistDownloaded(
@@ -305,7 +324,12 @@ class _LibraryPageState extends State<LibraryPage> {
 
     final rawOfflinePlaylists = offlinePlaylistService.offlinePlaylists.value;
     final visibleOfflinePlaylists = rawOfflinePlaylists
-        .where((p) => p is Map && !PlaylistUtils.isArtistPlaylist(p))
+        .where(
+          (p) =>
+              p is Map &&
+              !PlaylistUtils.isArtistPlaylist(p) &&
+              !MoodsService.isZenifyPlaylist(p['ytid']),
+        )
         .toList();
     final folders =
         (isOffline
@@ -527,7 +551,11 @@ class _LibraryPageState extends State<LibraryPage> {
 
   /// The tuning of the Moods and the Zenify playlists the user saved.
   List<Widget> _buildZenifySlivers() {
-    if (!moodsEnabled.value || !_showsYoutube || _query.isNotEmpty) return [];
+    if (offlineMode.value ||
+        !moodsEnabled.value ||
+        !_showsYoutube ||
+        _query.isNotEmpty)
+      return [];
     final saved = [
       for (final id in savedZenifyPlaylists.value)
         moodsService.cachedPlaylist(id),

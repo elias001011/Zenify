@@ -23,6 +23,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/moods/moods_service.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 
 /// Starts a radio from an artist or a playlist (see
@@ -51,6 +52,7 @@ class _StartRadioButtonState extends State<StartRadioButton> {
   bool _starting = false;
 
   Future<void> _start() async {
+    if (offlineMode.value) return;
     setState(() => _starting = true);
     final l10n = context.l10n!;
     final started = await moodsService
@@ -62,11 +64,18 @@ class _StartRadioButtonState extends State<StartRadioButton> {
         .catchError((_) => false);
     if (!mounted) return;
     setState(() => _starting = false);
-    if (!started) showToast(context, l10n.radioUnavailable);
+    if (!started && !offlineMode.value)
+      showToast(context, l10n.radioUnavailable);
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ValueListenableBuilder<bool>(
+    valueListenable: offlineMode,
+    builder: (context, offline, _) =>
+        offline ? const SizedBox.shrink() : _buildButton(context),
+  );
+
+  Widget _buildButton(BuildContext context) {
     return IconButton.filledTonal(
       icon: _starting
           ? const SizedBox.square(

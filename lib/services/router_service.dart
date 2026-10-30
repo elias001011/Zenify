@@ -43,6 +43,7 @@ import 'package:musify/screens/search_page.dart';
 import 'package:musify/screens/settings_page.dart';
 import 'package:musify/screens/time_machine_page.dart';
 import 'package:musify/screens/user_songs_page.dart';
+import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
@@ -78,10 +79,15 @@ class NavigationManager {
       restorationScopeId: 'router',
       debugLogDiagnostics: kDebugMode,
       routerNeglect: true,
+      refreshListenable: offlineMode,
       redirect: (context, state) {
         // Handle offline mode redirects
         final isOffline = offlineMode.value;
         final currentPath = state.matchedLocation;
+
+        if (isOffline && _isOnlineDiscoveryRoute(state)) {
+          return libraryPath;
+        }
 
         if (isOffline && currentPath.startsWith(timeMachinePath)) {
           // Redirect unavailable pages to home in offline mode
@@ -103,6 +109,22 @@ class NavigationManager {
         return null; // No redirect needed
       },
     );
+    offlineMode.addListener(_onOfflineModeChanged);
+  }
+
+  bool _isOnlineDiscoveryRoute(GoRouterState state) =>
+      state.matchedLocation.endsWith('/moods-tuning') ||
+      state.matchedLocation.endsWith('/radioStations') ||
+      MoodsService.isZenifyPlaylist(state.pathParameters['playlistId']);
+
+  void _onOfflineModeChanged() {
+    // A pushed page has its own state; the top-level redirect sees the
+    // branch's base location when that stack is refreshed.
+    if (offlineMode.value &&
+        router.routerDelegate.currentConfiguration.isNotEmpty &&
+        _isOnlineDiscoveryRoute(router.state)) {
+      router.go(libraryPath);
+    }
   }
 
   static final NavigationManager _instance = NavigationManager._internal();

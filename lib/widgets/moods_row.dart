@@ -23,6 +23,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/moods/moods_service.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/section_header.dart';
 
@@ -67,18 +68,28 @@ class MoodsRow extends StatefulWidget {
 
 class _MoodsRowState extends State<MoodsRow> {
   Mood? _starting;
+  late final _availability = Listenable.merge([offlineMode, moodsEnabled]);
 
   Future<void> _start(Mood mood) async {
-    if (_starting != null) return;
+    if (_starting != null || offlineMode.value || !moodsEnabled.value) return;
     setState(() => _starting = mood);
     final started = await moodsService.play(mood).catchError((_) => false);
     if (!mounted) return;
     setState(() => _starting = null);
-    if (!started) showToast(context, context.l10n!.moodUnavailable);
+    if (!started && !offlineMode.value && moodsEnabled.value) {
+      showToast(context, context.l10n!.moodUnavailable);
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: _availability,
+    builder: (context, _) => offlineMode.value || !moodsEnabled.value
+        ? const SizedBox.shrink()
+        : _buildRow(context),
+  );
+
+  Widget _buildRow(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

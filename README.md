@@ -80,8 +80,9 @@ New in Zenify:
 - **Moods and personal playlists**: start a Mix or choose a mood, and find
   daily, discovery and genre playlists below Time Machine on Home. Tune
   discovery, exclude genres or block artists in Settings. Moods can be
-  switched off and stay inactive in offline mode. Saved Zenify playlists and
-  tuning travel with backups and Local Sync.
+  switched off. Moods, Zenify playlists and radios are hidden in offline mode,
+  including in the library; downloaded songs and playlists stay available.
+  Saved Zenify playlists and tuning travel with backups and Local Sync.
 - **Artist and playlist radios**: start a radio from an artist or playlist;
   YouTube Music supplies the queue, with the automatic picker as a fallback.
 - **Multi-selection**: long-press a song to select several tracks in the order
