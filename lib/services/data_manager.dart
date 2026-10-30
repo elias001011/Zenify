@@ -295,6 +295,7 @@ const _deviceSettings = [
   'compactDesktopPlayer',
   'keyboardShortcuts',
   'floatingEffect',
+  'waveReading',
   'equalizerEnabled',
   'equalizerBandGains',
 ];

@@ -27,17 +27,20 @@ import 'package:flutter/scheduler.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/audio_levels.dart';
-import 'package:musify/utilities/platform_utils.dart';
+import 'package:musify/services/settings_manager.dart';
 
-/// Sound waves: lightweight synthesized motion on phones, live levels on
-/// desktop. Pausing or buffering freezes the bars in place.
+/// Sound waves: they follow the music's frequencies with the precise
+/// [waveReading] and keep a motion of their own otherwise. Pausing or
+/// buffering freezes the bars in place.
 class WaveVisualizer extends StatefulWidget {
   const WaveVisualizer({super.key, required this.size, this.compact = false});
 
   final double size;
 
-  /// The persistent thumbnail updates at 10 Hz without requesting frames
-  /// between updates. The open player uses a ticker for smoother motion.
+  /// For the mini player's thumbnail, always on screen, which draws only as
+  /// often as it needs: a step per audio reading (at most ~15 a second) with
+  /// the precise reading, otherwise a slower motion of its own (8 a second),
+  /// and no frames in between. The open player uses a ticker.
   final bool compact;
 
   @override
@@ -65,14 +68,12 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   bool _tickerEnabled = true;
   bool _connecting = false;
   Duration _last = Duration.zero;
+  final _clock = Stopwatch()..start();
+  Duration _lastStep = Duration.zero;
   double _time = 0;
   double _beat = 0;
 
-  bool get _moving =>
-      _ready &&
-      _visible &&
-      _tickerEnabled &&
-      (!isDesktopPlatform || _level != null);
+  bool get _moving => _ready && _visible && _tickerEnabled;
 
   @override
   void initState() {
@@ -89,7 +90,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
               state.playing &&
               state.processingState == AudioProcessingState.ready;
           if (!_ready) _clearLevel();
-          if (_ready && isDesktopPlatform) unawaited(_connect());
+          if (_ready) unawaited(_connect());
           _updateMotion();
         });
     _trackSubscription = audioHandler.mediaItem
@@ -99,6 +100,15 @@ class _WaveVisualizerState extends State<WaveVisualizer>
           _clearLevel();
           _updateMotion();
         });
+    waveReading.addListener(_onReadingChanged);
+  }
+
+  void _onReadingChanged() {
+    unawaited(_levels?.cancel());
+    _levels = null;
+    _clearLevel();
+    if (_ready) unawaited(_connect());
+    _updateMotion();
   }
 
   @override
@@ -132,7 +142,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
             _level = null;
             _updateMotion();
           });
-          if (widget.compact && _moving) _advance(0.1);
+          if (widget.compact) _stepThumbnail();
           _updateMotion();
         });
       }
@@ -148,15 +158,27 @@ class _WaveVisualizerState extends State<WaveVisualizer>
       _thumbnailTimer?.cancel();
       _thumbnailTimer = null;
     } else if (widget.compact) {
-      if (!isDesktopPlatform) {
+      if (_level == null) {
         _thumbnailTimer ??= Timer.periodic(
-          const Duration(milliseconds: 100),
-          (_) => _advance(0.1),
+          const Duration(milliseconds: 125),
+          (_) => _advance(0.125),
         );
+      } else {
+        _thumbnailTimer?.cancel();
+        _thumbnailTimer = null;
       }
     } else if (!_ticker.isActive) {
       _ticker.start();
     }
+  }
+
+  void _stepThumbnail() {
+    if (!_moving) return;
+    final now = _clock.elapsed;
+    final since = now - _lastStep;
+    if (since < const Duration(milliseconds: 66)) return;
+    _lastStep = now;
+    _advance(min(since.inMicroseconds / 1e6, 0.2));
   }
 
   void _tick(Duration elapsed) {
@@ -197,6 +219,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
 
   @override
   void dispose() {
+    waveReading.removeListener(_onReadingChanged);
     _lifecycle.dispose();
     _thumbnailTimer?.cancel();
     _stale?.cancel();

@@ -28,6 +28,7 @@ Widget wave({bool compact = true}) => MaterialApp(
 
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
+  useTestSettings();
   late WaveTestHandler handler;
   final captureCalls = <String>[];
   const channels = [
@@ -92,6 +93,24 @@ void main() {
       },
     );
   }
+
+  testWidgets('the simple thumbnail redraws 8 times a second, no more', (
+    tester,
+  ) async {
+    handler.ready();
+    await tester.pumpWidget(wave());
+    var previous = heights(tester);
+    var redraws = 0;
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 25));
+      final now = heights(tester);
+      if (!listEquals(now, previous)) redraws++;
+      previous = now;
+    }
+    expect(redraws, 8);
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
 
   testWidgets('buffering, idle and completed freeze waves until ready', (
     tester,

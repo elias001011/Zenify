@@ -64,6 +64,21 @@ Future<void> setPlayerVisualizer(bool value) async {
   }
 }
 
+/// How the waves move: on their own (simple), or following the audio's
+/// frequencies (precise), which on Android needs the audio recording
+/// permission. Belongs to the device, like the permission.
+enum WaveReading { simple, precise }
+
+WaveReading _readWaveReading() {
+  final stored = Hive.box('settings').get('waveReading');
+  for (final reading in WaveReading.values) {
+    if (reading.name == stored) return reading;
+  }
+  return isDesktopPlatform ? WaveReading.precise : WaveReading.simple;
+}
+
+final waveReading = ValueNotifier<WaveReading>(_readWaveReading());
+
 /// Musify stored this as 'usePureBlackColor', and only once the user chose,
 /// so a choice from a restored or copied Musify library still counts.
 bool _readPureBlack(Box settings) =>

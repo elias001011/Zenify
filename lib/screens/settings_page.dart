@@ -52,6 +52,7 @@ import 'package:musify/widgets/floating_effect_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/section_header.dart';
+import 'package:musify/widgets/wave_reading_bar.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -144,6 +145,7 @@ class SettingsPage extends StatelessWidget {
             onTap: () => context.push('/settings/equalizer'),
           ),
         const FloatingEffectBar(),
+        const WaveReadingBar(),
         CustomBar(
           context.l10n!.dynamicBackground,
           FluentIcons.color_24_regular,

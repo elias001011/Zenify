@@ -426,7 +426,6 @@
   "volume": "Volume",
   "yes": "Sim",
   "youtubePlaylistLinkOrId": "Link ou ID da playlist do YouTube",
-  "wavesFollowMusic": "Seguir a música (pede acesso ao áudio)",
   "imageSaved": "Imagem salva",
   "selectAll": "Selecionar todas",
   "selectSongs": "Selecionar músicas",
@@ -480,5 +479,10 @@
     }
   },
   "reorderSongs": "Reordenar músicas",
-  "finishReordering": "Concluir reordenação"
+  "finishReordering": "Concluir reordenação",
+  "waveReading": "Leitura das ondas",
+  "waveReadingSimple": "Simples: as ondas fazem o próprio movimento",
+  "waveReadingPrecise": "Precisa: as ondas seguem as frequências da música",
+  "waveReadingPreciseAndroid": "Precisa: segue as frequências da música (pede acesso ao áudio)",
+  "waveReadingDenied": "Sem acesso ao áudio, as ondas continuam na leitura simples"
 }

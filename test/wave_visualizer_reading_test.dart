@@ -9,6 +9,7 @@ import 'wave_visualizer_test.dart' show heights;
 
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
+  useTestSettings();
   for (final compact in [true, false]) {
     testWidgets('waves stop hidden and in background (compact: $compact)', (
       tester,

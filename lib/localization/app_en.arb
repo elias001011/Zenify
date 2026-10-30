@@ -437,7 +437,6 @@
   "volume": "Volume",
   "yes": "Yes",
   "youtubePlaylistLinkOrId": "YouTube playlist link or ID",
-  "wavesFollowMusic": "Follow the music (asks for audio access)",
   "imageSaved": "Image saved",
   "selectAll": "Select all",
   "selectSongs": "Select songs",
@@ -491,5 +490,10 @@
     }
   },
   "reorderSongs": "Reorder songs",
-  "finishReordering": "Finish reordering"
+  "finishReordering": "Finish reordering",
+  "waveReading": "Wave reading",
+  "waveReadingSimple": "Simple: the waves keep their own motion",
+  "waveReadingPrecise": "Precise: the waves follow the music's frequencies",
+  "waveReadingPreciseAndroid": "Precise: follows the music's frequencies (asks for audio access)",
+  "waveReadingDenied": "Without audio access the waves keep the simple reading"
 }
