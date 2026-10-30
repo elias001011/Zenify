@@ -414,7 +414,7 @@
   "topArtists": "Artistas mais ouvidos",
   "topSongs": "Top músicas",
   "translate": "Traduzir",
-  "translateDescription": "Ajude a traduzir o Zenify para o seu idioma no Crowdin.",
+  "translateDescription": "Ajude a traduzir o Zenify editando os arquivos de tradução. Toque para ver os arquivos e as instruções de contribuição.",
   "understand": "Entendi",
   "undo": "Desfazer",
   "unpinFromLibrary": "Desafixar",

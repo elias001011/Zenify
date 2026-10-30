@@ -278,7 +278,7 @@
   "tools": "Verktyg",
   "topSongs": "De bästa låtarna",
   "translate": "Translate",
-  "translateDescription": "Help translate Zenify into your language on Crowdin.",
+  "translateDescription": "Hjälp till att översätta Zenify genom att redigera översättningsfilerna. Tryck för filer och instruktioner.",
   "understand": "Jag förstår",
   "undo": "Ångra",
   "unpinFromLibrary": "Unpin biblioteket",

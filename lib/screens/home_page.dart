@@ -27,6 +27,7 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/listening_stats_service.dart';
+import 'package:musify/services/moods/moods_preferences.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
@@ -63,6 +64,8 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _loadZenifyPlaylists();
     moodsEnabled.addListener(_onMoodsToggled);
+    offlineMode.addListener(_onMoodsToggled);
+    moodsTuning.addListener(_onMoodsToggled);
     _lifecycle = AppLifecycleListener(onResume: _refreshIfStale);
     _suggestedPlaylistsFuture = getPlaylists(
       playlistsNum: suggestedPlaylistsNumber,
@@ -75,14 +78,16 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     externalRecommendations.removeListener(_refreshRecommendedSongs);
     moodsEnabled.removeListener(_onMoodsToggled);
+    offlineMode.removeListener(_onMoodsToggled);
+    moodsTuning.removeListener(_onMoodsToggled);
     _lifecycle.dispose();
     super.dispose();
   }
 
   void _loadZenifyPlaylists() {
     _zenifyLoadedAt = DateTime.now();
-    _zenifyPlaylists = moodsEnabled.value
-        ? moodsService.playlists().asBroadcastStream()
+    _zenifyPlaylists = moodsEnabled.value && !offlineMode.value
+        ? moodsService.playlists()
         : null;
   }
 
@@ -96,7 +101,9 @@ class _HomePageState extends State<HomePage> {
     final now = DateTime.now();
     final crossedSlot =
         now.hour ~/ 4 != _zenifyLoadedAt.hour ~/ 4 ||
-        now.day != _zenifyLoadedAt.day;
+        now.day != _zenifyLoadedAt.day ||
+        now.month != _zenifyLoadedAt.month ||
+        now.year != _zenifyLoadedAt.year;
     if (crossedSlot) _onMoodsToggled();
   }
 
@@ -140,13 +147,13 @@ class _HomePageState extends State<HomePage> {
                 );
               },
             ),
-            if (moodsEnabled.value) ...[
-              const MoodsRow(),
-              _buildZenifyPlaylists(playlistHeight),
-            ],
             _buildSuggestedPlaylists(playlistHeight),
             _buildSuggestedPlaylists(playlistHeight, showOnlyLiked: true),
             _buildCurrentMonthRecapSection(),
+            if (moodsEnabled.value && !offlineMode.value) ...[
+              const MoodsRow(),
+              _buildZenifyPlaylists(playlistHeight),
+            ],
             _buildRecommendedSongsSection(),
             const MiniPlayerBottomSpace(),
           ],
@@ -183,6 +190,7 @@ class _HomePageState extends State<HomePage> {
   Widget _buildZenifyPlaylists(double playlistHeight) {
     // They show up as they are made rather than holding a spinner on Home.
     return StreamBuilder<List<Map>>(
+      key: ValueKey(_zenifyPlaylists),
       stream: _zenifyPlaylists,
       builder: (context, snapshot) => _buildSuggestedPlaylistsSection(
         playlistHeight,

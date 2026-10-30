@@ -33,6 +33,7 @@ typedef SavedQueue = ({
   List<Map> original,
   int index,
   Duration position,
+  bool keepGoing,
 });
 
 /// Device-local playback state. Queue edits are coalesced; position is a
@@ -42,7 +43,7 @@ class QueuePersistenceService {
   static const positionKey = 'playbackQueuePosition';
   static const limit = 500;
   Timer? _timer;
-  ({List<Map> songs, List<Map>? original, int index})? _pending;
+  ({List<Map> songs, List<Map>? original, int index, bool keepGoing})? _pending;
 
   /// The entries and order last saved; a track change within the same queue
   /// only moves the small position record.
@@ -72,7 +73,12 @@ class QueuePersistenceService {
       'duration': duration.inMilliseconds / 1000,
   };
 
-  void saveQueue(List<Map> songs, List<Map> original, int index) {
+  void saveQueue(
+    List<Map> songs,
+    List<Map> original,
+    int index, {
+    bool keepGoing = false,
+  }) {
     final start = max(0, min(index - limit ~/ 2, songs.length - limit));
     final window = songs.skip(start).take(limit).toList();
     final ids = [for (final song in window) song['queueEntryId']];
@@ -84,7 +90,7 @@ class QueuePersistenceService {
     // Unshuffled, the original order is the queue itself: not saved twice.
     final shuffled = !listEquals(ids, originalIds);
     final shape =
-        '$start|${ids.join(',')}|${shuffled ? originalIds.join(',') : ''}';
+        '$start|$keepGoing|${ids.join(',')}|${shuffled ? originalIds.join(',') : ''}';
 
     if (shape == _savedShape && _pending == null) {
       // Same queue, another song: remember which, cheaply.
@@ -104,6 +110,7 @@ class QueuePersistenceService {
       }
     }
     _pending = (
+      keepGoing: keepGoing,
       songs: window,
       original: shuffled
           ? [
@@ -194,6 +201,7 @@ class QueuePersistenceService {
       original: validOriginal ? original : List<Map>.of(songs),
       index: index,
       position: position,
+      keepGoing: data['keepGoing'] == true,
     );
   }
 
@@ -212,6 +220,7 @@ class QueuePersistenceService {
           'songs': pending.songs.map(_song).toList(),
           'original': pending.original?.map(_song).toList(),
           'index': pending.index,
+          'keepGoing': pending.keepGoing,
         });
       }
       await box.flush();

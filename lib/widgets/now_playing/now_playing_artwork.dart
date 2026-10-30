@@ -37,14 +37,14 @@ class NowPlayingArtwork extends StatefulWidget {
     super.key,
     required this.metadata,
     required this.size,
-    this.showQualityBadge = true,
+    this.qualityBadgeOpacity,
   });
 
   final MediaItem metadata;
   final double size;
 
-  /// Hide the overlay while the artwork is a panel's compact header.
-  final bool showQualityBadge;
+  /// Follows the mobile panel transition, without a second delayed fade.
+  final Animation<double>? qualityBadgeOpacity;
 
   @override
   State<NowPlayingArtwork> createState() => _NowPlayingArtworkState();
@@ -121,12 +121,15 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
           child: ValueListenableBuilder<bool>(
             valueListenable: showPlayerVisualizer,
             builder: (context, visualizer, child) => AnimatedOpacity(
-              opacity: visualizer || !widget.showQualityBadge ? 0 : 1,
+              opacity: visualizer ? 0 : 1,
               duration: const Duration(milliseconds: 200),
               child: child,
             ),
-            child: IgnorePointer(
-              child: _AudioQualityBadge(metadata: widget.metadata),
+            child: FadeTransition(
+              opacity: widget.qualityBadgeOpacity ?? kAlwaysCompleteAnimation,
+              child: IgnorePointer(
+                child: _AudioQualityBadge(metadata: widget.metadata),
+              ),
             ),
           ),
         ),
@@ -209,6 +212,20 @@ class _AudioQualityBadgeState extends State<_AudioQualityBadge> {
   void initState() {
     super.initState();
     _resolveIfNeeded();
+    showAudioQualityBadge.addListener(_onSettingChanged);
+  }
+
+  void _onSettingChanged() {
+    setState(() {
+      _resolvedYtid = null;
+      _resolveIfNeeded();
+    });
+  }
+
+  @override
+  void dispose() {
+    showAudioQualityBadge.removeListener(_onSettingChanged);
+    super.dispose();
   }
 
   @override

@@ -88,7 +88,7 @@ void main() {
 
   for (final size in [const Size(420, 860), const Size(1280, 800)]) {
     testWidgets(
-      'quality badge fades out for panels and returns after closing ($size)',
+      'quality badge stays on wide layouts and follows the mobile transition ($size)',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -125,47 +125,114 @@ void main() {
         const badgeText = '192 kbps • Opus';
         final badge = find.text(badgeText);
         double opacity() => tester
-            .widget<FadeTransition>(
-              find
-                  .ancestor(of: badge, matching: find.byType(FadeTransition))
-                  .first,
+            .widgetList<FadeTransition>(
+              find.ancestor(of: badge, matching: find.byType(FadeTransition)),
             )
-            .opacity
-            .value;
+            .fold(1, (value, fade) => value * fade.opacity.value);
+        final compact = size.width < 900;
         expect(badge, findsOneWidget);
         expect(opacity(), 1);
 
         for (final panel in ['Lyrics', 'Queue']) {
           await tester.tap(find.byTooltip(panel));
           await tester.pump();
+          await tester.pump();
           await tester.pump(const Duration(milliseconds: 100));
-          expect(opacity(), lessThan(1));
+          expect(opacity(), compact ? lessThan(1) : 1);
           await tester.pump(const Duration(milliseconds: 500));
-          expect(opacity(), 0);
+          expect(opacity(), compact ? 0 : 1);
           await tester.tap(find.byTooltip(panel));
           await tester.pump();
-          if (size.width < 900) {
-            await tester.pump(const Duration(milliseconds: 200));
-            expect(opacity(), 0);
-          }
-          await tester.pump(const Duration(milliseconds: 600));
-          await tester.pump(const Duration(milliseconds: 250));
+          await tester.pump(const Duration(milliseconds: 350));
+          expect(opacity(), compact ? greaterThan(0) : 1);
+          await tester.pump(const Duration(milliseconds: 150));
           expect(opacity(), 1);
         }
         // Switching directly between panels must never bring the badge back.
         await tester.tap(find.byTooltip('Lyrics'));
         await tester.pump();
+        await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         await tester.tap(find.byTooltip('Queue'));
         await tester.pump();
+        await tester.pump();
         await tester.pump(const Duration(milliseconds: 600));
-        expect(opacity(), 0);
+        expect(opacity(), compact ? 0 : 1);
+
+        showAudioQualityBadge.value = false;
+        await tester.pump();
+        expect(badge, findsNothing);
+        showAudioQualityBadge.value = true;
+        await tester.pump();
+        await tester.pump();
+        expect(badge, findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
         await tester.pump(const Duration(seconds: 30));
       },
     );
   }
+
+  testWidgets(
+    'short desktop windows keep full-size action targets across resizes',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      audioHandler = _Handler();
+      audioHandler.mediaItem.add(
+        const MediaItem(
+          id: 'test',
+          title: 'A fairly long song title for the desktop player',
+          artist: 'Artist',
+          extras: {'ytid': 'test'},
+        ),
+      );
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      for (final size in [
+        const Size(900, 560),
+        const Size(1280, 800),
+        const Size(900, 560),
+      ]) {
+        tester.view.physicalSize = size;
+        await tester.pumpWidget(
+          const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              ...GlobalMaterialLocalizations.delegates,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: NowPlayingPage(),
+          ),
+        );
+        await tester.pump();
+        if (find.byType(QueueWidget).evaluate().isEmpty) {
+          await tester.tap(find.byTooltip('Queue'));
+        }
+        for (var frame = 0; frame < 20; frame++) {
+          await tester.pump(const Duration(milliseconds: 20));
+          expect(tester.takeException(), isNull);
+        }
+        for (final action in [
+          'Lyrics',
+          'Queue',
+          'Volume',
+          'Sleep timer',
+          'Make available offline',
+          'Add to playlist',
+          'Liked songs',
+        ]) {
+          final target = find.byTooltip(action).hitTestable();
+          expect(target, findsOneWidget, reason: action);
+          final rect = tester.getRect(target);
+          expect(rect.width, greaterThanOrEqualTo(44), reason: action);
+          expect(rect.height, greaterThanOrEqualTo(44), reason: action);
+        }
+      }
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 30));
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
 
   testWidgets('on a phone, lyrics and queue share the artwork area', (
     tester,

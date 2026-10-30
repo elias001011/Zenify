@@ -28,6 +28,6 @@ If you have any questions about contributing, please contact the project maintai
 
 ## Translations
 
-Edit the ARB files in `lib/localization/`. Add new strings to English and
+Edit the [ARB translation files](https://github.com/elias001011/Zenify/tree/master/lib/localization). Add new strings to English and
 Portuguese first, then run `flutter gen-l10n` and `flutter analyze`. Zenify
 currently accepts translations through pull requests.

@@ -278,7 +278,7 @@
   "tools": "Aletler",
   "topSongs": "Top songs",
   "translate": "Çevir",
-  "translateDescription": "Zenify'ı Crowdin'de kendi dilinize çevirmeye yardımcı olun.",
+  "translateDescription": "Çeviri dosyalarını düzenleyerek Zenify çevirisine yardımcı olun. Dosyalar ve talimatlar için dokunun.",
   "understand": "Anlıyorum",
   "undo": "Geri Al",
   "unpinFromLibrary": "Sabitlemeyi kaldır",

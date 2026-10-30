@@ -159,6 +159,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     _queueList.addAll(saved.songs);
     _originalQueueList.addAll(saved.original);
     _currentQueueIndex = saved.index;
+    _queueKeepsGoing = saved.keepGoing;
     _hydrateQueueEntryIds();
     _resumePosition = saved.position;
     _resumeEntryId = _queueEntryIds.ensureId(currentSong!);
@@ -562,6 +563,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           _queueList,
           _originalQueueList,
           _currentQueueIndex,
+          keepGoing: _queueKeepsGoing,
         );
       }
       if (mediaItemChanged || publishedQueueChanged) {
@@ -1409,6 +1411,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         _queueList,
         _originalQueueList,
         _currentQueueIndex,
+        keepGoing: _queueKeepsGoing,
       );
 
       if (_currentQueueIndex >= 0 && _currentQueueIndex < mediaItems.length) {
@@ -1533,6 +1536,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
             _queueList,
             _originalQueueList,
             _currentQueueIndex,
+            keepGoing: _queueKeepsGoing,
           );
           _preloadUpcomingSongs();
           // Trigger background song addition if auto-play is enabled

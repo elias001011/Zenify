@@ -66,9 +66,12 @@ class ArtworkColors {
       final image = await _load(sample);
       // The tiny sample would only crowd real artworks out of the cache.
       unawaited(sample.evict());
-      final data = await image.toByteData();
-      image.dispose();
-      return data == null ? null : vividColor(data.buffer.asUint8List());
+      try {
+        final data = await image.toByteData();
+        return data == null ? null : vividColor(data.buffer.asUint8List());
+      } finally {
+        image.dispose();
+      }
     } catch (_) {
       return null;
     }
@@ -100,10 +103,16 @@ class ArtworkColors {
     var r = 0.0, g = 0.0, b = 0.0, total = 0.0;
     for (var i = 0; i + 3 < pixels.length; i += 4) {
       if (pixels[i + 3] < 128) continue;
-      final hsv = HSVColor.fromColor(
-        Color.fromARGB(255, pixels[i], pixels[i + 1], pixels[i + 2]),
-      );
-      final weight = hsv.saturation * hsv.value * hsv.saturation + 0.002;
+      final red = pixels[i], green = pixels[i + 1], blue = pixels[i + 2];
+      final high = red > green
+          ? (red > blue ? red : blue)
+          : (green > blue ? green : blue);
+      final low = red < green
+          ? (red < blue ? red : blue)
+          : (green < blue ? green : blue);
+      final delta = high - low;
+      // saturation² × value, without constructing an HSV object per pixel.
+      final weight = (high == 0 ? 0 : delta * delta / (high * 255)) + 0.002;
       r += pixels[i] * weight;
       g += pixels[i + 1] * weight;
       b += pixels[i + 2] * weight;

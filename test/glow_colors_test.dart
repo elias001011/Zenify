@@ -45,7 +45,7 @@ void main() {
 
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1300));
-    expect(colors.colorAt(1)!.a, 0);
+    expect(colors.colorAt(1), isNull);
     expect(colors.colorAt(0), red);
   });
 
@@ -86,4 +86,26 @@ void main() {
     expect(colors.colorAt(0), red);
     await tester.pump(const Duration(milliseconds: 1500));
   });
+
+  testWidgets(
+    'suspending stops active frames and can resume a partial reveal',
+    (tester) async {
+      final colors = GlowColors(const TestVSync())..update([null], red);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(colors.reveal, inExclusiveRange(0, 1));
+      colors.suspend();
+      await tester.pump();
+      expect(tester.binding.hasScheduledFrame, isFalse);
+      final reveal = colors.reveal;
+      await tester.pump(const Duration(seconds: 2));
+      expect(colors.reveal, reveal);
+      colors.update([null], red);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 2));
+      expect(colors.reveal, 1);
+      expect(colors.colorAt(0), red);
+      colors.dispose();
+    },
+  );
 }

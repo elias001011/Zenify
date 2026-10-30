@@ -369,6 +369,8 @@ class SettingsPage extends StatelessWidget {
           FluentIcons.broom_24_regular,
           borderRadius: commonCustomBarRadiusFirst,
           onTap: () async {
+            // Stop background readers before deleting their persistent cache.
+            await moodsService.clearCache();
             final cleared = await clearCache();
             showToast(
               context,
@@ -457,10 +459,14 @@ class SettingsPage extends StatelessWidget {
           FluentIcons.cloud_add_24_regular,
           onTap: () async {
             try {
+              // Readers must not access Hive while restore closes its boxes.
+              await moodsService.clearCache();
               await LocalSyncService.instance.pauseForStorageRestore();
               if (!context.mounted) return;
               final result = await restoreData(context);
               if (result.success) {
+                // Generated playlists belonged to the previous library.
+                await moodsService.clearCache();
                 reloadSettingsFromStorage();
                 reloadSongLibraryStateFromStorage();
                 reloadPlaylistLibraryStateFromStorage();

@@ -425,7 +425,7 @@
   "topArtists": "Top artists",
   "topSongs": "Top songs",
   "translate": "Translate",
-  "translateDescription": "Help translate Zenify into your language on Crowdin.",
+  "translateDescription": "Help translate Zenify by editing the translation files. Tap for files and contribution instructions.",
   "understand": "I understand",
   "undo": "Undo",
   "unpinFromLibrary": "Unpin from library",

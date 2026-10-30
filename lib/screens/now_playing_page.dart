@@ -352,6 +352,12 @@ class _UprightStageState extends State<_UprightStage>
     curve: const Interval(0.4, 1, curve: Curves.easeIn),
   );
 
+  late final _badgeFade = CurvedAnimation(
+    parent: _controller,
+    curve: const Interval(0, 0.5, curve: Curves.easeOut),
+  );
+  late final _badgeOpacity = ReverseAnimation(_badgeFade);
+
   /// Keep the closing panel built until it has faded out.
   late PlayerPanel? _builtPanel = widget.panel;
 
@@ -374,6 +380,7 @@ class _UprightStageState extends State<_UprightStage>
 
   @override
   void dispose() {
+    _badgeFade.dispose();
     _panelFade.dispose();
     _progress.dispose();
     _controller.dispose();
@@ -405,9 +412,8 @@ class _UprightStageState extends State<_UprightStage>
               final artwork = NowPlayingArtwork(
                 metadata: metadata,
                 size: artSize,
-                // Keep it hidden until the closing animation has restored
-                // the full-size artwork.
-                showQualityBadge: _builtPanel == null,
+                // Share the move: fully visible as soon as it finishes.
+                qualityBadgeOpacity: _badgeOpacity,
               );
               // Built once: the frames of the move only reposition and fade
               // them.
@@ -591,43 +597,48 @@ class _WideLayoutState extends State<_WideLayout> {
                     ).clamp(160.0, 560.0);
                     return Center(
                       child: SizedBox(
-                        width: size,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            NowPlayingArtwork(
-                              metadata: metadata,
-                              size: size,
-                              showQualityBadge: panel == null,
-                            ),
-                            Column(
-                              key: _belowKey,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                const SizedBox(height: 28),
-                                NowPlayingTitle(
+                        // A small artwork must not shrink the action targets.
+                        width: min(c.maxWidth - 32, max(size, 380)),
+                        child: SingleChildScrollView(
+                          primary: false,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Center(
+                                child: NowPlayingArtwork(
                                   metadata: metadata,
-                                  titleSize: 24,
-                                  artistSize: 16,
-                                  spacing: 4,
-                                  alignment: CrossAxisAlignment.start,
+                                  size: size,
                                 ),
-                                const SizedBox(height: 12),
-                                if (!isLive) ...[
-                                  const PositionSlider(flush: true),
-                                  PlayerControlButtons(
+                              ),
+                              Column(
+                                key: _belowKey,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  const SizedBox(height: 28),
+                                  NowPlayingTitle(
                                     metadata: metadata,
-                                    iconSize: 40,
-                                    miniIconSize: 20,
-                                    flush: true,
+                                    titleSize: 24,
+                                    artistSize: 16,
+                                    spacing: 4,
+                                    alignment: CrossAxisAlignment.start,
                                   ),
+                                  const SizedBox(height: 12),
+                                  if (!isLive) ...[
+                                    const PositionSlider(flush: true),
+                                    PlayerControlButtons(
+                                      metadata: metadata,
+                                      iconSize: 40,
+                                      miniIconSize: 20,
+                                      flush: true,
+                                    ),
+                                  ],
+                                  const SizedBox(height: 16),
+                                  PlayerActionBar(child: widget.actions),
                                 ],
-                                const SizedBox(height: 16),
-                                PlayerActionBar(child: widget.actions),
-                              ],
-                            ),
-                          ],
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     );

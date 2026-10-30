@@ -278,7 +278,7 @@
   "tools": "工具",
   "topSongs": "热门歌曲",
   "translate": "翻译",
-  "translateDescription": "帮助我们在 Crowdin 上将 Zenify 翻译成您的语言。",
+  "translateDescription": "编辑翻译文件，帮助翻译 Zenify。点击查看文件和贡献说明。",
   "understand": "我知道了",
   "undo": "撤销",
   "unpinFromLibrary": "从媒体库取消固定",

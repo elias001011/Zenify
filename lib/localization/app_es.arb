@@ -278,7 +278,7 @@
   "tools": "Herramientas",
   "topSongs": "Top de canciones",
   "translate": "Traducir",
-  "translateDescription": "Ayuda a traducir Zenify a tu idioma en Crowdin.",
+  "translateDescription": "Ayuda a traducir Zenify editando los archivos de traducción. Toca para ver los archivos y las instrucciones.",
   "understand": "Entiendo",
   "undo": "Deshacer",
   "unpinFromLibrary": "Desfijar de la librería",

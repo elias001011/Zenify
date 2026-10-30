@@ -20,8 +20,8 @@
  */
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
-import 'dart:isolate';
 import 'dart:math';
 
 import 'package:hive/hive.dart';
@@ -32,6 +32,7 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/moods/mix_engine.dart';
 import 'package:musify/services/moods/moods_preferences.dart';
+import 'package:musify/services/moods/moods_worker.dart';
 import 'package:musify/services/moods/taste.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -75,6 +76,45 @@ typedef DetectedGenre = ({
 /// leave out; the user's tuning and saved playlists live in the library (see
 /// `moods_preferences.dart`).
 class MoodsService {
+  MoodsService() {
+    offlineMode.addListener(_onAvailabilityChanged);
+    moodsEnabled.addListener(_onAvailabilityChanged);
+    moodsTuning.addListener(_cancelPending);
+  }
+
+  final _worker = MoodsWorker();
+  int _generation = 0;
+
+  bool get _online => !offlineMode.value;
+  bool get _enabled => _online && moodsEnabled.value;
+
+  void _onAvailabilityChanged() {
+    if (!_enabled) _cancelPending();
+  }
+
+  void _cancelPending() {
+    _generation++;
+    _worker.cancel();
+    _radios.clear();
+    _catalog = null;
+    _readingGenres = null;
+    _tasteMemo = null;
+  }
+
+  /// Releases listeners on a short-lived service (the app shares one).
+  void dispose() {
+    offlineMode.removeListener(_onAvailabilityChanged);
+    moodsEnabled.removeListener(_onAvailabilityChanged);
+    moodsTuning.removeListener(_cancelPending);
+    _cancelPending();
+  }
+
+  Future<T> _run<T>(_Task<T> task) {
+    if (!_online) return Future.error(const MoodsCancelled());
+    return _worker.run(_musicTask(task));
+  }
+
+  String get _tuningSignature => jsonEncode(moodsTuning.value.toStorage());
   Box get _cache => Hive.box('cache');
 
   /// The device's region, for regional moods, genres and charts.
@@ -98,6 +138,7 @@ class MoodsService {
     if (memo != null &&
         memo.withBlocked == withBlocked &&
         memo.tuning == moodsTuning.value &&
+        memo.library == _libraryIdentity &&
         now.difference(memo.at) < const Duration(seconds: 30)) {
       return memo.taste;
     }
@@ -107,16 +148,38 @@ class MoodsService {
       at: now,
       withBlocked: withBlocked,
       tuning: moodsTuning.value,
+      library: _libraryIdentity,
     );
     return taste;
   }
 
-  ({Taste taste, DateTime at, bool withBlocked, MoodsTuning tuning})?
+  ({
+    Taste taste,
+    DateTime at,
+    bool withBlocked,
+    MoodsTuning tuning,
+    Object library,
+  })?
   _tasteMemo;
+
+  // Notifier lists are replaced when the library is edited or restored.
+  // Comparing their identities keeps the memo cheap without delaying edits.
+  Object get _libraryIdentity => (
+    userCustomPlaylists.value,
+    userPlaylistFolders.value,
+    userOfflineSongs.value,
+    userRecentlyPlayed.value,
+    userLikedSongsList.value,
+    userLikedPlaylists.value,
+  );
 
   Taste _readTaste(bool withBlocked) {
     final kept = <Map>[
-      for (final playlist in userCustomPlaylists.value)
+      for (final playlist in [
+        ...userCustomPlaylists.value,
+        for (final folder in userPlaylistFolders.value)
+          ...(folder['playlists'] as List? ?? const []).whereType<Map>(),
+      ])
         ...(playlist['list'] as List? ?? const []).whereType<Map>(),
       ...userOfflineSongs.value.whereType<Map>(),
     ];
@@ -159,10 +222,13 @@ class MoodsService {
   /// What YouTube Music plays after [id], songs only. Nothing when YouTube
   /// Music says [id] itself is no song: its radio would be more of it.
   Future<List<Map>> radio(String id) {
+    if (!_online) return Future.value(const []);
+    final generation = _generation;
     if (_radios.length > 200) _radios.clear();
     final region = country;
-    return _radios[id] ??= _inIsolate(_radioTask(id, region))
+    return _radios[id] ??= _run(_radioTask(id, region))
         .then((radio) {
+          if (generation != _generation || !_online) return <Map>[];
           if (radio.seedIsSong) return radio.songs;
           if (_notSongs.add(id)) {
             unawaited(_cache.put(_notSongsKey, _notSongs.toList()));
@@ -170,6 +236,7 @@ class MoodsService {
           return <Map>[];
         })
         .catchError((Object error) {
+          if (error is MoodsCancelled) return <Map>[];
           _radios.remove(id);
           logger.log('Moods radio failed for $id', error: error);
           return <Map>[];
@@ -182,6 +249,8 @@ class MoodsService {
     int length = 40,
     Random? random,
   }) async {
+    if (!_enabled) return const [];
+    final generation = _generation;
     final shuffle = random ?? Random();
     final taste = this.taste();
     var seeds = _pickSeeds(taste, shuffle);
@@ -190,7 +259,9 @@ class MoodsService {
       final top = await _chartSongs();
       seeds = {for (final song in top.take(6)) song['ytid'].toString(): 0.5};
     }
+    if (generation != _generation || !_enabled) return const [];
     final radios = await _radiosOf(seeds.keys);
+    if (generation != _generation || !_enabled) return const [];
     final excluded = await _excludedArtists();
     return assembleQueue(
       taste: taste,
@@ -205,9 +276,11 @@ class MoodsService {
   /// A mood's queue: songs of YouTube Music's playlists for it, ordered by
   /// the user's taste (see [_fromPool]).
   Future<List<Map>> mood(Mood mood, {int length = 40, Random? random}) async {
+    if (!_enabled) return const [];
+    final generation = _generation;
     if (mood == Mood.mix) return mix(length: length, random: random);
     final pool = await _moodPool(mood);
-    if (pool.isEmpty) return const [];
+    if (pool.isEmpty || generation != _generation || !_enabled) return const [];
     return _fromPool(pool, length: length, random: random ?? Random());
   }
 
@@ -221,6 +294,8 @@ class MoodsService {
     required Random random,
     Discovery? discovery,
   }) async {
+    if (!_enabled) return const [];
+    final generation = _generation;
     final taste = this.taste();
     final ids = {for (final song in pool) song['ytid'].toString()};
     final artists = {for (final song in pool) artistKey(song['artist'])};
@@ -236,9 +311,11 @@ class MoodsService {
               .take(6))
         seed.song['ytid'].toString(): seed.weight,
     };
+    final radios = await _radiosOf(seeds.keys);
+    if (generation != _generation || !_enabled) return const [];
     final similar = scoreRadios(
       taste: taste,
-      radios: await _radiosOf(seeds.keys),
+      radios: radios,
       seedWeights: seeds,
       accept: (song) => ids.contains(song['ytid']?.toString()),
     );
@@ -266,7 +343,7 @@ class MoodsService {
   /// Starts [mood] playing. The queue keeps going on its own after it.
   Future<bool> play(Mood mood) async {
     final songs = await this.mood(mood);
-    if (songs.isEmpty) return false;
+    if (!_enabled || songs.isEmpty) return false;
     await audioHandler.playPlaylistSong(
       playlist: {'title': moodLabel(_l10n, mood), 'list': songs},
       songIndex: 0,
@@ -289,7 +366,8 @@ class MoodsService {
     required String title,
     int perArtist = 3,
   }) async {
-    if (seeds.isEmpty) return false;
+    if (!_online || seeds.isEmpty) return false;
+    final generation = _generation;
     final songs = seeds.where(_isSong).take(4).toList();
     final weights = {
       for (final (i, song) in songs.indexed)
@@ -297,19 +375,18 @@ class MoodsService {
     };
     final taste = this.taste();
     final seedArtists = {for (final song in songs) artistKey(song['artist'])};
+    final radios = await _radiosOf(weights.keys);
+    if (!_online || generation != _generation) return false;
     final queue = assembleQueue(
       taste: taste,
-      scored: scoreRadios(
-        taste: taste,
-        radios: await _radiosOf(weights.keys),
-        seedWeights: weights,
-      ),
+      scored: scoreRadios(taste: taste, radios: radios, seedWeights: weights),
       discovery: moodsTuning.value.discovery,
       length: 50,
       perArtist: perArtist,
       // Asking for an artist's radio overrides leaving its genre out.
       excludedArtists: (await _excludedArtists()).difference(seedArtists),
     );
+    if (!_online || generation != _generation) return false;
     await audioHandler.playPlaylistSong(
       playlist: {
         'title': title,
@@ -346,7 +423,13 @@ class MoodsService {
 
   Future<Map<String, List<Map>>> _radiosOf(Iterable<String> ids) async {
     final list = ids.toList();
-    final radios = await _inBatches(list, radio);
+    final generation = _generation;
+    final radios = await _inBatches(
+      list,
+      (id) => generation == _generation && _online
+          ? radio(id)
+          : Future.value(<Map>[]),
+    );
     return {
       for (var i = 0; i < list.length; i++)
         if (radios[i].isNotEmpty) list[i]: radios[i],
@@ -360,12 +443,12 @@ class MoodsService {
   /// again at most once a session.
   Future<List<MusicMood>>? _catalog;
   Future<List<MusicMood>> _moods() {
+    final generation = _generation;
     final region = country;
-    return _catalog ??= _inIsolate(_moodsTask(region))
-        .catchError((Object error) {
-          _catalog = null;
-          throw error;
-        });
+    return _catalog ??= _run(_moodsTask(region)).catchError((Object error) {
+      if (generation == _generation) _catalog = null;
+      throw error;
+    });
   }
 
   static const _poolDays = 3;
@@ -381,6 +464,7 @@ class MoodsService {
     required bool genre,
     int playlists = 10,
   }) async {
+    final generation = _generation;
     final cached = _cache.get(key);
     if (cached is Map && _fresh(cached, const Duration(days: _poolDays))) {
       return _maps(cached['songs']);
@@ -392,7 +476,9 @@ class MoodsService {
       );
       final params = entry.params;
       final region = country;
-      final pool = await _inIsolate(_poolTask(params, region, playlists));
+      if (generation != _generation || !_enabled) return const [];
+      final pool = await _run(_poolTask(params, region, playlists));
+      if (generation != _generation || !_enabled) return const [];
       if (pool.isNotEmpty) {
         await _cache.put(key, {
           'at': DateTime.now().toIso8601String(),
@@ -401,6 +487,7 @@ class MoodsService {
       }
       return pool;
     } catch (e, stackTrace) {
+      if (e is MoodsCancelled || generation != _generation) return const [];
       logger.log('Moods pool failed: $title', error: e, stackTrace: stackTrace);
       return cached is Map ? _maps(cached['songs']) : const [];
     }
@@ -409,6 +496,7 @@ class MoodsService {
   /// The genres the user listens to, strongest first. Each genre's artists
   /// come from three of its YouTube Music playlists, read once a week.
   Future<List<DetectedGenre>> detectedGenres() async {
+    if (!_enabled) return const [];
     final genres = await _genreArtists();
     final taste = this.taste();
     final detected = <DetectedGenre>[];
@@ -451,20 +539,26 @@ class MoodsService {
 
   Future<List<Map>> _genreArtists() {
     final cached = _cache.get(_genresKey);
+    if (!_enabled)
+      return Future.value(cached is Map ? _maps(cached['genres']) : const []);
+    final generation = _generation;
     if (cached is Map &&
         cached['language'] == languageSetting.languageCode &&
         _fresh(cached, const Duration(days: 7))) {
       return Future.value(_maps(cached['genres']));
     }
-    return _readingGenres ??= _readGenres(cached)
-        .whenComplete(() => _readingGenres = null);
+    return _readingGenres ??= _readGenres(cached).whenComplete(() {
+      if (generation == _generation) _readingGenres = null;
+    });
   }
 
   Future<List<Map>> _readGenres(Object? cached) async {
+    final generation = _generation;
     try {
       final region = country;
       final language = languageSetting.languageCode;
-      final result = await _inIsolate(_genresTask(region, language));
+      final result = await _run(_genresTask(region, language));
+      if (generation != _generation || !_enabled) return const [];
       if (result.isNotEmpty) {
         await _cache.put(_genresKey, {
           'at': DateTime.now().toIso8601String(),
@@ -474,6 +568,7 @@ class MoodsService {
       }
       return result;
     } catch (e, stackTrace) {
+      if (e is MoodsCancelled || generation != _generation) return const [];
       logger.log('Moods genres failed', error: e, stackTrace: stackTrace);
       return cached is Map ? _maps(cached['genres']) : const [];
     }
@@ -489,6 +584,12 @@ class MoodsService {
     if (cached is! Map || !_fresh(cached, const Duration(days: 7))) {
       unawaited(_genreArtists());
     }
+    return _cachedExcludedArtists();
+  }
+
+  Set<String> _cachedExcludedArtists() {
+    final tuning = moodsTuning.value;
+    final cached = _cache.get(_genresKey);
     final genres = cached is Map ? _maps(cached['genres']) : const <Map>[];
     final out = <String>{};
     final kept = <String>{};
@@ -503,12 +604,15 @@ class MoodsService {
 
   Future<List<Map>> _chartSongs([String chart = 'ZZ']) async {
     final key = 'moods:chart:$chart';
+    final generation = _generation;
     final cached = _cache.get(key);
     if (cached is Map && _fresh(cached, const Duration(hours: 12))) {
       return _maps(cached['songs']);
     }
     try {
-      final songs = await _inIsolate(_chartTask(chart));
+      if (!_enabled) return cached is Map ? _maps(cached['songs']) : const [];
+      final songs = await _run(_chartTask(chart));
+      if (generation != _generation || !_enabled) return const [];
       if (songs.isNotEmpty) {
         await _cache.put(key, {
           'at': DateTime.now().toIso8601String(),
@@ -517,6 +621,7 @@ class MoodsService {
       }
       return songs;
     } catch (e, stackTrace) {
+      if (e is MoodsCancelled || generation != _generation) return const [];
       logger.log('Moods chart failed', error: e, stackTrace: stackTrace);
       return cached is Map ? _maps(cached['songs']) : const [];
     }
@@ -535,6 +640,11 @@ class MoodsService {
   /// that was never made is left out. Each one comes as soon as it is
   /// ready: the first ones of a day take a few seconds each.
   Stream<List<Map>> playlists() async* {
+    if (!_enabled) return;
+    final generation = _generation;
+    final tuning = _tuningSignature;
+    bool active() =>
+        _enabled && generation == _generation && tuning == _tuningSignature;
     final ids = [
       '${_playlistPrefix}daily',
       '${_playlistPrefix}moment',
@@ -551,6 +661,7 @@ class MoodsService {
       '${_playlistPrefix}top:ZZ',
       if (country case final c? when c != 'ZZ') '${_playlistPrefix}top:$c',
     ];
+    if (!active()) return;
     // What is current shows at once; the rest is made once the app has
     // opened, so the first playlists of a day don't compete with it.
     final made = <String, Map>{};
@@ -564,14 +675,16 @@ class MoodsService {
     if (stale.isNotEmpty) {
       await Future<void>.delayed(const Duration(seconds: 4));
       for (final id in stale) {
+        if (!active()) return;
         final playlist = await this.playlist(id);
+        if (!active()) return;
         if (playlist == null) continue;
         made[id] = playlist;
         yield inOrder();
       }
     }
     // Last, and in the background: genres are read again once a week.
-    if (!_genresFresh) {
+    if (active() && !_genresFresh) {
       unawaited(detectedGenres().catchError((Object _) => <DetectedGenre>[]));
     }
   }
@@ -623,7 +736,9 @@ class MoodsService {
     final cached = _cache.get('moods:playlist:$id');
     if (cached is Map &&
         cached['language'] == languageSetting.languageCode &&
-        DateTime.now().isBefore(DateTime.parse(cached['until'].toString()))) {
+        cached['tuning'] == _tuningSignature &&
+        (DateTime.tryParse('${cached['until']}')?.isAfter(DateTime.now()) ??
+            false)) {
       return _playlistMap(cached);
     }
     return null;
@@ -631,12 +746,18 @@ class MoodsService {
 
   /// One Zenify playlist by id, from its cache while it is current.
   Future<Map?> playlist(String id) async {
+    if (!isZenifyPlaylist(id)) return null;
+    final generation = _generation;
+    final tuning = _tuningSignature;
     if (_currentPlaylist(id) case final current?) return current;
     final cacheKey = 'moods:playlist:$id';
     final cached = _cache.get(cacheKey);
+    if (!_enabled) return cached is Map ? _playlistMap(cached) : null;
     final now = DateTime.now();
     try {
       final made = await _make(id.substring(_playlistPrefix.length), now);
+      if (!_enabled || generation != _generation) return null;
+      if (tuning != _tuningSignature) return await playlist(id);
       if (made == null || (made['list'] as List).length < 8) {
         return cached is Map ? _playlistMap(cached) : null;
       }
@@ -644,10 +765,12 @@ class MoodsService {
         ...made,
         'ytid': id,
         'language': languageSetting.languageCode,
+        'tuning': tuning,
       };
       await _cache.put(cacheKey, stored);
       return _playlistMap(stored);
     } catch (e, stackTrace) {
+      if (e is MoodsCancelled || generation != _generation) return null;
       logger.log(
         'Zenify playlist $id failed',
         error: e,
@@ -658,7 +781,10 @@ class MoodsService {
   }
 
   Map _playlistMap(Map stored) {
-    final songs = _maps(stored['list']);
+    final blocked = _cachedExcludedArtists();
+    final songs = _maps(stored['list'])
+        .where((song) => !blocked.contains(artistKey(song['artist'])))
+        .toList();
     // Recap songs may carry an empty artwork.
     final covers = {
       for (final song in songs.take(12))
@@ -858,8 +984,8 @@ class MoodsService {
   /// Drops what the Moods would play from the cache, e.g. when they are
   /// turned off.
   Future<void> clearCache() async {
-    _radios.clear();
-    _catalog = null;
+    _cancelPending();
+    _notSongs.clear();
     final keys = _cache.keys.where((k) => k.toString().startsWith('moods:'));
     await _cache.deleteAll(keys.toList());
   }
@@ -890,18 +1016,15 @@ class MoodsService {
 
 typedef _Task<T> = Future<T> Function(MusicClient music);
 
-/// Runs [task] against YouTube Music in its own isolate. Its answers are
-/// megabytes of JSON to decode and walk, which would stall the interface;
-/// only the songs come back. Tasks are made by the top-level `_…Task`
-/// functions below, so they carry plain values and never the service.
-Future<T> _inIsolate<T>(_Task<T> task) => Isolate.run(() async {
+/// A top-level factory keeps the worker closure free of service state.
+Future<T> Function() _musicTask<T>(_Task<T> task) => () async {
   final http = YoutubeHttpClient();
   try {
     return await task(MusicClient(http));
   } finally {
     http.close();
   }
-});
+};
 
 /// A track's radio, and whether YouTube Music lists the track itself as
 /// music: when it doesn't, its radio would be more of it.

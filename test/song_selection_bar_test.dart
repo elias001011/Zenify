@@ -30,6 +30,9 @@ void main() {
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    tester.view.physicalSize = const Size(1200, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     offlineMode.value = false;
     final selection = SongSelectionController()..start({'ytid': 'one'});
     addTearDown(selection.dispose);
@@ -95,4 +98,58 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     debugDefaultTargetPlatformOverride = null;
   });
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.linux]) {
+    testWidgets(
+      'compact selection scrolls by drag without arrows ($platform)',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        offlineMode.value = false;
+        final selection = SongSelectionController()..start({'ytid': 'one'});
+        await tester.pumpWidget(
+          MaterialApp(
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              ...GlobalMaterialLocalizations.delegates,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: Align(
+                alignment: Alignment.bottomCenter,
+                child: SongSelectionBar(
+                  controller: selection,
+                  visibleSongs: () => [
+                    {'ytid': 'one'},
+                  ],
+                  onRemoveSelected: (_) async {},
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byIcon(FluentIcons.chevron_left_24_regular), findsNothing);
+        expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsNothing);
+        await tester.drag(
+          find.byType(SingleChildScrollView),
+          const Offset(-1200, 0),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find
+              .widgetWithIcon(TextButton, FluentIcons.delete_24_regular)
+              .hitTestable(),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        selection.dispose();
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
+  }
 }

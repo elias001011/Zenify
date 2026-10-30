@@ -278,7 +278,7 @@
   "tools": "ツール",
   "topSongs": "Top songs",
   "translate": "翻訳",
-  "translateDescription": "CrowdinでZenifyの翻訳に協力してください。",
+  "translateDescription": "翻訳ファイルを編集してZenifyの翻訳にご協力ください。タップするとファイルと手順を確認できます。",
   "understand": "理解しました",
   "undo": "元に戻す",
   "unpinFromLibrary": "ライブラリから固定を解除",
