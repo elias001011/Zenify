@@ -1,0 +1,309 @@
+{
+ "playlist": {
+  "contents": [
+   {
+    "playlistPanelVideoRenderer": {
+     "title": {
+      "runs": [
+       {
+        "text": "Billie Jean"
+       }
+      ]
+     },
+     "longBylineText": {
+      "runs": [
+       {
+        "text": "Michael Jackson",
+        "navigationEndpoint": {
+         "browseEndpoint": {
+          "browseId": "UCoIOOL7QKuBhQHVKL8y7BEQ",
+          "browseEndpointContextSupportedConfigs": {
+           "browseEndpointContextMusicConfig": {
+            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+           }
+          }
+         }
+        }
+       },
+       {
+        "text": " \u2022 "
+       },
+       {
+        "text": "2.3B views"
+       },
+       {
+        "text": " \u2022 "
+       },
+       {
+        "text": "15M likes"
+       }
+      ]
+     },
+     "thumbnail": {
+      "thumbnails": [
+       {
+        "url": "https://i.ytimg.com/vi/Zi_XLOBDo_Y/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3nl9_1lu27GfLzUUl32kqN7tX4uog",
+        "width": 400,
+        "height": 225
+       },
+       {
+        "url": "https://i.ytimg.com/vi/Zi_XLOBDo_Y/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3ldoSMi1dIkpHvM-5pQ6Ta4v5xzHg",
+        "width": 800,
+        "height": 450
+       },
+       {
+        "url": "https://i.ytimg.com/vi/Zi_XLOBDo_Y/hq720.jpg?sqp=-oaymwEKCNUGEN8DIABIWg&rs=AMzJL3losc7BEx-ddp9VLhwicYLuQhrGog",
+        "width": 853,
+        "height": 479
+       }
+      ]
+     },
+     "lengthText": {
+      "runs": [
+       {
+        "text": "4:56"
+       }
+      ]
+     },
+     "selected": true,
+     "navigationEndpoint": {
+      "watchEndpoint": {
+       "videoId": "Zi_XLOBDo_Y",
+       "playlistId": "RDAMVMZi_XLOBDo_Y",
+       "index": 0,
+       "params": "OAHyAQIIAQ%3D%3D",
+       "playlistSetVideoId": "56B44F6D10557CC6",
+       "watchEndpointMusicSupportedConfigs": {
+        "watchEndpointMusicConfig": {
+         "hasPersistentPlaylistPanel": true,
+         "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+        }
+       }
+      }
+     },
+     "videoId": "Zi_XLOBDo_Y",
+     "shortBylineText": {
+      "runs": [
+       {
+        "text": "Michael Jackson"
+       }
+      ]
+     },
+     "playlistSetVideoId": "56B44F6D10557CC6",
+     "canReorder": true,
+     "queueNavigationEndpoint": {
+      "queueAddEndpoint": {
+       "queueTarget": {
+        "videoId": "Zi_XLOBDo_Y"
+       },
+       "queueInsertPosition": "INSERT_AT_END",
+       "params": "Q0FJJTNE"
+      }
+     }
+    }
+   },
+   {
+    "playlistPanelVideoRenderer": {
+     "title": {
+      "runs": [
+       {
+        "text": "Beat It"
+       }
+      ]
+     },
+     "longBylineText": {
+      "runs": [
+       {
+        "text": "Michael Jackson",
+        "navigationEndpoint": {
+         "browseEndpoint": {
+          "browseId": "UCoIOOL7QKuBhQHVKL8y7BEQ",
+          "browseEndpointContextSupportedConfigs": {
+           "browseEndpointContextMusicConfig": {
+            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+           }
+          }
+         }
+        }
+       },
+       {
+        "text": " \u2022 "
+       },
+       {
+        "text": "1.5B views"
+       },
+       {
+        "text": " \u2022 "
+       },
+       {
+        "text": "10M likes"
+       }
+      ]
+     },
+     "thumbnail": {
+      "thumbnails": [
+       {
+        "url": "https://i.ytimg.com/vi/oRdxUFDoQe0/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3k_Jtt549iWUHWKpIoXYtSrUW-XYg",
+        "width": 400,
+        "height": 225
+       },
+       {
+        "url": "https://i.ytimg.com/vi/oRdxUFDoQe0/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3lLwmOvL9R02oU41cdwYCfZP3fa_A",
+        "width": 800,
+        "height": 450
+       },
+       {
+        "url": "https://i.ytimg.com/vi/oRdxUFDoQe0/hq720.jpg?sqp=-oaymwEKCNUGEN8DIABIWg&rs=AMzJL3lS-S-liMYSB0qgzcHxm_yIBplo3w",
+        "width": 853,
+        "height": 479
+       }
+      ]
+     },
+     "lengthText": {
+      "runs": [
+       {
+        "text": "4:59"
+       }
+      ]
+     },
+     "selected": false,
+     "navigationEndpoint": {
+      "watchEndpoint": {
+       "videoId": "oRdxUFDoQe0",
+       "playlistId": "RDAMVMZi_XLOBDo_Y",
+       "index": 1,
+       "params": "OAHyAQIIAQ%3D%3D",
+       "playlistSetVideoId": "289F4A46DF0A30D2",
+       "watchEndpointMusicSupportedConfigs": {
+        "watchEndpointMusicConfig": {
+         "hasPersistentPlaylistPanel": true,
+         "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+        }
+       }
+      }
+     },
+     "videoId": "oRdxUFDoQe0",
+     "shortBylineText": {
+      "runs": [
+       {
+        "text": "Michael Jackson"
+       }
+      ]
+     },
+     "playlistSetVideoId": "289F4A46DF0A30D2",
+     "canReorder": true,
+     "queueNavigationEndpoint": {
+      "queueAddEndpoint": {
+       "queueTarget": {
+        "videoId": "oRdxUFDoQe0"
+       },
+       "queueInsertPosition": "INSERT_AT_END",
+       "params": "Q0FJJTNE"
+      }
+     }
+    }
+   },
+   {
+    "playlistPanelVideoRenderer": {
+     "title": {
+      "runs": [
+       {
+        "text": "Stayin' Alive (From \"Saturday Night Fever\" Soundtrack)"
+       }
+      ]
+     },
+     "longBylineText": {
+      "runs": [
+       {
+        "text": "Bee Gees",
+        "navigationEndpoint": {
+         "browseEndpoint": {
+          "browseId": "UC4GVf3NpBzQiuNVf5EYsI5A",
+          "browseEndpointContextSupportedConfigs": {
+           "browseEndpointContextMusicConfig": {
+            "pageType": "MUSIC_PAGE_TYPE_ARTIST"
+           }
+          }
+         }
+        }
+       },
+       {
+        "text": " \u2022 "
+       },
+       {
+        "text": "948M views"
+       },
+       {
+        "text": " \u2022 "
+       },
+       {
+        "text": "5.3M likes"
+       }
+      ]
+     },
+     "thumbnail": {
+      "thumbnails": [
+       {
+        "url": "https://i.ytimg.com/vi/I_izvAbhExY/hqdefault.jpg?sqp=-oaymwEWCJADEOEBIAQqCggAEOADGC0guwJIWg&rs=AMzJL3kCpVWDLVUVScZHtDh7s94dvo92kQ",
+        "width": 400,
+        "height": 225
+       },
+       {
+        "url": "https://i.ytimg.com/vi/I_izvAbhExY/hq720.jpg?sqp=-oaymwEKCKAGEMIDIABIWg&rs=AMzJL3llHaML5hvW6LaMJXaMzPXFYQ9Xvg",
+        "width": 800,
+        "height": 450
+       },
+       {
+        "url": "https://i.ytimg.com/vi/I_izvAbhExY/hq720.jpg?sqp=-oaymwEKCNUGEN8DIABIWg&rs=AMzJL3kMq5y5OISTOM-5FdcEn4EMY7yhSg",
+        "width": 853,
+        "height": 479
+       }
+      ]
+     },
+     "lengthText": {
+      "runs": [
+       {
+        "text": "4:10"
+       }
+      ]
+     },
+     "selected": false,
+     "navigationEndpoint": {
+      "watchEndpoint": {
+       "videoId": "I_izvAbhExY",
+       "playlistId": "RDAMVMZi_XLOBDo_Y",
+       "index": 2,
+       "params": "OAHyAQIIAQ%3D%3D",
+       "playlistSetVideoId": "017208FAA85233F9",
+       "watchEndpointMusicSupportedConfigs": {
+        "watchEndpointMusicConfig": {
+         "hasPersistentPlaylistPanel": true,
+         "musicVideoType": "MUSIC_VIDEO_TYPE_OMV"
+        }
+       }
+      }
+     },
+     "videoId": "I_izvAbhExY",
+     "shortBylineText": {
+      "runs": [
+       {
+        "text": "Bee Gees"
+       }
+      ]
+     },
+     "playlistSetVideoId": "017208FAA85233F9",
+     "canReorder": true,
+     "queueNavigationEndpoint": {
+      "queueAddEndpoint": {
+       "queueTarget": {
+        "videoId": "I_izvAbhExY"
+       },
+       "queueInsertPosition": "INSERT_AT_END",
+       "params": "Q0FJJTNE"
+      }
+     }
+    }
+   }
+  ]
+ }
+}

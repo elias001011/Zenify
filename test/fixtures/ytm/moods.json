@@ -1,0 +1,118 @@
+{
+ "sections": [
+  {
+   "gridRenderer": {
+    "header": {
+     "gridHeaderRenderer": {
+      "title": {
+       "runs": [
+        {
+         "text": "Moods & moments"
+        }
+       ]
+      }
+     }
+    },
+    "items": [
+     {
+      "musicNavigationButtonRenderer": {
+       "buttonText": {
+        "runs": [
+         {
+          "text": "Chill"
+         }
+        ]
+       },
+       "solid": {
+        "leftStripeColor": 4288988671
+       },
+       "clickCommand": {
+        "browseEndpoint": {
+         "browseId": "FEmusic_moods_and_genres_category",
+         "params": "ggMPOg1uX1JOQWZFeDByc2Jm"
+        }
+       }
+      }
+     },
+     {
+      "musicNavigationButtonRenderer": {
+       "buttonText": {
+        "runs": [
+         {
+          "text": "Commute"
+         }
+        ]
+       },
+       "solid": {
+        "leftStripeColor": 4294951424
+       },
+       "clickCommand": {
+        "browseEndpoint": {
+         "browseId": "FEmusic_moods_and_genres_category",
+         "params": "ggMPOg1uX044Z2o5WERLckpU"
+        }
+       }
+      }
+     }
+    ]
+   }
+  },
+  {
+   "gridRenderer": {
+    "header": {
+     "gridHeaderRenderer": {
+      "title": {
+       "runs": [
+        {
+         "text": "Genres"
+        }
+       ]
+      }
+     }
+    },
+    "items": [
+     {
+      "musicNavigationButtonRenderer": {
+       "buttonText": {
+        "runs": [
+         {
+          "text": "African"
+         }
+        ]
+       },
+       "solid": {
+        "leftStripeColor": 4278232339
+       },
+       "clickCommand": {
+        "browseEndpoint": {
+         "browseId": "FEmusic_moods_and_genres_category",
+         "params": "ggMPOg1uX0UzWGxlRE5jMDVk"
+        }
+       }
+      }
+     },
+     {
+      "musicNavigationButtonRenderer": {
+       "buttonText": {
+        "runs": [
+         {
+          "text": "Arabic"
+         }
+        ]
+       },
+       "solid": {
+        "leftStripeColor": 4293020416
+       },
+       "clickCommand": {
+        "browseEndpoint": {
+         "browseId": "FEmusic_moods_and_genres_category",
+         "params": "ggMPOg1uX3VOQWxsblVZTFNE"
+        }
+       }
+      }
+     }
+    ]
+   }
+  }
+ ]
+}
