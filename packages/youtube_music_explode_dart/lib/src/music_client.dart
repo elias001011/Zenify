@@ -526,11 +526,17 @@ class MusicClient {
   /// The radio YouTube Music plays after [videoId]: about 50 tracks like it,
   /// starting with the track itself. A song seeds a radio of songs, an
   /// official video one of official videos. [country] (ISO 3166-1 alpha-2)
-  /// biases the picks towards a region.
-  Future<List<MusicTrack>> getRadio(String videoId, {String? country}) async {
+  /// biases the picks towards a region; [language] (e.g. `pt`) sets the
+  /// language of the answer, English by default. The other calls take both
+  /// too.
+  Future<List<MusicTrack>> getRadio(
+    String videoId, {
+    String? country,
+    String? language,
+  }) async {
     final id = VideoId(videoId).value;
     final root = await _httpClient.sendPost('next', {
-      'context': _contextFor(country),
+      'context': _contextFor(country, language),
       'videoId': id,
       'playlistId': 'RDAMVM$id',
       'isAudioOnly': true,
@@ -581,10 +587,11 @@ class MusicClient {
   Future<List<MusicTrack>> getPlaylistTracks(
     String playlistId, {
     String? country,
+    String? language,
   }) async {
     final browseId = playlistId.startsWith('VL') ? playlistId : 'VL$playlistId';
     final root = await _httpClient.sendPost('browse', {
-      'context': _contextFor(country),
+      'context': _contextFor(country, language),
       'browseId': browseId,
     });
 
@@ -624,9 +631,12 @@ class MusicClient {
   /// The chart playlists of YouTube Music's Charts page for [country]
   /// (ISO 3166-1 alpha-2, `ZZ` for global), e.g. `Top 100 Music Videos
   /// Global`. Without signing in YouTube Music lists video charts only.
-  Future<List<MusicPlaylistSummary>> getCharts({String country = 'ZZ'}) async {
+  Future<List<MusicPlaylistSummary>> getCharts({
+    String country = 'ZZ',
+    String? language,
+  }) async {
     final root = await _httpClient.sendPost('browse', {
-      'context': _remixContext,
+      'context': _contextFor(null, language),
       'browseId': 'FEmusic_charts',
       'formData': {
         'selectedValues': [country],
@@ -638,9 +648,9 @@ class MusicClient {
   /// YouTube Music's moods and moments (`Chill`, `Feel good`, `Workout`…)
   /// and genres, in its own order. [country] decides the regional genres
   /// listed.
-  Future<List<MusicMood>> getMoods({String? country}) async {
+  Future<List<MusicMood>> getMoods({String? country, String? language}) async {
     final root = await _httpClient.sendPost('browse', {
-      'context': _contextFor(country),
+      'context': _contextFor(country, language),
       'browseId': 'FEmusic_moods_and_genres',
     });
 
@@ -671,21 +681,26 @@ class MusicClient {
   Future<List<MusicPlaylistSummary>> getMoodPlaylists(
     String params, {
     String? country,
+    String? language,
   }) async {
     final root = await _httpClient.sendPost('browse', {
-      'context': _contextFor(country),
+      'context': _contextFor(country, language),
       'browseId': 'FEmusic_moods_and_genres_category',
       'params': params,
     });
     return _collectPlaylists(root);
   }
 
-  Map<String, dynamic> _contextFor(String? country) => country == null
+  /// The client context for a region ([country], ISO 3166-1 alpha-2) and a
+  /// display [language] (e.g. `pt`), when given; English otherwise.
+  Map<String, dynamic> _contextFor(String? country, [String? language]) =>
+      country == null && language == null
       ? _remixContext
       : {
           'client': {
             ...(_remixContext['client']! as Map<String, dynamic>),
-            'gl': country,
+            if (country != null) 'gl': country,
+            if (language != null) 'hl': language,
           },
         };
 
