@@ -538,7 +538,7 @@ class _LibraryPageState extends State<LibraryPage> {
           children: [
             SectionHeader(
               title: context.l10n!.fromZenify,
-              icon: FluentIcons.sparkle_24_filled,
+              icon: FluentIcons.bookmark_multiple_24_filled,
             ),
             CustomBar(
               context.l10n!.moodsTuning,

@@ -84,7 +84,7 @@ class _MoodsRowState extends State<MoodsRow> {
       children: [
         SectionHeader(
           title: context.l10n!.moods,
-          icon: FluentIcons.sparkle_24_filled,
+          icon: FluentIcons.emoji_sparkle_24_filled,
         ),
         SizedBox(
           height: 104,

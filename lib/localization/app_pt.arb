@@ -536,5 +536,8 @@
   "discoveryAdventurous": "Mais novidades",
   "reset": "Redefinir",
   "syncMoods": "Ajuste dos moods e playlists do Zenify",
-  "moodsTuningReading": "Lendo seus gêneros. Da primeira vez leva cerca de um minuto."
+  "moodsTuningReading": "Lendo seus gêneros. Da primeira vez leva cerca de um minuto.",
+  "startRadio": "Iniciar rádio",
+  "radioOf": "Rádio de {name}",
+  "radioUnavailable": "Não deu para começar o rádio. Tente de novo daqui a pouco."
 }

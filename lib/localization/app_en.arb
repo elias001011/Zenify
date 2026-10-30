@@ -549,5 +549,9 @@
   "discoveryAdventurous": "More new songs",
   "reset": "Reset",
   "syncMoods": "Moods tuning and Zenify playlists",
-  "moodsTuningReading": "Reading your genres. The first time takes about a minute."
+  "moodsTuningReading": "Reading your genres. The first time takes about a minute.",
+  "startRadio": "Start radio",
+  "radioOf": "{name} radio",
+  "@radioOf": {"placeholders": {"name": {"type": "String"}}},
+  "radioUnavailable": "Couldn't start the radio. Try again in a moment."
 }

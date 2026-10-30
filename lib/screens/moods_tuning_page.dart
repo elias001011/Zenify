@@ -46,7 +46,7 @@ class MoodsTuningPage extends StatefulWidget {
 }
 
 class _MoodsTuningPageState extends State<MoodsTuningPage> {
-  late final Taste _taste = moodsService.taste();
+  late final Taste _taste = moodsService.taste(withBlocked: true);
   late final Future<List<DetectedGenre>> _genres = moodsService
       .detectedGenres();
 

@@ -320,7 +320,7 @@ class SettingsPage extends StatelessWidget {
           builder: (_, value, __) {
             return CustomBar(
               context.l10n!.moodsSetting,
-              FluentIcons.sparkle_24_regular,
+              FluentIcons.wand_24_regular,
               description: context.l10n!.moodsSettingDescription,
               trailing: Switch(
                 value: value,

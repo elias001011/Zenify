@@ -52,6 +52,7 @@ import 'package:musify/widgets/playlist_page/like_button.dart';
 import 'package:musify/widgets/playlist_page/playlist_action_buttons.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
+import 'package:musify/widgets/playlist_page/radio_button.dart';
 import 'package:musify/widgets/playlist_page/sync_button.dart';
 import 'package:musify/widgets/recommended_songs_section.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -412,18 +413,8 @@ class _PlaylistPageState extends State<PlaylistPage> {
           isAlbum: _playlist['isAlbum'] == true,
           isArtist: widget.isArtist,
           showTitle: false,
+          description: isZenify ? _playlist['description']?.toString() : null,
         ),
-        if (isZenify && _playlist['description'] != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-            child: Text(
-              _playlist['description'].toString(),
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
         if (songsLength > 0)
           PlaylistActionButtons(
             onPlay: () => audioHandler.playPlaylistSong(
@@ -464,6 +455,14 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   SyncButton(onSync: _handleSyncPlaylist),
               ],
               if (songsLength > 0 && !isZenify) _buildDownloadButton(),
+              // A Zenify playlist is already a mix of this kind.
+              if (songsLength > 0 && !isZenify && !offlineMode.value)
+                StartRadioButton(
+                  seeds: () => (List<Map>.from(
+                    (_playlist['list'] as List).whereType<Map>(),
+                  )..shuffle()),
+                  name: _playlistTitle,
+                ),
               if (isUserCreated) ...[
                 _buildShareButton(),
                 _buildEditButton(),

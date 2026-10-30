@@ -46,6 +46,7 @@ import 'package:musify/widgets/playlist_page/like_button.dart';
 import 'package:musify/widgets/playlist_page/playlist_action_buttons.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
+import 'package:musify/widgets/playlist_page/radio_button.dart';
 import 'package:musify/widgets/playlist_page/sync_button.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -343,6 +344,12 @@ class _ArtistPageState extends State<ArtistPage> {
               requireSnapshotMatch: true,
             ),
             SyncButton(onSync: _refresh),
+            if (_topSongs.isNotEmpty)
+              StartRadioButton(
+                seeds: () => _topSongs,
+                name: _artistTitle,
+                perArtist: 5,
+              ),
           ],
         ),
       ],

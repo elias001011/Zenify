@@ -59,7 +59,7 @@ const _categoryIcons = <SyncCategory, IconData>{
   SyncCategory.recap: FluentIcons.data_bar_vertical_24_regular,
   SyncCategory.searches: FluentIcons.search_24_regular,
   SyncCategory.radio: FluentIcons.live_24_regular,
-  SyncCategory.moods: FluentIcons.sparkle_24_regular,
+  SyncCategory.moods: FluentIcons.wand_24_regular,
 };
 
 IconData _deviceIcon(String name) => name.toLowerCase().contains('android')
