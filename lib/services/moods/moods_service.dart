@@ -79,7 +79,6 @@ class MoodsService {
   MoodsService() {
     offlineMode.addListener(_onAvailabilityChanged);
     moodsEnabled.addListener(_onAvailabilityChanged);
-    moodsTuning.addListener(_cancelPending);
   }
 
   final _worker = MoodsWorker();
@@ -105,7 +104,6 @@ class MoodsService {
   void dispose() {
     offlineMode.removeListener(_onAvailabilityChanged);
     moodsEnabled.removeListener(_onAvailabilityChanged);
-    moodsTuning.removeListener(_cancelPending);
     _cancelPending();
   }
 

@@ -19,8 +19,8 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
-import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/moods/mix_engine.dart';
 
 /// What the user told the Moods in their tuning: genres left out, artists
@@ -75,6 +75,22 @@ class MoodsTuning {
     discovery: discovery ?? this.discovery,
   );
 
+  // Equal tunings don't notify, so a Local Sync that changed nothing in them
+  // leaves the Moods alone.
+  @override
+  bool operator ==(Object other) =>
+      other is MoodsTuning &&
+      other.discovery == discovery &&
+      setEquals(other.excludedGenres, excludedGenres) &&
+      setEquals(other.blockedArtists, blockedArtists);
+
+  @override
+  int get hashCode => Object.hash(
+    discovery,
+    Object.hashAllUnordered(excludedGenres),
+    Object.hashAllUnordered(blockedArtists),
+  );
+
   Map<String, dynamic> toStorage() => {
     'excludedGenres': excludedGenres.toList()..sort(),
     'blockedArtists': blockedArtists.toList()..sort(),
@@ -121,5 +137,8 @@ void reloadMoodsFromStorage() {
   moodsTuning.value = MoodsTuning.fromStorage(
     Hive.box('user').get(MoodsTuning.storageKey),
   );
-  savedZenifyPlaylists.value = _readSaved();
+  final saved = _readSaved();
+  if (!listEquals(saved, savedZenifyPlaylists.value)) {
+    savedZenifyPlaylists.value = saved;
+  }
 }

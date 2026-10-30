@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/database/radio_stations.db.dart';
@@ -238,19 +240,18 @@ void main() {
       final router = NavigationManager.router..go('/library');
       await tester.pumpWidget(routedApp());
       await tester.pump(const Duration(milliseconds: 300));
-      for (final path in [
-        '/library/moods-tuning',
-        '/library/radioStations',
-        '/home/playlist/zenify%3Adaily',
+      for (final (path, start) in [
+        ('/library/moods-tuning', '/library'),
+        ('/library/radioStations', '/library'),
+        ('/home/playlist/zenify%3Adaily', '/home'),
       ]) {
         router.go(path);
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
-        expect(router.routeInformationProvider.value.uri.path, '/library');
+        expect(router.routeInformationProvider.value.uri.path, start);
         expect(find.byType(MoodsTuningPage), findsNothing);
         expect(find.byType(RadioStationsPage), findsNothing);
         expect(find.byType(PlaylistPage), findsNothing);
-        expect(find.byType(LibraryPage), findsOneWidget);
       }
       await finish(tester);
     },
@@ -285,4 +286,52 @@ void main() {
     expect(router.canPop(), isFalse);
     await finish(tester);
   });
+
+  testWidgets(
+    'a Zenify playlist left in the Home tab keeps Home reachable offline',
+    (tester) async {
+      size(tester);
+      await tester.runAsync(
+        () => Hive.box('cache').put('moods:playlist:zenify:daily', {
+          'ytid': 'zenify:daily',
+          'title': 'Daily',
+          'list': <Map>[],
+          'language': languageSetting.languageCode,
+          'tuning': jsonEncode(moodsTuning.value.toStorage()),
+          'until': DateTime.now()
+              .add(const Duration(days: 1))
+              .toIso8601String(),
+        }),
+      );
+      addTearDown(
+        () => tester.runAsync(
+          () => Hive.box('cache').delete('moods:playlist:zenify:daily'),
+        ),
+      );
+      NavigationManager();
+      final router = NavigationManager.router
+        ..go('/home/playlist/zenify%3Adaily');
+      await tester.pumpWidget(routedApp());
+      await tester.pump(const Duration(milliseconds: 300));
+      StatefulNavigationShell shell() =>
+          tester.widget(find.byType(StatefulNavigationShell));
+
+      shell().goBranch(2);
+      await tester.pump(const Duration(milliseconds: 300));
+      offlineMode.value = true;
+      await tester.pump(const Duration(milliseconds: 300));
+      shell().goBranch(0);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(router.routeInformationProvider.value.uri.path, '/home');
+      expect(shell().currentIndex, 0);
+      expect(find.byType(PlaylistPage), findsNothing);
+      // Home started loading while online; let its retries wind down.
+      for (var i = 0; i < 30; i++) {
+        await tester.pump(const Duration(seconds: 1));
+      }
+      await finish(tester);
+    },
+  );
 }

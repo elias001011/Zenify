@@ -85,8 +85,8 @@ class NavigationManager {
         final isOffline = offlineMode.value;
         final currentPath = state.matchedLocation;
 
-        if (isOffline && _isOnlineDiscoveryRoute(state)) {
-          return libraryPath;
+        if (isOffline) {
+          if (_offlineFallback(state) case final fallback?) return fallback;
         }
 
         if (isOffline && currentPath.startsWith(timeMachinePath)) {
@@ -112,18 +112,28 @@ class NavigationManager {
     offlineMode.addListener(_onOfflineModeChanged);
   }
 
-  bool _isOnlineDiscoveryRoute(GoRouterState state) =>
-      state.matchedLocation.endsWith('/moods-tuning') ||
-      state.matchedLocation.endsWith('/radioStations') ||
-      MoodsService.isZenifyPlaylist(state.pathParameters['playlistId']);
+  /// Where an online-only page leads offline: the start of its own tab, so
+  /// a page left in another tab's stack never sends that tab elsewhere.
+  String? _offlineFallback(GoRouterState state) {
+    final location = state.matchedLocation;
+    if (location.endsWith('/moods-tuning') ||
+        location.endsWith('/radioStations')) {
+      return libraryPath;
+    }
+    if (MoodsService.isZenifyPlaylist(state.pathParameters['playlistId'])) {
+      return homePath;
+    }
+    return null;
+  }
 
   void _onOfflineModeChanged() {
     // A pushed page has its own state; the top-level redirect sees the
     // branch's base location when that stack is refreshed.
     if (offlineMode.value &&
-        router.routerDelegate.currentConfiguration.isNotEmpty &&
-        _isOnlineDiscoveryRoute(router.state)) {
-      router.go(libraryPath);
+        router.routerDelegate.currentConfiguration.isNotEmpty) {
+      if (_offlineFallback(router.state) case final fallback?) {
+        router.go(fallback);
+      }
     }
   }
 

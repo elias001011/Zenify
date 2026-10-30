@@ -94,6 +94,42 @@ void main() {
     },
   );
 
+  test('a tuning change mid-generation remakes the playlist instead of dropping it', () async {
+    service.pending = Completer<List<Map>>();
+    final pending = service.playlist('zenify:daily');
+    await setMoodsTuning(const MoodsTuning(discovery: Discovery.familiar));
+    service.pending!.complete(_songs('late'));
+    expect((await pending)!['list'], _songs('late'));
+    expect(service.made, 2);
+  });
+
+  test('a tuning reloaded unchanged from storage notifies nobody', () async {
+    await setMoodsTuning(
+      const MoodsTuning(
+        excludedGenres: {'Jazz', 'Rock'},
+        blockedArtists: {'x'},
+      ),
+    );
+    reloadMoodsFromStorage();
+    var notified = 0;
+    void count() => notified++;
+    moodsTuning.addListener(count);
+    savedZenifyPlaylists.addListener(count);
+    addTearDown(() {
+      moodsTuning.removeListener(count);
+      savedZenifyPlaylists.removeListener(count);
+    });
+    reloadMoodsFromStorage();
+    expect(notified, 0);
+    expect(
+      const MoodsTuning(
+        excludedGenres: {'Rock', 'Jazz'},
+        blockedArtists: {'x'},
+      ),
+      moodsTuning.value,
+    );
+  });
+
   test('blocked artists are removed even from an offline fallback', () async {
     await service.playlist('zenify:daily');
     await setMoodsTuning(const MoodsTuning(blockedArtists: {'artist0'}));
