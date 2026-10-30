@@ -664,7 +664,14 @@ class LocalSyncService {
       final auth = await _authenticated(request, maxBytes: _smallMessageBytes);
       return await _encryptedReply(request, auth.peer, auth.body, {
         'schemaVersion': syncSchemaVersion,
-        'categories': selectedCategories.map((e) => e.name).toList(),
+        'categories': selectedCategories
+            .difference(zenifyOnlySyncCategories)
+            .map((e) => e.name)
+            .toList(),
+        'zenifyCategories': selectedCategories
+            .intersection(zenifyOnlySyncCategories)
+            .map((e) => e.name)
+            .toList(),
       });
     } on _HttpFailure catch (e) {
       return (e.status, {'error': e.code});
@@ -1156,9 +1163,11 @@ class LocalSyncService {
     if (capabilities['schemaVersion'] != syncSchemaVersion) {
       throw const _LocalSyncException(LocalSyncError.updateRequired);
     }
-    final categories = selectedCategories.intersection(
-      parseSyncCategories(capabilities['categories']),
-    );
+    final categories = selectedCategories.intersection({
+      ...parseSyncCategories(capabilities['categories']),
+      // Only Zenify devices send these.
+      ...parseSyncCategories(capabilities['zenifyCategories'] ?? const []),
+    });
     if (categories.isEmpty) {
       throw const _LocalSyncException(LocalSyncError.noCommonCategories);
     }

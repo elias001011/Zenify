@@ -64,6 +64,12 @@ Future<void> setPlayerVisualizer(bool value) async {
   }
 }
 
+/// The Moods row, Zenify's own playlists and their tuning. Off, none of them
+/// shows and nothing is fetched for them.
+final moodsEnabled = ValueNotifier<bool>(
+  Hive.box('settings').get('moodsEnabled', defaultValue: true),
+);
+
 /// How the waves move: on their own (simple), or following the audio's
 /// frequencies (precise), which on Android needs the audio recording
 /// permission. Belongs to the device, like the permission.
@@ -242,6 +248,7 @@ void reloadSettingsFromStorage() {
   );
   useSystemColor.value = settings.get('useSystemColor', defaultValue: true);
   floatingEffect.value = _readFloatingEffect();
+  moodsEnabled.value = settings.get('moodsEnabled', defaultValue: true);
   showPlayerVisualizer.value = settings.get(
     'showPlayerVisualizer',
     defaultValue: false,

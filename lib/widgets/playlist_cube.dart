@@ -23,6 +23,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/widgets/playlist_artwork.dart';
+import 'package:musify/widgets/zenify_cover.dart';
 
 class PlaylistCube extends StatelessWidget {
   const PlaylistCube(
@@ -50,12 +51,17 @@ class PlaylistCube extends StatelessWidget {
       borderRadius: BorderRadius.circular(borderRadius),
       child: Stack(
         children: [
-          PlaylistArtwork(
-            playlistArtwork: playlist['image'],
-            size: size,
-            cubeIcon: cubeIcon,
-          ),
-          if (showTypeLabel && playlist['image'] != null)
+          if (playlist['source'] == 'zenify')
+            ZenifyCover(playlist, size: size)
+          else
+            PlaylistArtwork(
+              playlistArtwork: playlist['image'],
+              size: size,
+              cubeIcon: cubeIcon,
+            ),
+          if (showTypeLabel &&
+              playlist['image'] != null &&
+              playlist['source'] != 'zenify')
             Positioned(
               top: typeLabelOffset,
               right: typeLabelOffset,

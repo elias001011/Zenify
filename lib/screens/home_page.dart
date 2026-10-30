@@ -27,6 +27,7 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/listening_stats_service.dart';
+import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -38,6 +39,7 @@ import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/glow_row.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/moods_row.dart';
 import 'package:musify/widgets/playlist_cube.dart';
 import 'package:musify/widgets/recommended_songs_section.dart';
 import 'package:musify/widgets/section_header.dart';
@@ -52,10 +54,13 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   late final Future<List> _suggestedPlaylistsFuture;
   late Future<List> _recommendedSongsFuture;
+  Stream<List<Map>>? _zenifyPlaylists;
 
   @override
   void initState() {
     super.initState();
+    _loadZenifyPlaylists();
+    moodsEnabled.addListener(_onMoodsToggled);
     _suggestedPlaylistsFuture = getPlaylists(
       playlistsNum: suggestedPlaylistsNumber,
     );
@@ -66,7 +71,18 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     externalRecommendations.removeListener(_refreshRecommendedSongs);
+    moodsEnabled.removeListener(_onMoodsToggled);
     super.dispose();
+  }
+
+  void _loadZenifyPlaylists() {
+    _zenifyPlaylists = moodsEnabled.value
+        ? moodsService.playlists().asBroadcastStream()
+        : null;
+  }
+
+  void _onMoodsToggled() {
+    if (mounted) setState(_loadZenifyPlaylists);
   }
 
   void _refreshRecommendedSongs() {
@@ -109,6 +125,10 @@ class _HomePageState extends State<HomePage> {
                 );
               },
             ),
+            if (moodsEnabled.value) ...[
+              const MoodsRow(),
+              _buildZenifyPlaylists(playlistHeight),
+            ],
             _buildSuggestedPlaylists(playlistHeight),
             _buildSuggestedPlaylists(playlistHeight, showOnlyLiked: true),
             _buildCurrentMonthRecapSection(),
@@ -145,16 +165,33 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildZenifyPlaylists(double playlistHeight) {
+    // They show up as they are made rather than holding a spinner on Home.
+    return StreamBuilder<List<Map>>(
+      stream: _zenifyPlaylists,
+      builder: (context, snapshot) => _buildSuggestedPlaylistsSection(
+        playlistHeight,
+        snapshot.data ?? const [],
+        title: context.l10n!.madeForYou,
+        icon: FluentIcons.sparkle_24_filled,
+      ),
+    );
+  }
+
   Widget _buildSuggestedPlaylistsSection(
     double playlistHeight,
     List<dynamic> playlists, {
     bool showOnlyLiked = false,
+    String? title,
+    IconData? icon,
   }) {
     if (playlists.isEmpty) return const SizedBox.shrink();
 
-    final sectionTitle = showOnlyLiked
-        ? context.l10n!.backToFavorites
-        : context.l10n!.suggestedPlaylists;
+    final sectionTitle =
+        title ??
+        (showOnlyLiked
+            ? context.l10n!.backToFavorites
+            : context.l10n!.suggestedPlaylists);
     final itemsNumber = playlists.length;
     final isLargeScreen = MediaQuery.of(context).size.width > 480;
 
@@ -162,9 +199,11 @@ class _HomePageState extends State<HomePage> {
       children: [
         SectionHeader(
           title: sectionTitle,
-          icon: showOnlyLiked
-              ? FluentIcons.heart_24_filled
-              : FluentIcons.list_24_filled,
+          icon:
+              icon ??
+              (showOnlyLiked
+                  ? FluentIcons.heart_24_filled
+                  : FluentIcons.list_24_filled),
         ),
         ConstrainedBox(
           constraints: BoxConstraints(maxHeight: playlistHeight),
@@ -191,7 +230,9 @@ class _HomePageState extends State<HomePage> {
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: GestureDetector(
-            onTap: () => context.push('/home/playlist/${playlist['ytid']}'),
+            onTap: () => context.push(
+              '/home/playlist/${Uri.encodeComponent('${playlist['ytid']}')}',
+            ),
             child: PlaylistCube(playlist, size: height),
           ),
         );
@@ -208,8 +249,9 @@ class _HomePageState extends State<HomePage> {
       sources: [
         for (var i = 0; i < itemCount; i++) playlists[i]['image']?.toString(),
       ],
-      onTap: (index) =>
-          context.push('/home/playlist/${playlists[index]['ytid']}'),
+      onTap: (index) => context.push(
+        '/home/playlist/${Uri.encodeComponent('${playlists[index]['ytid']}')}',
+      ),
       itemBuilder: (context, index) =>
           PlaylistCube(playlists[index], size: height * 2),
     );

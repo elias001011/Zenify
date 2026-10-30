@@ -49,6 +49,7 @@ Map<SyncCategory, String> syncCategoryLabels(AppLocalizations l10n) => {
   SyncCategory.recap: l10n.syncRecap,
   SyncCategory.searches: l10n.syncSearches,
   SyncCategory.radio: l10n.syncRadio,
+  SyncCategory.moods: l10n.syncMoods,
 };
 
 const _categoryIcons = <SyncCategory, IconData>{
@@ -58,6 +59,7 @@ const _categoryIcons = <SyncCategory, IconData>{
   SyncCategory.recap: FluentIcons.data_bar_vertical_24_regular,
   SyncCategory.searches: FluentIcons.search_24_regular,
   SyncCategory.radio: FluentIcons.live_24_regular,
+  SyncCategory.moods: FluentIcons.sparkle_24_regular,
 };
 
 IconData _deviceIcon(String name) => name.toLowerCase().contains('android')

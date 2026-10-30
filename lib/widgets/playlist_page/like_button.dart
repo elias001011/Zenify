@@ -25,6 +25,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/moods/moods_preferences.dart';
 import 'package:musify/services/playlists_manager.dart';
 
 /// Likes a playlist, an album or an artist, and follows the liked playlists so
@@ -109,6 +110,44 @@ class _PlaylistLikeButtonState extends State<PlaylistLikeButton> {
                 iconSize: 24,
                 onPressed: _toggleLikeStatus,
                 tooltip: context.l10n!.addToLikedPlaylists,
+              );
+      },
+    );
+  }
+}
+
+/// Saves one of Zenify's own playlists to the library. It keeps changing
+/// there: the library holds the playlist, not a copy of its songs.
+class ZenifyPlaylistSaveButton extends StatelessWidget {
+  const ZenifyPlaylistSaveButton({super.key, required this.id});
+
+  final String id;
+
+  @override
+  Widget build(BuildContext context) {
+    if (id.isEmpty) return const SizedBox.shrink();
+    return ValueListenableBuilder<List<String>>(
+      valueListenable: savedZenifyPlaylists,
+      builder: (context, saved, _) {
+        final isSaved = saved.contains(id);
+        void toggle() => unawaited(setZenifyPlaylistSaved(id, !isSaved));
+        final icon = Icon(
+          isSaved
+              ? FluentIcons.bookmark_24_filled
+              : FluentIcons.bookmark_24_regular,
+        );
+        return isSaved
+            ? IconButton.filled(
+                icon: icon,
+                iconSize: 24,
+                onPressed: toggle,
+                tooltip: context.l10n!.removeFromLibrary,
+              )
+            : IconButton.filledTonal(
+                icon: icon,
+                iconSize: 24,
+                onPressed: toggle,
+                tooltip: context.l10n!.saveToLibrary,
               );
       },
     );

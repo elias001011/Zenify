@@ -30,6 +30,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlist_sharing.dart';
 import 'package:musify/services/playlists_manager.dart';
@@ -143,7 +144,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
       final resolvedId =
           initialPlaylist?['ytid']?.toString() ?? widget.playlistId;
 
-      if (initialPlaylist != null) {
+      if (MoodsService.isZenifyPlaylist(resolvedId)) {
+        _playlist = await moodsService.playlist(resolvedId!);
+      } else if (initialPlaylist != null) {
         _playlist = initialPlaylist;
         final playlistList = _playlist?['list'] as List?;
         final shouldFetchInitialPlaylist =
@@ -393,6 +396,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
   Widget _buildHeaderSection() {
     final songsLength = (_playlist['list'] as List? ?? const []).length;
     final isUserCreated = _playlist['source'] == 'user-created';
+    // Zenify's playlists change on their own: saved, never downloaded or
+    // edited. Their songs can still go to the user's playlists.
+    final isZenify = _playlist['source'] == 'zenify';
     final hasSecondaryActions =
         (widget.playlistId != null && !isUserCreated && !offlineMode.value) ||
         !offlineMode.value ||
@@ -407,6 +413,17 @@ class _PlaylistPageState extends State<PlaylistPage> {
           isArtist: widget.isArtist,
           showTitle: false,
         ),
+        if (isZenify && _playlist['description'] != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+            child: Text(
+              _playlist['description'].toString(),
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
         if (songsLength > 0)
           PlaylistActionButtons(
             onPlay: () => audioHandler.playPlaylistSong(
@@ -430,7 +447,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             spacing: 5,
             children: [
-              if (widget.playlistId != null &&
+              if (isZenify)
+                ZenifyPlaylistSaveButton(id: _resolvedPlaylistId ?? '')
+              else if (widget.playlistId != null &&
                   !isUserCreated &&
                   !offlineMode.value)
                 PlaylistLikeButton(
@@ -441,9 +460,10 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 PlaylistAddToPlaylistButton(
                   resolvePlaylist: () async => _playlist,
                 ),
-                if (!isUserCreated) SyncButton(onSync: _handleSyncPlaylist),
+                if (!isUserCreated && !isZenify)
+                  SyncButton(onSync: _handleSyncPlaylist),
               ],
-              if (songsLength > 0) _buildDownloadButton(),
+              if (songsLength > 0 && !isZenify) _buildDownloadButton(),
               if (isUserCreated) ...[
                 _buildShareButton(),
                 _buildEditButton(),

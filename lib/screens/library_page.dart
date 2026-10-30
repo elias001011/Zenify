@@ -22,12 +22,15 @@
 import 'dart:async';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/library_search.dart';
+import 'package:musify/services/moods/moods_preferences.dart';
+import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
@@ -39,6 +42,7 @@ import 'package:musify/utilities/offline_playlist_dialogs.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
+import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_bar.dart';
@@ -203,6 +207,8 @@ class _LibraryPageState extends State<LibraryPage> {
           userPlaylists,
           userOfflineSongs,
           userLikedSongsList,
+          moodsEnabled,
+          savedZenifyPlaylists,
         ]),
         builder: (context, _) {
           // In another tab (built early, see the router), a like or a
@@ -216,6 +222,7 @@ class _LibraryPageState extends State<LibraryPage> {
             ..._buildSongSlivers(),
             ..._buildPinnedSlivers(),
             ..._buildUserPlaylistsSlivers(),
+            if (!offlineMode.value) ..._buildZenifySlivers(),
             if (!offlineMode.value) ..._buildLikedPlaylistsSlivers(),
             ..._buildLikedArtistsSlivers(),
           ];
@@ -516,6 +523,57 @@ class _LibraryPageState extends State<LibraryPage> {
     }
 
     return slivers;
+  }
+
+  /// The tuning of the Moods and the Zenify playlists the user saved.
+  List<Widget> _buildZenifySlivers() {
+    if (!moodsEnabled.value || !_showsYoutube || _query.isNotEmpty) return [];
+    final saved = [
+      for (final id in savedZenifyPlaylists.value)
+        moodsService.cachedPlaylist(id),
+    ];
+    return [
+      SliverToBoxAdapter(
+        child: Column(
+          children: [
+            SectionHeader(
+              title: context.l10n!.fromZenify,
+              icon: FluentIcons.sparkle_24_filled,
+            ),
+            CustomBar(
+              context.l10n!.moodsTuning,
+              FluentIcons.options_24_regular,
+              description: context.l10n!.moodsTuningDescription,
+              borderRadius: saved.isEmpty
+                  ? commonCustomBarRadius
+                  : commonCustomBarRadiusFirst,
+              onTap: () => context.push('/library/moods-tuning'),
+            ),
+          ],
+        ),
+      ),
+      if (saved.isNotEmpty)
+        SliverList.builder(
+          itemCount: saved.length,
+          itemBuilder: (context, index) {
+            final playlist = saved[index];
+            final id = playlist['ytid'].toString();
+            return PlaylistBar(
+              key: ValueKey(id),
+              playlist['title'],
+              playlistId: id,
+              playlistArtwork: playlist['image'],
+              borderRadius: getItemBorderRadius(
+                index,
+                saved.length,
+                hasItemsBefore: true,
+              ),
+              onPressed: () =>
+                  context.push('/home/playlist/${Uri.encodeComponent(id)}'),
+            );
+          },
+        ),
+    ];
   }
 
   List<Widget> _buildLikedPlaylistsSlivers() {

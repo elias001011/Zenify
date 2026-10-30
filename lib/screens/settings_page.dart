@@ -32,6 +32,8 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/local_sync_service.dart';
+import 'package:musify/services/moods/moods_preferences.dart';
+import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
@@ -314,6 +316,26 @@ class SettingsPage extends StatelessWidget {
           },
         ),
         ValueListenableBuilder<bool>(
+          valueListenable: moodsEnabled,
+          builder: (_, value, __) {
+            return CustomBar(
+              context.l10n!.moodsSetting,
+              FluentIcons.sparkle_24_regular,
+              description: context.l10n!.moodsSettingDescription,
+              trailing: Switch(
+                value: value,
+                onChanged: (value) {
+                  moodsEnabled.value = value;
+                  addOrUpdateData<bool>('settings', 'moodsEnabled', value);
+                  // Off, nothing of theirs stays behind but the user's own
+                  // choices, kept in case they come back.
+                  if (!value) moodsService.clearCache();
+                },
+              ),
+            );
+          },
+        ),
+        ValueListenableBuilder<bool>(
           valueListenable: externalRecommendations,
           builder: (_, value, __) {
             return CustomBar(
@@ -442,6 +464,7 @@ class SettingsPage extends StatelessWidget {
                 reloadSettingsFromStorage();
                 reloadSongLibraryStateFromStorage();
                 reloadPlaylistLibraryStateFromStorage();
+                reloadMoodsFromStorage();
                 reloadSearchHistoryFromStorage();
                 listeningStatsService.reload();
                 await audioHandler.setShuffleMode(
