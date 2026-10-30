@@ -41,7 +41,6 @@ class IslandScaffold extends StatefulWidget {
     super.key,
     required this.title,
     required this.body,
-    this.fadeTitleAfter,
     this.headerTitleKey,
     this.actions = const [],
     this.onBack,
@@ -61,10 +60,6 @@ class IslandScaffold extends StatefulWidget {
 
   /// Offer the search shortcut, which opens the search page on Enter.
   final bool globalSearch;
-
-  /// Scroll offset after which the title appears, for pages that show their
-  /// own big title (playlists). Until then the island stays compact.
-  final double? fadeTitleAfter;
 
   /// The title in the scrolling header. Show the island title only once its
   /// bottom has left the visible page, including wrapped and scaled text.
@@ -88,9 +83,7 @@ class IslandScaffold extends StatefulWidget {
 }
 
 class _IslandScaffoldState extends State<IslandScaffold> {
-  late final _titleShown = ValueNotifier<bool>(
-    widget.fadeTitleAfter == null && widget.headerTitleKey == null,
-  );
+  late final _titleShown = ValueNotifier<bool>(widget.headerTitleKey == null);
   bool _visibilityScheduled = false;
 
   void _scheduleTitleVisibility() {
@@ -113,10 +106,8 @@ class _IslandScaffoldState extends State<IslandScaffold> {
   @override
   void didUpdateWidget(IslandScaffold oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.headerTitleKey != oldWidget.headerTitleKey ||
-        widget.fadeTitleAfter != oldWidget.fadeTitleAfter) {
-      _titleShown.value =
-          widget.headerTitleKey == null && widget.fadeTitleAfter == null;
+    if (widget.headerTitleKey != oldWidget.headerTitleKey) {
+      _titleShown.value = widget.headerTitleKey == null;
     }
   }
 
@@ -127,18 +118,8 @@ class _IslandScaffoldState extends State<IslandScaffold> {
   }
 
   bool _onScroll(ScrollUpdateNotification notification) {
-    if (widget.headerTitleKey != null) {
-      if (notification.depth == 0 &&
-          notification.metrics.axis == Axis.vertical) {
-        _scheduleTitleVisibility();
-      }
-      return false;
-    }
-    final start = widget.fadeTitleAfter;
-    if (start != null &&
-        notification.depth == 0 &&
-        notification.metrics.axis == Axis.vertical) {
-      _titleShown.value = notification.metrics.pixels > start;
+    if (notification.depth == 0 && notification.metrics.axis == Axis.vertical) {
+      _scheduleTitleVisibility();
     }
     return false;
   }
