@@ -53,7 +53,7 @@ Map<String, ({Map song, double score})> scoreRadios({
     for (var i = 0; i < songs.length; i++) {
       final song = songs[i];
       final id = song['ytid']?.toString() ?? '';
-      if (id.isEmpty || !looksLikeSong(song)) continue;
+      if (id.isEmpty) continue;
       if (accept != null && !accept(song)) continue;
       final gain = weight * (1 - i / songs.length);
       final previous = scores[id];

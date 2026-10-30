@@ -105,8 +105,21 @@ class MoodsService {
           artist['title']?.toString() ?? '',
       ],
       blockedArtists: moodsTuning.value.blockedArtists,
+      notSongs: _notSongs,
     );
   }
+
+  /// Library songs YouTube Music says are no songs: uploads by users, such
+  /// as rain for sleeping or an hour-long mix. Learnt from the radios, which
+  /// start with the song they come from, and kept in the cache.
+  late final Set<String> _notSongs = {
+    for (final id in _cache.get(_notSongsKey) as List? ?? const [])
+      id.toString(),
+  };
+  static const _notSongsKey = 'moods:notSongs';
+
+  bool _isSong(Object? song) =>
+      song is Map && !_notSongs.contains(song['ytid']?.toString());
 
   /// The songs of each recap month, the current one first.
   List<Map> _recapMonths() {
@@ -118,12 +131,22 @@ class MoodsService {
     ];
   }
 
-  /// What YouTube Music plays after [id], songs only.
+  /// What YouTube Music plays after [id], songs only. Nothing when YouTube
+  /// Music says [id] itself is no song: its radio would be more of it.
   Future<List<Map>> radio(String id) {
     if (_radios.length > 200) _radios.clear();
     return _radios[id] ??= _music
         .getRadio(id, country: country)
-        .then(_songsOf)
+        .then((tracks) {
+          final seed = tracks.firstOrNull;
+          if (seed != null && seed.video.id.value == id && !_counts(seed)) {
+            if (_notSongs.add(id)) {
+              unawaited(_cache.put(_notSongsKey, _notSongs.toList()));
+            }
+            return <Map>[];
+          }
+          return _songsOf(tracks);
+        })
         .catchError((Object error) {
           _radios.remove(id);
           logger.log('Moods radio failed for $id', error: error);
@@ -702,7 +725,7 @@ class MoodsService {
           DateFormat.MMMM(languageSetting.toString()).format(date),
         ),
         l10n.zenifyAddictionsDescription,
-        songs.where(looksLikeSong).toList(),
+        songs.where(_isSong).toList(),
         now.add(const Duration(days: 30)),
       );
     }
@@ -757,7 +780,7 @@ class MoodsService {
         ...userRecentlyPlayed.value.whereType<Map>(),
       ])
         if (!older.contains(song['ytid']?.toString()) &&
-            looksLikeSong(song) &&
+            _isSong(song) &&
             ids.add(song['ytid'].toString()))
           song,
     ].take(50).toList();
@@ -771,7 +794,7 @@ class MoodsService {
     for (var i = 0; i < months.length; i++) {
       for (final entry in months[i].values.whereType<Map>()) {
         final id = entry['ytid']?.toString() ?? '';
-        if (id.isEmpty || !looksLikeSong(entry)) continue;
+        if (id.isEmpty || !_isSong(entry)) continue;
         seconds[id] =
             (seconds[id] ?? 0) + (entry['seconds'] as num? ?? 0) / (i + 1);
         songs[id] = entry;
@@ -831,11 +854,16 @@ class MoodsService {
   }
 }
 
-/// YouTube Music tracks as song maps, user uploads and non-songs left out.
+/// Whether YouTube Music lists [track] as music: a release's audio or an
+/// official video. That is the whole quality filter of the Moods.
+bool _counts(MusicTrack track) =>
+    track.type == MusicVideoType.song ||
+    track.type == MusicVideoType.officialVideo;
+
+/// YouTube Music tracks as song maps, only those it lists as music.
 List<Map> _songsOf(List<MusicTrack> tracks) => [
   for (final track in tracks)
-    if (track.type != MusicVideoType.userUpload)
-      if (trackToSong(track) case final song when looksLikeSong(song)) song,
+    if (_counts(track)) trackToSong(track),
 ];
 
 /// A YouTube Music track as the song map the rest of the app plays.

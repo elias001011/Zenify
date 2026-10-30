@@ -21,28 +21,6 @@
 
 import 'dart:math';
 
-/// Longer than this is a mix, a compilation or "1 hour of…", not a song.
-const maxSongSeconds = 12 * 60;
-
-final _notASong = RegExp(
-  r'\b(rain|chuva|thunder|trovão|white noise|ruído branco|brown noise|'
-  'pink noise|sleep sounds?|sons? para dormir|nature sounds?|'
-  'sons? da natureza|ocean waves|ondas do mar|asmr|24/7|'
-  r'\d+\s*(hours?|horas?|hrs?)|full album|álbum completo|album completo|'
-  r'compilation|coletânea|non-?stop|mixtape|dj set)\b',
-  caseSensitive: false,
-  unicode: true,
-);
-
-/// Whether [song] (a song map) looks like a song: short enough and not one
-/// of the sounds and mixes people play that say nothing about their taste.
-bool looksLikeSong(Map song) {
-  final seconds = song['duration'];
-  if (seconds is num && seconds > maxSongSeconds) return false;
-  if (song['isLive'] == true) return false;
-  return !_notASong.hasMatch('${song['title'] ?? ''} ${song['artist'] ?? ''}');
-}
-
 /// One artist name, comparable across spellings: "Seu Jorge & Ana Carolina"
 /// and "seu jorge" share a key. Only the first credited artist counts.
 String artistKey(Object? artist) {
@@ -71,7 +49,9 @@ class Taste {
 
   /// From the library. [recap] holds the songs of each recap month, the
   /// current one first; [recentlyPlayed] and [liked] are newest first.
-  /// Songs by [blockedArtists] (keys) are left out entirely.
+  /// Songs by [blockedArtists] (keys) are left out entirely, and so are
+  /// [notSongs]: what YouTube Music says is no song (rain for sleeping, an
+  /// hour-long mix uploaded by someone), still counted as known.
   factory Taste.of({
     List<Map> recap = const [],
     List recentlyPlayed = const [],
@@ -79,6 +59,7 @@ class Taste {
     List kept = const [],
     Iterable<String> likedArtists = const [],
     Set<String> blockedArtists = const {},
+    Set<String> notSongs = const {},
     DateTime? now,
   }) {
     final today = now ?? DateTime.now();
@@ -92,7 +73,7 @@ class Taste {
       if (id.isEmpty) return;
       known.add(id);
       if (weight <= 0 ||
-          !looksLikeSong(raw) ||
+          notSongs.contains(id) ||
           blockedArtists.contains(artistKey(raw['artist']))) {
         return;
       }
@@ -109,7 +90,7 @@ class Taste {
         final id = entry['ytid']?.toString() ?? '';
         if (id.isEmpty) continue;
         // Hours of rain would flatten every real song next to them.
-        if (!looksLikeSong(entry)) {
+        if (notSongs.contains(id)) {
           known.add(id);
           continue;
         }

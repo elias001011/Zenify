@@ -18,21 +18,11 @@ Map<String, dynamic> song(
 };
 
 void main() {
-  test('rain, hour-long mixes and live streams are not songs', () {
-    expect(looksLikeSong(song('a', title: 'Garota de Ipanema')), isTrue);
-    expect(
-      looksLikeSong(song('b', title: 'Barulho de chuva para dormir')),
-      isFalse,
+  test('songs are never judged by their title', () {
+    final taste = Taste.of(
+      liked: [song('jorge', title: 'Chove Chuva', artist: 'Jorge Ben Jor')],
     );
-    expect(looksLikeSong(song('c', title: 'Lofi beats 3 hours')), isFalse);
-    expect(
-      looksLikeSong(song('d', title: 'Rain Sounds', artist: 'Nature')),
-      isFalse,
-    );
-    expect(looksLikeSong(song('e', duration: 3600)), isFalse);
-    expect(looksLikeSong({...song('f'), 'isLive': true}), isFalse);
-    // A word inside another one is not a match.
-    expect(looksLikeSong(song('g', title: 'Brainstorm')), isTrue);
+    expect(taste.seeds.single.song['ytid'], 'jorge');
   });
 
   test('artists compare across credits and spellings', () {
@@ -41,44 +31,49 @@ void main() {
     expect(artistKey('Djavan'), isNot(artistKey('Caetano Veloso')));
   });
 
-  test('taste leans on recent listening and leaves noise and blocks out', () {
-    final now = DateTime(2026, 10, 30);
-    final taste = Taste.of(
-      now: now,
-      recap: [
-        {
-          'a': {
-            ...song('a', artist: 'Djavan'),
-            'seconds': 3000,
-            'lastPlayed': '2026-10-29T10:00:00',
+  test(
+    'taste leans on recent listening and leaves non-songs and blocks out',
+    () {
+      final now = DateTime(2026, 10, 30);
+      final taste = Taste.of(
+        now: now,
+        recap: [
+          {
+            'a': {
+              ...song('a', artist: 'Djavan'),
+              'seconds': 3000,
+              'lastPlayed': '2026-10-29T10:00:00',
+            },
+            'rain': {
+              ...song('rain', title: 'Chuva forte para dormir'),
+              'seconds': 90000,
+            },
           },
-          'rain': {
-            ...song('rain', title: 'Chuva forte para dormir'),
-            'seconds': 90000,
+          {
+            'old': {...song('old', artist: 'Legião Urbana'), 'seconds': 3000},
           },
-        },
-        {
-          'old': {...song('old', artist: 'Legião Urbana'), 'seconds': 3000},
-        },
-      ],
-      liked: [song('liked', artist: 'Marisa Monte')],
-      recentlyPlayed: [song('blocked', artist: 'Blocked Band')],
-      blockedArtists: {artistKey('Blocked Band')},
-    );
+        ],
+        liked: [song('liked', artist: 'Marisa Monte')],
+        recentlyPlayed: [song('blocked', artist: 'Blocked Band')],
+        blockedArtists: {artistKey('Blocked Band')},
+        // What YouTube Music said is a user upload, not a song.
+        notSongs: {'rain'},
+      );
 
-    expect(taste.seeds.first.song['ytid'], 'a');
-    final ids = taste.seeds.map((s) => s.song['ytid']).toList();
-    expect(ids, isNot(contains('rain')));
-    expect(ids, isNot(contains('blocked')));
-    // Last month's favourite counts, half as much.
-    expect(
-      taste.seeds.firstWhere((s) => s.song['ytid'] == 'old').weight,
-      lessThan(taste.seeds.first.weight),
-    );
-    // Heard counts as known even when it is no seed.
-    expect(taste.known, containsAll(['a', 'rain', 'blocked', 'liked']));
-    expect(taste.artists[artistKey('Djavan')], 1);
-  });
+      expect(taste.seeds.first.song['ytid'], 'a');
+      final ids = taste.seeds.map((s) => s.song['ytid']).toList();
+      expect(ids, isNot(contains('rain')));
+      expect(ids, isNot(contains('blocked')));
+      // Last month's favourite counts, half as much.
+      expect(
+        taste.seeds.firstWhere((s) => s.song['ytid'] == 'old').weight,
+        lessThan(taste.seeds.first.weight),
+      );
+      // Heard counts as known even when it is no seed.
+      expect(taste.known, containsAll(['a', 'rain', 'blocked', 'liked']));
+      expect(taste.artists[artistKey('Djavan')], 1);
+    },
+  );
 
   Map<String, ({Map song, double score})> scored(Iterable<Map> songs) => {
     for (final (i, s) in songs.indexed)
@@ -153,12 +148,11 @@ void main() {
       taste: taste,
       radios: {
         'seed1': [song('seed1'), song('both'), song('only1')],
-        'seed2': [song('seed2'), song('both'), song('long', duration: 4000)],
+        'seed2': [song('seed2'), song('both')],
       },
       seedWeights: {'seed1': 1, 'seed2': 0.5},
     );
     expect(scores['both']!.score, greaterThan(scores['only1']!.score));
-    expect(scores, isNot(contains('long')));
   });
 
   test('a library without tuning reads as the defaults', () {
