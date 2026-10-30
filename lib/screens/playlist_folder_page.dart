@@ -51,6 +51,7 @@ class PlaylistFolderPage extends StatefulWidget {
 }
 
 class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
+  final _headerTitleKey = GlobalKey();
   late String _folderName;
 
   @override
@@ -72,7 +73,7 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
             : getPlaylistsInFolder(widget.folderId);
         return IslandScaffold(
           title: _folderName,
-          fadeTitleAfter: 150,
+          headerTitleKey: _headerTitleKey,
           background: const PageGlow(source: null),
           actions: [
             PopupMenuButton<String>(
@@ -197,6 +198,7 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
           const SizedBox(height: 16),
           Text(
             _folderName,
+            key: _headerTitleKey,
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,

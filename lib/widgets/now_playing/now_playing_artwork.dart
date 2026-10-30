@@ -37,10 +37,14 @@ class NowPlayingArtwork extends StatefulWidget {
     super.key,
     required this.metadata,
     required this.size,
+    this.qualityBadgeOpacity,
   });
 
   final MediaItem metadata;
   final double size;
+
+  /// Follows the mobile panel transition, without a second delayed fade.
+  final Animation<double>? qualityBadgeOpacity;
 
   @override
   State<NowPlayingArtwork> createState() => _NowPlayingArtworkState();
@@ -100,9 +104,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
             dimension: size,
             // The card builds only the side in view, so the waves listen
             // to playback only while they show.
-            child: Center(
-              child: WaveVisualizer(size: size * 0.8, offerAccess: true),
-            ),
+            child: Center(child: WaveVisualizer(size: size * 0.8)),
           ),
         ),
       ),
@@ -123,8 +125,11 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
               duration: const Duration(milliseconds: 200),
               child: child,
             ),
-            child: IgnorePointer(
-              child: _AudioQualityBadge(metadata: widget.metadata),
+            child: FadeTransition(
+              opacity: widget.qualityBadgeOpacity ?? kAlwaysCompleteAnimation,
+              child: IgnorePointer(
+                child: _AudioQualityBadge(metadata: widget.metadata),
+              ),
             ),
           ),
         ),
@@ -207,6 +212,20 @@ class _AudioQualityBadgeState extends State<_AudioQualityBadge> {
   void initState() {
     super.initState();
     _resolveIfNeeded();
+    showAudioQualityBadge.addListener(_onSettingChanged);
+  }
+
+  void _onSettingChanged() {
+    setState(() {
+      _resolvedYtid = null;
+      _resolveIfNeeded();
+    });
+  }
+
+  @override
+  void dispose() {
+    showAudioQualityBadge.removeListener(_onSettingChanged);
+    super.dispose();
   }
 
   @override

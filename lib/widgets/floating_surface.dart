@@ -56,7 +56,7 @@ class FloatingSurface extends StatefulWidget {
 }
 
 class _FloatingSurfaceState extends State<FloatingSurface> {
-  static const _blurSigma = 18.0;
+  static final _blurFilter = ImageFilter.blur(sigmaX: 18, sigmaY: 18);
 
   /// Moves the content, with its state (the mini player's audio reader and
   /// animations), when the blur is added or taken away around it, so solid
@@ -102,12 +102,11 @@ class _FloatingSurfaceState extends State<FloatingSurface> {
 
     switch (effect) {
       case FloatingEffect.blurred:
-        final filter = ImageFilter.blur(sigmaX: _blurSigma, sigmaY: _blurSigma);
         return ClipRRect(
           borderRadius: borderRadius,
           child: widget.grouped
-              ? BackdropFilter.grouped(filter: filter, child: surface)
-              : BackdropFilter(filter: filter, child: surface),
+              ? BackdropFilter.grouped(filter: _blurFilter, child: surface)
+              : BackdropFilter(filter: _blurFilter, child: surface),
         );
       // A shadow under a see-through surface would darken what shows through.
       case FloatingEffect.translucent:

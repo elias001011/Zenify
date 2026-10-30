@@ -159,6 +159,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     _queueList.addAll(saved.songs);
     _originalQueueList.addAll(saved.original);
     _currentQueueIndex = saved.index;
+    _queueKeepsGoing = saved.keepGoing;
     _hydrateQueueEntryIds();
     _resumePosition = saved.position;
     _resumeEntryId = _queueEntryIds.ensureId(currentSong!);
@@ -248,13 +249,19 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   bool get shouldContinuePlayback =>
       _currentLoadingIndex >= 0 ? _queuePlayWhenReady : audioPlayer.playing;
 
+  /// Whether the picker adds a song when the queue runs out: when the user
+  /// chose it, and always for a queue the Moods started.
+  bool get _continuesQueue =>
+      playNextSongAutomatically.value || _queueKeepsGoing;
+  bool _queueKeepsGoing = false;
+
   bool get hasPrevious => _currentQueueIndex > 0 || _historyList.isNotEmpty;
 
   bool get canSkipToNext =>
       _hasCurrentQueueIndex &&
       (hasNext ||
           repeatNotifier.value == AudioServiceRepeatMode.all ||
-          (playNextSongAutomatically.value &&
+          (_continuesQueue &&
               audioPlayer.playing &&
               !offlineMode.value &&
               repeatNotifier.value == AudioServiceRepeatMode.none &&
@@ -556,6 +563,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           _queueList,
           _originalQueueList,
           _currentQueueIndex,
+          keepGoing: _queueKeepsGoing,
         );
       }
       if (mediaItemChanged || publishedQueueChanged) {
@@ -931,7 +939,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       hasNext ||
       (repeatNotifier.value == AudioServiceRepeatMode.all &&
           _queueList.isNotEmpty) ||
-      playNextSongAutomatically.value;
+      _continuesQueue;
 
   void _handlePlaybackError() {
     _consecutiveErrors++;
@@ -1102,7 +1110,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       );
 
       final shouldPlayInsertedSong =
-          playNextSongAutomatically.value &&
+          _continuesQueue &&
           !sleepTimerExpired &&
           _currentLoadingIndex == -1 &&
           audioPlayer.processingState == ProcessingState.completed &&
@@ -1174,8 +1182,10 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     bool replace = false,
     int? startIndex,
     bool? shuffle,
+    bool keepGoing = false,
   }) async {
     try {
+      if (replace) _queueKeepsGoing = keepGoing;
       final manuallyAddedSongs = replace ? _getUnplayedManualSongs() : <Map>[];
       final shuffleAfterReplace = shuffle ?? shuffleNotifier.value;
       if (replace) {
@@ -1401,6 +1411,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         _queueList,
         _originalQueueList,
         _currentQueueIndex,
+        keepGoing: _queueKeepsGoing,
       );
 
       if (_currentQueueIndex >= 0 && _currentQueueIndex < mediaItems.length) {
@@ -1525,10 +1536,11 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
             _queueList,
             _originalQueueList,
             _currentQueueIndex,
+            keepGoing: _queueKeepsGoing,
           );
           _preloadUpcomingSongs();
           // Trigger background song addition if auto-play is enabled
-          if (playNextSongAutomatically.value) {
+          if (_continuesQueue) {
             unawaited(_backgroundAddSongsToQueue());
           }
         } else {
@@ -2379,10 +2391,13 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     await addToQueue(song, playNext: true);
   }
 
+  /// Plays [playlist] from [songIndex]. With [keepGoing] the queue never
+  /// runs out: the picker keeps adding songs, as the Moods want.
   Future<void> playPlaylistSong({
     Map<dynamic, dynamic>? playlist,
     required int songIndex,
     bool? shuffle,
+    bool keepGoing = false,
   }) async {
     try {
       if (playlist != null && playlist['list'] != null) {
@@ -2391,6 +2406,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           replace: true,
           startIndex: songIndex,
           shuffle: shuffle,
+          keepGoing: keepGoing,
         );
       }
     } catch (e, stackTrace) {
@@ -2622,8 +2638,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       } else if (repeatNotifier.value == AudioServiceRepeatMode.all &&
           _queueList.isNotEmpty) {
         await _playFromQueue(0, playWhenReady: playWhenReady);
-      } else if (playNextSongAutomatically.value &&
-          _currentLoadingIndex == -1) {
+      } else if (_continuesQueue && _currentLoadingIndex == -1) {
         // At end of queue with auto-play enabled - trigger background fetch
         unawaited(_backgroundAddSongsToQueue());
       } else {

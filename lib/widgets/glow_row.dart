@@ -73,7 +73,12 @@ class _GlowRowState extends State<GlowRow>
   Iterable<(int, double, double)> _slots(double width) sync* {
     final offset = _controller.hasClients ? _controller.offset : 0.0;
     final extent = widget.itemExtent;
-    for (final index in glowColors.indices) {
+    final first = max(0, (offset / extent - 2).floor());
+    final end = min(
+      widget.sources.length,
+      ((offset + width) / extent + 2).ceil(),
+    );
+    for (var index = first; index < end; index++) {
       // Glows spread past their artwork, so neighbours out of view count.
       final center = index * extent + extent / 2 - offset;
       if (center > -extent * 1.5 && center < width + extent * 1.5) {

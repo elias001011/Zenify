@@ -278,7 +278,7 @@
   "tools": "Alat",
   "topSongs": "Lagu teratas",
   "translate": "Terjemahkan",
-  "translateDescription": "Bantu terjemahkan Zenify ke dalam bahasa Anda di Crowdin.",
+  "translateDescription": "Bantu terjemahkan Zenify dengan mengedit berkas terjemahan. Ketuk untuk melihat berkas dan petunjuk.",
   "understand": "Saya mengerti",
   "undo": "Batalkan",
   "unpinFromLibrary": "Lepaskan sematan dari pustaka",

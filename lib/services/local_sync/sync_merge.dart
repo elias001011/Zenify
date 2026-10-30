@@ -48,6 +48,9 @@ const _kindKeys = <String, String>{
   'searchHistoryOrder': 'searchHistory',
   'recapMonth': 'wrappedListeningStats',
   'recapReset': 'wrappedListeningStats',
+  'savedZenifyPlaylists': 'savedZenifyPlaylists',
+  'savedZenifyPlaylistsOrder': 'savedZenifyPlaylists',
+  'moodsTuning': 'moodsTuning',
 };
 
 class SyncDocument {
@@ -368,6 +371,9 @@ class SyncDocument {
       'pinnedPlaylistIds': pins,
       'recentlyPlayedSongs': recent.take(100).toList(),
       'searchHistory': list('searchHistory', strings: true),
+      'savedZenifyPlaylists': list('savedZenifyPlaylists', strings: true),
+      if (live[_key('moodsTuning', '', '')] case final Map tuning)
+        'moodsTuning': tuning,
     };
   }
 
@@ -410,6 +416,14 @@ class SyncDocument {
       order: false,
     );
     mapList('searchHistory', library['searchHistory'], strings: true);
+    mapList(
+      'savedZenifyPlaylists',
+      library['savedZenifyPlaylists'],
+      strings: true,
+    );
+    if (library['moodsTuning'] case final Map tuning) {
+      result[_key('moodsTuning', '', '')] = Map<String, dynamic>.from(tuning);
+    }
     void playlist(Map item, String? folder) {
       final id = item['ytid']?.toString();
       if (id == null || id.isEmpty || item['list'] is! List) {
@@ -549,11 +563,16 @@ class SyncDocument {
       if (value != null && value is! String) {
         throw const FormatException('Invalid folder reference');
       }
+    } else if (kind == 'moodsTuning') {
+      if (value is! Map || parts[1].isNotEmpty || parts[2].isNotEmpty) {
+        throw const FormatException('Invalid moods tuning');
+      }
     } else if ([
       'playlists',
       'pinnedPlaylistIds',
       'likedRadioStations',
       'searchHistory',
+      'savedZenifyPlaylists',
     ].contains(kind)) {
       if (value != true) throw const FormatException('Invalid membership');
     } else {

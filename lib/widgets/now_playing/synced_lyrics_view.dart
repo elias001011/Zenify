@@ -207,7 +207,8 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
           style: TextStyle(
             fontSize: 20,
             height: 1.4,
-            fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+            // Keep glyph metrics fixed so highlighting never reflows a line.
+            fontWeight: FontWeight.w800,
             color: baseColor.withValues(alpha: isActive ? 1 : 0.45),
           ),
           textAlign: TextAlign.center,

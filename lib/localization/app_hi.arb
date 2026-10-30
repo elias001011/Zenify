@@ -278,7 +278,7 @@
   "tools": "उपकरण",
   "topSongs": "Top songs",
   "translate": "Translate",
-  "translateDescription": "Help translate Zenify into your language on Crowdin.",
+  "translateDescription": "अनुवाद फ़ाइलों को संपादित करके Zenify का अनुवाद करने में मदद करें। फ़ाइलें और निर्देश देखने के लिए टैप करें।",
   "understand": "समझ गया",
   "undo": "पूर्ववत करें",
   "unpinFromLibrary": "Unpin from library",

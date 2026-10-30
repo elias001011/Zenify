@@ -50,6 +50,13 @@ class PlaylistHeroArtwork extends StatelessWidget {
           showTypeLabel: false,
         );
 
+        // A Zenify cover has its logo and title near the edges.
+        if (playlist['source'] == 'zenify') {
+          return ClipRRect(
+            borderRadius: BorderRadius.circular(size * 0.08),
+            child: artwork,
+          );
+        }
         return ClipPath(
           clipper: const ShapeBorderClipper(
             shape: StarBorder(

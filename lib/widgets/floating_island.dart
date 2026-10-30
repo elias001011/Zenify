@@ -41,7 +41,7 @@ class IslandScaffold extends StatefulWidget {
     super.key,
     required this.title,
     required this.body,
-    this.fadeTitleAfter,
+    this.headerTitleKey,
     this.actions = const [],
     this.onBack,
     this.onFilter,
@@ -61,9 +61,9 @@ class IslandScaffold extends StatefulWidget {
   /// Offer the search shortcut, which opens the search page on Enter.
   final bool globalSearch;
 
-  /// Scroll offset after which the title appears, for pages that show their
-  /// own big title (playlists). Until then the island stays compact.
-  final double? fadeTitleAfter;
+  /// The title in the scrolling header. Show the island title only once its
+  /// bottom has left the visible page, including wrapped and scaled text.
+  final GlobalKey? headerTitleKey;
   final List<Widget> actions;
 
   /// Replaces the default pop, e.g. to return a result.
@@ -83,7 +83,33 @@ class IslandScaffold extends StatefulWidget {
 }
 
 class _IslandScaffoldState extends State<IslandScaffold> {
-  late final _titleShown = ValueNotifier<bool>(widget.fadeTitleAfter == null);
+  late final _titleShown = ValueNotifier<bool>(widget.headerTitleKey == null);
+  bool _visibilityScheduled = false;
+
+  void _scheduleTitleVisibility() {
+    if (widget.headerTitleKey == null || _visibilityScheduled) return;
+    _visibilityScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _visibilityScheduled = false;
+      if (!mounted) return;
+      final title = widget.headerTitleKey?.currentContext?.findRenderObject();
+      final page = context.findRenderObject();
+      if (title is RenderBox && title.hasSize && page is RenderBox) {
+        final bottom = title
+            .localToGlobal(Offset(0, title.size.height), ancestor: page)
+            .dy;
+        _titleShown.value = bottom <= MediaQuery.viewPaddingOf(context).top;
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(IslandScaffold oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.headerTitleKey != oldWidget.headerTitleKey) {
+      _titleShown.value = widget.headerTitleKey == null;
+    }
+  }
 
   @override
   void dispose() {
@@ -92,17 +118,15 @@ class _IslandScaffoldState extends State<IslandScaffold> {
   }
 
   bool _onScroll(ScrollUpdateNotification notification) {
-    final start = widget.fadeTitleAfter;
-    if (start != null &&
-        notification.depth == 0 &&
-        notification.metrics.axis == Axis.vertical) {
-      _titleShown.value = notification.metrics.pixels > start;
+    if (notification.depth == 0 && notification.metrics.axis == Axis.vertical) {
+      _scheduleTitleVisibility();
     }
     return false;
   }
 
   @override
   Widget build(BuildContext context) {
+    _scheduleTitleVisibility();
     final media = MediaQuery.of(context);
     // Room for the desktop rail, which floats over the page's background.
     final left = media.padding.left;
@@ -123,7 +147,13 @@ class _IslandScaffoldState extends State<IslandScaffold> {
                     left: 0,
                   ),
                 ),
-                child: widget.body,
+                child: NotificationListener<ScrollMetricsNotification>(
+                  onNotification: (_) {
+                    _scheduleTitleVisibility();
+                    return false;
+                  },
+                  child: widget.body,
+                ),
               ),
             ),
           ),

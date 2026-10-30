@@ -29,6 +29,7 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/local_sync/sync_data.dart';
 import 'package:musify/services/local_sync/sync_merge.dart';
+import 'package:musify/services/moods/moods_preferences.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
 
@@ -113,7 +114,9 @@ class LibraryMergeService {
     final user = Hive.box('user');
     return {
       for (final key in syncCategoryKeys.values.expand((keys) => keys))
-        if (key != 'wrappedListeningStats' || user.get(key) != null)
+        // A recap or a tuning never made is no data, not an empty one.
+        if ((key != 'wrappedListeningStats' && key != 'moodsTuning') ||
+            user.get(key) != null)
           key: encodeSyncValue(user.get(key, defaultValue: [])),
     };
   }
@@ -259,6 +262,7 @@ class LibraryMergeService {
     reloadSettingsFromStorage();
     reloadSongLibraryStateFromStorage();
     reloadPlaylistLibraryStateFromStorage();
+    reloadMoodsFromStorage();
     reloadSearchHistoryFromStorage();
     listeningStatsService.reload();
   }

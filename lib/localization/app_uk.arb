@@ -278,7 +278,7 @@
   "tools": "Інструменти",
   "topSongs": "Топ пісні",
   "translate": "Перекласти",
-  "translateDescription": "Допоможіть перекласти Zenify вашою мовою на Crowdin.",
+  "translateDescription": "Допоможіть перекласти Zenify, редагуючи файли перекладів. Натисніть, щоб відкрити файли та інструкції.",
   "understand": "Я розумію",
   "undo": "Скасувати",
   "unpinFromLibrary": "Відкріпити з бібліотеки",

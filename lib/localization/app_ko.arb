@@ -278,7 +278,7 @@
   "tools": "도구",
   "topSongs": "Top songs",
   "translate": "Translate",
-  "translateDescription": "Help translate Zenify into your language on Crowdin.",
+  "translateDescription": "번역 파일을 편집하여 Zenify 번역에 참여하세요. 파일과 안내를 보려면 탭하세요.",
   "understand": "이해했음",
   "undo": "실행 취소",
   "unpinFromLibrary": "Unpin from library",

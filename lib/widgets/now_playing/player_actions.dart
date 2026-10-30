@@ -261,8 +261,8 @@ class _PlayerActionsState extends State<PlayerActions> {
   }
 }
 
-/// The actions in a wide floating bar that scrolls sideways when they do
-/// not fit, in the island's style.
+/// The actions in a wide floating bar, in the island's style, all of them
+/// always in view.
 class PlayerActionBar extends StatelessWidget {
   const PlayerActionBar({super.key, required this.child});
 
@@ -274,12 +274,11 @@ class PlayerActionBar extends StatelessWidget {
       grouped: true,
       child: SizedBox(
         height: 64,
-        child: Center(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: child,
-          ),
+        // Every button stays in view: as wide as the artwork, a narrow
+        // window shrinks them a little instead of hiding the last ones.
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: FittedBox(fit: BoxFit.scaleDown, child: child),
         ),
       ),
     );

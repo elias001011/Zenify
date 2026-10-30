@@ -78,13 +78,28 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     showPlayerVisualizer.value = true;
     floatingEffect.value = FloatingEffect.solid;
+    waveReading.value = WaveReading.precise;
   });
   tearDown(() async {
     debugDefaultTargetPlatformOverride = null;
     showPlayerVisualizer.value = false;
     floatingEffect.value = FloatingEffect.solid;
+    waveReading.value = WaveReading.simple;
     binding.defaultBinaryMessenger.setMockMethodCallHandler(methods, null);
     binding.defaultBinaryMessenger.setMockMethodCallHandler(frames, null);
+  });
+
+  test('the simple reading never asks for access or reads audio', () async {
+    waveReading.value = WaveReading.simple;
+    permission = true;
+    expect(await AudioLevels.available, isFalse);
+    expect(listens, 0);
+  });
+
+  test('the precise reading reads only once access is granted', () async {
+    expect(await AudioLevels.available, isFalse);
+    expect(await AudioLevels.requestAccess(), isTrue);
+    expect(await AudioLevels.available, isTrue);
   });
 
   test(

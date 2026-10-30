@@ -69,7 +69,14 @@ class GlowColors {
       _reveal = AnimationController(
         vsync: vsync,
         duration: const Duration(milliseconds: 1400),
-      );
+      ) {
+    _transition.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _from = {};
+        _indices = _to.keys.toSet();
+      }
+    });
+  }
 
   final AnimationController _transition;
   final AnimationController _reveal;
@@ -79,9 +86,11 @@ class GlowColors {
   List<String?>? _sources;
   Color? _appColor;
   int _generation = 0;
+  Timer? _flush;
+  Set<int> _indices = {};
 
   /// Indices that have a glow now or are easing out of one.
-  Iterable<int> get indices => {..._from.keys, ..._to.keys};
+  Iterable<int> get indices => _indices;
 
   /// 0 to 1 while the glow first expands; painters fade it in with this.
   double get reveal => Curves.easeOutCubic.transform(_reveal.value);
@@ -108,6 +117,8 @@ class GlowColors {
     _sources = List.of(sources);
     _appColor = appColor;
     final generation = ++_generation;
+    _flush?.cancel();
+    _flush = null;
 
     final next = <int, Color>{};
     final pending = <Future<(int, Color?)>>[];
@@ -129,13 +140,12 @@ class GlowColors {
     // Colours still to read arrive in batches, at most one transition per
     // 150 ms, so neither a slow artwork nor many quick ones hold the rest.
     final arrived = <int, Color>{};
-    Timer? flush;
     for (final read in pending) {
       read.then((found) {
         if (generation != _generation) return;
         arrived[found.$1] = found.$2 ?? appColor;
-        flush ??= Timer(const Duration(milliseconds: 150), () {
-          flush = null;
+        _flush ??= Timer(const Duration(milliseconds: 150), () {
+          _flush = null;
           if (generation != _generation || arrived.isEmpty) return;
           _retarget({..._to, ...arrived});
           arrived.clear();
@@ -154,21 +164,44 @@ class GlowColors {
   }
 
   void _maybeReveal() {
-    if (!_held && _to.isNotEmpty && _reveal.isDismissed) _reveal.forward();
+    if (!_held &&
+        _to.isNotEmpty &&
+        !_reveal.isCompleted &&
+        !_reveal.isAnimating) {
+      _reveal.forward();
+    }
   }
 
   void _retarget(Map<int, Color> next) {
+    if (mapEquals(next, _to)) {
+      if (!_transition.isCompleted && !_transition.isAnimating) {
+        _transition.forward();
+      }
+      _maybeReveal();
+      return;
+    }
     _from = {
       for (final i in indices)
         if (colorAt(i) case final color? when color.a > 0) i: color,
     };
     _to = next;
+    _indices = {..._from.keys, ..._to.keys};
     _transition.forward(from: 0);
     _maybeReveal();
   }
 
-  void dispose() {
+  /// Stops frames and discards pending colours while the effect is off.
+  void suspend() {
     _generation++;
+    _flush?.cancel();
+    _flush = null;
+    _sources = null;
+    _transition.stop();
+    _reveal.stop();
+  }
+
+  void dispose() {
+    suspend();
     _transition.dispose();
     _reveal.dispose();
   }
@@ -186,7 +219,10 @@ mixin GlowColorsHost<T extends StatefulWidget> on TickerProviderStateMixin<T> {
   // With the dynamic background off nothing is read or animated: no artwork
   // colours, no transitions asking for frames. Turning it on catches up.
   void _updateGlow() {
-    if (!dynamicBackground.value) return;
+    if (!dynamicBackground.value) {
+      _glowColors?.suspend();
+      return;
+    }
     glowColors.update(glowSources, Theme.of(context).colorScheme.primary);
   }
 

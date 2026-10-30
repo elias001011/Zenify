@@ -26,11 +26,13 @@ class PlaylistSliverAppBar extends StatelessWidget {
   const PlaylistSliverAppBar({
     super.key,
     required this.title,
+    this.titleKey,
     required this.playlist,
     this.cubeIcon = FluentIcons.text_bullet_list_24_filled,
   });
 
   final String title;
+  final GlobalKey? titleKey;
   final Map playlist;
   final IconData cubeIcon;
 
@@ -38,10 +40,6 @@ class PlaylistSliverAppBar extends StatelessWidget {
     final size = MediaQuery.sizeOf(context);
     return size.width > size.height ? 260 : 220;
   }
-
-  /// Where the island starts fading the title in.
-  static double titleFadeStart(BuildContext context) =>
-      _artworkHeight(context) + 16;
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +60,7 @@ class PlaylistSliverAppBar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Text(
               title,
+              key: titleKey,
               textAlign: TextAlign.center,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,

@@ -27,7 +27,20 @@ const syncSchemaVersion = 3;
 const maxSyncImageCharacters = 16 * 1024 * 1024;
 const maxSyncMessageBytes = 64 * 1024 * 1024;
 
-enum SyncCategory { favourites, playlists, recent, recap, searches, radio }
+enum SyncCategory {
+  favourites,
+  playlists,
+  recent,
+  recap,
+  searches,
+  radio,
+  moods,
+}
+
+/// Zenify's own categories. Musify Desktop Port and Musify with Local Sync
+/// reject a category they don't know, so these are announced apart from the
+/// rest and only exchanged between Zenify devices.
+const zenifyOnlySyncCategories = {SyncCategory.moods};
 
 const syncCategoryKeys = <SyncCategory, List<String>>{
   SyncCategory.favourites: ['likedSongs'],
@@ -42,6 +55,7 @@ const syncCategoryKeys = <SyncCategory, List<String>>{
   SyncCategory.recap: ['wrappedListeningStats'],
   SyncCategory.searches: ['searchHistory'],
   SyncCategory.radio: ['likedRadioStations'],
+  SyncCategory.moods: ['savedZenifyPlaylists', 'moodsTuning'],
 };
 
 Set<SyncCategory> parseSyncCategories(Object? raw) {

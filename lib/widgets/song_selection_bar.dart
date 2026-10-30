@@ -448,7 +448,9 @@ class _SelectionActionsState extends State<_SelectionActions> {
         ),
       ),
     );
-    if (!isDesktopPlatform) return actions;
+    if (!isDesktopPlatform || MediaQuery.sizeOf(context).width < 600) {
+      return actions;
+    }
     return ValueListenableBuilder<(bool, bool)>(
       valueListenable: _edges,
       child: actions,

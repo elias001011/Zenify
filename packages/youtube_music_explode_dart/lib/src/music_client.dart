@@ -136,6 +136,101 @@ class MusicArtistProfile {
   final List<MusicArtist> relatedArtists;
 }
 
+/// How a YouTube Music track was uploaded.
+enum MusicVideoType {
+  /// The audio of a release (`MUSIC_VIDEO_TYPE_ATV`).
+  song,
+
+  /// An official music video (`MUSIC_VIDEO_TYPE_OMV`).
+  officialVideo,
+
+  /// Anything a user uploaded (`MUSIC_VIDEO_TYPE_UGC`): covers, fan edits,
+  /// hour-long mixes, ambient sounds.
+  userUpload,
+
+  /// A podcast episode or a type this client doesn't know.
+  other,
+}
+
+/// A track as YouTube Music lists it in a queue or a playlist.
+class MusicTrack {
+  const MusicTrack({
+    required this.video,
+    required this.type,
+    this.artistId,
+    this.album,
+    this.thumbnailUrl,
+  });
+
+  /// The track's id, title, credited artists and duration. Only the fields
+  /// YouTube Music lists in a row are known, the rest is left empty.
+  final Video video;
+
+  /// How the track was uploaded.
+  final MusicVideoType type;
+
+  /// Channel id of the first credited artist, when its name links to its
+  /// page.
+  final String? artistId;
+
+  /// Album title, when YouTube Music lists one (songs only).
+  final String? album;
+
+  /// Largest artwork URL YouTube Music lists for the track.
+  final String? thumbnailUrl;
+
+  @override
+  String toString() => 'MusicTrack(${video.id}, ${video.title})';
+}
+
+/// A playlist as listed on a YouTube Music shelf.
+class MusicPlaylistSummary {
+  const MusicPlaylistSummary({
+    required this.id,
+    required this.title,
+    this.thumbnailUrl,
+    this.shelf,
+  });
+
+  /// Playlist id, without the `VL` browse prefix.
+  final String id;
+
+  /// Display title of the playlist.
+  final String title;
+
+  /// Playlist artwork URL, when YouTube Music exposes one.
+  final String? thumbnailUrl;
+
+  /// Title of the shelf the playlist sits on, e.g. `Chill pop`.
+  final String? shelf;
+
+  @override
+  String toString() => 'MusicPlaylistSummary($id, $title)';
+}
+
+/// An entry of YouTube Music's "Moods & genres" page.
+class MusicMood {
+  const MusicMood({
+    required this.title,
+    required this.params,
+    required this.isGenre,
+  });
+
+  /// Display title, e.g. `Feel good` or `Jazz`.
+  final String title;
+
+  /// Browse params for [MusicClient.getMoodPlaylists]. They expire: read
+  /// them again from [MusicClient.getMoods] instead of storing them for
+  /// long.
+  final String params;
+
+  /// Whether the entry is a genre rather than a mood or moment.
+  final bool isGenre;
+
+  @override
+  String toString() => 'MusicMood($title)';
+}
+
 /// Queries the YouTube Music (`WEB_REMIX`) browse endpoints.
 class MusicClient {
   /// Initializes an instance of [MusicClient].
@@ -428,6 +523,266 @@ class MusicClient {
     return null;
   }
 
+  /// The radio YouTube Music plays after [videoId]: about 50 tracks like it,
+  /// starting with the track itself. A song seeds a radio of songs, an
+  /// official video one of official videos. [country] (ISO 3166-1 alpha-2)
+  /// biases the picks towards a region; [language] (e.g. `pt`) sets the
+  /// language of the answer, English by default. The other calls take both
+  /// too.
+  Future<List<MusicTrack>> getRadio(
+    String videoId, {
+    String? country,
+    String? language,
+  }) async {
+    final id = VideoId(videoId).value;
+    final root = await _httpClient.sendPost('next', {
+      'context': _contextFor(country, language),
+      'videoId': id,
+      'playlistId': 'RDAMVM$id',
+      'isAudioOnly': true,
+      'enablePersistentPlaylistPanel': true,
+    });
+
+    final tracks = <MusicTrack>[];
+    final seen = <String>{};
+    for (final item in _findRenderers(root, 'playlistPanelVideoRenderer')) {
+      final trackId = item.getValue<String>('videoId');
+      if (trackId == null || !seen.add(trackId)) continue;
+      final title = _runsText(item.getMap('title'))?.trim();
+      if (title == null || title.isEmpty) continue;
+
+      // `Artist • Album • 2019` for songs, `Artist • 1.2B views • …` for
+      // videos.
+      final byline = item.getMap('longBylineText');
+      final parts = _splitBullets(_runsText(byline));
+      final type = _videoTypeOf(item);
+      final thumbnails = item.getMap('thumbnail')?.getList('thumbnails');
+      final thumbnail = thumbnails == null || thumbnails.isEmpty
+          ? null
+          : thumbnails.last;
+      tracks.add(
+        MusicTrack(
+          video: _trackVideoFrom(
+            trackId,
+            title,
+            parts.isEmpty ? '' : parts.first,
+            _parseDuration(_runsText(item.getMap('lengthText'))),
+          ),
+          type: type,
+          artistId: _artistIdIn(byline),
+          album: type == MusicVideoType.song && parts.length > 1
+              ? parts[1]
+              : null,
+          thumbnailUrl: thumbnail is Map
+              ? thumbnail.cast<String, dynamic>().getValue<String>('url')
+              : null,
+        ),
+      );
+    }
+    return tracks;
+  }
+
+  /// The tracks of a playlist: its first page, which holds the first 100
+  /// tracks or so. [playlistId] may carry the `VL` browse prefix.
+  Future<List<MusicTrack>> getPlaylistTracks(
+    String playlistId, {
+    String? country,
+    String? language,
+  }) async {
+    final browseId = playlistId.startsWith('VL') ? playlistId : 'VL$playlistId';
+    final root = await _httpClient.sendPost('browse', {
+      'context': _contextFor(country, language),
+      'browseId': browseId,
+    });
+
+    final tracks = <MusicTrack>[];
+    final seen = <String>{};
+    for (final item in _findRenderers(
+      root,
+      'musicResponsiveListItemRenderer',
+    )) {
+      final trackId =
+          item.getMap('playlistItemData')?.getValue<String>('videoId') ??
+          _trackVideoId(item);
+      if (trackId == null || !seen.add(trackId)) continue;
+      final title = _flexColumnText(item, 0)?.trim();
+      if (title == null || title.isEmpty) continue;
+
+      final artistColumn = _flexColumn(item, 1);
+      final albumColumn = _flexColumn(item, 2);
+      tracks.add(
+        MusicTrack(
+          video: _trackVideoFrom(
+            trackId,
+            title,
+            _runsText(artistColumn) ?? '',
+            _parseDuration(_fixedColumnText(item)),
+          ),
+          type: _videoTypeOf(item),
+          artistId: _artistIdIn(artistColumn),
+          album: _runsText(albumColumn),
+          thumbnailUrl: _thumbnailUrl(item, 'thumbnail'),
+        ),
+      );
+    }
+    return tracks;
+  }
+
+  /// The chart playlists of YouTube Music's Charts page for [country]
+  /// (ISO 3166-1 alpha-2, `ZZ` for global), e.g. `Top 100 Music Videos
+  /// Global`. Without signing in YouTube Music lists video charts only.
+  Future<List<MusicPlaylistSummary>> getCharts({
+    String country = 'ZZ',
+    String? language,
+  }) async {
+    final root = await _httpClient.sendPost('browse', {
+      'context': _contextFor(null, language),
+      'browseId': 'FEmusic_charts',
+      'formData': {
+        'selectedValues': [country],
+      },
+    });
+    return _collectPlaylists(root);
+  }
+
+  /// YouTube Music's moods and moments (`Chill`, `Feel good`, `Workout`…)
+  /// and genres, in its own order. [country] decides the regional genres
+  /// listed.
+  Future<List<MusicMood>> getMoods({String? country, String? language}) async {
+    final root = await _httpClient.sendPost('browse', {
+      'context': _contextFor(country, language),
+      'browseId': 'FEmusic_moods_and_genres',
+    });
+
+    final moods = <MusicMood>[];
+    var grid = 0;
+    for (final section in _findRenderers(root, 'gridRenderer')) {
+      final items = section.getList('items') ?? const [];
+      for (final item in items.whereType<Map>()) {
+        final button = item.cast<String, dynamic>().getMap(
+          'musicNavigationButtonRenderer',
+        );
+        final title = _runsText(button?.getMap('buttonText'))?.trim();
+        final params = button
+            ?.getMap('clickCommand')
+            ?.getMap('browseEndpoint')
+            ?.getValue<String>('params');
+        if (title == null || title.isEmpty || params == null) continue;
+        // The page lists moods and moments first, genres second.
+        moods.add(MusicMood(title: title, params: params, isGenre: grid > 0));
+      }
+      grid++;
+    }
+    return moods;
+  }
+
+  /// The playlists YouTube Music curates for a mood or genre, by shelf.
+  /// [params] comes from a current [getMoods] answer.
+  Future<List<MusicPlaylistSummary>> getMoodPlaylists(
+    String params, {
+    String? country,
+    String? language,
+  }) async {
+    final root = await _httpClient.sendPost('browse', {
+      'context': _contextFor(country, language),
+      'browseId': 'FEmusic_moods_and_genres_category',
+      'params': params,
+    });
+    return _collectPlaylists(root);
+  }
+
+  /// The client context for a region ([country], ISO 3166-1 alpha-2) and a
+  /// display [language] (e.g. `pt`), when given; English otherwise.
+  Map<String, dynamic> _contextFor(String? country, [String? language]) =>
+      country == null && language == null
+      ? _remixContext
+      : {
+          'client': {
+            ...(_remixContext['client']! as Map<String, dynamic>),
+            if (country != null) 'gl': country,
+            if (language != null) 'hl': language,
+          },
+        };
+
+  /// Every playlist of the shelves under [root], with its shelf's title.
+  List<MusicPlaylistSummary> _collectPlaylists(_JsonMap root) {
+    final playlists = <String, MusicPlaylistSummary>{};
+    void collect(dynamic node, String? shelf) {
+      for (final item in _findRenderers(node, 'musicTwoRowItemRenderer')) {
+        final browseId = item
+            .getMap('navigationEndpoint')
+            ?.getMap('browseEndpoint')
+            ?.getValue<String>('browseId');
+        if (browseId == null || !browseId.startsWith('VL')) continue;
+        final title = _runsText(item.getMap('title'))?.trim();
+        if (title == null || title.isEmpty) continue;
+        final id = browseId.substring(2);
+        playlists.putIfAbsent(
+          id,
+          () => MusicPlaylistSummary(
+            id: id,
+            title: title,
+            thumbnailUrl: _thumbnailUrl(item, 'thumbnailRenderer'),
+            shelf: shelf,
+          ),
+        );
+      }
+    }
+
+    for (final shelf in [
+      ..._findRenderers(root, 'musicCarouselShelfRenderer'),
+      ..._findRenderers(root, 'gridRenderer'),
+    ]) {
+      final header =
+          shelf
+              .getMap('header')
+              ?.getMap('musicCarouselShelfBasicHeaderRenderer')
+              ?.getMap('title') ??
+          shelf.getMap('header')?.getMap('gridHeaderRenderer')?.getMap('title');
+      collect(shelf, _runsText(header)?.trim());
+    }
+    return playlists.values.toList();
+  }
+
+  MusicVideoType _videoTypeOf(_JsonMap item) {
+    for (final config in _findRenderers(item, 'watchEndpointMusicConfig')) {
+      switch (config.getValue<String>('musicVideoType')) {
+        case 'MUSIC_VIDEO_TYPE_ATV':
+          return MusicVideoType.song;
+        case 'MUSIC_VIDEO_TYPE_OMV':
+          return MusicVideoType.officialVideo;
+        case 'MUSIC_VIDEO_TYPE_UGC':
+          return MusicVideoType.userUpload;
+      }
+    }
+    return MusicVideoType.other;
+  }
+
+  /// The channel id of the first artist linked in a text's runs.
+  String? _artistIdIn(_JsonMap? text) {
+    for (final run in text?.getList('runs') ?? const []) {
+      if (run is! Map) continue;
+      final browseId = run
+          .cast<String, dynamic>()
+          .getMap('navigationEndpoint')
+          ?.getMap('browseEndpoint')
+          ?.getValue<String>('browseId');
+      if (browseId != null && browseId.startsWith('UC')) return browseId;
+    }
+    return null;
+  }
+
+  _JsonMap? _flexColumn(_JsonMap item, int index) {
+    final columns = item.getList('flexColumns');
+    if (columns == null || columns.length <= index) return null;
+    final column = columns[index];
+    if (column is! Map) return null;
+    return column
+        .cast<String, dynamic>()
+        .getMap('musicResponsiveListItemFlexColumnRenderer')
+        ?.getMap('text');
+  }
+
   Future<_JsonMap> _browse(String browseId, {String? params}) {
     return _httpClient.sendPost('browse', {
       'context': _remixContext,
@@ -503,7 +858,21 @@ class MusicClient {
     String title,
     String author,
     String? channelId,
-  ) {
+  ) => _trackVideoFrom(
+    videoId,
+    title,
+    author,
+    _parseDuration(_fixedColumnText(item)),
+    channelId,
+  );
+
+  Video _trackVideoFrom(
+    String videoId,
+    String title,
+    String author,
+    Duration? duration, [
+    String? channelId,
+  ]) {
     return Video(
       VideoId(videoId),
       title,
@@ -513,7 +882,7 @@ class MusicClient {
       null,
       null,
       '',
-      _parseDuration(_fixedColumnText(item)),
+      duration,
       ThumbnailSet(videoId),
       null,
       const Engagement(0, null, null),
@@ -648,18 +1017,8 @@ class MusicClient {
         ?.getValue<String>('videoId');
   }
 
-  String? _flexColumnText(_JsonMap item, int index) {
-    final columns = item.getList('flexColumns');
-    if (columns == null || columns.length <= index) return null;
-    final column = columns[index];
-    if (column is! Map) return null;
-    return _runsText(
-      column
-          .cast<String, dynamic>()
-          .getMap('musicResponsiveListItemFlexColumnRenderer')
-          ?.getMap('text'),
-    );
-  }
+  String? _flexColumnText(_JsonMap item, int index) =>
+      _runsText(_flexColumn(item, index));
 
   String? _runsText(_JsonMap? node) {
     final runs = node?.getList('runs')?.whereType<Map>().parseRuns();

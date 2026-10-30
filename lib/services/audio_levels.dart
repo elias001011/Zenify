@@ -23,13 +23,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart'
     show AppLifecycleListener, AppLifecycleState, WidgetsBinding;
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -43,11 +43,12 @@ typedef _Frame = ({double loud, List<double> bands});
 
 /// Live levels of the audio Zenify plays, for the player's waves.
 ///
-/// Desktop reads them from filters in libmpv, which plays the audio anyway.
-/// Android reads them from its Visualizer, which needs the audio recording
-/// permission, so phones only use it once the user allows it. Either way the
-/// reader runs only while something listens, the app is in view and, on
-/// desktop, something plays.
+/// Only with [WaveReading.precise]; the simple reading is the waves' own
+/// motion. Desktop reads them from filters in libmpv, which plays the audio
+/// anyway. Android reads them from its Visualizer, which needs the audio
+/// recording permission, asked for when the user chooses the precise reading.
+/// Either way the reader runs only while something listens, the app is in
+/// view and something plays.
 class AudioLevels {
   AudioLevels._();
 
@@ -88,8 +89,10 @@ class AudioLevels {
     JustAudioMediaKit.pitch = false;
   }
 
-  /// Whether levels can be read without asking the user anything.
+  /// Whether levels can be read now: the precise reading is chosen and, on
+  /// Android, its permission still granted.
   static Future<bool> get available async {
+    if (waveReading.value != WaveReading.precise) return false;
     if (isDesktopPlatform) return MediaKitPlayer.latest != null;
     if (!isAndroidPlatform) return false;
     try {
@@ -101,20 +104,12 @@ class AudioLevels {
     }
   }
 
-  /// Whether this platform can read levels once the user allows it.
-  static bool get canAsk => isAndroidPlatform;
-
-  /// Existing visualizers reconnect when access is granted in the player.
-  static final _accessChanged = ValueNotifier(0);
-  static ValueListenable<int> get accessChanged => _accessChanged;
-
-  /// Asks for the audio recording permission (Android); true once granted.
+  /// Asks for the audio recording permission the precise reading needs on
+  /// Android; true once granted, and right away elsewhere.
   static Future<bool> requestAccess() async {
+    if (!isAndroidPlatform) return true;
     try {
-      final granted =
-          await _methods.invokeMethod<bool>('requestPermission') ?? false;
-      if (granted) _accessChanged.value++;
-      return granted;
+      return await _methods.invokeMethod<bool>('requestPermission') ?? false;
     } on PlatformException {
       return false;
     } on MissingPluginException {

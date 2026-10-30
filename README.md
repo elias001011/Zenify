@@ -31,6 +31,7 @@ moving your library between devices.
 | Interface | Material app bars and bottom navigation | Floating island, dock and desktop rail; solid, translucent or blurred |
 | Background | Plain | Optional dynamic background in your albums' colours |
 | Player | Flip card with lyrics | Integrated lyrics and queue panels, sound waves and a floating action bar |
+| Discovery | Recommendations and automatic song picker | Optional Moods, personal Mix and Zenify playlists, with taste tuning |
 | Playlists | Single-song actions | Multi-selection in tap order, batch actions, moving songs and drag-to-reorder for custom playlists |
 | Resume | Recently played songs | Saved queue, shuffle order and playback position, restored while paused |
 | Library | Sections | Filters (custom, YouTube, albums, artists, offline) and its own search, songs included; global search lists what you own first |
@@ -72,9 +73,17 @@ New in Zenify:
   and queue open beside it on desktop; on phones they share the artwork's
   space through the same animated transition. Tapping the artwork switches
   to sound waves. They follow the music when audio levels are available and
-  keep a gentle motion when capture is unavailable. While audio loads or
-  capture recovers, the current Zenify logo appears. Android keeps the
+  keep a gentle motion with the simple reading or when capture is unavailable.
+  Choose simple or precise reading from the player; paused or buffering audio
+  freezes the waves. Android keeps the
   screen awake while lyrics are open.
+- **Moods and personal playlists**: start a Mix or choose a mood, and find
+  daily, discovery and genre playlists below Time Machine on Home. Tune
+  discovery, exclude genres or block artists in Settings. Moods can be
+  switched off and stay inactive in offline mode. Saved Zenify playlists and
+  tuning travel with backups and Local Sync.
+- **Artist and playlist radios**: start a radio from an artist or playlist;
+  YouTube Music supplies the queue, with the automatic picker as a fallback.
 - **Multi-selection**: long-press a song to select several tracks in the order
   you tap them. Play next, add to the queue or another playlist, like, download
   or remove a batch. Custom playlists also support moving songs to another
@@ -83,7 +92,7 @@ New in Zenify:
   On desktop, arrows and the mouse wheel scroll the batch actions.
 - **Pick up where you stopped**: the queue and playback position survive app
   restarts. The app opens paused and loads audio when you press play. This
-  stays on the device; queues over 1,000 songs retain a window around the
+  stays on the device; queues over 500 songs retain a window around the
   current track.
 - **Search by YouTube link**: paste a watch, share, Shorts, live or embed link
   to find that exact video, alongside the regular text search.
@@ -161,7 +170,7 @@ supported.
 
 ## Roadmap
 
-- Translations through Crowdin
+- More community translations through [translation files and pull requests](CONTRIBUTING.md#translations)
 - More of the interface following the dynamic background
 
 ---
@@ -180,6 +189,9 @@ Contributions are welcome. Please read the
 - [Musify Desktop Port](https://github.com/elias001011/Musify-Desktop-Port):
   where the desktop features, Local Sync and packaging of this fork were first
   built and tested.
+- [youtube_music_explode_dart](https://github.com/elias001011/youtube_music_explode_dart):
+  the fork maintained by Elias for Zenify’s YouTube Music integration
+  (radios, playlists, charts and moods).
 - [Musify](https://github.com/Harsh-23/Musify) by Harsh-23: the original
   inspiration for the concept and name of Musify.
 

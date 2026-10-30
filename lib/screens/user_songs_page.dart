@@ -57,6 +57,7 @@ class UserSongsPage extends StatefulWidget {
 }
 
 class _UserSongsPageState extends State<UserSongsPage> {
+  final _headerTitleKey = GlobalKey();
   final _selection = SongSelectionController();
   final ValueNotifier<String> _searchQueryNotifier = ValueNotifier('');
 
@@ -99,7 +100,7 @@ class _UserSongsPageState extends State<UserSongsPage> {
       ),
       child: IslandScaffold(
         title: title,
-        fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
+        headerTitleKey: _headerTitleKey,
         background: const PageGlow(source: null),
         onFilter: (value) => _searchQueryNotifier.value = value,
         onBack: () {
@@ -183,6 +184,7 @@ class _UserSongsPageState extends State<UserSongsPage> {
     return CustomScrollView(
       slivers: [
         PlaylistSliverAppBar(
+          titleKey: _headerTitleKey,
           title: title,
           playlist: {'title': title},
           cubeIcon: icon,

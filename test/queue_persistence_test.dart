@@ -157,4 +157,26 @@ void main() {
       );
     },
   );
+
+  test(
+    'restores radio continuation and resets it for an ordinary playlist',
+    () async {
+      final songs = [song(1), song(2)];
+      memory.saveQueue(songs, songs, 0, keepGoing: true);
+      await memory.flush();
+      await Hive.box('userNoBackup').close();
+      await Hive.openBox('userNoBackup');
+      expect(QueuePersistenceService().read()!.keepGoing, isTrue);
+      memory.saveQueue(songs, songs, 0);
+      await memory.flush();
+      expect(QueuePersistenceService().read()!.keepGoing, isFalse);
+      final box = Hive.box('userNoBackup');
+      await box.put(
+        QueuePersistenceService.queueKey,
+        Map.of(box.get(QueuePersistenceService.queueKey) as Map)
+          ..remove('keepGoing'),
+      );
+      expect(QueuePersistenceService().read()!.keepGoing, isFalse);
+    },
+  );
 }

@@ -30,6 +30,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlist_sharing.dart';
 import 'package:musify/services/playlists_manager.dart';
@@ -51,6 +52,7 @@ import 'package:musify/widgets/playlist_page/like_button.dart';
 import 'package:musify/widgets/playlist_page/playlist_action_buttons.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
+import 'package:musify/widgets/playlist_page/radio_button.dart';
 import 'package:musify/widgets/playlist_page/sync_button.dart';
 import 'package:musify/widgets/recommended_songs_section.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -80,6 +82,7 @@ class PlaylistPage extends StatefulWidget {
 }
 
 class _PlaylistPageState extends State<PlaylistPage> {
+  final _headerTitleKey = GlobalKey();
   dynamic _playlist;
 
   /// Canonical (storage) order; `_playlist['list']` is always derived from it.
@@ -142,7 +145,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
       final resolvedId =
           initialPlaylist?['ytid']?.toString() ?? widget.playlistId;
 
-      if (initialPlaylist != null) {
+      if (MoodsService.isZenifyPlaylist(resolvedId)) {
+        _playlist = await moodsService.playlist(resolvedId!);
+      } else if (initialPlaylist != null) {
         _playlist = initialPlaylist;
         final playlistList = _playlist?['list'] as List?;
         final shouldFetchInitialPlaylist =
@@ -218,7 +223,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
   Widget _buildScaffold(BuildContext context) {
     return IslandScaffold(
       title: _playlist != null ? _playlistTitle : '',
-      fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
+      headerTitleKey: _headerTitleKey,
       onFilter: (value) {
         _searchQueryNotifier.value = value;
         if (_reorderEnabled && value.trim().isNotEmpty) {
@@ -246,6 +251,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
             ? CustomScrollView(
                 slivers: [
                   PlaylistSliverAppBar(
+                    titleKey: _headerTitleKey,
                     title: _playlistTitle,
                     playlist: _playlist,
                     cubeIcon: widget.cubeIcon,
@@ -391,6 +397,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
   Widget _buildHeaderSection() {
     final songsLength = (_playlist['list'] as List? ?? const []).length;
     final isUserCreated = _playlist['source'] == 'user-created';
+    // Zenify's playlists change on their own: saved, never downloaded or
+    // edited. Their songs can still go to the user's playlists.
+    final isZenify = _playlist['source'] == 'zenify';
     final hasSecondaryActions =
         (widget.playlistId != null && !isUserCreated && !offlineMode.value) ||
         !offlineMode.value ||
@@ -404,6 +413,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
           isAlbum: _playlist['isAlbum'] == true,
           isArtist: widget.isArtist,
           showTitle: false,
+          description: isZenify ? _playlist['description']?.toString() : null,
         ),
         if (songsLength > 0)
           PlaylistActionButtons(
@@ -428,7 +438,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             spacing: 5,
             children: [
-              if (widget.playlistId != null &&
+              if (isZenify)
+                ZenifyPlaylistSaveButton(id: _resolvedPlaylistId ?? '')
+              else if (widget.playlistId != null &&
                   !isUserCreated &&
                   !offlineMode.value)
                 PlaylistLikeButton(
@@ -439,9 +451,18 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 PlaylistAddToPlaylistButton(
                   resolvePlaylist: () async => _playlist,
                 ),
-                if (!isUserCreated) SyncButton(onSync: _handleSyncPlaylist),
+                if (!isUserCreated && !isZenify)
+                  SyncButton(onSync: _handleSyncPlaylist),
               ],
-              if (songsLength > 0) _buildDownloadButton(),
+              if (songsLength > 0 && !isZenify) _buildDownloadButton(),
+              // A Zenify playlist is already a mix of this kind.
+              if (songsLength > 0 && !isZenify && !offlineMode.value)
+                StartRadioButton(
+                  seeds: () => (List<Map>.from(
+                    (_playlist['list'] as List).whereType<Map>(),
+                  )..shuffle()),
+                  name: _playlistTitle,
+                ),
               if (isUserCreated) ...[
                 _buildShareButton(),
                 _buildEditButton(),
