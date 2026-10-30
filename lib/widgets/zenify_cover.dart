@@ -50,56 +50,72 @@ class ZenifyCover extends StatelessWidget {
 
     return SizedBox.square(
       dimension: size,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Under the artworks while they load, and alone without any.
-          ColoredBox(color: theme.colorScheme.primaryContainer),
-          if (covers.isEmpty)
-            const SizedBox.shrink()
-          else if (covers.length < 4)
-            art(covers.first)
-          else
-            GridView.count(
-              crossAxisCount: 2,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: EdgeInsets.zero,
-              children: [for (final cover in covers.take(4)) art(cover)],
-            ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.1),
-                  Colors.black.withValues(alpha: 0.75),
-                ],
-              ),
-            ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(size * 0.07),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppLogo(size: size * 0.14, color: Colors.white),
-                const Spacer(),
-                Text(
-                  playlist['title']?.toString() ?? '',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: size * 0.1,
-                    height: 1.1,
+      // Treat the composed cover like an image: weighted carousels crop it
+      // as a card narrows, without reflowing its title or adding a scrollable.
+      child: FittedBox(
+        fit: BoxFit.cover,
+        clipBehavior: Clip.hardEdge,
+        child: SizedBox.square(
+          dimension: size,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Under the artworks while they load, and alone without any.
+              ColoredBox(color: theme.colorScheme.primaryContainer),
+              if (covers.isEmpty)
+                const SizedBox.shrink()
+              else if (covers.length < 4)
+                art(covers.first)
+              else
+                Column(
+                  children: [
+                    for (var row = 0; row < 2; row++)
+                      Expanded(
+                        child: Row(
+                          children: [
+                            for (var column = 0; column < 2; column++)
+                              Expanded(child: art(covers[row * 2 + column])),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withValues(alpha: 0.1),
+                      Colors.black.withValues(alpha: 0.75),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              Padding(
+                padding: EdgeInsets.all(size * 0.07),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    AppLogo(size: size * 0.14, color: Colors.white),
+                    const Spacer(),
+                    Text(
+                      playlist['title']?.toString() ?? '',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: size * 0.1,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
