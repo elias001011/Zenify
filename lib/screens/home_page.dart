@@ -55,12 +55,15 @@ class _HomePageState extends State<HomePage> {
   late final Future<List> _suggestedPlaylistsFuture;
   late Future<List> _recommendedSongsFuture;
   Stream<List<Map>>? _zenifyPlaylists;
+  DateTime _zenifyLoadedAt = DateTime.now();
+  late final AppLifecycleListener _lifecycle;
 
   @override
   void initState() {
     super.initState();
     _loadZenifyPlaylists();
     moodsEnabled.addListener(_onMoodsToggled);
+    _lifecycle = AppLifecycleListener(onResume: _refreshIfStale);
     _suggestedPlaylistsFuture = getPlaylists(
       playlistsNum: suggestedPlaylistsNumber,
     );
@@ -72,10 +75,12 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     externalRecommendations.removeListener(_refreshRecommendedSongs);
     moodsEnabled.removeListener(_onMoodsToggled);
+    _lifecycle.dispose();
     super.dispose();
   }
 
   void _loadZenifyPlaylists() {
+    _zenifyLoadedAt = DateTime.now();
     _zenifyPlaylists = moodsEnabled.value
         ? moodsService.playlists().asBroadcastStream()
         : null;
@@ -83,6 +88,16 @@ class _HomePageState extends State<HomePage> {
 
   void _onMoodsToggled() {
     if (mounted) setState(_loadZenifyPlaylists);
+  }
+
+  /// Back in the app after a while, the playlist of the moment or of the
+  /// day may have changed; the rest come from the cache.
+  void _refreshIfStale() {
+    final now = DateTime.now();
+    final crossedSlot =
+        now.hour ~/ 4 != _zenifyLoadedAt.hour ~/ 4 ||
+        now.day != _zenifyLoadedAt.day;
+    if (crossedSlot) _onMoodsToggled();
   }
 
   void _refreshRecommendedSongs() {
@@ -173,7 +188,7 @@ class _HomePageState extends State<HomePage> {
         playlistHeight,
         snapshot.data ?? const [],
         title: context.l10n!.madeForYou,
-        icon: FluentIcons.sparkle_24_filled,
+        icon: FluentIcons.person_star_24_filled,
       ),
     );
   }
