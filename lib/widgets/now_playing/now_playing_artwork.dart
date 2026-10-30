@@ -100,9 +100,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
             dimension: size,
             // The card builds only the side in view, so the waves listen
             // to playback only while they show.
-            child: Center(
-              child: WaveVisualizer(size: size * 0.8, offerAccess: true),
-            ),
+            child: Center(child: WaveVisualizer(size: size * 0.8)),
           ),
         ),
       ),

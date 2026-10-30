@@ -21,20 +21,20 @@
 
 import 'dart:math';
 
-import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/widgets/app_logo.dart';
 
 class NullArtworkWidget extends StatelessWidget {
   const NullArtworkWidget({
     super.key,
-    this.icon = FluentIcons.music_note_1_24_regular,
+    this.icon,
     this.size = 220,
     this.iconSize,
     this.title,
     this.borderRadius = 20,
   });
 
-  final IconData icon;
+  final IconData? icon;
   final double? iconSize;
   final double size;
   final String? title;
@@ -73,11 +73,16 @@ class NullArtworkWidget extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: colorScheme.primaryContainer.withValues(alpha: 0.55),
                 ),
-                child: Icon(
-                  icon,
-                  size: calculatedIconSize,
-                  color: colorScheme.onPrimaryContainer,
-                ),
+                child: icon == null
+                    ? AppLogo(
+                        size: calculatedIconSize,
+                        color: colorScheme.onPrimaryContainer,
+                      )
+                    : Icon(
+                        icon,
+                        size: calculatedIconSize,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
               ),
               if (title != null) ...[
                 SizedBox(height: size * 0.045),

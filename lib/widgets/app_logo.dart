@@ -61,7 +61,7 @@ void paintZenifyWaves(
   }
 }
 
-/// The app's logo in one colour, drawn at its size so it stays sharp.
+/// The current five-bar launcher glyph, drawn sharply in one colour.
 class AppLogo extends StatelessWidget {
   const AppLogo({super.key, required this.size, required this.color});
 
@@ -84,9 +84,9 @@ class _AppLogoPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Bars are counted by the logical size: what reads at a glance.
+    // Match the five-bar silhouette used by the launcher at every size.
     final rect = (Offset.zero & size).deflate(size.width * 0.04);
-    paintZenifyWaves(canvas, rect, size.width, Paint()..color = color);
+    paintZenifyWaves(canvas, rect, size.width, Paint()..color = color, bars: 5);
   }
 
   @override

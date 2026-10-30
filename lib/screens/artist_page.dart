@@ -64,6 +64,8 @@ class ArtistPage extends StatefulWidget {
 }
 
 class _ArtistPageState extends State<ArtistPage> {
+  final _headerTitleKey = GlobalKey();
+
   /// Read the first time the page is shown online, and left alone offline,
   /// where the artist is its downloaded songs and there is nothing to read.
   Future<Map<String, dynamic>?>? _artistFuture;
@@ -215,7 +217,7 @@ class _ArtistPageState extends State<ArtistPage> {
       emptyWidget: _buildNotFoundPage(),
       builder: (context, _) => IslandScaffold(
         title: _artistTitle,
-        fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
+        headerTitleKey: _headerTitleKey,
         background: _artist == null
             ? null
             : PageGlow(source: _artist?['image']?.toString()),
@@ -224,6 +226,7 @@ class _ArtistPageState extends State<ArtistPage> {
           child: CustomScrollView(
             slivers: [
               PlaylistSliverAppBar(
+                titleKey: _headerTitleKey,
                 title: _artistTitle,
                 playlist: _artist!,
                 cubeIcon: FluentIcons.person_24_filled,

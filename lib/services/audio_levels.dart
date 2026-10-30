@@ -23,15 +23,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
-import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart'
     show AppLifecycleListener, AppLifecycleState, WidgetsBinding;
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/platform_utils.dart';
-import 'package:rxdart/rxdart.dart';
 
 /// What is playing right now, each from 0 to 1: how loud, how much a beat
 /// just hit (onset), and the level of each of [AudioLevels.bandCount]
@@ -44,17 +41,13 @@ typedef _Frame = ({double loud, List<double> bands});
 /// Live levels of the audio Zenify plays, for the player's waves.
 ///
 /// Desktop reads them from filters in libmpv, which plays the audio anyway.
-/// Android reads them from its Visualizer, which needs the audio recording
-/// permission, so phones only use it once the user allows it. Either way the
-/// reader runs only while something listens, the app is in view and, on
-/// desktop, something plays.
+/// Phones use a lightweight animation instead, with no audio capture or
+/// recording permission. The desktop reader runs only while listened to and
+/// while the app is visible.
 class AudioLevels {
   AudioLevels._();
 
   static const bandCount = 5;
-
-  static const _methods = MethodChannel('zenify/audio_levels');
-  static const _frames = MethodChannel('zenify/audio_levels/frames');
 
   /// mpv's label for the filters; their numbers land in `af-metadata/zviz`.
   /// They are installed at engine preparation and retained until disposal.
@@ -88,39 +81,9 @@ class AudioLevels {
     JustAudioMediaKit.pitch = false;
   }
 
-  /// Whether levels can be read without asking the user anything.
-  static Future<bool> get available async {
-    if (isDesktopPlatform) return MediaKitPlayer.latest != null;
-    if (!isAndroidPlatform) return false;
-    try {
-      return await _methods.invokeMethod<bool>('hasPermission') ?? false;
-    } on PlatformException {
-      return false;
-    } on MissingPluginException {
-      return false;
-    }
-  }
-
-  /// Whether this platform can read levels once the user allows it.
-  static bool get canAsk => isAndroidPlatform;
-
-  /// Existing visualizers reconnect when access is granted in the player.
-  static final _accessChanged = ValueNotifier(0);
-  static ValueListenable<int> get accessChanged => _accessChanged;
-
-  /// Asks for the audio recording permission (Android); true once granted.
-  static Future<bool> requestAccess() async {
-    try {
-      final granted =
-          await _methods.invokeMethod<bool>('requestPermission') ?? false;
-      if (granted) _accessChanged.value++;
-      return granted;
-    } on PlatformException {
-      return false;
-    } on MissingPluginException {
-      return false;
-    }
-  }
+  /// Phones never open an audio reader.
+  static Future<bool> get available async =>
+      isDesktopPlatform && MediaKitPlayer.latest != null;
 
   static StreamController<AudioLevel>? _levels;
 
@@ -128,6 +91,7 @@ class AudioLevels {
   /// player and the mini player) shares one reader, which stops with the
   /// last one and while the app is out of view.
   static Stream<AudioLevel> listen() {
+    if (!isDesktopPlatform) return const Stream.empty();
     StreamSubscription<_Frame>? source;
     AppLifecycleListener? lifecycle;
 
@@ -135,8 +99,8 @@ class AudioLevels {
     var visible = true;
     var transition = Future<void>.value();
 
-    // EventChannel cancellation is asynchronous. Finish releasing the old
-    // reader before attaching another, including after a surface remount.
+    // Finish releasing the old reader before attaching another, including
+    // after a surface remount.
     void update() {
       transition = transition.then((_) async {
         if (!listening || !visible) {
@@ -145,16 +109,14 @@ class AudioLevels {
         } else if (source == null) {
           var normalizer = _Normalizer();
           String? track;
-          source = (isDesktopPlatform ? _mpvFrames() : _androidFrames()).listen(
-            (frame) {
-              final current = audioHandler.mediaItem.valueOrNull?.id;
-              if (current != track) {
-                track = current;
-                normalizer = _Normalizer();
-              }
-              _levels?.add(normalizer(frame));
-            },
-          );
+          source = _mpvFrames().listen((frame) {
+            final current = audioHandler.mediaItem.valueOrNull?.id;
+            if (current != track) {
+              track = current;
+              normalizer = _Normalizer();
+            }
+            _levels?.add(normalizer(frame));
+          });
         }
       });
     }
@@ -185,78 +147,6 @@ class AudioLevels {
         update();
       },
     )).stream;
-  }
-
-  /// Readings from Android's Visualizer: the overall level, then each band.
-  /// Follows the player's audio session: none before the first playback
-  /// (session 0, the whole output, needs another permission) and a new one
-  /// when the player recreates it.
-  static Stream<_Frame> _androidFrames() {
-    return audioHandler.audioPlayer.androidAudioSessionIdStream
-        .whereType<int>()
-        .distinct()
-        .where((session) => session > 0)
-        .switchMap(_recoveringSessionFrames)
-        .map((event) {
-          final values = (event as List).cast<num>();
-          return (
-            loud: values[0].toDouble(),
-            bands: [for (final v in values.skip(1)) v.toDouble()],
-          );
-        })
-        // Malformed native events must not interrupt the other listeners.
-        .handleError((Object _) {});
-  }
-
-  // Some devices stop delivering Visualizer callbacks without changing the
-  // audio session. Recreate that capture after a stall, without remounting
-  // either visualizer; stream forwarding awaits the old native release first.
-  static Stream<dynamic> _recoveringSessionFrames(int session) async* {
-    while (true) {
-      yield* _sessionFrames(session).timeout(
-        const Duration(seconds: 2),
-        onTimeout: (sink) {
-          if (audioHandler.playbackState.value.playing) sink.close();
-        },
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 250));
-    }
-  }
-
-  /// A single-subscription channel so cancel() waits for the native release.
-  /// EventChannel's broadcast controller discards its async cancellation.
-  static Stream<dynamic> _sessionFrames(int session) {
-    late final StreamController<dynamic> controller;
-    final messenger = ServicesBinding.instance.defaultBinaryMessenger;
-    controller = StreamController<dynamic>(
-      onListen: () {
-        messenger.setMessageHandler(_frames.name, (data) async {
-          if (data == null) {
-            unawaited(controller.close());
-          } else {
-            try {
-              controller.add(_frames.codec.decodeEnvelope(data));
-            } on PlatformException catch (error, stack) {
-              controller.addError(error, stack);
-            }
-          }
-          return null;
-        });
-        unawaited(
-          _frames.invokeMethod<void>('listen', session).catchError((
-            Object error,
-            StackTrace stack,
-          ) {
-            if (!controller.isClosed) controller.addError(error, stack);
-          }),
-        );
-      },
-      onCancel: () async {
-        messenger.setMessageHandler(_frames.name, null);
-        await _frames.invokeMethod<void>('cancel');
-      },
-    );
-    return controller.stream;
   }
 
   /// Read only: filter ownership belongs to the engine, not either widget.

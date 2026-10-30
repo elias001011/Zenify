@@ -80,6 +80,7 @@ class PlaylistPage extends StatefulWidget {
 }
 
 class _PlaylistPageState extends State<PlaylistPage> {
+  final _headerTitleKey = GlobalKey();
   dynamic _playlist;
 
   /// Canonical (storage) order; `_playlist['list']` is always derived from it.
@@ -218,7 +219,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
   Widget _buildScaffold(BuildContext context) {
     return IslandScaffold(
       title: _playlist != null ? _playlistTitle : '',
-      fadeTitleAfter: PlaylistSliverAppBar.titleFadeStart(context),
+      headerTitleKey: _headerTitleKey,
       onFilter: (value) {
         _searchQueryNotifier.value = value;
         if (_reorderEnabled && value.trim().isNotEmpty) {
@@ -246,6 +247,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
             ? CustomScrollView(
                 slivers: [
                   PlaylistSliverAppBar(
+                    titleKey: _headerTitleKey,
                     title: _playlistTitle,
                     playlist: _playlist,
                     cubeIcon: widget.cubeIcon,
