@@ -239,6 +239,7 @@ Future<void> _retryAll(BuildContext context, List<DownloadEntry> failed) async {
   final l10n = context.l10n!;
   _retryingAll.value = true;
   showToast(context, l10n.downloadsRetrying(failed.length));
+  final run = DownloadManager.instance.openRun();
   try {
     await Future.wait([
       for (final entry in failed)
@@ -247,6 +248,7 @@ Future<void> _retryAll(BuildContext context, List<DownloadEntry> failed) async {
           makeSongOffline(entry.song),
     ]);
   } finally {
+    run.close();
     _retryingAll.value = false;
   }
 }

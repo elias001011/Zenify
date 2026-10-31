@@ -23,6 +23,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
@@ -179,23 +180,30 @@ class _PlaylistDownloadButtonState extends State<PlaylistDownloadButton> {
   Future<void> _download(BuildContext context) async {
     if (_isResolving) return;
 
-    setState(() => _isResolving = true);
-    Map? playlist;
+    // Open from the tap: loading the playlist is part of the run, so what
+    // failed in the one before is not told in between.
+    final run = DownloadManager.instance.openRun();
     try {
-      playlist = await widget.resolvePlaylist();
-    } catch (_) {
-      if (context.mounted) showToast(context, context.l10n!.error);
-      return;
+      setState(() => _isResolving = true);
+      Map? playlist;
+      try {
+        playlist = await widget.resolvePlaylist();
+      } catch (_) {
+        if (context.mounted) showToast(context, context.l10n!.error);
+        return;
+      } finally {
+        if (mounted) setState(() => _isResolving = false);
+      }
+      if (!context.mounted) return;
+
+      if (playlist == null) {
+        showToast(context, context.l10n!.error);
+        return;
+      }
+
+      await offlinePlaylistService.downloadPlaylist(context, playlist);
     } finally {
-      if (mounted) setState(() => _isResolving = false);
+      run.close();
     }
-    if (!context.mounted) return;
-
-    if (playlist == null) {
-      showToast(context, context.l10n!.error);
-      return;
-    }
-
-    await offlinePlaylistService.downloadPlaylist(context, playlist);
   }
 }

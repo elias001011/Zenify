@@ -328,6 +328,42 @@ void main() {
         expect(notices.single.failed, 2);
       });
 
+      test('an open run holds the end, however long the gap', () async {
+        final run = manager.openRun();
+        await settle([manager.download(song('bad-r1'), save)], ['bad-r1']);
+        // Longer than the margin, with nothing queued: the next playlist is
+        // still loading.
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+        expect(manager.idle.value, isFalse);
+        expect(notices, isEmpty);
+
+        await settle([manager.download(song('gone-r2'), save)], ['gone-r2']);
+        run.close();
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(manager.idle.value, isTrue);
+        expect(notices, hasLength(1));
+        expect(notices.single.failed, 2);
+        expect(notices.single.unavailable, 1);
+      });
+
+      test(
+        'the end waits for every open run, and closing twice counts once',
+        () async {
+          final first = manager.openRun();
+          final second = manager.openRun();
+          first
+            ..close()
+            ..close();
+          await Future<void>.delayed(const Duration(milliseconds: 60));
+          expect(manager.idle.value, isFalse);
+          second.close();
+          await Future<void>.delayed(const Duration(milliseconds: 60));
+          expect(manager.idle.value, isTrue);
+          // Nothing was downloaded: nothing to tell.
+          expect(notices, isEmpty);
+        },
+      );
+
       test('a run without failures says nothing', () async {
         await settle([manager.download(song('ok'), save)], ['ok']);
         await Future<void>.delayed(const Duration(milliseconds: 60));

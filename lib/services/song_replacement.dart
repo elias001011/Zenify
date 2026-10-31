@@ -200,9 +200,11 @@ Future<int> replaceUnavailableSongs(
     ..forEach(unavailableSongs.markAvailable);
   DownloadManager.instance.forget(settled);
 
-  for (final id in applied) {
-    unawaited(downloadReplacement(swaps[id]));
-  }
+  final run = DownloadManager.instance.openRun();
+  unawaited(
+    Future.wait([for (final id in applied) downloadReplacement(swaps[id])])
+        .whenComplete(run.close),
+  );
   replacedSongs.value++;
   return applied.length;
 }

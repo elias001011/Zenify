@@ -28,6 +28,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/platform_utils.dart';
@@ -337,9 +338,15 @@ class SongSelectionBar extends StatelessWidget {
     BuildContext context,
     List<Map> songs,
   ) async {
-    final results = await Future.wait([
-      for (final song in songs) makeSongOffline(song),
-    ]);
+    final run = DownloadManager.instance.openRun();
+    final List<bool> results;
+    try {
+      results = await Future.wait([
+        for (final song in songs) makeSongOffline(song),
+      ]);
+    } finally {
+      run.close();
+    }
     final downloaded = results.where((saved) => saved).length;
     if (context.mounted) {
       showToast(context, context.l10n!.songsAddedToOffline(downloaded));
