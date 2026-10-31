@@ -21,6 +21,7 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -79,6 +80,21 @@ class SyncSecurity {
     validateSyncJson(value);
     return Map<String, dynamic>.from(value);
   }
+
+  /// [seal] on another isolate: compressing and encrypting a whole library
+  /// takes long enough to freeze the interface.
+  static Future<Map<String, dynamic>> sealInBackground(
+    String secret,
+    Map<String, dynamic> body,
+    String context,
+  ) => Isolate.run(() => seal(secret, body, context));
+
+  /// [open] on another isolate, for the same reason.
+  static Future<Map<String, dynamic>> openInBackground(
+    String secret,
+    Map box,
+    String context,
+  ) => Isolate.run(() => open(secret, box, context));
 
   static List<int> _inflate(List<int> compressed) {
     final output = _CappedSink();

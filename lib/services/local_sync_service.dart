@@ -612,7 +612,7 @@ class LocalSyncService {
     if (data['encrypted'] is! Map) throw const _HttpFailure(400, 'invalid');
     final Map<String, dynamic> body;
     try {
-      body = await SyncSecurity.open(
+      body = await SyncSecurity.openInBackground(
         peer.secret,
         data['encrypted'],
         '${request.uri.path.substring(1)}|$id|${LibraryMergeService.deviceId}',
@@ -651,7 +651,7 @@ class LocalSyncService {
     return (
       200,
       {
-        'encrypted': await SyncSecurity.seal(peer.secret, {
+        'encrypted': await SyncSecurity.sealInBackground(peer.secret, {
           ...body,
           'requestId': received['requestId'],
         }, context),
@@ -1107,7 +1107,7 @@ class LocalSyncService {
     final sequence = (store.get(counterKey, defaultValue: 0) as int) + 1;
     await store.put(counterKey, sequence);
     await store.flush();
-    final encrypted = await SyncSecurity.seal(peer.secret, {
+    final encrypted = await SyncSecurity.sealInBackground(peer.secret, {
       ...body,
       'requestId': nonce,
       'sequence': sequence,
@@ -1122,7 +1122,7 @@ class LocalSyncService {
     if (response['encrypted'] is! Map) {
       throw const _LocalSyncException(LocalSyncError.updateRequired);
     }
-    final result = await SyncSecurity.open(
+    final result = await SyncSecurity.openInBackground(
       peer.secret,
       response['encrypted'],
       '${path.substring(1)}|${target.deviceId}|$ownId',
