@@ -20,12 +20,14 @@
  */
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/song_replacement.dart';
 import 'package:musify/services/unavailable_songs.dart';
+import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -83,9 +85,23 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
 
   bool get _fromFile => widget.kind == ReviewKind.missing;
 
+  /// The songs still without a match, as the file had them, to look for them
+  /// elsewhere.
+  Future<void> _copyMissing() async {
+    final text = [
+      for (final song in widget.plan.songs)
+        if (!_chosen.containsKey(song['ytid'].toString()))
+          '${song['title']} - ${song['artist']}',
+    ].join('\n');
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) showToast(context, context.l10n!.importCopied);
+  }
+
   // What is shown under a song that has no replacement.
   String _missing(AppLocalizations l10n, String id) => _fromFile
-      ? l10n.importMissingNone
+      ? (widget.plan.notSearched.contains(id)
+            ? l10n.replaceSearchFailed
+            : l10n.importMissingNone)
       : widget.plan.notSearched.contains(id)
       ? l10n.replaceSearchFailed
       : _skipped.contains(id)
@@ -154,7 +170,7 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
                                 alignment: Alignment.centerRight,
                                 child: Wrap(
                                   children: [
-                                    if (chosen != null && !_fromFile)
+                                    if (chosen != null)
                                       TextButton(
                                         onPressed: () => setState(() {
                                           final id = song['ytid'].toString();
@@ -162,7 +178,11 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
                                           _byYou.remove(id);
                                           _skipped.add(id);
                                         }),
-                                        child: Text(l10n.replaceKeepAsIs),
+                                        child: Text(
+                                          _fromFile
+                                              ? l10n.importDontAdd
+                                              : l10n.replaceKeepAsIs,
+                                        ),
                                       ),
                                     TextButton.icon(
                                       onPressed: () => _searchManually(song),
@@ -189,18 +209,23 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
+                if (_fromFile)
+                  TextButton(onPressed: _copyMissing, child: Text(l10n.copy)),
+                const Spacer(),
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text(_fromFile ? l10n.importSkip : l10n.cancel),
+                  child: Text(l10n.cancel),
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
-                  onPressed: _chosen.isEmpty
+                  onPressed: _fromFile
+                      ? () => Navigator.of(context).pop(_chosen)
+                      : _chosen.isEmpty
                       ? null
                       : () => Navigator.of(context).pop(_chosen),
                   child: Text(
                     _fromFile
-                        ? l10n.importAddSongs(_chosen.length)
+                        ? l10n.importFinish
                         : l10n.replaceSwapAction(_chosen.length),
                   ),
                 ),

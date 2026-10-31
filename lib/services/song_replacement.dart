@@ -223,6 +223,41 @@ Future<ReplacementPlan> planReplacements(
   );
 }
 
+/// Looks for the songs an imported file left out, YouTube Music first and a
+/// plain YouTube search after (the import itself only asked YouTube Music).
+/// What it finds is a suggestion, to be read before it is added; a song whose
+/// search could not be made is told apart from one that found nothing.
+/// [held] are the songs the playlist already has. Nothing here throws.
+Future<ReplacementPlan> planMissingSongs(
+  List<Map> songs, {
+  required String playlistId,
+  Set<String> held = const {},
+  VoidCallback? onSearched,
+}) async {
+  final found = <String, Map>{};
+  final notSearched = <String>{};
+  for (final song in songs) {
+    final id = song['ytid'].toString();
+    try {
+      final match = await findReplacement(
+        song,
+        exclude: {...held, for (final f in found.values) f['ytid'].toString()},
+      );
+      if (match != null) found[id] = match;
+    } on ReplacementSearchFailed {
+      notSearched.add(id);
+    }
+    onSearched?.call();
+  }
+  return ReplacementPlan(
+    songs: songs,
+    found: found,
+    playlistIds: {playlistId},
+    held: held,
+    notSearched: notSearched,
+  );
+}
+
 /// Swaps in [plan]'s playlists the songs of [swaps] (the ytid to leave and
 /// the song to take its place) and starts downloading the replacements.
 /// Every playlist that holds a song gets the same replacement. A song that

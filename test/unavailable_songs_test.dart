@@ -343,6 +343,38 @@ void main() {
     });
   });
 
+  group('songs an import left out', () {
+    test('are searched again and the matches kept as suggestions', () async {
+      findReplacement = (original, {Set<String> exclude = const {}}) async =>
+          original['ytid'] == 'file:1'
+          ? null
+          : original['ytid'] == 'file:2'
+          ? throw const ReplacementSearchFailed()
+          : {...original, 'ytid': 'found-${original['ytid']}'};
+      var searched = 0;
+      final plan = await planMissingSongs(
+        [song('file:0'), song('file:1'), song('file:2')],
+        playlistId: 'p',
+        held: {'already'},
+        onSearched: () => searched++,
+      );
+      expect(plan.found.keys, {'file:0'});
+      expect(plan.notSearched, {'file:2'});
+      expect(plan.held, {'already'});
+      expect(searched, 3);
+    });
+
+    test('a suggestion is never one the playlist already has', () async {
+      Set<String>? excluded;
+      findReplacement = (original, {Set<String> exclude = const {}}) async {
+        excluded = exclude;
+        return null;
+      };
+      await planMissingSongs([song('file:0')], playlistId: 'p', held: {'kept'});
+      expect(excluded, contains('kept'));
+    });
+  });
+
   group('what flags a song', () {
     test('only an unplayable download does, and a download clears it', () {
       final manager = DownloadManager.instance;

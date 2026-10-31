@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -181,15 +182,15 @@ void main() {
     expect(find.text('No replacement found'), findsNothing);
   });
 
-  testWidgets('songs of an imported file get a search already filled in', (
-    tester,
-  ) async {
+  testWidgets('songs of an imported file: suggestions, a prefilled search, '
+      'copy and finish', (tester) async {
     String? first;
     await open(
       tester,
       ReplacementPlan(
         songs: [song('file:0', 'Singer'), song('file:1', 'Other')],
-        found: const {},
+        // The automatic search found one of them.
+        found: {'file:1': song('suggested')},
         playlistIds: {'p'},
         held: {'kept'},
       ),
@@ -202,12 +203,8 @@ void main() {
     expect(find.text('Songs not found'), findsOneWidget);
     expect(find.text('In your file'), findsNWidgets(2));
     expect(find.text('Track file:0'), findsOneWidget);
-    expect(find.text('No match chosen yet'), findsNWidgets(2));
-    // Nothing to add until one is chosen.
-    expect(
-      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
-      isNull,
-    );
+    expect(find.text('No match chosen yet'), findsOneWidget);
+    expect(find.text('Track suggested'), findsOneWidget);
 
     await tester.tap(find.text('Search manually').first);
     await tester.pump();
@@ -222,9 +219,65 @@ void main() {
     await tester.tap(find.byIcon(FluentIcons.checkmark_24_regular).last);
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    await tester.tap(find.text('Add 1 song'));
+    // The suggestion (the second row) can be left out.
+    await tester.tap(find.text("Don't add").last);
+    await tester.pump();
+    expect(find.text('Track suggested'), findsNothing);
+
+    await tester.tap(find.text('Finish'));
     await tester.pump(const Duration(milliseconds: 500));
     expect(result!.keys, {'file:0'});
     expect(result!['file:0']!['ytid'], 'hit');
+  });
+
+  testWidgets('copy puts the songs still without a match on the clipboard', (
+    tester,
+  ) async {
+    String? clipboard;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboard = (call.arguments as Map)['text'] as String;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await open(
+      tester,
+      ReplacementPlan(
+        songs: [song('file:0', 'Singer'), song('file:1', 'Other')],
+        found: {'file:1': song('suggested')},
+        playlistIds: {'p'},
+      ),
+      kind: ReviewKind.missing,
+    );
+    await tester.tap(find.text('Copy'));
+    await tester.pump();
+    // Only the one with no match is left to look for elsewhere.
+    expect(clipboard, 'Track file:0 - Singer');
+    await tester.pump(const Duration(seconds: 5));
+  });
+
+  testWidgets('finishing with nothing chosen adds nothing', (tester) async {
+    await open(
+      tester,
+      ReplacementPlan(
+        songs: [song('file:0')],
+        found: const {},
+        playlistIds: {'p'},
+      ),
+      kind: ReviewKind.missing,
+    );
+    await tester.tap(find.text('Finish'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(closed, isTrue);
+    expect(result, isEmpty);
   });
 }

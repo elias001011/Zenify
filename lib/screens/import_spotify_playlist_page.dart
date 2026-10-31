@@ -172,34 +172,42 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
     if (!mounted) return;
     final (_, playlistId) = createCustomPlaylist(playlistName, null, context);
     addSongsInCustomPlaylist(context, playlistId, foundSongs);
-    setState(() => _isImporting = false);
+    // Still busy while the songs that were left out are looked for again.
+    if (missingRows.isEmpty || rateLimited) {
+      setState(() => _isImporting = false);
+    }
 
-    // The songs no search found: shown beside a search already filled with
-    // each one's name, to pick a match by hand. Not while YouTube is
-    // limiting this device: the search by hand would be refused too.
+    // The songs no search found are looked for once more (a plain YouTube
+    // search after YouTube Music) and shown beside what was found, to be read,
+    // searched by hand, copied or left out. Not while YouTube is limiting this
+    // device: the other searches would be refused too.
     var stillMissing = missingRows;
     var imported = foundSongs.length;
     if (missingRows.isNotEmpty && !rateLimited) {
+      if (mounted) setState(() => _totalCount += missingRows.length);
+      final plan = await planMissingSongs(
+        [
+          for (final row in missingRows)
+            {
+              'ytid': 'file:${row.index}',
+              'title': row.title,
+              'artist': row.artist,
+            },
+        ],
+        playlistId: playlistId,
+        held: songIdsOf([
+          {'list': foundSongs},
+        ]),
+        onSearched: () {
+          if (mounted) setState(() => _processedCount++);
+        },
+      );
+      if (!mounted) return;
+      setState(() => _isImporting = false);
       final picked = await Navigator.of(context).push<Map<String, Map>>(
         MaterialPageRoute(
-          builder: (_) => ReplaceReviewPage(
-            kind: ReviewKind.missing,
-            plan: ReplacementPlan(
-              songs: [
-                for (final row in missingRows)
-                  {
-                    'ytid': 'file:${row.index}',
-                    'title': row.title,
-                    'artist': row.artist,
-                  },
-              ],
-              found: const {},
-              playlistIds: {playlistId},
-              held: songIdsOf([
-                {'list': foundSongs},
-              ]),
-            ),
-          ),
+          builder: (_) =>
+              ReplaceReviewPage(kind: ReviewKind.missing, plan: plan),
         ),
       );
       if (picked != null && picked.isNotEmpty && mounted) {
@@ -220,7 +228,6 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
       final missingText = stillMissing
           .map((row) => '${row.title} - ${row.artist}')
           .join('\n');
-      await Clipboard.setData(ClipboardData(text: missingText));
       if (mounted) {
         showToastWithButton(
           context,
