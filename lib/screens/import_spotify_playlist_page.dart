@@ -6,8 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
+import 'package:musify/screens/replace_review_page.dart';
 import 'package:musify/services/artist_service.dart' show ytMusicClient;
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/song_replacement.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/formatter.dart';
 import 'package:musify/utilities/url_launcher.dart';
@@ -172,14 +174,50 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
     addSongsInCustomPlaylist(context, playlistId, foundSongs);
     setState(() => _isImporting = false);
 
+    // The songs no search found: shown beside a search already filled with
+    // each one's name, to pick a match by hand. Not while YouTube is
+    // limiting this device: the search by hand would be refused too.
+    var stillMissing = missingRows;
+    var imported = foundSongs.length;
+    if (missingRows.isNotEmpty && !rateLimited) {
+      final picked = await Navigator.of(context).push<Map<String, Map>>(
+        MaterialPageRoute(
+          builder: (_) => ReplaceReviewPage(
+            kind: ReviewKind.missing,
+            plan: ReplacementPlan(
+              songs: [
+                for (final row in missingRows)
+                  {
+                    'ytid': 'file:${row.index}',
+                    'title': row.title,
+                    'artist': row.artist,
+                  },
+              ],
+              found: const {},
+              playlistIds: {playlistId},
+              held: songIdsOf([
+                {'list': foundSongs},
+              ]),
+            ),
+          ),
+        ),
+      );
+      if (picked != null && picked.isNotEmpty && mounted) {
+        addSongsInCustomPlaylist(context, playlistId, picked.values.toList());
+        imported += picked.length;
+        stillMissing = [
+          for (final row in missingRows)
+            if (!picked.containsKey('file:${row.index}')) row,
+        ];
+      }
+    }
+
+    if (!mounted) return;
     final resultText = rateLimited
-        ? '${context.l10n!.spotifyPlaylistImportFailed}\n${context.l10n!.spotifyPlaylistImportResult(foundSongs.length, rows.length)}'
-        : context.l10n!.spotifyPlaylistImportResult(
-            foundSongs.length,
-            rows.length,
-          );
-    if (missingRows.isNotEmpty) {
-      final missingText = missingRows
+        ? '${context.l10n!.spotifyPlaylistImportFailed}\n${context.l10n!.spotifyPlaylistImportResult(imported, rows.length)}'
+        : context.l10n!.spotifyPlaylistImportResult(imported, rows.length);
+    if (stillMissing.isNotEmpty) {
+      final missingText = stillMissing
           .map((row) => '${row.title} - ${row.artist}')
           .join('\n');
       await Clipboard.setData(ClipboardData(text: missingText));

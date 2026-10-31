@@ -30,6 +30,10 @@ import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/song_bar.dart';
 
+/// What the review is for: swapping unavailable songs, or finding a match for
+/// songs of an imported file that were not found.
+enum ReviewKind { replace, missing }
+
 /// The unavailable songs of a [ReplacementPlan] beside what would replace
 /// them, to read, play and change before anything is swapped. Pops the swaps
 /// to make (the ytid to leave and the song to take its place), or null when
@@ -38,10 +42,12 @@ class ReplaceReviewPage extends StatefulWidget {
   const ReplaceReviewPage({
     super.key,
     required this.plan,
+    this.kind = ReviewKind.replace,
     this.search = searchReplacementCandidates,
   });
 
   final ReplacementPlan plan;
+  final ReviewKind kind;
 
   /// Where the manual search looks; tests give their own.
   final Future<List<Map>> Function(String query) search;
@@ -75,9 +81,12 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
     });
   }
 
+  bool get _fromFile => widget.kind == ReviewKind.missing;
+
   // What is shown under a song that has no replacement.
-  String _missing(AppLocalizations l10n, String id) =>
-      widget.plan.notSearched.contains(id)
+  String _missing(AppLocalizations l10n, String id) => _fromFile
+      ? l10n.importMissingNone
+      : widget.plan.notSearched.contains(id)
       ? l10n.replaceSearchFailed
       : _skipped.contains(id)
       ? l10n.replaceNotReplaced
@@ -88,7 +97,7 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
     final l10n = context.l10n!;
     final colors = Theme.of(context).colorScheme;
     return IslandScaffold(
-      title: l10n.replaceReviewTitle,
+      title: _fromFile ? l10n.importMissingTitle : l10n.replaceReviewTitle,
       globalSearch: false,
       body: Column(
         children: [
@@ -114,12 +123,21 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _Label(l10n.replaceReviewOld),
-                              SongBar(song, true),
+                              _Label(
+                                _fromFile
+                                    ? l10n.importMissingOld
+                                    : l10n.replaceReviewOld,
+                              ),
+                              if (_fromFile)
+                                _FileSong(song)
+                              else
+                                SongBar(song, true),
                               const SizedBox(height: 8),
                               _Label(
                                 _byYou.contains(song['ytid'].toString())
                                     ? l10n.replaceChosenByYou
+                                    : _fromFile
+                                    ? l10n.importMissingNew
                                     : l10n.replaceReviewNew,
                               ),
                               if (chosen != null)
@@ -136,7 +154,7 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
                                 alignment: Alignment.centerRight,
                                 child: Wrap(
                                   children: [
-                                    if (chosen != null)
+                                    if (chosen != null && !_fromFile)
                                       TextButton(
                                         onPressed: () => setState(() {
                                           final id = song['ytid'].toString();
@@ -173,19 +191,55 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
               children: [
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
-                  child: Text(l10n.cancel),
+                  child: Text(_fromFile ? l10n.importSkip : l10n.cancel),
                 ),
                 const SizedBox(width: 8),
                 FilledButton(
                   onPressed: _chosen.isEmpty
                       ? null
                       : () => Navigator.of(context).pop(_chosen),
-                  child: Text(l10n.replaceSwapAction(_chosen.length)),
+                  child: Text(
+                    _fromFile
+                        ? l10n.importAddSongs(_chosen.length)
+                        : l10n.replaceSwapAction(_chosen.length),
+                  ),
                 ),
               ],
             ),
           ),
           const MiniPlayerBottomSpace(),
+        ],
+      ),
+    );
+  }
+}
+
+/// A song of an imported file: not on YouTube, so there is nothing to play.
+class _FileSong extends StatelessWidget {
+  const _FileSong(this.song);
+
+  final Map song;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            song['title'].toString(),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            song['artist'].toString(),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );

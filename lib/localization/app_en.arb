@@ -135,6 +135,12 @@
   "replaceKeepAsIs": "Don't replace",
   "replaceNotReplaced": "Won't be replaced",
   "replaceSearchFailed": "The search failed. Try by hand",
+  "importMissingTitle": "Songs not found",
+  "importMissingOld": "In your file",
+  "importMissingNew": "Match",
+  "importMissingNone": "No match chosen yet",
+  "importSkip": "Skip",
+  "importAddSongs": "{count, plural, =1{Add 1 song} other{Add {count} songs}}",
   "noReplacementFound": "No replacement found",
   "downloadsRetrying": "{count, plural, =1{Retrying 1 download} other{Retrying {count} downloads}}",
   "dynamicBackground": "Dynamic background",
@@ -504,6 +510,13 @@
     }
   },
   "@replaceSwapAction": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@importAddSongs": {
     "placeholders": {
       "count": {
         "type": "int"

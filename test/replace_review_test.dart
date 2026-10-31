@@ -30,6 +30,7 @@ void main() {
     WidgetTester tester,
     ReplacementPlan plan, {
     Future<List<Map>> Function(String query)? search,
+    ReviewKind kind = ReviewKind.replace,
   }) async {
     tester.view.physicalSize = const Size(420, 900);
     tester.view.devicePixelRatio = 1;
@@ -51,6 +52,7 @@ void main() {
                 MaterialPageRoute(
                   builder: (_) => ReplaceReviewPage(
                     plan: plan,
+                    kind: kind,
                     search: search ?? (query) async => [],
                   ),
                 ),
@@ -177,5 +179,52 @@ void main() {
     );
     expect(find.text('The search failed. Try by hand'), findsOneWidget);
     expect(find.text('No replacement found'), findsNothing);
+  });
+
+  testWidgets('songs of an imported file get a search already filled in', (
+    tester,
+  ) async {
+    String? first;
+    await open(
+      tester,
+      ReplacementPlan(
+        songs: [song('file:0', 'Singer'), song('file:1', 'Other')],
+        found: const {},
+        playlistIds: {'p'},
+        held: {'kept'},
+      ),
+      kind: ReviewKind.missing,
+      search: (query) async {
+        first ??= query;
+        return [song('kept'), song('hit')];
+      },
+    );
+    expect(find.text('Songs not found'), findsOneWidget);
+    expect(find.text('In your file'), findsNWidgets(2));
+    expect(find.text('Track file:0'), findsOneWidget);
+    expect(find.text('No match chosen yet'), findsNWidgets(2));
+    // Nothing to add until one is chosen.
+    expect(
+      tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+      isNull,
+    );
+
+    await tester.tap(find.text('Search manually').first);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(seconds: 1));
+    // The name of the song is in the search bar already, and one the playlist
+    // holds is not offered.
+    expect(first, 'Singer Track file:0');
+    expect(find.text('Track hit'), findsOneWidget);
+    expect(find.text('Track kept'), findsNothing);
+
+    await tester.tap(find.byIcon(FluentIcons.checkmark_24_regular).last);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+    await tester.tap(find.text('Add 1 song'));
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(result!.keys, {'file:0'});
+    expect(result!['file:0']!['ytid'], 'hit');
   });
 }

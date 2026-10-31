@@ -129,6 +129,12 @@
   "replaceKeepAsIs": "Não substituir",
   "replaceNotReplaced": "Não será substituída",
   "replaceSearchFailed": "A busca falhou. Tente à mão",
+  "importMissingTitle": "Músicas não encontradas",
+  "importMissingOld": "No seu arquivo",
+  "importMissingNew": "Correspondente",
+  "importMissingNone": "Nenhuma escolhida ainda",
+  "importSkip": "Pular",
+  "importAddSongs": "{count, plural, =1{Adicionar 1 música} other{Adicionar {count} músicas}}",
   "noReplacementFound": "Nenhuma substituição encontrada",
   "downloadsRetrying": "{count, plural, =1{Tentando baixar 1 música de novo} other{Tentando baixar {count} músicas de novo}}",
   "dynamicBackground": "Fundo dinâmico",
@@ -493,6 +499,13 @@
     }
   },
   "@replaceSwapAction": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@importAddSongs": {
     "placeholders": {
       "count": {
         "type": "int"
