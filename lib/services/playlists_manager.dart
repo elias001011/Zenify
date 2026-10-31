@@ -497,6 +497,28 @@ int removeSongsFromPlaylist(Map playlist, Iterable<Map> songs) {
   return removed;
 }
 
+/// Swaps songs of [playlist] for others, each in its own place: the keys of
+/// [replacements] are the ytids to leave, the values the songs to take over.
+/// A replacement already in the playlist just removes the old song. Returns
+/// how many songs were swapped.
+int replaceSongsInPlaylist(Map playlist, Map<String, Map> replacements) {
+  final songs = List<dynamic>.from(playlist['list'] as List? ?? const []);
+  final present = {for (final song in songs) song['ytid']?.toString()};
+  var replaced = 0;
+  final result = <dynamic>[];
+  for (final song in songs) {
+    final replacement = replacements[song['ytid']?.toString()];
+    if (replacement == null) {
+      result.add(song);
+      continue;
+    }
+    replaced++;
+    if (present.add(replacement['ytid']?.toString())) result.add(replacement);
+  }
+  if (replaced == 0 || !_storePlaylistSongs(playlist, result)) return 0;
+  return replaced;
+}
+
 /// Saves [playlistSongs] as [playlist]'s songs, wherever it is kept.
 bool _storePlaylistSongs(Map playlist, List<dynamic> playlistSongs) {
   playlist['list'] = playlistSongs;
@@ -1576,7 +1598,17 @@ bool isPlaylistPinned(String playlistId) =>
     pinnedPlaylistIds.value.contains(playlistId);
 
 bool togglePinnedPlaylist(String playlistId, BuildContext context) {
-  final current = List<String>.from(pinnedPlaylistIds.value);
+  // Pins whose playlist is gone (deleted, unliked, restored from another
+  // device) are not listed, so they must not take a place from a new one.
+  final current = [
+    for (final id in pinnedPlaylistIds.value)
+      if (id == playlistId || _searchAppPlaylistsById(id) != null) id,
+  ];
+  if (current.length != pinnedPlaylistIds.value.length) {
+    pinnedPlaylistIds.value = current;
+    unawaited(addOrUpdateData<List>('user', 'pinnedPlaylistIds', current));
+    return togglePinnedPlaylist(playlistId, context);
+  }
   if (current.contains(playlistId)) {
     current.remove(playlistId);
     pinnedPlaylistIds.value = current;

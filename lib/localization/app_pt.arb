@@ -110,6 +110,11 @@
   "downloadsFolderUnavailable": "{path} não está disponível, então os novos downloads vão para o local padrão por enquanto.",
   "downloadsRetry": "Tentar de novo",
   "downloadsRetryAll": "Tentar todos",
+  "unavailableSongsNotice": "{count, plural, =1{1 música desta playlist pode estar indisponível} other{{count} músicas desta playlist podem estar indisponíveis}}",
+  "dismiss": "Dispensar",
+  "replaceUnavailable": "Substituir",
+  "songsReplaced": "{count, plural, =1{1 música substituída} other{{count} músicas substituídas}}",
+  "noReplacementFound": "Nenhuma substituição encontrada",
   "downloadsRetrying": "{count, plural, =1{Tentando baixar 1 música de novo} other{Tentando baixar {count} músicas de novo}}",
   "downloadsRetriedFailed": "{count, plural, =1{1 download falhou de novo} other{{count} downloads falharam de novo}}",
   "dynamicBackground": "Fundo dinâmico",
@@ -446,6 +451,20 @@
     }
   },
   "@downloadsRetriedFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@unavailableSongsNotice": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@songsReplaced": {
     "placeholders": {
       "count": {
         "type": "int"

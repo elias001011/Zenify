@@ -28,13 +28,14 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/artist_service.dart';
-import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/moods/moods_service.dart';
+import 'package:musify/services/music_radio.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlist_sharing.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/services/song_replacement.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/utilities/flutter_toast.dart';
@@ -54,6 +55,7 @@ import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
 import 'package:musify/widgets/playlist_page/radio_button.dart';
 import 'package:musify/widgets/playlist_page/sync_button.dart';
+import 'package:musify/widgets/playlist_page/unavailable_notice.dart';
 import 'package:musify/widgets/recommended_songs_section.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:musify/widgets/song_selection_bar.dart';
@@ -257,6 +259,14 @@ class _PlaylistPageState extends State<PlaylistPage> {
                     cubeIcon: widget.cubeIcon,
                   ),
                   SliverToBoxAdapter(child: _buildHeaderSection()),
+                  if (_playlist['source'] == 'user-created')
+                    SliverToBoxAdapter(
+                      child: UnavailableNotice(
+                        playlistId: _resolvedPlaylistId ?? '',
+                        songs: _originalPlaylistList,
+                        onReplace: _replaceUnavailable,
+                      ),
+                    ),
                   if ((_playlist['list'] as List? ?? const []).isNotEmpty) ...[
                     ValueListenableBuilder<String>(
                       valueListenable: _searchQueryNotifier,
@@ -393,6 +403,39 @@ class _PlaylistPageState extends State<PlaylistPage> {
           _applySort();
         }
       }),
+    );
+  }
+
+  /// Swaps unavailable songs for other uploads of them, one search at a
+  /// time, each in its own place; a song nothing is found for stays.
+  Future<void> _replaceUnavailable(List<Map> songs) async {
+    final taken = {
+      for (final song in _originalPlaylistList) song['ytid'].toString(),
+    };
+    final found = <String, Map>{};
+    for (final song in songs) {
+      final replacement = await findReplacementSong(
+        song,
+        exclude: {...taken, for (final r in found.values) r['ytid'].toString()},
+      );
+      if (replacement != null) found[song['ytid'].toString()] = replacement;
+    }
+    if (!mounted) return;
+    final playlist = _storedPlaylist;
+    final replaced = found.isEmpty
+        ? 0
+        : replaceSongsInPlaylist(playlist, found);
+    if (replaced > 0) {
+      setState(() {
+        _originalPlaylistList = List<dynamic>.from(playlist['list'] as List);
+        _applySort();
+      });
+    }
+    showToast(
+      context,
+      replaced > 0
+          ? context.l10n!.songsReplaced(replaced)
+          : context.l10n!.noReplacementFound,
     );
   }
 
@@ -828,10 +871,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
         !offlineMode.value &&
         songs.isNotEmpty &&
         playlistId != null) {
-      _recommendedSongsFuture = getRecommendedSongsForPlaylist(
-        playlistId,
-        songs,
-      );
+      _recommendedSongsFuture = getPlaylistRecommendations(playlistId, songs);
     } else {
       _recommendedSongsFuture = null;
     }

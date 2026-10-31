@@ -20,6 +20,7 @@
  */
 
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:musify/main.dart';
 import 'package:musify/services/proxy_manager.dart';
@@ -28,10 +29,16 @@ import 'package:musify/utilities/formatter.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 class PlaylistSharingService {
+  static const _expandBatch = 8;
+
   static Map<String, dynamic> createCompactPlaylist(Map fullPlaylist) {
     return {
       'title': fullPlaylist['title'],
-      if (fullPlaylist['image'] != null) 'image': fullPlaylist['image'],
+      // A picked cover is the image itself, hundreds of kilobytes in a link;
+      // only an address is worth carrying.
+      if (fullPlaylist['image'] case final String image
+          when image.startsWith('http'))
+        'image': image,
       'source': 'user-created',
       'list': fullPlaylist['list'].map((song) => song['ytid']).toList(),
     };
@@ -49,21 +56,30 @@ class PlaylistSharingService {
         ytClient = ProxyManager().getClientSync();
       }
 
-      final expandedSongs = await Future.wait(
-        songIds.map((ytid) async {
-          try {
-            final video = await ytClient!.videos.get(ytid);
-            return returnSongLayout(songIds.indexOf(ytid), video);
-          } catch (e, stackTrace) {
-            logger.log(
-              'Error expanding song: $ytid',
-              error: e,
-              stackTrace: stackTrace,
-            );
-            return null;
-          }
-        }),
+      // A few at a time: a long playlist must not become hundreds of
+      // requests at once.
+      final expandedSongs = List<Map<String, dynamic>?>.filled(
+        songIds.length,
+        null,
       );
+      for (var start = 0; start < songIds.length; start += _expandBatch) {
+        final end = min(start + _expandBatch, songIds.length);
+        await Future.wait([
+          for (var index = start; index < end; index++)
+            () async {
+              try {
+                final video = await ytClient!.videos.get(songIds[index]);
+                expandedSongs[index] = returnSongLayout(index, video);
+              } catch (e, stackTrace) {
+                logger.log(
+                  'Error expanding song: ${songIds[index]}',
+                  error: e,
+                  stackTrace: stackTrace,
+                );
+              }
+            }(),
+        ]);
+      }
 
       return {
         ...compactPlaylist,

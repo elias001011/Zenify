@@ -36,6 +36,7 @@ import 'package:musify/services/lyrics_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/proxy_manager.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/formatter.dart';
 import 'package:musify/utilities/map_utils.dart';
@@ -123,6 +124,16 @@ void reloadSongLibraryStateFromStorage() {
 const Duration _manifestTimeout = Duration(seconds: 30);
 const Duration _cacheValidationDuration = Duration(hours: 1);
 
+/// Whether another address could get what this one was refused: YouTube
+/// limiting or blocking it, or a video closed to this country.
+bool _proxyMayHelp(Exception error) => switch (error) {
+  VideoUnplayableException(:final message) => message.toLowerCase().contains(
+    'country',
+  ),
+  RequestLimitExceededException() || FatalFailureException() => true,
+  _ => false,
+};
+
 /// Fetches a stream manifest for a song, honoring proxy settings.
 Future<StreamManifest?> _fetchStreamManifest(String songId) async {
   if (useProxy.value) {
@@ -136,15 +147,22 @@ Future<StreamManifest?> _fetchStreamManifest(String songId) async {
       timeout: _manifestTimeout,
     );
   } on Exception catch (error, stackTrace) {
+    // A removed or restricted video fails the same way through any proxy;
+    // trying several only costs half a minute per song.
+    if (!_proxyMayHelp(error)) rethrow;
     logger.log(
       'Direct stream lookup failed for $songId; trying proxy fallback',
       error: error,
       stackTrace: stackTrace,
     );
-    final manifest = await ProxyManager()
-        .getSongManifestViaProxy(songId)
-        .timeout(_manifestTimeout);
-    if (manifest != null) return manifest;
+    try {
+      final manifest = await ProxyManager()
+          .getSongManifestViaProxy(songId)
+          .timeout(_manifestTimeout);
+      if (manifest != null) return manifest;
+    } catch (_) {
+      // Only a second chance: the direct error is the one that tells why.
+    }
     Error.throwWithStackTrace(error, stackTrace);
   }
 }
@@ -303,7 +321,7 @@ Future<List> getRecommendedSongsForPlaylist(
       if (stillFresh.isNotEmpty) return stillFresh;
     }
 
-    final seeds = _sampleSeedSongs(
+    final seeds = sampleSeedSongs(
       playlistSongs,
       _playlistRecommendationSeedCount,
     );
@@ -325,7 +343,7 @@ Future<List> getRecommendedSongsForPlaylist(
 }
 
 /// Uniformly samples up to [count] valid songs in one pass without copying or shuffling the playlist.
-List<Map> _sampleSeedSongs(List songs, int count) {
+List<Map> sampleSeedSongs(List songs, int count) {
   final random = Random();
   final reservoir = <Map>[];
   var seen = 0;
@@ -359,7 +377,7 @@ Future<List> _getRecommendationsFromMixedSources() async {
   if (userCustomPlaylists.value.isNotEmpty) {
     for (final userPlaylist in userCustomPlaylists.value) {
       final playlistSongs = userPlaylist['list'] as List;
-      recommendationSources.add(_sampleSeedSongs(playlistSongs, 5));
+      recommendationSources.add(sampleSeedSongs(playlistSongs, 5));
     }
   }
 
@@ -725,34 +743,39 @@ Future<void> invalidateSongStreamCache(String songId) async {
   await deleteData('cache', 'song_${songId}_${audioQualitySetting.value}_url');
 }
 
-/// Fetches the best available audio stream for a song.
-Future<AudioOnlyStreamInfo?> fetchBestAudioStream(String? songId) async {
+/// The best audio stream of a song. Throws what YouTube answered: a
+/// [VideoUnplayableException] means the song itself is unavailable.
+Future<AudioOnlyStreamInfo> resolveBestAudioStream(String songId) async {
+  final cachedStream = _getSelectedAudioStream(songId);
+  if (cachedStream != null) return cachedStream;
+
   try {
-    if (songId == null || songId.isEmpty) {
-      logger.log('fetchBestAudioStream: songId is null or empty');
-      return null;
-    }
-
-    final cachedStream = _getSelectedAudioStream(songId);
-    if (cachedStream != null) return cachedStream;
-
     final manifest = await _fetchStreamManifest(songId);
-    final audioStream = manifest?.audioOnly;
-    if (audioStream == null || audioStream.isEmpty) {
-      logger.log('fetchBestAudioStream: no audio streams for $songId');
-      return null;
-    }
-
-    final selectedStream = selectAudioOnlyStreamForQuality(audioStream);
+    if (manifest == null) throw StateError('No stream manifest for $songId');
+    final selectedStream = manifest.audioOnly.isEmpty
+        ? null
+        : selectAudioOnlyStreamForQuality(manifest.audioOnly);
     if (selectedStream == null) {
-      logger.log(
-        'fetchBestAudioStream: no compatible audio streams for $songId',
-      );
-      return null;
+      throw VideoUnavailableException('No audio streams for "$songId"');
     }
-
     _cacheSelectedAudioStream(songId, selectedStream);
+    unavailableSongs.markAvailable(songId);
     return selectedStream;
+  } on VideoUnplayableException {
+    unavailableSongs.markUnavailable(songId);
+    rethrow;
+  }
+}
+
+/// Fetches the best available audio stream for a song, or null when it
+/// cannot be had.
+Future<AudioOnlyStreamInfo?> fetchBestAudioStream(String? songId) async {
+  if (songId == null || songId.isEmpty) {
+    logger.log('fetchBestAudioStream: songId is null or empty');
+    return null;
+  }
+  try {
+    return await resolveBestAudioStream(songId);
   } on TimeoutException catch (_) {
     logger.log('fetchBestAudioStream request timed out for $songId');
     return null;
@@ -882,166 +905,110 @@ Future<String?> getSongLyrics(
   return result == null ? null : formatPlainLyrics(result);
 }
 
-final _downloadsInFlight = <String, Future<bool>>{};
-
-/// Downloads [song], once at a time per song: a playlist, a retry and the
-/// player asking for the same song share one download instead of writing
-/// the same file together.
-Future<bool> makeSongOffline(dynamic song) {
+/// Downloads [song] for offline use through the [DownloadManager]. A song
+/// already downloaded counts as done; [cancelled] lets a queued download
+/// leave the queue.
+Future<bool> makeSongOffline(dynamic song, {bool Function()? cancelled}) async {
   final ytid = song is Map ? songYtid(song) : null;
-  if (ytid == null) return _downloadSong(song);
-  // A block body: `remove` returns this very future, which whenComplete
-  // would then wait for for ever.
-  return _downloadsInFlight[ytid] ??= _downloadSong(song).whenComplete(() {
-    _downloadsInFlight.remove(ytid);
-  });
-}
-
-Future<bool> _downloadSong(dynamic song) async {
-  DownloadEntry? download;
-  try {
-    final String? ytid = song['ytid'];
-
-    if (ytid == null || ytid.isEmpty) {
-      logger.log('makeSongOffline: song["ytid"] is null or empty');
-      return false;
-    }
-
-    if (isSongAlreadyOffline(ytid)) {
-      final existingPath = _storedOfflinePath(
-        ytid,
-        'audioPath',
-        FilePaths.getAudioPath(ytid),
-      );
-      if (await File(existingPath).exists()) {
-        unawaited(cacheSponsorBlockSegments(ytid));
-        return true;
-      }
-    }
-
-    final offlineSong = Map<String, dynamic>.from(song as Map);
-    download = DownloadManager.instance.started(song);
-
-    final audioPath = FilePaths.getAudioPath(ytid);
-    final audioFile = File(audioPath);
-    final artworkPath = FilePaths.getArtworkPath(ytid);
-
-    await audioFile.parent.create(recursive: true);
-
-    int? audioBitrateKbps;
-    String? audioCodec;
-    IOSink? fileStream;
-    try {
-      final audioManifest = await fetchBestAudioStream(ytid);
-      if (audioManifest == null) {
-        logger.log('makeSongOffline: audioManifest is null for $ytid');
-        DownloadManager.instance.failed(download, null);
-        return false;
-      }
-      audioBitrateKbps = audioManifest.bitrate.kiloBitsPerSecond.round();
-      audioCodec = audioManifest.audioCodec;
-
-      final stream = ytClient.videos.streamsClient.get(audioManifest);
-      final total = audioManifest.size.totalBytes;
-      final progress = download.progress;
-      var received = 0;
-      fileStream = audioFile.openWrite();
-      await stream
-          .map((chunk) {
-            received += chunk.length;
-            // Whole percents only, so listeners do not rebuild per chunk.
-            if (total > 0) {
-              final value = (received * 100 ~/ total) / 100;
-              if (value != progress.value) progress.value = value;
-            }
-            return chunk;
-          })
-          .pipe(fileStream);
-      await fileStream.flush();
-      await fileStream.close();
-      fileStream = null;
-    } catch (e, stackTrace) {
-      logger.log(
-        'Error downloading audio file',
-        error: e,
-        stackTrace: stackTrace,
-      );
-      try {
-        await fileStream?.close();
-      } catch (_) {}
-      if (await audioFile.exists()) {
-        await audioFile.delete();
-      }
-      DownloadManager.instance.failed(download, e);
-      return false;
-    }
-
-    try {
-      if (offlineSong['highResImage'] != null &&
-          offlineSong['highResImage'].toString().isNotEmpty) {
-        final _artworkFile = await _downloadAndSaveArtworkFile(
-          offlineSong['highResImage'],
-          artworkPath,
-        );
-
-        if (_artworkFile != null && await _artworkFile.exists()) {
-          offlineSong['artworkPath'] = artworkPath;
-        } else {
-          logger.log(
-            'Artwork download failed or file does not exist for $ytid',
-          );
-          offlineSong['artworkPath'] = null;
-        }
-      }
-    } catch (e, stackTrace) {
-      logger.log('Error downloading artwork', error: e, stackTrace: stackTrace);
-      offlineSong['artworkPath'] = null;
-    }
-
-    offlineSong['audioPath'] = audioFile.path;
-    offlineSong['audioBitrateKbps'] = audioBitrateKbps;
-    offlineSong['audioCodec'] = audioCodec;
-    offlineSong['dateAdded'] = DateTime.now().millisecondsSinceEpoch;
-
-    try {
-      final existingIndex = userOfflineSongs.value.indexWhere(
-        (s) => s['ytid'] == ytid,
-      );
-
-      final updatedOfflineSongs = List.from(userOfflineSongs.value);
-      if (existingIndex != -1) {
-        updatedOfflineSongs[existingIndex] = offlineSong;
-      } else {
-        updatedOfflineSongs.add(offlineSong);
-      }
-      userOfflineSongs.value = updatedOfflineSongs;
-
-      unawaited(
-        addOrUpdateData<List>(
-          'userNoBackup',
-          'offlineSongs',
-          userOfflineSongs.value,
-        ),
-      );
-
-      unawaited(cacheSponsorBlockSegments(ytid));
-    } catch (e, st) {
-      logger.log(
-        'Error updating global offline songs list',
-        error: e,
-        stackTrace: st,
-      );
-    }
-
-    DownloadManager.instance.finished(download);
-    return true;
-  } catch (e, stackTrace) {
-    logger.log('Error making song offline', error: e, stackTrace: stackTrace);
-    if (download?.status == DownloadStatus.downloading) {
-      DownloadManager.instance.failed(download!, e);
-    }
+  if (ytid == null) {
+    logger.log('makeSongOffline: song["ytid"] is null or empty');
     return false;
   }
+
+  if (isSongAlreadyOffline(ytid)) {
+    final existingPath = _storedOfflinePath(
+      ytid,
+      'audioPath',
+      FilePaths.getAudioPath(ytid),
+    );
+    if (await File(existingPath).exists()) {
+      unawaited(cacheSponsorBlockSegments(ytid));
+      return true;
+    }
+  }
+
+  return DownloadManager.instance.download(
+    song as Map,
+    saveSongFiles,
+    cancelled: cancelled,
+  );
+}
+
+/// Saves the audio and the cover of [song] and records it as offline,
+/// reporting the audio's progress from 0 to 1. Throws when it cannot.
+Future<void> saveSongFiles(
+  Map<String, dynamic> song,
+  void Function(double) onProgress,
+) async {
+  final ytid = song['ytid'].toString();
+  final audioFile = File(FilePaths.getAudioPath(ytid));
+  await audioFile.parent.create(recursive: true);
+
+  final audio = await resolveBestAudioStream(ytid);
+  IOSink? fileStream;
+  try {
+    final total = audio.size.totalBytes;
+    var received = 0;
+    var reported = -1;
+    fileStream = audioFile.openWrite();
+    await ytClient.videos.streamsClient
+        .get(audio)
+        .map((chunk) {
+          received += chunk.length;
+          // Whole percents only, so listeners do not rebuild per chunk.
+          final percent = total > 0 ? received * 100 ~/ total : reported;
+          if (percent != reported) {
+            reported = percent;
+            onProgress(percent / 100);
+          }
+          return chunk;
+        })
+        .pipe(fileStream);
+    await fileStream.flush();
+    await fileStream.close();
+    fileStream = null;
+  } catch (_) {
+    try {
+      await fileStream?.close();
+    } catch (_) {}
+    if (await audioFile.exists()) await audioFile.delete();
+    rethrow;
+  }
+
+  final offlineSong = {
+    ...song,
+    'audioPath': audioFile.path,
+    'audioBitrateKbps': audio.bitrate.kiloBitsPerSecond.round(),
+    'audioCodec': audio.audioCodec,
+    'dateAdded': DateTime.now().millisecondsSinceEpoch,
+  };
+  final cover = [song['highResImage'], song['lowResImage'], song['image']]
+      .map((url) => url?.toString() ?? '')
+      .firstWhere((url) => url.isNotEmpty, orElse: () => '');
+  if (cover.isNotEmpty) {
+    offlineSong['artworkPath'] = await _saveArtwork(
+      cover,
+      FilePaths.getArtworkPath(ytid),
+    );
+  }
+
+  final updated = List.of(userOfflineSongs.value);
+  final index = updated.indexWhere((s) => s['ytid'] == ytid);
+  index == -1 ? updated.add(offlineSong) : updated[index] = offlineSong;
+  userOfflineSongs.value = updated;
+  unawaited(addOrUpdateData<List>('userNoBackup', 'offlineSongs', updated));
+  unawaited(cacheSponsorBlockSegments(ytid));
+}
+
+/// The path of the cover saved from [url], or null when it could not be.
+Future<String?> _saveArtwork(String url, String path) async {
+  try {
+    final file = await _downloadAndSaveArtworkFile(url, path);
+    if (file != null && await file.exists()) return path;
+  } catch (e, stackTrace) {
+    logger.log('Error downloading artwork', error: e, stackTrace: stackTrace);
+  }
+  return null;
 }
 
 Future<void> _deleteFileIfExists(File file, String errorDescription) async {

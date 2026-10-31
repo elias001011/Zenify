@@ -20,13 +20,15 @@
  */
 
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
+import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
-enum DownloadStatus { downloading, done, failed }
+enum DownloadStatus { queued, downloading, done, failed }
 
 enum DownloadFailure { unavailable, network, other }
 
@@ -66,23 +68,37 @@ class DownloadEntry {
   };
 }
 
+/// Writes the files of [song] and records it as offline, reporting its
+/// progress from 0 to 1. Throws when the song cannot be saved.
+typedef SongSaver = Future<void> Function(
+  Map<String, dynamic> song,
+  void Function(double),
+);
+
 /// Every song download, current and past, so the Downloads tab can show what
-/// is downloading, what finished and what failed, and retry failures.
+/// waits, what downloads, what finished and what failed, and retry failures.
 ///
-/// Downloads report here from `makeSongOffline`, which every download path
-/// (single songs, playlists, the player, shortcuts) goes through.
+/// All downloads (single songs, playlists, the player, shortcuts, retries)
+/// go through [download]: one download per song at a time, and a few songs
+/// at once however many playlists are downloading.
 class DownloadManager {
   DownloadManager._();
 
   static final instance = DownloadManager._();
 
+  static const maxConcurrent = 3;
+  static const _songTimeout = Duration(minutes: 10);
   static const _storageKey = 'downloadHistory';
   static const _maxHistory = 200;
   static const _persistDelay = Duration(seconds: 1);
 
-  /// Newest first: downloads in progress plus the last [_maxHistory] others.
+  /// Newest first: queued and running downloads plus the last [_maxHistory]
+  /// others.
   late final entries = ValueNotifier<List<DownloadEntry>>(_load());
   Timer? _persistTimer;
+  final _inFlight = <String, Future<bool>>{};
+  final _waiting = Queue<Completer<void>>();
+  var _running = 0;
 
   static List<DownloadEntry> _load() {
     try {
@@ -99,14 +115,77 @@ class DownloadManager {
     return [];
   }
 
-  List<DownloadEntry> get active => entries.value
-      .where((entry) => entry.status == DownloadStatus.downloading)
-      .toList();
+  static bool _isActive(DownloadEntry entry) =>
+      entry.status == DownloadStatus.queued ||
+      entry.status == DownloadStatus.downloading;
 
-  DownloadEntry started(Map song) {
+  List<DownloadEntry> get active => entries.value.where(_isActive).toList();
+
+  /// Downloads [song] with [save]. Asking again for a song that is queued or
+  /// downloading shares that download. Returns whether the song was saved;
+  /// [cancelled] is asked when its turn comes, to leave the queue.
+  Future<bool> download(
+    Map song,
+    SongSaver save, {
+    bool Function()? cancelled,
+  }) {
+    final ytid = song['ytid'].toString();
+    // A block body: `remove` returns this very future, which whenComplete
+    // would then wait for for ever.
+    return _inFlight[ytid] ??= _run(song, save, cancelled).whenComplete(() {
+      _inFlight.remove(ytid);
+    });
+  }
+
+  Future<bool> _run(
+    Map song,
+    SongSaver save,
+    bool Function()? cancelled,
+  ) async {
+    final entry = queued(song);
+    await _acquire();
+    try {
+      if (cancelled?.call() ?? false) {
+        entries.value = [...entries.value.where((e) => e != entry)];
+        return false;
+      }
+      _track(entry..status = DownloadStatus.downloading);
+      await save(
+        entry.song,
+        (value) => entry.progress.value = value,
+      ).timeout(_songTimeout);
+      finished(entry);
+      return true;
+    } catch (error) {
+      failed(entry, error);
+      return false;
+    } finally {
+      _release();
+    }
+  }
+
+  Future<void> _acquire() async {
+    if (_running < maxConcurrent) {
+      _running++;
+      return;
+    }
+    final turn = Completer<void>();
+    _waiting.add(turn);
+    await turn.future;
+  }
+
+  // A waiting download takes over the slot, so the count stays as it is.
+  void _release() =>
+      _waiting.isEmpty ? _running-- : _waiting.removeFirst().complete();
+
+  DownloadEntry queued(Map song) => _add(song, DownloadStatus.queued);
+
+  DownloadEntry started(Map song) => _add(song, DownloadStatus.downloading);
+
+  DownloadEntry _add(Map song, DownloadStatus status) {
     final entry = DownloadEntry(
       song: Map<String, dynamic>.from(song),
-      status: DownloadStatus.downloading,
+      status: status,
       time: DateTime.now(),
     );
     entries.value = [
@@ -115,6 +194,9 @@ class DownloadManager {
     ];
     return entry;
   }
+
+  /// Tells the listeners that [entry] changed in place.
+  void _track(DownloadEntry entry) => entries.value = [...entries.value];
 
   void finished(DownloadEntry entry) => _settle(entry, DownloadStatus.done);
 
@@ -132,8 +214,7 @@ class DownloadManager {
     var kept = 0;
     entries.value = [
       for (final other in entries.value)
-        if (other.status == DownloadStatus.downloading || kept++ < _maxHistory)
-          other,
+        if (_isActive(other) || kept++ < _maxHistory) other,
     ];
     _schedulePersist();
   }
@@ -152,17 +233,21 @@ class DownloadManager {
     _persistTimer = null;
     final history = [
       for (final entry in entries.value)
-        if (entry.status != DownloadStatus.downloading) entry.toMap(),
+        if (!_isActive(entry)) entry.toMap(),
     ];
     Hive.box('userNoBackup').put(_storageKey, history);
   }
 
   @visibleForTesting
   static DownloadFailure failureFor(Object? error) {
-    if (error == null) return DownloadFailure.unavailable;
+    if (error == null || error is VideoUnplayableException) {
+      return DownloadFailure.unavailable;
+    }
     if (error is SocketException ||
         error is HttpException ||
-        error is http.ClientException) {
+        error is TimeoutException ||
+        error is http.ClientException ||
+        error is YoutubeExplodeException) {
       return DownloadFailure.network;
     }
     return DownloadFailure.other;

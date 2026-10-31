@@ -19,9 +19,6 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
-import 'dart:collection';
-import 'dart:math';
-
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
@@ -49,13 +46,17 @@ class DownloadsPage extends StatelessWidget {
     return ValueListenableBuilder<List<DownloadEntry>>(
       valueListenable: manager.entries,
       builder: (context, entries, _) {
+        // Running first, then the queue in the order it will run.
         final downloading = <DownloadEntry>[];
+        final waiting = <DownloadEntry>[];
         final failed = <DownloadEntry>[];
         final done = <DownloadEntry>[];
         for (final entry in entries) {
           switch (entry.status) {
             case DownloadStatus.downloading:
               downloading.add(entry);
+            case DownloadStatus.queued:
+              waiting.insert(0, entry);
             case DownloadStatus.failed:
               failed.add(entry);
             case DownloadStatus.done:
@@ -88,7 +89,7 @@ class DownloadsPage extends StatelessWidget {
                               ..._section(
                                 l10n.downloadsActive,
                                 FluentIcons.arrow_download_24_filled,
-                                downloading,
+                                [...downloading, ...waiting],
                               ),
                               ..._section(
                                 l10n.downloadsFailed,
@@ -188,31 +189,26 @@ class DownloadsPage extends StatelessWidget {
 
 final _retryingAll = ValueNotifier(false);
 
-/// Failed downloads again, three at a time like a playlist download.
+/// Failed downloads again; the manager decides how many run at once.
 Future<void> _retryAll(BuildContext context, List<DownloadEntry> failed) async {
   if (_retryingAll.value) return;
   final l10n = context.l10n!;
   _retryingAll.value = true;
   showToast(context, l10n.downloadsRetrying(failed.length));
-  final pending = Queue.of(failed);
-  var failedAgain = 0;
+  final results = <bool>[];
   try {
-    await Future.wait([
-      for (var i = 0; i < min(3, failed.length); i++)
-        () async {
-          while (pending.isNotEmpty) {
-            final entry = pending.removeFirst();
-            // A song retried on its own meanwhile has a new entry.
-            if (!DownloadManager.instance.entries.value.contains(entry)) {
-              continue;
-            }
-            if (!await makeSongOffline(entry.song)) failedAgain++;
-          }
-        }(),
-    ]);
+    results.addAll(
+      await Future.wait([
+        for (final entry in failed)
+          // A song retried on its own meanwhile has a new entry.
+          if (DownloadManager.instance.entries.value.contains(entry))
+            makeSongOffline(entry.song),
+      ]),
+    );
   } finally {
     _retryingAll.value = false;
   }
+  final failedAgain = results.where((ok) => !ok).length;
   if (failedAgain > 0 && context.mounted) {
     showToast(context, l10n.downloadsRetriedFailed(failedAgain));
   }
@@ -238,6 +234,13 @@ class _DownloadStatus extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return switch (entry.status) {
+      DownloadStatus.queued => Padding(
+        padding: const EdgeInsets.all(10),
+        child: Icon(
+          FluentIcons.clock_24_regular,
+          color: colorScheme.onSurfaceVariant,
+        ),
+      ),
       DownloadStatus.downloading => Padding(
         padding: const EdgeInsets.all(10),
         child: ValueListenableBuilder<double?>(
