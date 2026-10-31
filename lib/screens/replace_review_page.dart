@@ -145,7 +145,11 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
                               if (_fromFile)
                                 _FileSong(song)
                               else
-                                SongBar(song, true),
+                                SongBar(
+                                  song,
+                                  true,
+                                  key: ValueKey('old-${song['ytid']}'),
+                                ),
                               const SizedBox(height: 8),
                               _Label(
                                 _byYou.contains(song['ytid'].toString())
@@ -155,7 +159,11 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
                                     : l10n.replaceReviewNew,
                               ),
                               if (chosen != null)
-                                SongBar(chosen, true)
+                                SongBar(
+                                  chosen,
+                                  true,
+                                  key: ValueKey('new-${chosen['ytid']}'),
+                                )
                               else
                                 Padding(
                                   padding: const EdgeInsets.all(12),
@@ -368,6 +376,7 @@ class _ManualSearchState extends State<_ManualSearch> {
               itemBuilder: (context, index) => SongBar(
                 _results[index],
                 true,
+                key: ValueKey(_results[index]['ytid']),
                 trailing: IconButton(
                   icon: const Icon(FluentIcons.checkmark_24_regular),
                   onPressed: () => Navigator.of(context).pop(_results[index]),

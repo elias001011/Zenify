@@ -415,7 +415,9 @@ class _SongBarState extends State<SongBar> {
   @override
   void didUpdateWidget(SongBar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final previous = _ytid;
     _readSong();
+    if (_ytid != previous) _songDownloadStatus.value = false;
     _songLikeStatus.value = isSongAlreadyLiked(_ytid);
     _songOfflineStatus.value = isSongAlreadyOffline(_ytid);
   }

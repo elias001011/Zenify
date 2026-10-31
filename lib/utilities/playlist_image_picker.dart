@@ -37,7 +37,7 @@ Future<String?> pickImage() async {
 
     final fileName = file.name;
     final extensionStart = fileName.lastIndexOf('.') + 1;
-    if (!identical(bytes, picked)) {
+    if (bytes.length != picked.length) {
       mimeType = 'image/jpeg';
     } else if (extensionStart > 0 && extensionStart < fileName.length) {
       switch (fileName.substring(extensionStart).toLowerCase()) {

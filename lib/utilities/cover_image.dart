@@ -22,10 +22,13 @@
 import 'dart:convert';
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:image/image.dart' as img;
 import 'package:musify/main.dart' show logger;
+import 'package:musify/services/local_sync_service.dart';
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/settings_manager.dart';
 
 /// The longest side of a playlist cover, in pixels: far more than it is ever
 /// shown at.
@@ -56,11 +59,64 @@ Uint8List shrinkCover(Uint8List bytes) {
   return smaller.length < bytes.length ? smaller : bytes;
 }
 
-/// [shrinkCover], off the interface's thread: decoding a photo takes a while.
-Future<Uint8List> shrinkCoverInBackground(Uint8List bytes) =>
-    bytes.length <= _coverLimit
-    ? Future.value(bytes)
-    : Isolate.run(() => shrinkCover(bytes));
+/// [shrinkCover] without holding the whole photo in memory or freezing the
+/// interface: the engine decodes it already at the cover's size (a 48 MP photo
+/// would be 140 MB decoded), and only the small picture is encoded, on another
+/// isolate. [shrinkCover] is the fallback when the engine cannot decode it.
+Future<Uint8List> shrinkCoverInBackground(Uint8List bytes) async {
+  if (bytes.length <= _coverLimit) return bytes;
+  try {
+    final scaled = await _decodeScaled(bytes);
+    if (scaled != null) {
+      final jpeg = await Isolate.run(() => _encodeJpeg(scaled));
+      return jpeg.length < bytes.length ? jpeg : bytes;
+    }
+  } catch (e, stackTrace) {
+    logger.log('Decoding a cover natively', error: e, stackTrace: stackTrace);
+  }
+  return Isolate.run(() => shrinkCover(bytes));
+}
+
+typedef _Pixels = ({Uint8List rgba, int width, int height});
+
+Future<_Pixels?> _decodeScaled(Uint8List bytes) async {
+  final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+  try {
+    final descriptor = await ui.ImageDescriptor.encoded(buffer);
+    final landscape = descriptor.width >= descriptor.height;
+    final codec = await descriptor.instantiateCodec(
+      targetWidth: landscape && descriptor.width > coverSide ? coverSide : null,
+      targetHeight: !landscape && descriptor.height > coverSide
+          ? coverSide
+          : null,
+    );
+    final image = (await codec.getNextFrame()).image;
+    final data = await image.toByteData();
+    final result = data == null
+        ? null
+        : (
+            rgba: data.buffer.asUint8List(),
+            width: image.width,
+            height: image.height,
+          );
+    image.dispose();
+    codec.dispose();
+    descriptor.dispose();
+    return result;
+  } finally {
+    buffer.dispose();
+  }
+}
+
+Uint8List _encodeJpeg(_Pixels pixels) => img.encodeJpg(
+  img.Image.fromBytes(
+    width: pixels.width,
+    height: pixels.height,
+    bytes: pixels.rgba.buffer,
+    numChannels: 4,
+  ),
+  quality: 82,
+);
 
 /// A cover stored as a data URI, shrunk if it is large; the same string
 /// otherwise.
@@ -69,26 +125,42 @@ Future<String> shrinkCoverDataUri(String dataUri) async {
   if (!dataUri.startsWith('data:image') || comma == -1) return dataUri;
   final bytes = base64Decode(dataUri.substring(comma + 1));
   final smaller = await shrinkCoverInBackground(bytes);
-  if (identical(smaller, bytes)) return dataUri;
+  if (smaller.length == bytes.length) return dataUri;
   return 'data:image/jpeg;base64,${base64Encode(smaller)}';
 }
 
 /// Shrinks the large covers of the playlists you made, which older versions
 /// kept as picked. Each is written back through the playlists, so the other
 /// devices receive the smaller one.
+///
+/// A write stamps the playlist with this device's clock, which wins over an
+/// edit another device made and this one has not received yet: with devices
+/// paired it waits until a sync has just happened.
 Future<void> shrinkStoredCovers() async {
-  try {
-    for (final playlist in getUserCustomPlaylists()) {
-      final cover = playlist['image'];
+  if (localSyncEnabled.value &&
+      LocalSyncService.instance.pairedDevices.value.isNotEmpty) {
+    final last = localSyncLastSyncedAt.value;
+    if (last == null ||
+        DateTime.now().difference(last) > const Duration(minutes: 5)) {
+      return;
+    }
+  }
+  for (final listed in List.of(getUserCustomPlaylists())) {
+    try {
+      final cover = listed['image'];
       if (cover is! String || cover.length < _coverLimit * 4 ~/ 3) continue;
       final smaller = await shrinkCoverDataUri(cover);
       if (smaller == cover) continue;
-      await replaceCustomPlaylist(playlist['ytid'].toString(), {
-        ...playlist,
-        'image': smaller,
-      });
+      // The playlist may have changed while the cover was being shrunk: the
+      // current one is edited, and only if its cover is still this one.
+      final id = listed['ytid'].toString();
+      final current = getUserCustomPlaylists()
+          .where((playlist) => playlist['ytid']?.toString() == id)
+          .firstOrNull;
+      if (current == null || current['image'] != cover) continue;
+      await replaceCustomPlaylist(id, {...current, 'image': smaller});
+    } catch (e, stackTrace) {
+      logger.log('Error shrinking a cover', error: e, stackTrace: stackTrace);
     }
-  } catch (e, stackTrace) {
-    logger.log('Error shrinking covers', error: e, stackTrace: stackTrace);
   }
 }
