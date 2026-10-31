@@ -139,8 +139,6 @@
   "importMissingOld": "In your file",
   "importMissingNew": "Match",
   "importMissingNone": "No match chosen yet",
-  "importSkip": "Skip",
-  "importAddSongs": "{count, plural, =1{Add 1 song} other{Add {count} songs}}",
   "importFinish": "Finish",
   "importDontAdd": "Don't add",
   "importCopied": "List copied",
@@ -513,13 +511,6 @@
     }
   },
   "@replaceSwapAction": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "@importAddSongs": {
     "placeholders": {
       "count": {
         "type": "int"

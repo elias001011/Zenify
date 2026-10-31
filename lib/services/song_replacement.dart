@@ -78,6 +78,9 @@ bool isSameRecording(Map song, Map candidate) {
   return true;
 }
 
+/// How many searches in a row may fail before the others are not tried.
+const _failuresBeforeGivingUp = 3;
+
 /// Neither search could be made at all (no connection, YouTube refusing): not
 /// the same as a search that found nothing.
 class ReplacementSearchFailed implements Exception {
@@ -212,20 +215,27 @@ Future<ReplacementPlan> planReplacements(
   final searched = <Map>[];
   final found = <String, Map>{};
   final notSearched = <String>{};
+  var failures = 0;
   for (final song in songs) {
     final id = song['ytid'].toString();
     if (!taken.contains(id) || !unavailableSongs.contains(id)) continue;
     // A song kept twice is searched, and listed, once.
     if (searched.any((s) => s['ytid'].toString() == id)) continue;
     searched.add(song);
+    if (failures >= _failuresBeforeGivingUp) {
+      notSearched.add(id);
+      continue;
+    }
     try {
       final replacement = await findReplacement(
         song,
         exclude: {...taken, for (final r in found.values) r['ytid'].toString()},
       );
       if (replacement != null) found[id] = replacement;
+      failures = 0;
     } on ReplacementSearchFailed {
       notSearched.add(id);
+      failures++;
     }
   }
   // Every search failed: there is no telling whether replacements exist.
@@ -253,16 +263,26 @@ Future<({Map<String, Map> found, Set<String> notSearched})> searchOnYoutube(
 }) async {
   final found = <String, Map>{};
   final notSearched = <String>{};
+  var failures = 0;
   for (final song in songs) {
     final id = song['ytid'].toString();
+    // Searches that keep failing (YouTube limiting this device) are not
+    // pressed on: the rest are left for the person to try by hand.
+    if (failures >= _failuresBeforeGivingUp) {
+      notSearched.add(id);
+      onSearched?.call();
+      continue;
+    }
     try {
       final match = await findFallback(
         song,
         exclude: {...held, for (final f in found.values) f['ytid'].toString()},
       );
       if (match != null) found[id] = match;
+      failures = 0;
     } on ReplacementSearchFailed {
       notSearched.add(id);
+      failures++;
     }
     onSearched?.call();
   }

@@ -56,6 +56,9 @@ class _Store {
 
   Future<void> load(String defaultName) async {
     await directory.create(recursive: true);
+    // The secrets of the paired devices are in here: only this user's.
+    if (!Platform.isWindows)
+      await Process.run('chmod', ['700', directory.path]);
     final state = _file('state.json');
     if (await state.exists()) {
       final raw = jsonDecode(await state.readAsString()) as Map;
@@ -88,12 +91,20 @@ class _Store {
     }
   }
 
-  Future<void> _write(String fileName, Object value) async {
-    final target = _file(fileName);
-    final temporary = File('${target.path}.tmp');
-    await temporary.writeAsString(jsonEncode(value), flush: true);
-    await temporary.rename(target.path);
-    if (!Platform.isWindows) await Process.run('chmod', ['600', target.path]);
+  // One write at a time: two requests at once would share the temporary file.
+  var _writing = Future<void>.value();
+
+  Future<void> _write(String fileName, Object value) {
+    final text = jsonEncode(value);
+    final done = _writing.then((_) async {
+      final target = _file(fileName);
+      final temporary = File('${target.path}.tmp');
+      await temporary.writeAsString(text, flush: true);
+      await temporary.rename(target.path);
+    });
+    // A failed write must not stop the next ones, but its caller sees it.
+    _writing = done.then((_) {}, onError: (Object _) {});
+    return done;
   }
 
   Future<void> saveState() => _write('state.json', {
