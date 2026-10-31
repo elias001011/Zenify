@@ -27,10 +27,13 @@ import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/download_manager.dart';
+import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/replace_unavailable_button.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/song_bar.dart';
 
@@ -43,13 +46,15 @@ class DownloadsPage extends StatelessWidget {
     final l10n = context.l10n!;
     final manager = DownloadManager.instance;
 
-    return ValueListenableBuilder<List<DownloadEntry>>(
-      valueListenable: manager.entries,
-      builder: (context, entries, _) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([manager.entries, unavailableSongs.ids]),
+      builder: (context, _) {
+        final entries = manager.entries.value;
         // Running first, then the queue in the order it will run.
         final downloading = <DownloadEntry>[];
         final waiting = <DownloadEntry>[];
         final failed = <DownloadEntry>[];
+        final unavailable = <DownloadEntry>[];
         final done = <DownloadEntry>[];
         for (final entry in entries) {
           switch (entry.status) {
@@ -58,7 +63,14 @@ class DownloadsPage extends StatelessWidget {
             case DownloadStatus.queued:
               waiting.insert(0, entry);
             case DownloadStatus.failed:
-              failed.add(entry);
+              // Songs YouTube says are unavailable are not worth another
+              // try as they are: they have their own place and way out. One
+              // that has played since is only a failure of the past.
+              (entry.failure == DownloadFailure.unavailable &&
+                          unavailableSongs.contains(entry.ytid)
+                      ? unavailable
+                      : failed)
+                  .add(entry);
             case DownloadStatus.done:
               done.add(entry);
           }
@@ -68,7 +80,7 @@ class DownloadsPage extends StatelessWidget {
           title: l10n.downloads,
           globalSearch: false,
           actions: [
-            if (failed.isNotEmpty || done.isNotEmpty)
+            if (failed.isNotEmpty || unavailable.isNotEmpty || done.isNotEmpty)
               IconButton(
                 icon: const Icon(FluentIcons.delete_24_regular),
                 tooltip: l10n.downloadsClearHistory,
@@ -106,6 +118,27 @@ class DownloadsPage extends StatelessWidget {
                                 ),
                               ),
                               ..._section(
+                                l10n.downloadsUnavailable,
+                                FluentIcons.cloud_off_24_filled,
+                                unavailable,
+                                // Once every download is over, one swap
+                                // covers every playlist.
+                                action: ValueListenableBuilder<bool>(
+                                  valueListenable: manager.idle,
+                                  builder: (context, idle, _) {
+                                    final songs = idle
+                                        ? _inPlaylists(unavailable)
+                                        : const <Map>[];
+                                    return songs.isEmpty
+                                        ? const SizedBox.shrink()
+                                        : ReplaceUnavailableButton(
+                                            songs: songs,
+                                            filled: false,
+                                          );
+                                  },
+                                ),
+                              ),
+                              ..._section(
                                 l10n.downloadsDone,
                                 FluentIcons.checkmark_circle_24_filled,
                                 done,
@@ -122,6 +155,17 @@ class DownloadsPage extends StatelessWidget {
         );
       },
     );
+  }
+
+  /// The songs of [entries] that a playlist of yours holds: the ones a swap
+  /// can change.
+  static List<Map> _inPlaylists(List<DownloadEntry> entries) {
+    if (entries.isEmpty) return const [];
+    final held = songIdsOf(getUserCustomPlaylists());
+    return [
+      for (final entry in entries)
+        if (held.contains(entry.ytid)) entry.song,
+    ];
   }
 
   /// Built lazily, like playlist songs, with the app's own song rows.
@@ -195,22 +239,15 @@ Future<void> _retryAll(BuildContext context, List<DownloadEntry> failed) async {
   final l10n = context.l10n!;
   _retryingAll.value = true;
   showToast(context, l10n.downloadsRetrying(failed.length));
-  final results = <bool>[];
   try {
-    results.addAll(
-      await Future.wait([
-        for (final entry in failed)
-          // A song retried on its own meanwhile has a new entry.
-          if (DownloadManager.instance.entries.value.contains(entry))
-            makeSongOffline(entry.song),
-      ]),
-    );
+    await Future.wait([
+      for (final entry in failed)
+        // A song retried on its own meanwhile has a new entry.
+        if (DownloadManager.instance.entries.value.contains(entry))
+          makeSongOffline(entry.song),
+    ]);
   } finally {
     _retryingAll.value = false;
-  }
-  final failedAgain = results.where((ok) => !ok).length;
-  if (failedAgain > 0 && context.mounted) {
-    showToast(context, l10n.downloadsRetriedFailed(failedAgain));
   }
 }
 

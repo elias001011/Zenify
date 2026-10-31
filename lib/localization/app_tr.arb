@@ -39,7 +39,6 @@
   "cacheMsg": "Bellek Temizlendi",
   "cancel": "İptal",
   "cancellingDownload": "İndirme iptal ediliyor...",
-  "checkForUpdates": "Güncellemeler kontrol edilsin mi?",
   "chooseBackupDir": "Yedeklemek için klasör seç",
   "chooseBackupFiles": "Yedeklemek için dosyaları seç",
   "chooseCsvFile": "Choose CSV file",
@@ -76,7 +75,6 @@
   "download": "İndir",
   "downloadAppUpdate": "Uygulama Güncellemesini İndir",
   "downloadCancelled": "İndirme iptal edildi",
-  "downloadFailed": "İndirme başarısız oldu",
   "downloadPlaylist": "Çalma Listesini İndir",
   "downloadsDeleted": "İndirilenler başarıyla silindi",
   "dynamicColor": "Değişken Vurgu Rengi (Android 12+)",
@@ -84,7 +82,6 @@
   "editFolder": "Klasörü düzenle",
   "editPlaylist": "Çalma listesini düzenle",
   "emptyFolderMsg": "Bu klasör boş. Müziklerinizi düzenlemek için çalma listeleri ekleyin.",
-  "enableUpdateChecksDescription": "Zenify'ın GitHub sürümlerinden gelen güncellemeleri otomatik olarak kontrol etmesini ister misiniz? Güncellemeleri istediğiniz zaman ayarlardan manuel olarak kontrol edebilirsiniz",
   "endOfSong": "Parça sonu",
   "enterFolderName": "Lütfen bir klasör adı girin",
   "enterPlaylistName": "Please enter a playlist name",
@@ -168,7 +165,6 @@
   "name": "İsme göre",
   "newAnnouncement": "Yeni duyuru yayımlandı",
   "newFolder": "Yeni klasör",
-  "no": "Hayır",
   "noCustomPlaylists": "Henüz çalma listesi oluşturulmadı.",
   "noFolders": "Henüz hiç klasör oluşturulmamış",
   "noListeningStats": "No listening stats yet",
@@ -286,6 +282,5 @@
   "useProxy": "Proxy kullan",
   "useProxyDescription": "Yalnızca bağlantı sorunları olduğunda proxy kullanın, gereksiz kullanım müzik oynatmayı bir ihtimal bozabilir.",
   "userPlaylists": "Kullanıcı Listeleri",
-  "yes": "Evet",
   "youtubePlaylistLinkOrId": "YouTube listesi bağlantısı veya ID'si"
 }

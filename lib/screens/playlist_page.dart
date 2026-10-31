@@ -131,10 +131,12 @@ class _PlaylistPageState extends State<PlaylistPage> {
   void initState() {
     super.initState();
     _initializePlaylist();
+    replacedSongs.addListener(_reloadStoredSongs);
   }
 
   @override
   void dispose() {
+    replacedSongs.removeListener(_reloadStoredSongs);
     _searchQueryNotifier.dispose();
     _selection.dispose();
     _songsRevision.dispose();
@@ -264,7 +266,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
                       child: UnavailableNotice(
                         playlistId: _resolvedPlaylistId ?? '',
                         songs: _originalPlaylistList,
-                        onReplace: _replaceUnavailable,
                       ),
                     ),
                   if ((_playlist['list'] as List? ?? const []).isNotEmpty) ...[
@@ -406,37 +407,19 @@ class _PlaylistPageState extends State<PlaylistPage> {
     );
   }
 
-  /// Swaps unavailable songs for other uploads of them, one search at a
-  /// time, each in its own place; a song nothing is found for stays.
-  Future<void> _replaceUnavailable(List<Map> songs) async {
-    final taken = {
-      for (final song in _originalPlaylistList) song['ytid'].toString(),
-    };
-    final found = <String, Map>{};
-    for (final song in songs) {
-      final replacement = await findReplacementSong(
-        song,
-        exclude: {...taken, for (final r in found.values) r['ytid'].toString()},
-      );
-      if (replacement != null) found[song['ytid'].toString()] = replacement;
-    }
-    if (!mounted) return;
-    final playlist = _storedPlaylist;
-    final replaced = found.isEmpty
-        ? 0
-        : replaceSongsInPlaylist(playlist, found);
-    if (replaced > 0) {
-      setState(() {
-        _originalPlaylistList = List<dynamic>.from(playlist['list'] as List);
-        _applySort();
-      });
-    }
-    showToast(
-      context,
-      replaced > 0
-          ? context.l10n!.songsReplaced(replaced)
-          : context.l10n!.noReplacementFound,
-    );
+  /// Shows the songs as stored, after some were swapped for others, wherever
+  /// the swap was asked: a page left open would save its old list back.
+  void _reloadStoredSongs() {
+    final stored = getUserCustomPlaylists()
+        .where(
+          (playlist) => playlist['ytid']?.toString() == _resolvedPlaylistId,
+        )
+        .firstOrNull;
+    if (stored == null || !mounted) return;
+    setState(() {
+      _originalPlaylistList = List<dynamic>.from(stored['list'] as List);
+      _applySort();
+    });
   }
 
   Widget _buildHeaderSection() {

@@ -39,7 +39,6 @@
   "cacheMsg": "Vahemälu tühjendatud",
   "cancel": "Tühista",
   "cancellingDownload": "Allalaadimise tühistamine...",
-  "checkForUpdates": "Kontrolli uuendusi?",
   "chooseBackupDir": "Vali varunduskaust",
   "chooseBackupFiles": "Vali varundatavad failid",
   "chooseCsvFile": "Choose CSV file",
@@ -76,7 +75,6 @@
   "download": "Laadi alla",
   "downloadAppUpdate": "Laadi rakenduse uuendus alla",
   "downloadCancelled": "Allalaadimine tühistatud",
-  "downloadFailed": "Allalaadimine ebaõnnestus",
   "downloadPlaylist": "Laadi esitusloend alla",
   "downloadsDeleted": "Allalaadimised edukalt kustutatud",
   "dynamicColor": "Dünaamiline aktsentvärv (Android 12+)",
@@ -84,7 +82,6 @@
   "editFolder": "Muuda kausta",
   "editPlaylist": "Muuda esitusloendit",
   "emptyFolderMsg": "See kaust on tühi. Lisa esitusloendeid, et oma muusikat korraldada.",
-  "enableUpdateChecksDescription": "Kas soovid, et Zenify kontrolliks automaatselt uuendusi GitHubi väljalasetest? Uuendusi saab alati käsitsi kontrollida seadetest.",
   "endOfSong": "Loo lõpp",
   "enterFolderName": "Sisesta kausta nimi",
   "enterPlaylistName": "Please enter a playlist name",
@@ -168,7 +165,6 @@
   "name": "Nimi",
   "newAnnouncement": "Uus teadaanne postitatud",
   "newFolder": "Uus kaust",
-  "no": "Ei",
   "noCustomPlaylists": "Kohandatud esitusloendeid pole veel loodud",
   "noFolders": "Kaustu pole veel loodud",
   "noListeningStats": "Kuulamisstatistikat pole veel",
@@ -286,6 +282,5 @@
   "useProxy": "Kasuta proksit",
   "useProxyDescription": "Kasuta proksit ainult siis, kui voogesitus ebaõnnestub; tarbetu kasutamine võib esituse katkestada.",
   "userPlaylists": "Kasutaja esitusloendid",
-  "yes": "Jah",
   "youtubePlaylistLinkOrId": "YouTube'i esitusloendi link või ID"
 }

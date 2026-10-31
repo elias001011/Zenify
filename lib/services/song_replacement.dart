@@ -19,8 +19,15 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:async';
+import 'dart:math';
+
+import 'package:flutter/foundation.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/artist_service.dart';
+import 'package:musify/services/common_services.dart';
+import 'package:musify/services/download_manager.dart';
+import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/proxy_manager.dart';
 import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/utilities/formatter.dart';
@@ -31,10 +38,47 @@ String replacementQuery(Map song) => [song['artist'], song['title']]
     .where((part) => part.isNotEmpty)
     .join(' ');
 
+final _notWord = RegExp(r'[^\p{L}\p{N}]+', unicode: true);
+
+Set<String> _words(Object? text, {int minLength = 1}) => {
+  for (final word in (text?.toString() ?? '').toLowerCase().split(_notWord))
+    if (word.length >= minLength) word,
+};
+
+/// Whether [candidate] is the same recording as [song]: it carries every word
+/// of the title, its artist (in the artist, the title or the channel) and
+/// about the same length. A cover, a remix or an unrelated result differs in
+/// at least one, and a wrong swap is saved for good, so when in doubt the
+/// answer is no.
+bool isSameRecording(Map song, Map candidate) {
+  final title = _words(song['title']);
+  if (title.isEmpty) return false;
+  final candidateTitle = _words(candidate['title']);
+  if (!candidateTitle.containsAll(title)) return false;
+
+  final artist = _words(song['artist'], minLength: 3);
+  if (artist.isNotEmpty) {
+    final credited = {
+      ...candidateTitle,
+      ..._words(candidate['artist']),
+      ..._words(candidate['videoAuthor']),
+    };
+    if (artist.intersection(credited).isEmpty) return false;
+  }
+
+  final length = song['duration'];
+  final candidateLength = candidate['duration'];
+  if (length is num && candidateLength is num && length > 0) {
+    if ((length - candidateLength).abs() > max(10, length * 0.1)) return false;
+  }
+  return true;
+}
+
 /// Another upload of [song] to take its place, or null when none is found.
 /// YouTube Music is asked first, for the song of the same artist and title;
-/// a plain YouTube search is the fallback. Results in [exclude], the ones
-/// known to be unavailable and the song itself are never offered.
+/// a plain YouTube search is the fallback. What is offered must be the same
+/// recording ([isSameRecording]); results in [exclude], the ones known to be
+/// unavailable and the song itself are never offered.
 Future<Map<String, dynamic>?> findReplacementSong(
   Map song, {
   Set<String> exclude = const {},
@@ -52,7 +96,8 @@ Future<Map<String, dynamic>?> findReplacementSong(
       expectedTitle: song['title']?.toString(),
     );
     if (video != null && usable(video.id.value)) {
-      return returnSongLayout(0, video);
+      final candidate = returnSongLayout(0, video);
+      if (isSameRecording(song, candidate)) return candidate;
     }
   } catch (e, stackTrace) {
     logger.log(
@@ -65,9 +110,9 @@ Future<Map<String, dynamic>?> findReplacementSong(
   try {
     final results = await ytClient.search.search(query);
     for (final video in results) {
-      if (usable(video.id.value) && !video.isLive) {
-        return returnSongLayout(0, video);
-      }
+      if (!usable(video.id.value) || video.isLive) continue;
+      final candidate = returnSongLayout(0, video);
+      if (isSameRecording(song, candidate)) return candidate;
     }
   } catch (e, stackTrace) {
     logger.log(
@@ -77,4 +122,76 @@ Future<Map<String, dynamic>?> findReplacementSong(
     );
   }
   return null;
+}
+
+/// Where the replacements come from and how they are downloaded.
+@visibleForTesting
+var findReplacement = findReplacementSong;
+
+@visibleForTesting
+var downloadReplacement = makeSongOffline;
+
+/// Tells the playlist pages that are open that songs were swapped in storage.
+final replacedSongs = ValueNotifier<int>(0);
+
+/// Swaps [songs], unavailable on YouTube, for other uploads in the
+/// playlists you made, and starts downloading the replacements. Every
+/// playlist that holds a song gets the same replacement, unless [playlistId]
+/// limits it to one. A song nothing is found for stays where it is, and so
+/// does one that plays after all.
+///
+/// A song no playlist or liked list of yours holds any more is no longer
+/// unavailable for the app: it leaves the record and the Downloads tab,
+/// wherever the swap was asked. Returns how many songs were swapped.
+Future<int> replaceUnavailableSongs(
+  Iterable<Map> songs, {
+  String? playlistId,
+}) async {
+  final playlists = [
+    for (final playlist in getUserCustomPlaylists())
+      if (playlistId == null || playlist['ytid']?.toString() == playlistId)
+        playlist,
+  ];
+  final taken = songIdsOf(playlists);
+
+  final found = <String, Map>{};
+  for (final song in songs) {
+    final id = song['ytid'].toString();
+    if (!taken.contains(id) || !unavailableSongs.contains(id)) continue;
+    final replacement = await findReplacement(
+      song,
+      exclude: {...taken, for (final r in found.values) r['ytid'].toString()},
+    );
+    if (replacement != null) found[id] = replacement;
+  }
+
+  // The playlists may have changed while searching: only what is still there
+  // is swapped, and only that is counted and downloaded.
+  final applied = <String>{};
+  for (final playlist in playlists) {
+    final here = songIdsOf([playlist]);
+    applied.addAll(
+      replaceSongsInPlaylist(playlist, {
+        for (final entry in found.entries)
+          if (here.contains(entry.key)) entry.key: entry.value,
+      }),
+    );
+  }
+  if (applied.isEmpty) return 0;
+
+  final stillHeld = {
+    ...songIdsOf(getUserCustomPlaylists()),
+    ...songIdsOf(userLikedPlaylists.value.whereType<Map>()),
+    for (final song in userLikedSongsList.value.whereType<Map>())
+      song['ytid'].toString(),
+  };
+  final settled = applied.where((id) => !stillHeld.contains(id)).toList()
+    ..forEach(unavailableSongs.markAvailable);
+  DownloadManager.instance.forget(settled);
+
+  for (final id in applied) {
+    unawaited(downloadReplacement(found[id]));
+  }
+  replacedSongs.value++;
+  return applied.length;
 }

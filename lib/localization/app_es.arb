@@ -39,7 +39,6 @@
   "cacheMsg": "Caché eliminada",
   "cancel": "Cancelar",
   "cancellingDownload": "Cancelando Descarga...",
-  "checkForUpdates": "¿Comprobar actualizaciones?",
   "chooseBackupDir": "Seleccionar carpeta de respaldo",
   "chooseBackupFiles": "Elegir ficheros de respaldo",
   "chooseCsvFile": "Elige un archivo CSV",
@@ -76,7 +75,6 @@
   "download": "Descargar",
   "downloadAppUpdate": "Descargar actualización de la aplicación",
   "downloadCancelled": "Descarga cancelada",
-  "downloadFailed": "Descarga fallida",
   "downloadPlaylist": "Descargar lista de reproducción",
   "downloadsDeleted": "Descargas eliminadas exitosamente",
   "dynamicColor": "Color de acento dinámico (Android 12+)",
@@ -84,7 +82,6 @@
   "editFolder": "Editar carpeta",
   "editPlaylist": "Edita la playlist",
   "emptyFolderMsg": "Esta carpeta está vacía. Añade listas de reproducción para organizar tu música.",
-  "enableUpdateChecksDescription": "¿Desea que Zenify compruebe automáticamente si hay actualizaciones disponibles en las versiones de GitHub? Siempre puedes comprobar si hay actualizaciones manualmente desde los ajustes",
   "endOfSong": "Fin de canción",
   "enterFolderName": "Por favor, introduzca un nombre para la carpeta",
   "enterPlaylistName": "Por favor, introduzca el nombre de la playlist",
@@ -168,7 +165,6 @@
   "name": "Nombre",
   "newAnnouncement": "Nuevo anuncio publicado",
   "newFolder": "Nueva carpeta",
-  "no": "No",
   "noCustomPlaylists": "Aún no se han creado listas de reproducción personalizadas",
   "noFolders": "No hay carpetas creadas",
   "noListeningStats": "Aún no hay estadísticas de reproducción",
@@ -286,6 +282,5 @@
   "useProxy": "Usar proxy",
   "useProxyDescription": "Usa el proxy solo cuando el streaming falle, uso innecesario puede interrumpir la reproducción.",
   "userPlaylists": "Listas de reproducción del usuario",
-  "yes": "Si",
   "youtubePlaylistLinkOrId": "Enlace o ID de lista de reproducción de YouTube"
 }

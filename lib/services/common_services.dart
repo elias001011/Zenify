@@ -124,15 +124,13 @@ void reloadSongLibraryStateFromStorage() {
 const Duration _manifestTimeout = Duration(seconds: 30);
 const Duration _cacheValidationDuration = Duration(hours: 1);
 
-/// Whether another address could get what this one was refused: YouTube
-/// limiting or blocking it, or a video closed to this country.
-bool _proxyMayHelp(Exception error) => switch (error) {
-  VideoUnplayableException(:final message) => message.toLowerCase().contains(
-    'country',
-  ),
-  RequestLimitExceededException() || FatalFailureException() => true,
-  _ => false,
-};
+/// Whether another address could get what this one was refused: a refused
+/// stream (a 403 is a plain [YoutubeExplodeException]), a limit, a block, a
+/// video closed to this country, a bot check. Only a video that is removed or
+/// restricted for everyone is not worth it: it fails the same through any
+/// proxy.
+bool _proxyMayHelp(Exception error) =>
+    error is! VideoUnplayableException || isDeviceBlock(error);
 
 /// Fetches a stream manifest for a song, honoring proxy settings.
 Future<StreamManifest?> _fetchStreamManifest(String songId) async {
@@ -749,22 +747,18 @@ Future<AudioOnlyStreamInfo> resolveBestAudioStream(String songId) async {
   final cachedStream = _getSelectedAudioStream(songId);
   if (cachedStream != null) return cachedStream;
 
-  try {
-    final manifest = await _fetchStreamManifest(songId);
-    if (manifest == null) throw StateError('No stream manifest for $songId');
-    final selectedStream = manifest.audioOnly.isEmpty
-        ? null
-        : selectAudioOnlyStreamForQuality(manifest.audioOnly);
-    if (selectedStream == null) {
-      throw VideoUnavailableException('No audio streams for "$songId"');
-    }
-    _cacheSelectedAudioStream(songId, selectedStream);
-    unavailableSongs.markAvailable(songId);
-    return selectedStream;
-  } on VideoUnplayableException {
-    unavailableSongs.markUnavailable(songId);
-    rethrow;
+  final manifest = await _fetchStreamManifest(songId);
+  if (manifest == null) throw StateError('No stream manifest for $songId');
+  final selectedStream = manifest.audioOnly.isEmpty
+      ? null
+      : selectAudioOnlyStreamForQuality(manifest.audioOnly);
+  if (selectedStream == null) {
+    throw VideoUnavailableException('No audio streams for "$songId"');
   }
+  _cacheSelectedAudioStream(songId, selectedStream);
+  // It plays: whatever a download said before no longer holds.
+  unavailableSongs.markAvailable(songId);
+  return selectedStream;
 }
 
 /// Fetches the best available audio stream for a song, or null when it
@@ -934,6 +928,13 @@ Future<bool> makeSongOffline(dynamic song, {bool Function()? cancelled}) async {
   );
 }
 
+/// How long a download may go without receiving anything before it fails.
+const _transferStall = Duration(seconds: 60);
+
+/// How long finding the stream may take: two direct clients of 30 seconds
+/// each, then a proxy.
+const _resolveLimit = Duration(minutes: 2);
+
 /// Saves the audio and the cover of [song] and records it as offline,
 /// reporting the audio's progress from 0 to 1. Throws when it cannot.
 Future<void> saveSongFiles(
@@ -944,7 +945,7 @@ Future<void> saveSongFiles(
   final audioFile = File(FilePaths.getAudioPath(ytid));
   await audioFile.parent.create(recursive: true);
 
-  final audio = await resolveBestAudioStream(ytid);
+  final audio = await resolveBestAudioStream(ytid).timeout(_resolveLimit);
   IOSink? fileStream;
   try {
     final total = audio.size.totalBytes;
@@ -953,6 +954,12 @@ Future<void> saveSongFiles(
     fileStream = audioFile.openWrite();
     await ytClient.videos.streamsClient
         .get(audio)
+        .timeout(
+          _transferStall,
+          onTimeout: (sink) => sink
+            ..addError(TimeoutException('The download stalled for $ytid'))
+            ..close(),
+        )
         .map((chunk) {
           received += chunk.length;
           // Whole percents only, so listeners do not rebuild per chunk.
@@ -1003,7 +1010,10 @@ Future<void> saveSongFiles(
 /// The path of the cover saved from [url], or null when it could not be.
 Future<String?> _saveArtwork(String url, String path) async {
   try {
-    final file = await _downloadAndSaveArtworkFile(url, path);
+    final file = await _downloadAndSaveArtworkFile(
+      url,
+      path,
+    ).timeout(_transferStall);
     if (file != null && await file.exists()) return path;
   } catch (e, stackTrace) {
     logger.log('Error downloading artwork', error: e, stackTrace: stackTrace);

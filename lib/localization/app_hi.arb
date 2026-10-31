@@ -39,7 +39,6 @@
   "cacheMsg": "कैश साफ़ कर दिया गया",
   "cancel": "रद्द करें",
   "cancellingDownload": "Cancelling download...",
-  "checkForUpdates": "Check for Updates?",
   "chooseBackupDir": "बैकअप फ़ोल्डर चुनें",
   "chooseBackupFiles": "बैकअप के लिए फ़ाइलें चुनें",
   "chooseCsvFile": "Choose CSV file",
@@ -76,7 +75,6 @@
   "download": "डाउनलोड करें",
   "downloadAppUpdate": "ऐप अपडेट डाउनलोड करें",
   "downloadCancelled": "Download cancelled",
-  "downloadFailed": "Download failed",
   "downloadPlaylist": "Download playlist",
   "downloadsDeleted": "Downloads deleted successfully",
   "dynamicColor": "डायनेमिक एक्सेंट रंग (Android 12+)",
@@ -84,7 +82,6 @@
   "editFolder": "Edit folder",
   "editPlaylist": "Edit playlist",
   "emptyFolderMsg": "This folder is empty. Add playlists to organize your music.",
-  "enableUpdateChecksDescription": "Would you like Zenify to check for updates automatically from GitHub releases? You can always check for updates manually from the settings",
   "endOfSong": "गाने का अंत",
   "enterFolderName": "Please enter a folder name",
   "enterPlaylistName": "Please enter a playlist name",
@@ -168,7 +165,6 @@
   "name": "नाम",
   "newAnnouncement": "नया घोषणा पोस्ट किया गया",
   "newFolder": "New folder",
-  "no": "No",
   "noCustomPlaylists": "अभी तक कोई कस्टम प्लेलिस्ट नहीं बनाई गई",
   "noFolders": "No folders created yet",
   "noListeningStats": "No listening stats yet",
@@ -286,6 +282,5 @@
   "useProxy": "Use proxy",
   "useProxyDescription": "Use the proxy only when streaming fails, unnecessary use may break playback.",
   "userPlaylists": "उपयोगकर्ता की प्लेलिस्ट्स",
-  "yes": "Yes",
   "youtubePlaylistLinkOrId": "YouTube प्लेलिस्ट लिंक या ID"
 }

@@ -22,7 +22,11 @@ void main() {
     await dir.delete(recursive: true);
   });
 
-  setUp(manager.clearHistory);
+  setUp(() {
+    manager
+      ..idleMargin = const Duration(milliseconds: 20)
+      ..reset();
+  });
 
   Map<String, dynamic> song(String id) => {
     'ytid': id,
@@ -65,6 +69,17 @@ void main() {
     expect(
       DownloadManager.failureFor(StateError('bad')),
       DownloadFailure.other,
+    );
+    // YouTube refusing this device is not a song that is gone.
+    expect(
+      DownloadManager.failureFor(
+        VideoUnplayableException("Sign in to confirm you're not a bot"),
+      ),
+      DownloadFailure.network,
+    );
+    expect(
+      DownloadManager.failureFor(VideoUnavailableException('gone')),
+      DownloadFailure.unavailable,
     );
   });
 
@@ -194,6 +209,161 @@ void main() {
       expect(await waiting, isFalse);
       expect(saved, isNot(contains('late')));
       expect(manager.entries.value.map((e) => e.ytid), isNot(contains('late')));
+    });
+
+    test(
+      'a shared download is cancelled only when everyone cancelled',
+      () async {
+        final blockers = [
+          for (var i = 0; i < DownloadManager.maxConcurrent; i++)
+            manager.download(song('c$i'), save),
+        ];
+        // Two playlists want the same song; the first one is cancelled.
+        final first = manager.download(
+          song('shared'),
+          save,
+          cancelled: () => true,
+        );
+        final second = manager.download(
+          song('shared'),
+          save,
+          cancelled: () => false,
+        );
+        expect(identical(first, second), isTrue);
+        for (var i = 0; i < DownloadManager.maxConcurrent; i++) {
+          open('c$i');
+        }
+        await Future.wait(blockers);
+        open('shared');
+        expect(await first, isTrue);
+        expect(saved, contains('shared'));
+      },
+    );
+
+    test('a song everyone cancelled is not downloaded', () async {
+      final blockers = [
+        for (var i = 0; i < DownloadManager.maxConcurrent; i++)
+          manager.download(song('d$i'), save),
+      ];
+      final first = manager.download(
+        song('dropped'),
+        save,
+        cancelled: () => true,
+      );
+      unawaited(manager.download(song('dropped'), save, cancelled: () => true));
+      for (var i = 0; i < DownloadManager.maxConcurrent; i++) {
+        open('d$i');
+      }
+      await Future.wait(blockers);
+      expect(await first, isFalse);
+      expect(saved, isNot(contains('dropped')));
+    });
+
+    test('the place is kept until the save has ended', () async {
+      final slow = manager.download(song('slow'), save);
+      await Future<void>.delayed(Duration.zero);
+      expect(running, 1);
+      // Nothing lets go of a save that is still writing.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(manager.active.map((e) => e.ytid), contains('slow'));
+      expect(manager.download(song('slow'), save), same(slow));
+      open('slow');
+      expect(await slow, isTrue);
+      expect(running, 0);
+    });
+
+    group('the end of a run', () {
+      final notices = <DownloadBatch>[];
+      void listen() => notices.add(manager.batch.value!);
+      setUp(() {
+        notices.clear();
+        manager.batch.addListener(listen);
+      });
+      tearDown(() => manager.batch.removeListener(listen));
+
+      Future<void> settle(
+        List<Future<bool>> downloads,
+        List<String> ids,
+      ) async {
+        ids.forEach(open);
+        await Future.wait(downloads);
+      }
+
+      test(
+        'waits a margin, then tells every playlist\'s failures once',
+        () async {
+          // Two playlists at once, each with songs that fail.
+          final downloads = [
+            manager.download(song('fine1'), save),
+            manager.download(song('bad-a'), save),
+            manager.download(song('gone-a'), save),
+            manager.download(song('fine2'), save),
+            manager.download(song('gone-b'), save),
+          ];
+          expect(manager.idle.value, isFalse);
+          await settle(downloads, [
+            'fine1',
+            'bad-a',
+            'gone-a',
+            'fine2',
+            'gone-b',
+          ]);
+          // Over, but not yet said: another playlist may start right now.
+          expect(manager.idle.value, isFalse);
+          expect(notices, isEmpty);
+
+          await Future<void>.delayed(const Duration(milliseconds: 60));
+          expect(manager.idle.value, isTrue);
+          expect(notices, hasLength(1));
+          expect(notices.single.failed, 3);
+          expect(notices.single.unavailable, 2);
+        },
+      );
+
+      test('a download inside the margin belongs to the same run', () async {
+        await settle([manager.download(song('bad-1'), save)], ['bad-1']);
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        await settle([manager.download(song('bad-2'), save)], ['bad-2']);
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(notices.single.failed, 2);
+      });
+
+      test('a run without failures says nothing', () async {
+        await settle([manager.download(song('ok'), save)], ['ok']);
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(manager.idle.value, isTrue);
+        expect(notices, isEmpty);
+      });
+
+      test('the next run starts counting from zero', () async {
+        await settle([manager.download(song('bad-x'), save)], ['bad-x']);
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        await settle([manager.download(song('gone-y'), save)], ['gone-y']);
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(notices.map((n) => n.failed), [1, 1]);
+        expect(notices.map((n) => n.unavailable), [0, 1]);
+        expect(notices.first.id, isNot(notices.last.id));
+      });
+    });
+
+    test('cancelling a new try keeps the earlier entry of the song', () async {
+      manager.failed(manager.started(song('again')), StateError('x'));
+      final blockers = [
+        for (var i = 0; i < DownloadManager.maxConcurrent; i++)
+          manager.download(song('k$i'), save),
+      ];
+      final retry = manager.download(
+        song('again'),
+        save,
+        cancelled: () => true,
+      );
+      for (var i = 0; i < DownloadManager.maxConcurrent; i++) {
+        open('k$i');
+      }
+      await Future.wait(blockers);
+      expect(await retry, isFalse);
+      final entry = manager.entries.value.firstWhere((e) => e.ytid == 'again');
+      expect(entry.status, DownloadStatus.failed);
     });
 
     test('a failure frees its place and says why', () async {

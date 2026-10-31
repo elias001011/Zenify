@@ -39,7 +39,6 @@
   "cacheMsg": "キャッシュを削除しました",
   "cancel": "キャンセル",
   "cancellingDownload": "ダウンロードをキャンセルしています...",
-  "checkForUpdates": "アップデートを確認しますか？",
   "chooseBackupDir": "バックアップ先フォルダーを選択",
   "chooseBackupFiles": "バックアップするファイルを選択",
   "chooseCsvFile": "Choose CSV file",
@@ -76,7 +75,6 @@
   "download": "ダウンロード",
   "downloadAppUpdate": "アプリのアップデートをダウンロード",
   "downloadCancelled": "ダウンロードをキャンセルしました",
-  "downloadFailed": "ダウンロードに失敗しました",
   "downloadPlaylist": "プレイリストをダウンロード",
   "downloadsDeleted": "ダウンロードを削除しました",
   "dynamicColor": "動的アクセントカラー (Android 12以上)",
@@ -84,7 +82,6 @@
   "editFolder": "フォルダーを編集",
   "editPlaylist": "プレイリストを編集",
   "emptyFolderMsg": "このフォルダーは空です。プレイリストを追加して音楽を整理しましょう。",
-  "enableUpdateChecksDescription": "ZenifyがGitHubのリリースから自動的にアップデートを確認するようにしますか？設定からいつでも手動で確認できます。",
   "endOfSong": "曲の終わり",
   "enterFolderName": "フォルダー名を入力してください",
   "enterPlaylistName": "Please enter a playlist name",
@@ -168,7 +165,6 @@
   "name": "名前",
   "newAnnouncement": "新しいお知らせを投稿しました",
   "newFolder": "新規フォルダー",
-  "no": "いいえ",
   "noCustomPlaylists": "まだカスタムプレイリストはありません",
   "noFolders": "まだフォルダーはありません",
   "noListeningStats": "リスニング統計はまだありません",
@@ -286,6 +282,5 @@
   "useProxy": "プロキシを使用",
   "useProxyDescription": "ストリーミングに失敗した場合のみプロキシを使用してください。不必要な使用は再生に問題を引き起こす可能性があります。",
   "userPlaylists": "ユーザープレイリスト",
-  "yes": "はい",
   "youtubePlaylistLinkOrId": "YouTubeプレイリストのリンクまたはID"
 }

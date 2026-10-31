@@ -19,6 +19,8 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:async';
+
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -33,6 +35,9 @@ class UnavailableSongs {
   static const _idsKey = 'unavailableSongs';
   static const _dismissedKey = 'unavailableDismissed';
   static const _maxIds = 2000;
+  static const _writeDelay = Duration(seconds: 1);
+
+  Timer? _writeTimer;
 
   late final ids = ValueNotifier<Set<String>>(_loadIds());
 
@@ -64,29 +69,55 @@ class UnavailableSongs {
 
   void _setIds(Set<String> next) {
     ids.value = next;
-    _box?.put(_idsKey, next.toList());
+    // A failing playlist flags many songs: one write for the burst.
+    if (persist) _writeTimer ??= Timer(_writeDelay, flush);
   }
 
+  /// Writes the record now.
+  void flush() {
+    _writeTimer?.cancel();
+    _writeTimer = null;
+    _box?.put(_idsKey, ids.value.toList());
+  }
+
+  final _dismissed = <String, Set<String>>{};
+
   /// The songs of [playlistId] whose notice the user closed.
-  Set<String> dismissed(String playlistId) {
+  Set<String> dismissed(String playlistId) => _dismissed[playlistId] ??= () {
     final raw = _box?.get(_dismissedKey);
     final list = raw is Map ? raw[playlistId] : null;
-    return list is List ? {for (final id in list) id.toString()} : {};
-  }
+    return list is List ? {for (final id in list) id.toString()} : <String>{};
+  }();
 
   /// Stops telling about [songs] in [playlistId]; one that fails later, and
   /// is not among them, brings the notice back.
   void dismiss(String playlistId, Iterable<String> songs) {
-    final raw = _box?.get(_dismissedKey);
-    final all = {
-      if (raw is Map)
-        for (final entry in raw.entries)
-          entry.key.toString(): List<dynamic>.of(entry.value as List),
+    final dismissed = _dismissed[playlistId] = {
+      ...this.dismissed(playlistId),
+      ...songs,
     };
-    all[playlistId] = {...dismissed(playlistId), ...songs}.toList();
-    _box?.put(_dismissedKey, all);
+    if (persist) {
+      // Merged with the file: playlists not opened this session keep theirs.
+      final stored = _box?.get(_dismissedKey);
+      _box?.put(_dismissedKey, {
+        if (stored is Map)
+          for (final entry in stored.entries) entry.key.toString(): entry.value,
+        playlistId: dismissed.toList(),
+      });
+    }
     // The notice reads this together with the ids, so it follows them.
     ids.value = {...ids.value};
+  }
+
+  /// Whether what is learnt is written to the device. Off in tests that run
+  /// under a fake clock, where writes to the box never settle.
+  @visibleForTesting
+  var persist = true;
+
+  @visibleForTesting
+  void reset() {
+    _dismissed.clear();
+    ids.value = {};
   }
 }
 

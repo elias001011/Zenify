@@ -39,7 +39,6 @@
   "cacheMsg": "Cache effacé",
   "cancel": "Annuler",
   "cancellingDownload": "Annulation du téléchargement...",
-  "checkForUpdates": "Vérifier les mises à jour ?",
   "chooseBackupDir": "Choisissez un dossier de sauvegarde",
   "chooseBackupFiles": "Sélectionnez les fichiers à sauvegarder",
   "chooseCsvFile": "Choisissez un fichier CSV",
@@ -76,7 +75,6 @@
   "download": "Télécharger",
   "downloadAppUpdate": "Télécharger la mise à jour de l'application",
   "downloadCancelled": "Téléchargement annulé",
-  "downloadFailed": "Échec du téléchargement",
   "downloadPlaylist": "Télécharger la playlist",
   "downloadsDeleted": "Téléchargements supprimés avec succès",
   "dynamicColor": "Couleur d'accentuation dynamique (Android 12 et versions ultérieures)",
@@ -84,7 +82,6 @@
   "editFolder": "Modifier le dossier",
   "editPlaylist": "Modifier la playlist",
   "emptyFolderMsg": "Ce dossier est vide. Ajoutez des playlists pour organiser votre musique.",
-  "enableUpdateChecksDescription": "Souhaitez-vous que Zenify vérifie automatiquement la présence de mises à jour à partir des versions publiées sur GitHub ? Vous pouvez à tout moment vérifier manuellement la présence de mises à jour depuis les paramètres.",
   "endOfSong": "Fin du titre",
   "enterFolderName": "Veuillez saisir un nom de dossier",
   "enterPlaylistName": "Veuillez saisir un nom pour la playlist",
@@ -168,7 +165,6 @@
   "name": "Nom",
   "newAnnouncement": "Nouvelle annonce publiée",
   "newFolder": "Nouveau dossier",
-  "no": "Non",
   "noCustomPlaylists": "Aucune playlist personnalisée n'a encore été créée",
   "noFolders": "Aucun dossier n'a encore été créé",
   "noListeningStats": "Aucune statistique d'écoute n'est encore disponible",
@@ -286,6 +282,5 @@
   "useProxy": "Utiliser un proxy",
   "useProxyDescription": "N'utilisez le proxy qu'en cas d'échec de la diffusion en continu ; une utilisation inutile pourrait perturber la lecture.",
   "userPlaylists": "Playlists des Utilisateurs",
-  "yes": "Oui",
   "youtubePlaylistLinkOrId": "Lien ou identifiant d'une playlist YouTube"
 }

@@ -258,8 +258,8 @@ class SettingsPage extends StatelessWidget {
             );
           },
         ),
-        if (!isFdroidBuild && isMobilePlatform)
-          ValueListenableBuilder<bool?>(
+        if (!isFdroidBuild)
+          ValueListenableBuilder<bool>(
             valueListenable: shouldWeCheckUpdates,
             builder: (_, value, __) {
               return CustomBar(
@@ -270,7 +270,7 @@ class SettingsPage extends StatelessWidget {
                     ? commonCustomBarRadiusLast
                     : BorderRadius.zero,
                 trailing: Switch(
-                  value: value ?? false,
+                  value: value,
                   onChanged: (value) =>
                       _toggleAutomaticUpdateChecks(context, value),
                 ),

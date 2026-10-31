@@ -39,7 +39,6 @@
   "cacheMsg": "Έγινε εκκαθάριση της βραχύχρονης μνήμης",
   "cancel": "Ακύρωση",
   "cancellingDownload": "Cancelling download...",
-  "checkForUpdates": "Έλεγχος για ενημερώσεις;",
   "chooseBackupDir": "Επιλογή καταλόγου αντιγράφων ασφαλείας",
   "chooseBackupFiles": "Επιλογή αρχείων για αντίγραφα ασφαλείας",
   "chooseCsvFile": "Choose CSV file",
@@ -76,7 +75,6 @@
   "download": "Λήψη",
   "downloadAppUpdate": "Λήψη ενημέρωσης εφαρμογής",
   "downloadCancelled": "Η λήψη ακυρώθηκε",
-  "downloadFailed": "Αποτυχία λήψης",
   "downloadPlaylist": "Λήψη λίστας αναπαραγωγής",
   "downloadsDeleted": "Downloads deleted successfully",
   "dynamicColor": "Δυναμικό χρώμα έμφασης (Android 12+)",
@@ -84,7 +82,6 @@
   "editFolder": "Edit folder",
   "editPlaylist": "Επεξεργασία λίστας αναπαραγωγής",
   "emptyFolderMsg": "Αυτός ο φάκελος είναι κενός. Προσθέστε λίστες αναπαραγωγής για να οργανώσετε τη μουσική σας.",
-  "enableUpdateChecksDescription": "Θα θέλατε το Zenify να ελέγχει για ενημερώσεις αυτόματα από τις εκδόσεις του GitHub? Μπορείτε πάντα να ελέγξετε για ενημερώσεις χειροκίνητα από τις ρυθμίσεις",
   "endOfSong": "Τέλος τραγουδιού",
   "enterFolderName": "Παρακαλώ εισάγετε ένα όνομα φακέλου",
   "enterPlaylistName": "Please enter a playlist name",
@@ -168,7 +165,6 @@
   "name": "Όνομα",
   "newAnnouncement": "Νέα ανακοίνωση δημοσιεύτηκε",
   "newFolder": "Νέος φάκελος",
-  "no": "Όχι",
   "noCustomPlaylists": "Δεν έχετε δημιουργήσει ακόμα λίστες αναπαραγωγής",
   "noFolders": "No folders created yet",
   "noListeningStats": "No listening stats yet",
@@ -286,6 +282,5 @@
   "useProxy": "Χρήση διαμεσολαβητή",
   "useProxyDescription": "Use the proxy only when streaming fails, unnecessary use may break playback.",
   "userPlaylists": "Λίστες αναπαραγωγής χρήστη",
-  "yes": "Ναι",
   "youtubePlaylistLinkOrId": "YouTube playlist link or ID "
 }

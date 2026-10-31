@@ -44,7 +44,6 @@
   "cacheMsg": "Cache limpo",
   "cancel": "Cancelar",
   "cancellingDownload": "Cancelando download...",
-  "checkForUpdates": "Verificar atualizações?",
   "chooseBackupDir": "Escolher pasta de backup",
   "chooseBackupFiles": "Selecionar arquivos para o backup",
   "chooseCsvFile": "Escolha o arquivo CSV",
@@ -84,7 +83,6 @@
   "download": "Baixar",
   "downloadAppUpdate": "Baixar atualização do app",
   "downloadCancelled": "Download cancelado",
-  "downloadFailed": "Falha no download",
   "downloadFailedNetwork": "A conexão caiu",
   "downloadFailedOther": "Algo deu errado",
   "downloadFailedUnavailable": "Nenhum áudio disponível para esta música",
@@ -110,13 +108,18 @@
   "downloadsFolderUnavailable": "{path} não está disponível, então os novos downloads vão para o local padrão por enquanto.",
   "downloadsRetry": "Tentar de novo",
   "downloadsRetryAll": "Tentar todos",
+  "importAction": "Importar",
+  "spotifyImportIntroTitle": "Traga suas playlists do Spotify",
+  "spotifyImportIntroDescription": "Exporte uma playlist do Spotify como arquivo CSV e importe aqui: o Zenify procura cada música no YouTube. Você também pode fazer isso depois, nas Configurações.",
+  "downloadsUnavailable": "Indisponíveis",
+  "downloadFailuresCount": "{failed, plural, =1{1 música falhou} other{{failed} músicas falharam}}",
+  "downloadFailuresUnavailable": "{failed, plural, =1{1 música falhou} other{{failed} músicas falharam}}, {unavailable} indisponíveis",
   "unavailableSongsNotice": "{count, plural, =1{1 música desta playlist pode estar indisponível} other{{count} músicas desta playlist podem estar indisponíveis}}",
   "dismiss": "Dispensar",
   "replaceUnavailable": "Substituir",
   "songsReplaced": "{count, plural, =1{1 música substituída} other{{count} músicas substituídas}}",
   "noReplacementFound": "Nenhuma substituição encontrada",
   "downloadsRetrying": "{count, plural, =1{Tentando baixar 1 música de novo} other{Tentando baixar {count} músicas de novo}}",
-  "downloadsRetriedFailed": "{count, plural, =1{1 download falhou de novo} other{{count} downloads falharam de novo}}",
   "dynamicBackground": "Fundo dinâmico",
   "dynamicBackgroundDescription": "As cores dos álbuns pintam suavemente o fundo da página.",
   "dynamicColor": "Cor de destaque dinâmica (Android 12+)",
@@ -124,7 +127,6 @@
   "editFolder": "Editar pasta",
   "editPlaylist": "Editar playlist",
   "emptyFolderMsg": "Esta pasta está vazia. Adicione playlists para organizar sua música.",
-  "enableUpdateChecksDescription": "Deseja que o Zenify verifique automaticamente se há atualizações a partir dos lançamentos do GitHub? Você sempre pode verificar as atualizações manualmente nas configurações.",
   "endOfSong": "Fim da faixa",
   "enterFolderName": "Por favor, digite o nome da pasta",
   "enterPlaylistName": "Por favor, insira um nome de playlist",
@@ -222,7 +224,6 @@
   "navigation": "Navegação",
   "newAnnouncement": "Novo anúncio postado",
   "newFolder": "Nova pasta",
-  "no": "Não",
   "noCustomPlaylists": "Nenhuma playlist personalizada criada ainda",
   "noFolders": "Nenhuma pasta criada ainda",
   "noLibraryMatches": "Nada encontrado na sua biblioteca.",
@@ -431,7 +432,6 @@
   "useProxyDescription": "Ative isso apenas se a reprodução falhar para contornar restrições regionais. Usá-lo sem necessidade pode causar falhas na reprodução.",
   "userPlaylists": "Playlists do usuário",
   "volume": "Volume",
-  "yes": "Sim",
   "youtubePlaylistLinkOrId": "Link ou ID da playlist do YouTube",
   "imageSaved": "Imagem salva",
   "selectAll": "Selecionar todas",
@@ -450,13 +450,6 @@
       }
     }
   },
-  "@downloadsRetriedFailed": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "@unavailableSongsNotice": {
     "placeholders": {
       "count": {
@@ -467,6 +460,23 @@
   "@songsReplaced": {
     "placeholders": {
       "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@downloadFailuresCount": {
+    "placeholders": {
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "@downloadFailuresUnavailable": {
+    "placeholders": {
+      "failed": {
+        "type": "int"
+      },
+      "unavailable": {
         "type": "int"
       }
     }

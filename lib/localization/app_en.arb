@@ -50,7 +50,6 @@
   "cacheMsg": "Cache cleared",
   "cancel": "Cancel",
   "cancellingDownload": "Cancelling download...",
-  "checkForUpdates": "Check for Updates?",
   "chooseBackupDir": "Choose backup folder",
   "chooseBackupFiles": "Select files for backup",
   "chooseCsvFile": "Choose CSV file",
@@ -90,7 +89,6 @@
   "download": "Download",
   "downloadAppUpdate": "Download app update",
   "downloadCancelled": "Download cancelled",
-  "downloadFailed": "Download failed",
   "downloadFailedNetwork": "Connection lost",
   "downloadFailedOther": "Something went wrong",
   "downloadFailedUnavailable": "No audio available for this song",
@@ -116,13 +114,18 @@
   "downloadsFolderUnavailable": "{path} is unavailable, so new downloads go to the default location for now.",
   "downloadsRetry": "Retry",
   "downloadsRetryAll": "Retry all",
+  "importAction": "Import",
+  "spotifyImportIntroTitle": "Bring your Spotify playlists",
+  "spotifyImportIntroDescription": "Export a playlist from Spotify as a CSV file and import it here: Zenify finds each song on YouTube. You can also do it later from Settings.",
+  "downloadsUnavailable": "Unavailable",
+  "downloadFailuresCount": "{failed, plural, =1{1 song failed} other{{failed} songs failed}}",
+  "downloadFailuresUnavailable": "{failed, plural, =1{1 song failed} other{{failed} songs failed}}, {unavailable} unavailable",
   "unavailableSongsNotice": "{count, plural, =1{1 song in this playlist may be unavailable} other{{count} songs in this playlist may be unavailable}}",
   "dismiss": "Dismiss",
   "replaceUnavailable": "Replace",
   "songsReplaced": "{count, plural, =1{1 song replaced} other{{count} songs replaced}}",
   "noReplacementFound": "No replacement found",
   "downloadsRetrying": "{count, plural, =1{Retrying 1 download} other{Retrying {count} downloads}}",
-  "downloadsRetriedFailed": "{count, plural, =1{1 download failed again} other{{count} downloads failed again}}",
   "dynamicBackground": "Dynamic background",
   "dynamicBackgroundDescription": "Album colours softly paint the page background.",
   "dynamicColor": "Dynamic accent color (Android 12+)",
@@ -130,7 +133,6 @@
   "editFolder": "Edit folder",
   "editPlaylist": "Edit playlist",
   "emptyFolderMsg": "This folder is empty. Add playlists to organize your music.",
-  "enableUpdateChecksDescription": "Would you like Zenify to check for updates automatically from GitHub releases? You can always check for updates manually from the settings",
   "endOfSong": "End of song",
   "enterFolderName": "Please enter a folder name",
   "enterPlaylistName": "Please enter a playlist name",
@@ -228,7 +230,6 @@
   "navigation": "Navigation",
   "newAnnouncement": "New announcement posted",
   "newFolder": "New folder",
-  "no": "No",
   "noCustomPlaylists": "No custom playlists created yet",
   "noFolders": "No folders created yet",
   "noLibraryMatches": "Nothing in your library matches.",
@@ -442,7 +443,6 @@
   "useProxyDescription": "Use the proxy only when streaming fails, unnecessary use may break playback.",
   "userPlaylists": "User playlists",
   "volume": "Volume",
-  "yes": "Yes",
   "youtubePlaylistLinkOrId": "YouTube playlist link or ID",
   "imageSaved": "Image saved",
   "selectAll": "Select all",
@@ -461,13 +461,6 @@
       }
     }
   },
-  "@downloadsRetriedFailed": {
-    "placeholders": {
-      "count": {
-        "type": "int"
-      }
-    }
-  },
   "@unavailableSongsNotice": {
     "placeholders": {
       "count": {
@@ -478,6 +471,23 @@
   "@songsReplaced": {
     "placeholders": {
       "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@downloadFailuresCount": {
+    "placeholders": {
+      "failed": {
+        "type": "int"
+      }
+    }
+  },
+  "@downloadFailuresUnavailable": {
+    "placeholders": {
+      "failed": {
+        "type": "int"
+      },
+      "unavailable": {
         "type": "int"
       }
     }

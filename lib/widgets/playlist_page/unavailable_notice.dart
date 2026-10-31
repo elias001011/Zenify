@@ -23,42 +23,39 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/services/song_replacement.dart';
 import 'package:musify/services/unavailable_songs.dart';
+import 'package:musify/widgets/replace_unavailable_button.dart';
 
-/// Tells that some songs of a playlist failed as unavailable on YouTube, and
-/// offers to dismiss that or to swap them for other uploads. Songs that are
-/// downloaded still play, so they are not counted.
-class UnavailableNotice extends StatefulWidget {
+final _changes = Listenable.merge([
+  unavailableSongs.ids,
+  offlineMode,
+  userOfflineSongs,
+  DownloadManager.instance.idle,
+]);
+
+/// Tells, once a playlist's download is over, that some songs of it failed as
+/// unavailable on YouTube, and offers to dismiss that or to swap them for
+/// other uploads. Songs that are downloaded still play, so they are not
+/// counted.
+class UnavailableNotice extends StatelessWidget {
   const UnavailableNotice({
     super.key,
     required this.playlistId,
     required this.songs,
-    required this.onReplace,
+    this.replace = replaceUnavailableSongs,
   });
 
   final String playlistId;
   final List songs;
-
-  /// Replaces the given songs; completes when it is done.
-  final Future<void> Function(List<Map> songs) onReplace;
-
-  @override
-  State<UnavailableNotice> createState() => _UnavailableNoticeState();
-}
-
-class _UnavailableNoticeState extends State<UnavailableNotice> {
-  var _replacing = false;
-  late final _changes = Listenable.merge([
-    unavailableSongs.ids,
-    offlineMode,
-    userOfflineSongs,
-  ]);
+  final Future<int> Function(List<Map> songs, {String? playlistId}) replace;
 
   List<Map> get _affected {
-    final dismissed = unavailableSongs.dismissed(widget.playlistId);
+    final dismissed = unavailableSongs.dismissed(playlistId);
     return [
-      for (final song in widget.songs.whereType<Map>())
+      for (final song in songs.whereType<Map>())
         if (unavailableSongs.contains(song['ytid']) &&
             !isSongAlreadyOffline(song['ytid']) &&
             !dismissed.contains(song['ytid'].toString()))
@@ -66,24 +63,18 @@ class _UnavailableNoticeState extends State<UnavailableNotice> {
     ];
   }
 
-  Future<void> _replace(List<Map> songs) async {
-    setState(() => _replacing = true);
-    try {
-      await widget.onReplace(songs);
-    } finally {
-      if (mounted) setState(() => _replacing = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: _changes,
       builder: (context, _) {
-        final affected = _affected;
-        if (offlineMode.value || affected.isEmpty) {
+        // Only once every download is over: a song of this playlist may be
+        // queued by another one, and may still fail.
+        if (offlineMode.value || !DownloadManager.instance.idle.value) {
           return const SizedBox.shrink();
         }
+        final affected = _affected;
+        if (affected.isEmpty) return const SizedBox.shrink();
         final l10n = context.l10n!;
         final colors = Theme.of(context).colorScheme;
         return Padding(
@@ -117,25 +108,15 @@ class _UnavailableNoticeState extends State<UnavailableNotice> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       TextButton(
-                        onPressed: _replacing
-                            ? null
-                            : () =>
-                                  unavailableSongs.dismiss(widget.playlistId, [
-                                    for (final s in affected)
-                                      s['ytid'].toString(),
-                                  ]),
+                        onPressed: () => unavailableSongs.dismiss(playlistId, [
+                          for (final song in affected) song['ytid'].toString(),
+                        ]),
                         child: Text(l10n.dismiss),
                       ),
-                      FilledButton(
-                        onPressed: _replacing ? null : () => _replace(affected),
-                        child: _replacing
-                            ? const SizedBox.square(
-                                dimension: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : Text(l10n.replaceUnavailable),
+                      ReplaceUnavailableButton(
+                        songs: affected,
+                        playlistId: playlistId,
+                        replace: replace,
                       ),
                     ],
                   ),

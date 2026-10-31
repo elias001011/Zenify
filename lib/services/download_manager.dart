@@ -26,6 +26,8 @@ import 'dart:io';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/clients.dart';
+import 'package:musify/services/unavailable_songs.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 enum DownloadStatus { queued, downloading, done, failed }
@@ -69,7 +71,10 @@ class DownloadEntry {
 }
 
 /// Writes the files of [song] and records it as offline, reporting its
-/// progress from 0 to 1. Throws when the song cannot be saved.
+/// progress from 0 to 1. Throws when the song cannot be saved. It must end on
+/// its own (a stalled transfer fails): the manager waits for it, because
+/// letting go of one still writing would let the next try write the same
+/// file.
 typedef SongSaver = Future<void> Function(
   Map<String, dynamic> song,
   void Function(double),
@@ -87,7 +92,6 @@ class DownloadManager {
   static final instance = DownloadManager._();
 
   static const maxConcurrent = 3;
-  static const _songTimeout = Duration(minutes: 10);
   static const _storageKey = 'downloadHistory';
   static const _maxHistory = 200;
   static const _persistDelay = Duration(seconds: 1);
@@ -96,7 +100,29 @@ class DownloadManager {
   /// others.
   late final entries = ValueNotifier<List<DownloadEntry>>(_load());
   Timer? _persistTimer;
-  final _inFlight = <String, Future<bool>>{};
+  final _inFlight = <String, _Request>{};
+
+  /// Whether nothing is queued or downloading, for a moment longer than the
+  /// last download: playlists start one after the other, and what is told at
+  /// the end must not come in between. Notices about failures wait for it.
+  final idle = ValueNotifier<bool>(true);
+
+  /// What failed since the last time everything was idle, told once when it
+  /// is again, whichever playlists the songs came from.
+  final batch = ValueNotifier<DownloadBatch?>(null);
+
+  @visibleForTesting
+  var idleMargin = const Duration(seconds: 3);
+
+  /// Whether the history is written to the device; off in tests that run
+  /// under a fake clock.
+  @visibleForTesting
+  var persist = true;
+
+  Timer? _idleTimer;
+  var _batchFailed = 0;
+  var _batchUnavailable = 0;
+  var _batches = 0;
   final _waiting = Queue<Completer<void>>();
   var _running = 0;
 
@@ -122,38 +148,46 @@ class DownloadManager {
   List<DownloadEntry> get active => entries.value.where(_isActive).toList();
 
   /// Downloads [song] with [save]. Asking again for a song that is queued or
-  /// downloading shares that download. Returns whether the song was saved;
-  /// [cancelled] is asked when its turn comes, to leave the queue.
+  /// downloading shares that download. Returns whether the song was saved.
+  ///
+  /// [cancelled] is asked when its turn comes, to leave the queue; a shared
+  /// download leaves it only when everyone who asked for it says so.
   Future<bool> download(
     Map song,
     SongSaver save, {
     bool Function()? cancelled,
   }) {
     final ytid = song['ytid'].toString();
-    // A block body: `remove` returns this very future, which whenComplete
-    // would then wait for for ever.
-    return _inFlight[ytid] ??= _run(song, save, cancelled).whenComplete(() {
+    final asker = cancelled ?? _never;
+    if (_inFlight[ytid] case final request?) {
+      request.askers.add(asker);
+      return request.result;
+    }
+    final request = _Request()..askers.add(asker);
+    // A block body: `remove` returns this very request, whose future
+    // whenComplete would then wait for for ever.
+    request.result = _run(song, save, request).whenComplete(() {
       _inFlight.remove(ytid);
     });
+    return (_inFlight[ytid] = request).result;
   }
 
-  Future<bool> _run(
-    Map song,
-    SongSaver save,
-    bool Function()? cancelled,
-  ) async {
+  static bool _never() => false;
+
+  Future<bool> _run(Map song, SongSaver save, _Request request) async {
+    final earlier = entries.value
+        .where((e) => e.ytid == song['ytid'].toString() && !_isActive(e))
+        .firstOrNull;
     final entry = queued(song);
     await _acquire();
     try {
-      if (cancelled?.call() ?? false) {
-        entries.value = [...entries.value.where((e) => e != entry)];
+      if (request.askers.every((cancelled) => cancelled())) {
+        entries.value = [?earlier, ...entries.value.where((e) => e != entry)];
+        _checkIdle();
         return false;
       }
       _track(entry..status = DownloadStatus.downloading);
-      await save(
-        entry.song,
-        (value) => entry.progress.value = value,
-      ).timeout(_songTimeout);
+      await save(entry.song, (value) => entry.progress.value = value);
       finished(entry);
       return true;
     } catch (error) {
@@ -192,17 +226,58 @@ class DownloadManager {
       entry,
       ...entries.value.where((other) => other.ytid != entry.ytid),
     ];
+    _idleTimer?.cancel();
+    idle.value = false;
     return entry;
+  }
+
+  /// Starts the wait that ends in [idle] and the [batch] notice, if nothing
+  /// is left to do.
+  void _checkIdle() {
+    if (entries.value.any(_isActive)) return;
+    _idleTimer?.cancel();
+    _idleTimer = Timer(idleMargin, () {
+      if (entries.value.any(_isActive)) return;
+      idle.value = true;
+      if (_batchFailed > 0) {
+        batch.value = (
+          failed: _batchFailed,
+          unavailable: _batchUnavailable,
+          id: ++_batches,
+        );
+      }
+      _batchFailed = _batchUnavailable = 0;
+    });
   }
 
   /// Tells the listeners that [entry] changed in place.
   void _track(DownloadEntry entry) => entries.value = [...entries.value];
 
-  void finished(DownloadEntry entry) => _settle(entry, DownloadStatus.done);
+  void finished(DownloadEntry entry) {
+    unavailableSongs.markAvailable(entry.ytid);
+    _settle(entry, DownloadStatus.done);
+  }
 
+  /// Settles [entry] as failed. A song YouTube reports as unplayable is also
+  /// remembered as unavailable, which only a download attempt does.
   void failed(DownloadEntry entry, Object? error) {
     entry.failure = failureFor(error);
+    _batchFailed++;
+    if (entry.failure == DownloadFailure.unavailable) {
+      _batchUnavailable++;
+      unavailableSongs.markUnavailable(entry.ytid);
+    }
     _settle(entry, DownloadStatus.failed);
+  }
+
+  /// Drops the finished entries of [ytids]: songs that were replaced.
+  void forget(Iterable<String> ytids) {
+    final gone = ytids.toSet();
+    entries.value = [
+      for (final entry in entries.value)
+        if (_isActive(entry) || !gone.contains(entry.ytid)) entry,
+    ];
+    _schedulePersist();
   }
 
   void _settle(DownloadEntry entry, DownloadStatus status) {
@@ -217,6 +292,17 @@ class DownloadManager {
         if (_isActive(other) || kept++ < _maxHistory) other,
     ];
     _schedulePersist();
+    _checkIdle();
+  }
+
+  /// Forgets everything, including what is running: a clean slate for tests.
+  @visibleForTesting
+  void reset() {
+    _idleTimer?.cancel();
+    entries.value = [];
+    idle.value = true;
+    batch.value = null;
+    _batchFailed = _batchUnavailable = 0;
   }
 
   void clearHistory() {
@@ -225,7 +311,9 @@ class DownloadManager {
   }
 
   /// Batches the writes of a playlist download into one per [_persistDelay].
-  void _schedulePersist() => _persistTimer ??= Timer(_persistDelay, flush);
+  void _schedulePersist() {
+    if (persist) _persistTimer ??= Timer(_persistDelay, flush);
+  }
 
   /// Writes the history now.
   void flush() {
@@ -240,7 +328,8 @@ class DownloadManager {
 
   @visibleForTesting
   static DownloadFailure failureFor(Object? error) {
-    if (error == null || error is VideoUnplayableException) {
+    if (error == null ||
+        (error is VideoUnplayableException && !isDeviceBlock(error))) {
       return DownloadFailure.unavailable;
     }
     if (error is SocketException ||
@@ -252,4 +341,15 @@ class DownloadManager {
     }
     return DownloadFailure.other;
   }
+}
+
+/// How many songs failed in a run of downloads, and how many of those are
+/// unavailable on YouTube. `id` tells one run from the next.
+typedef DownloadBatch = ({int failed, int unavailable, int id});
+
+/// A download that may be asked for by several callers, each with its own
+/// way to say it no longer wants it.
+class _Request {
+  late final Future<bool> result;
+  final askers = <bool Function()>[];
 }

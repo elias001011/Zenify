@@ -304,6 +304,13 @@ List<Map> getUserCustomPlaylists() {
   ];
 }
 
+/// The ytids of every song in [playlists].
+Set<String> songIdsOf(Iterable<Map> playlists) => {
+  for (final playlist in playlists)
+    for (final song in playlist['list'] as List? ?? const [])
+      song['ytid'].toString(),
+};
+
 String addSongsInCustomPlaylist(
   BuildContext context,
   String playlistId,
@@ -500,22 +507,26 @@ int removeSongsFromPlaylist(Map playlist, Iterable<Map> songs) {
 /// Swaps songs of [playlist] for others, each in its own place: the keys of
 /// [replacements] are the ytids to leave, the values the songs to take over.
 /// A replacement already in the playlist just removes the old song. Returns
-/// how many songs were swapped.
-int replaceSongsInPlaylist(Map playlist, Map<String, Map> replacements) {
+/// the ytids that were swapped: none when nothing changed.
+Set<String> replaceSongsInPlaylist(
+  Map playlist,
+  Map<String, Map> replacements,
+) {
   final songs = List<dynamic>.from(playlist['list'] as List? ?? const []);
   final present = {for (final song in songs) song['ytid']?.toString()};
-  var replaced = 0;
+  final replaced = <String>{};
   final result = <dynamic>[];
   for (final song in songs) {
-    final replacement = replacements[song['ytid']?.toString()];
+    final id = song['ytid']?.toString();
+    final replacement = replacements[id];
     if (replacement == null) {
       result.add(song);
       continue;
     }
-    replaced++;
+    replaced.add(id!);
     if (present.add(replacement['ytid']?.toString())) result.add(replacement);
   }
-  if (replaced == 0 || !_storePlaylistSongs(playlist, result)) return 0;
+  if (replaced.isEmpty || !_storePlaylistSongs(playlist, result)) return {};
   return replaced;
 }
 

@@ -34,6 +34,16 @@ Future<StreamManifest> getManifestWithFallback(
   Error.throwWithStackTrace(lastError!, lastStack!);
 }
 
+/// Whether YouTube refused this device rather than the video: a video closed
+/// to the country, or the check that asks to sign in to prove it is no bot.
+/// Another address may get through; the song is not gone.
+bool isDeviceBlock(VideoUnplayableException error) {
+  final text = error.message.toLowerCase();
+  return text.contains('country') ||
+      text.contains('not a bot') ||
+      text.contains('sign in');
+}
+
 /// Headers googlevideo.com expects for URLs minted by the client that served
 /// [songId]; a mismatched User-Agent can cause HTTP 403.
 Map<String, String> streamPlaybackHeaders(String? songId) {

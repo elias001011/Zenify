@@ -39,7 +39,6 @@
   "cacheMsg": "缓存已清除",
   "cancel": "取消",
   "cancellingDownload": "取消下载……",
-  "checkForUpdates": "检查更新？",
   "chooseBackupDir": "选择备份文件夹",
   "chooseBackupFiles": "选择要备份的文件",
   "chooseCsvFile": "选择 CSV 文件",
@@ -76,7 +75,6 @@
   "download": "下载",
   "downloadAppUpdate": "下载应用更新",
   "downloadCancelled": "下载已取消",
-  "downloadFailed": "下载失败",
   "downloadPlaylist": "下载播放列表",
   "downloadsDeleted": "下载内容删除成功",
   "dynamicColor": "动态主题色（Android 12+）",
@@ -84,7 +82,6 @@
   "editFolder": "编辑文件夹",
   "editPlaylist": "编辑播放列表",
   "emptyFolderMsg": "此文件夹为空。添加播放列表来整理您的音乐。",
-  "enableUpdateChecksDescription": "您希望 Zenify 自动从 GitHub Releases 检查更新吗？您也可以随时在设置中手动检查更新",
   "endOfSong": "歌曲结束",
   "enterFolderName": "请输入文件夹名称",
   "enterPlaylistName": "请输入播放列表名称",
@@ -168,7 +165,6 @@
   "name": "名称",
   "newAnnouncement": "新公告已发布",
   "newFolder": "新建文件夹",
-  "no": "否",
   "noCustomPlaylists": "尚未创建自定义播放列表",
   "noFolders": "尚未创建文件夹",
   "noListeningStats": "暂无收听统计",
@@ -286,6 +282,5 @@
   "useProxy": "使用代理",
   "useProxyDescription": "仅在流媒体播放失败时才使用代理，不必要的代理使用可能会导致播放中断。",
   "userPlaylists": "用户播放列表",
-  "yes": "是",
   "youtubePlaylistLinkOrId": "YouTube 播放列表链接或 ID"
 }

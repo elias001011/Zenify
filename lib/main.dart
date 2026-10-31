@@ -40,6 +40,7 @@ import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/desktop_media_artwork.dart';
 import 'package:musify/services/desktop_window_service.dart';
+import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/downloads_location_service.dart';
 import 'package:musify/services/install_config_service.dart';
 import 'package:musify/services/io_service.dart';
@@ -62,6 +63,7 @@ import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/sharing_intent.dart';
 import 'package:musify/utilities/startup_support.dart';
 import 'package:musify/widgets/app_notice.dart';
+import 'package:musify/widgets/spotify_import_intro.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
@@ -129,11 +131,27 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
     });
   }
 
+  /// Tells once what failed in a run of downloads, however many playlists
+  /// it had.
+  void _onDownloadsEnded() {
+    final batch = DownloadManager.instance.batch.value;
+    final context = NavigationManager().context;
+    if (batch == null || !context.mounted) return;
+    final l10n = context.l10n!;
+    showToast(
+      context,
+      batch.unavailable > 0
+          ? l10n.downloadFailuresUnavailable(batch.failed, batch.unavailable)
+          : l10n.downloadFailuresCount(batch.failed),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
 
     WidgetsBinding.instance.addObserver(this);
+    DownloadManager.instance.batch.addListener(_onDownloadsEnded);
 
     if (isMobilePlatform) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -193,22 +211,22 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
 
     if (!offlineMode.value) unawaited(fetchAnnouncement());
 
-    if (!isFdroidBuild) {
-      if (shouldWeCheckUpdates.value == true) {
-        if (!isUpdateChecked && kReleaseMode) {
-          SchedulerBinding.instance.addPostFrameCallback((_) {
-            if (!offlineMode.value) {
-              checkAppUpdates();
-            }
-            isUpdateChecked = true;
-          });
+    if (!isFdroidBuild &&
+        shouldWeCheckUpdates.value &&
+        !isUpdateChecked &&
+        kReleaseMode) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!offlineMode.value) {
+          checkAppUpdates();
         }
-      } else if (shouldWeCheckUpdates.value == null) {
-        // show dialog that asks user if they want to enable update checks
-        SchedulerBinding.instance.addPostFrameCallback((_) {
-          showUpdateCheckDialog(NavigationManager().context);
-        });
-      }
+        isUpdateChecked = true;
+      });
+    }
+
+    if (!spotifyImportIntroSeen) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        showSpotifyImportIntro(NavigationManager().context);
+      });
     }
   }
 
@@ -236,6 +254,7 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    DownloadManager.instance.batch.removeListener(_onDownloadsEnded);
     offlineMode.removeListener(_onOfflineModeChanged);
     PlatformDispatcher.instance.onPlatformBrightnessChanged = null;
 

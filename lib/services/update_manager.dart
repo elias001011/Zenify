@@ -23,7 +23,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
@@ -31,7 +30,6 @@ import 'package:musify/constants/version.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart';
-import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
@@ -190,65 +188,6 @@ Future<void> checkAppUpdates({bool manual = false}) async {
     logger.log('Error in checkAppUpdates', error: e, stackTrace: stackTrace);
     report((l10n) => l10n.updateCheckFailed);
   }
-}
-
-void showUpdateCheckDialog(BuildContext context) {
-  final colorScheme = Theme.of(context).colorScheme;
-
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        icon: Icon(
-          FluentIcons.arrow_sync_circle_24_regular,
-          color: colorScheme.primary,
-          size: 40,
-        ),
-        title: Text(
-          context.l10n!.checkForUpdates,
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        content: Text(
-          context.l10n!.enableUpdateChecksDescription,
-          style: TextStyle(color: colorScheme.onSurfaceVariant),
-          textAlign: TextAlign.center,
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          OutlinedButton(
-            onPressed: () {
-              shouldWeCheckUpdates.value = false;
-              addOrUpdateData<bool>('settings', 'shouldWeCheckUpdates', false);
-              Navigator.of(context).pop();
-            },
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: colorScheme.outline),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(context.l10n!.no),
-          ),
-          FilledButton(
-            onPressed: () {
-              shouldWeCheckUpdates.value = true;
-              addOrUpdateData<bool>('settings', 'shouldWeCheckUpdates', true);
-              if (!isFdroidBuild && kReleaseMode && !offlineMode.value) {
-                checkAppUpdates();
-                isUpdateChecked = true;
-              }
-              Navigator.of(context).pop();
-            },
-            child: Text(context.l10n!.yes),
-          ),
-        ],
-      );
-    },
-  );
 }
 
 /// Whether [latestVersion] is newer, comparing numbers (`0.1.0-1` > `0.1.0`).

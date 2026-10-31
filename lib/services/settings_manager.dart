@@ -29,8 +29,8 @@ import 'package:musify/utilities/platform_utils.dart';
 
 // Preferences
 
-final shouldWeCheckUpdates = ValueNotifier<bool?>(
-  Hive.box('settings').get('shouldWeCheckUpdates', defaultValue: null),
+final shouldWeCheckUpdates = ValueNotifier<bool>(
+  Hive.box('settings').get('shouldWeCheckUpdates', defaultValue: true),
 );
 
 final playNextSongAutomatically = ValueNotifier<bool>(
@@ -236,7 +236,7 @@ void reloadSettingsFromStorage() {
 
   shouldWeCheckUpdates.value = settings.get(
     'shouldWeCheckUpdates',
-    defaultValue: null,
+    defaultValue: true,
   );
   playNextSongAutomatically.value = settings.get(
     'playNextSongAutomatically',

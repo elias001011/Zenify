@@ -39,7 +39,6 @@
   "cacheMsg": "கேச் அழிக்கப்பட்டது",
   "cancel": "ரத்து",
   "cancellingDownload": "Cancelling download...",
-  "checkForUpdates": "புதுப்பிப்புகளை சரிபார்க்கவா?",
   "chooseBackupDir": "காப்புப்பிரதி கோப்புறையை தேர்ந்தெடுக்கவும்",
   "chooseBackupFiles": "காப்புப்பிரதி கோப்புகளை தேர்வு செய்யவும்",
   "chooseCsvFile": "Choose CSV file",
@@ -76,7 +75,6 @@
   "download": "பதிவிறக்கம்",
   "downloadAppUpdate": "பயன்பாட்டு புதுப்பிப்பை பதிவிறக்கு",
   "downloadCancelled": "பதிவிறக்கம் ரத்து செய்யப்பட்டது",
-  "downloadFailed": "பதிவிறக்கம் தோல்வியடைந்தது",
   "downloadPlaylist": "பிளேலிஸ்டை பதிவிறக்கு",
   "downloadsDeleted": "Downloads deleted successfully",
   "dynamicColor": "இயங்கும் முக்கிய நிறம் (Android 12+)",
@@ -84,7 +82,6 @@
   "editFolder": "Edit folder",
   "editPlaylist": "பிளேலிஸ்டை திருத்து",
   "emptyFolderMsg": "இந்த கோப்புறை காலியாக உள்ளது. உங்கள் இசையை ஒழுங்குபடுத்த பிளேலிஸ்ட்களை சேர்க்கவும்.",
-  "enableUpdateChecksDescription": "GitHub வெளியீடுகளிலிருந்து Zenify தானாக புதுப்பிப்புகளை சரிபார்க்க வேண்டுமா?",
   "endOfSong": "பாடலின் முடிவு",
   "enterFolderName": "கோப்புறை பெயரை உள்ளிடவும்",
   "enterPlaylistName": "Please enter a playlist name",
@@ -168,7 +165,6 @@
   "name": "பெயர்",
   "newAnnouncement": "புதிய அறிவிப்பு வெளியிடப்பட்டது",
   "newFolder": "புதிய கோப்புறை",
-  "no": "இல்லை",
   "noCustomPlaylists": "இன்னும் எந்த தனிப்பயன் பிளேலிஸ்ட்களும் உருவாக்கப்படவில்லை",
   "noFolders": "No folders created yet",
   "noListeningStats": "No listening stats yet",
@@ -286,6 +282,5 @@
   "useProxy": "ப்ராக்ஸி பயன்படுத்த",
   "useProxyDescription": "ஸ்ட்ரீமிங் தோல்வியுற்றால் மட்டுமே ப்ராக்ஸியை பயன்படுத்தவும்",
   "userPlaylists": "பயனர் பிளேலிஸ்ட்கள்",
-  "yes": "ஆம்",
   "youtubePlaylistLinkOrId": "YouTube பிளேலிஸ்ட் இணைப்பு அல்லது ID"
 }

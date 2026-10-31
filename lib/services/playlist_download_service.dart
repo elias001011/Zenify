@@ -251,15 +251,9 @@ class OfflinePlaylistService {
             '${context.l10n!.playlistDownloaded}: ${progressNotifier.value.completed}/${songsList.length}',
           );
         }
-      } else if (!progressNotifier.value.isCancelled) {
-        // Cancelled toast is shown by cancelDownload, only show failure toast here.
-        if (context.mounted) {
-          showToast(
-            context,
-            '${context.l10n!.downloadFailed}: ${progressNotifier.value.failed}/${songsList.length}',
-          );
-        }
       }
+      // What failed is told once, when every download is over: the manager
+      // gathers it from all the playlists.
 
       // Clean up the progress notifier now that the download is fully done.
       cleanupProgressNotifier(playlistId);
