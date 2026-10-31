@@ -229,6 +229,8 @@ Future<List> fetchSongsList(String searchQuery) async {
 }
 
 Future<List> getRecommendedSongs() async {
+  // Offline mode keeps the app off the network.
+  if (offlineMode.value) return [];
   try {
     if (externalRecommendations.value && userRecentlyPlayed.value.isNotEmpty) {
       return await _getRecommendationsFromRecentlyPlayed();
@@ -882,21 +884,6 @@ Future<Lyrics?> getSongLyricsResult(
     lastFetchedLyrics = key;
   }
   return result;
-}
-
-Future<String?> getSongLyrics(
-  String? artist,
-  String title, {
-  Duration? duration,
-  String? album,
-}) async {
-  final result = await getSongLyricsResult(
-    artist,
-    title,
-    duration: duration,
-    album: album,
-  );
-  return result == null ? null : formatPlainLyrics(result);
 }
 
 /// Downloads [song] for offline use through the [DownloadManager]. A song

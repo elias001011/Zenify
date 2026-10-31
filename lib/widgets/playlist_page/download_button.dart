@@ -182,8 +182,7 @@ class _PlaylistDownloadButtonState extends State<PlaylistDownloadButton> {
 
     // Open from the tap: loading the playlist is part of the run, so what
     // failed in the one before is not told in between.
-    final run = DownloadManager.instance.openRun();
-    try {
+    await DownloadManager.instance.inRun(() async {
       setState(() => _isResolving = true);
       Map? playlist;
       try {
@@ -202,8 +201,6 @@ class _PlaylistDownloadButtonState extends State<PlaylistDownloadButton> {
       }
 
       await offlinePlaylistService.downloadPlaylist(context, playlist);
-    } finally {
-      run.close();
-    }
+    });
   }
 }

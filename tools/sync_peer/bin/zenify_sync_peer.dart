@@ -28,6 +28,10 @@ const _deviceHeader = 'x-musify-device';
 const _discoveryRequest = 'MUSIFY_DISCOVERY_REQUEST';
 const _discoveryResponse = 'MUSIFY_DISCOVERY_RESPONSE';
 const _pairingTimeout = Duration(seconds: 60);
+
+// Pairing is only accepted after `run.sh pair` opens it, and it closes with
+// the first attempt: the PIN is six digits and nobody watches this process.
+const _pairingWindow = Duration(minutes: 5);
 const _readTimeout = Duration(seconds: 45);
 
 typedef _Reply = (int, Map<String, dynamic>);
@@ -222,6 +226,21 @@ class _Peer {
     return Map<String, dynamic>.from(decoded);
   }
 
+  File get _windowFile => File('${store.directory.path}/pairing-open');
+
+  bool get _pairingOpen {
+    final file = _windowFile;
+    return file.existsSync() &&
+        DateTime.now().difference(file.lastModifiedSync()) < _pairingWindow;
+  }
+
+  void _closePairingWindow() {
+    final file = _windowFile;
+    if (file.existsSync()) file.deleteSync();
+  }
+
+  DateTime? _lastRefusalLogged;
+
   void _clearPairing() {
     _pendingTimer?.cancel();
     _pendingSession = null;
@@ -243,6 +262,15 @@ class _Peer {
     try {
       if (data['apiVersion'] != _apiVersion) {
         return (426, {'error': 'upgrade_required'});
+      }
+      if (!_pairingOpen) {
+        final now = DateTime.now();
+        if (_lastRefusalLogged == null ||
+            now.difference(_lastRefusalLogged!) > const Duration(minutes: 1)) {
+          _lastRefusalLogged = now;
+          _log('Pairing refused: not open (run.sh pair opens it)');
+        }
+        return (403, {'error': 'pairing_closed'});
       }
       final id = data['clientId'];
       if (id is! String || id.isEmpty || id.length > 128) {
@@ -322,10 +350,13 @@ class _Peer {
         'deviceName': store.name,
       }, 'pair:$session:reply');
       _log('Paired with "$_pendingClientName" ($id)');
+      _closePairingWindow();
       _clearPairing();
       return (200, {'proof': agreement.proof, 'confirmation': confirmation});
     } catch (_) {
+      _closePairingWindow();
       _clearPairing();
+      _log('Pairing failed: wrong PIN; pairing is closed');
       return (403, {'error': 'incorrect_pin'});
     }
   }
@@ -474,6 +505,8 @@ Future<void> main(List<String> arguments) async {
   var data = '${Platform.environment['HOME'] ?? '.'}/zenify-sync/data';
   var name = 'Zenify Sync Server';
   var port = 0;
+  var list = false;
+  String? unpair;
   for (var i = 0; i < arguments.length; i++) {
     switch (arguments[i]) {
       case '--data':
@@ -482,14 +515,35 @@ Future<void> main(List<String> arguments) async {
         name = arguments[++i];
       case '--port':
         port = int.parse(arguments[++i]);
+      case '--list':
+        list = true;
+      case '--unpair':
+        unpair = arguments[++i];
       default:
         stderr.writeln(
-          'Usage: zenify_sync_peer [--data DIR] [--name NAME] [--port PORT]',
+          'Usage: zenify_sync_peer [--data DIR] [--name NAME] [--port PORT]\n'
+          '       zenify_sync_peer [--data DIR] --list | --unpair ID',
         );
         exit(64);
     }
   }
   final store = _Store(Directory(data));
   await store.load(name);
+  if (list || unpair != null) {
+    // Offline commands: the peer must not be running, it keeps these in memory.
+    if (unpair != null) {
+      if (store.paired.remove(unpair) == null) {
+        stderr.writeln('No paired device with that id.');
+        exit(1);
+      }
+      store.counters.removeWhere((key, _) => key.contains(':$unpair:'));
+      await store.saveState();
+      stdout.writeln('Unpaired $unpair.');
+    }
+    for (final entry in store.paired.entries) {
+      stdout.writeln('${entry.key}  ${entry.value.name}');
+    }
+    return;
+  }
   await _Peer(store).start(port);
 }

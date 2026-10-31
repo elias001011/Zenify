@@ -252,8 +252,6 @@ class OfflinePlaylistService {
           );
         }
       }
-      // What failed is told once, when every download is over: the manager
-      // gathers it from all the playlists.
 
       // Clean up the progress notifier now that the download is fully done.
       cleanupProgressNotifier(playlistId);

@@ -125,13 +125,9 @@ class DownloadsPage extends StatelessWidget {
                                 // Once every download is over, one swap
                                 // covers every playlist.
                                 action: ListenableBuilder(
-                                  listenable: Listenable.merge([
-                                    manager.idle,
-                                    replacing,
-                                  ]),
+                                  listenable: replacementOffer,
                                   builder: (context, _) {
-                                    final songs =
-                                        manager.idle.value || replacing.value
+                                    final songs = canOfferReplacement
                                         ? _inPlaylists(unavailable)
                                         : const <Map>[];
                                     return songs.isEmpty
@@ -244,16 +240,16 @@ Future<void> _retryAll(BuildContext context, List<DownloadEntry> failed) async {
   final l10n = context.l10n!;
   _retryingAll.value = true;
   showToast(context, l10n.downloadsRetrying(failed.length));
-  final run = DownloadManager.instance.openRun();
   try {
-    await Future.wait([
-      for (final entry in failed)
-        // A song retried on its own meanwhile has a new entry.
-        if (DownloadManager.instance.entries.value.contains(entry))
-          makeSongOffline(entry.song),
-    ]);
+    await DownloadManager.instance.inRun(
+      () => Future.wait([
+        for (final entry in failed)
+          // A song retried on its own meanwhile has a new entry.
+          if (DownloadManager.instance.entries.value.contains(entry))
+            makeSongOffline(entry.song),
+      ]),
+    );
   } finally {
-    run.close();
     _retryingAll.value = false;
   }
 }

@@ -25,8 +25,8 @@ import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Songs YouTube itself reports as unplayable (removed, private, not
-/// available), learnt when a download or a stream lookup fails that way and
-/// forgotten when one works. A network failure is never recorded here.
+/// available), learnt when a download fails that way and forgotten when a
+/// download or a playback works. A network failure is never recorded here.
 ///
 /// Kept on this device only: what is unavailable here may play elsewhere.
 class UnavailableSongs {

@@ -39,7 +39,17 @@ else
   pin_file="$work/peer/pairing-pin.txt"
 fi
 
+open_pairing() {
+  if [ -n "${1:-}" ]; then
+    ssh -o BatchMode=yes ${SSH_OPTS:-} -p "$port" "$user_host" "touch $data/pairing-open"
+  else
+    touch "$work/peer/pairing-open"
+  fi
+}
+
 for role in a b; do
+  # Pairing is closed after each attempt, and opened by whoever runs the peer.
+  open_pairing "${1:-}"
   MUSIFY_HEADLESS_ROLE="$role" MUSIFY_HEADLESS_PIN_FILE="$pin_file" \
     MUSIFY_HEADLESS_DATA="$work/device-$role" MUSIFY_HEADLESS_NAME="$name" \
     flutter test --no-pub test/local_sync/support/headless_device_test.dart

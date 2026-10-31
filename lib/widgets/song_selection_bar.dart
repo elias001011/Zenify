@@ -338,15 +338,9 @@ class SongSelectionBar extends StatelessWidget {
     BuildContext context,
     List<Map> songs,
   ) async {
-    final run = DownloadManager.instance.openRun();
-    final List<bool> results;
-    try {
-      results = await Future.wait([
-        for (final song in songs) makeSongOffline(song),
-      ]);
-    } finally {
-      run.close();
-    }
+    final results = await DownloadManager.instance.inRun(
+      () => Future.wait([for (final song in songs) makeSongOffline(song)]),
+    );
     final downloaded = results.where((saved) => saved).length;
     if (context.mounted) {
       showToast(context, context.l10n!.songsAddedToOffline(downloaded));

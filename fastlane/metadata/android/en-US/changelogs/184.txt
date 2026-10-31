@@ -1,2 +1,0 @@
-- Improved app stability and performance
-- Full changelog: https://github.com/gokadzev/Musify/releases

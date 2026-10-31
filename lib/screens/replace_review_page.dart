@@ -98,15 +98,13 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
   }
 
   // What is shown under a song that has no replacement.
-  String _missing(AppLocalizations l10n, String id) => _fromFile
-      ? (widget.plan.notSearched.contains(id)
-            ? l10n.replaceSearchFailed
-            : l10n.importMissingNone)
-      : widget.plan.notSearched.contains(id)
-      ? l10n.replaceSearchFailed
-      : _skipped.contains(id)
-      ? l10n.replaceNotReplaced
-      : l10n.noReplacementFound;
+  String _missing(AppLocalizations l10n, String id) {
+    if (widget.plan.notSearched.contains(id)) return l10n.replaceSearchFailed;
+    if (_fromFile) return l10n.importMissingNone;
+    return _skipped.contains(id)
+        ? l10n.replaceNotReplaced
+        : l10n.noReplacementFound;
+  }
 
   @override
   Widget build(BuildContext context) {

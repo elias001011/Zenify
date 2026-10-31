@@ -53,6 +53,7 @@ import 'package:musify/services/playlist_sharing.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/services/update_manager.dart';
 import 'package:musify/services/windows_media_controls.dart';
 import 'package:musify/theme/app_themes.dart';
@@ -248,6 +249,9 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
       );
       unawaited(listeningStatsService.flush());
       unawaited(audioHandler.persistPlaybackState());
+      // These two write after a short delay, which the OS may not allow.
+      unavailableSongs.flush();
+      DownloadManager.instance.flush();
     }
   }
 

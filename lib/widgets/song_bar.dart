@@ -363,15 +363,13 @@ class _SongBarState extends State<SongBar> {
   late final ValueNotifier<bool> _songDownloadStatus;
   late String _songTitle;
   late String _songArtist;
-  late final String? _artworkPath;
-  late final String _lowResImageUrl;
-  late final String _ytid;
+  late String? _artworkPath;
+  late String _lowResImageUrl;
+  late String _ytid;
 
-  @override
-  void initState() {
-    super.initState();
-
-    // Cache frequently accessed values
+  // What the row shows and acts on is the song it is given: a list may hand
+  // the same row another song.
+  void _readSong() {
     _songTitle = widget.song['title'] ?? '';
     _songArtist = widget.song['artist']?.toString() ?? '';
     _artworkPath = _firstNonEmptyString([
@@ -386,8 +384,12 @@ class _SongBarState extends State<SongBar> {
         ]) ??
         '';
     _ytid = widget.song['ytid'] ?? '';
+  }
 
-    // Initialize ValueNotifiers only once
+  @override
+  void initState() {
+    super.initState();
+    _readSong();
     _songLikeStatus = ValueNotifier(isSongAlreadyLiked(_ytid));
     final isOffline = isSongAlreadyOffline(_ytid);
     _songOfflineStatus = ValueNotifier(isOffline);
@@ -413,17 +415,9 @@ class _SongBarState extends State<SongBar> {
   @override
   void didUpdateWidget(SongBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    // Update cached title and artist if they changed
-    final newTitle = widget.song['title'] ?? '';
-    final newArtist = widget.song['artist']?.toString() ?? '';
-
-    if (_songTitle != newTitle || _songArtist != newArtist) {
-      setState(() {
-        _songTitle = newTitle;
-        _songArtist = newArtist;
-      });
-    }
+    _readSong();
+    _songLikeStatus.value = isSongAlreadyLiked(_ytid);
+    _songOfflineStatus.value = isSongAlreadyOffline(_ytid);
   }
 
   @override

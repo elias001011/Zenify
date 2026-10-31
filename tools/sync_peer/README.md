@@ -7,9 +7,12 @@ library. It runs on a server that is always on, on the same network (Local
 Sync finds devices by broadcast on the local network; it does not work over
 the internet).
 
-It changes nothing in the app: it speaks the app's own protocol with the
-app's own code (`lib/services/local_sync`, shared by link, so a change to the
-protocol in the app reaches the peer when it is copied again).
+It changes nothing in the app: it speaks the app's own protocol. The sync
+document, the encryption and the pairing are the app's own code
+(`lib/services/local_sync`, shared by link, so a change there reaches the
+peer when it is copied again); the server half (the routes and the checks of
+each request) is a copy of the app's, and `test/local_sync/sync_peer_protocol_test.dart`
+keeps its constants equal to the app's.
 
 ```
 dart run bin/zenify_sync_peer.dart [--data DIR] [--name NAME] [--port PORT]
@@ -20,11 +23,20 @@ and so on, with the clocks the merge needs), not a copy of the app.
 
 ## Pairing
 
-Start the peer, then pair from the app as with any device (Settings → Local
-Sync → the peer shows up in the list). The PIN is not on a screen: it is
-printed in the peer's output and written to `pairing-pin.txt` in its data
-folder for 60 seconds. Read it, type it in the app. Pair each of your devices
-once; after that they sync with the peer automatically.
+The peer runs all the time and nobody watches it, so it does not accept a
+pairing by itself: open it first.
+
+1. `run.sh pair` opens pairing for 5 minutes, for one attempt (a wrong PIN
+   closes it again).
+2. Pair from the app as with any device (Settings → Local Sync → the peer
+   shows up in the list).
+3. The PIN is not on a screen: `run.sh pin` shows it (it is also in the log),
+   for 60 seconds. Type it in the app.
+
+Pair each of your devices once; after that they sync with the peer
+automatically. `run.sh devices` lists the paired devices and `run.sh unpair
+ID` removes one (a lost phone, for example): it stops the peer, edits who is
+paired and starts it again.
 
 ## On a Termux server
 
@@ -37,7 +49,7 @@ scp tools/sync_peer/run.sh HOST:zenify-sync/run.sh
 ssh HOST 'cd ~/zenify-sync/app && dart pub get && ~/zenify-sync/run.sh start'
 ```
 
-`run.sh start | stop | status | log | pin`. To start it with the server, call
+`run.sh start | stop | status | log | pair | pin | devices | unpair ID`. To start it with the server, call
 `~/zenify-sync/run.sh start` where the server starts its services.
 
 ## Checking it

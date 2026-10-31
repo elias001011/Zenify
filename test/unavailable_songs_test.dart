@@ -544,6 +544,24 @@ void main() {
       'duration': seconds,
     };
 
+    test('a very short artist name is still the credit to look for', () {
+      final short = {'title': 'Thunderstruck', 'artist': 'AC/DC'};
+      expect(
+        isSameRecording(
+          short,
+          candidate('Thunderstruck', artist: 'Cover Band', seconds: null),
+        ),
+        isFalse,
+      );
+      expect(
+        isSameRecording(
+          short,
+          candidate('Thunderstruck', artist: 'AC/DC', seconds: null),
+        ),
+        isTrue,
+      );
+    });
+
     test('accepts another upload of it', () {
       expect(isSameRecording(original, candidate('Bohemian Rhapsody')), isTrue);
       expect(

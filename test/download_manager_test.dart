@@ -77,6 +77,13 @@ void main() {
       ),
       DownloadFailure.network,
     );
+    // The age gate asks to sign in too, but it is closed to everyone.
+    expect(
+      DownloadManager.failureFor(
+        VideoUnplayableException('Sign in to confirm your age'),
+      ),
+      DownloadFailure.unavailable,
+    );
     expect(
       DownloadManager.failureFor(VideoUnavailableException('gone')),
       DownloadFailure.unavailable,
@@ -363,6 +370,17 @@ void main() {
           expect(notices, isEmpty);
         },
       );
+
+      test('a song that failed and then worked is not told', () async {
+        final run = manager.openRun();
+        manager
+          ..failed(manager.started(song('retried')), StateError('x'))
+          ..failed(manager.started(song('stays')), StateError('x'))
+          ..finished(manager.started(song('retried')));
+        run.close();
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(notices.single.failed, 1);
+      });
 
       test('a run without failures says nothing', () async {
         await settle([manager.download(song('ok'), save)], ['ok']);

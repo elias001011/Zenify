@@ -28,7 +28,6 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/common_services.dart';
-import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/utilities/artwork_provider.dart';
@@ -622,26 +621,11 @@ class PlaylistBar extends StatelessWidget {
       builder: (context) => EditPlaylistDialog(playlistData: playlistData!),
     );
 
-    if (result != null) {
-      final index = userCustomPlaylists.value.indexOf(playlistData!);
-      if (index != -1) {
-        final updatedPlaylists = List<Map>.from(userCustomPlaylists.value);
-        updatedPlaylists[index] = result;
-        userCustomPlaylists.value = updatedPlaylists;
-        unawaited(
-          addOrUpdateData<List<Map>>(
-            'user',
-            'customPlaylists',
-            userCustomPlaylists.value,
-          ),
-        );
-
-        // Update offline playlist if it exists
-        unawaited(syncOfflinePlaylistMetadata(result));
-
-        final appCtx = NavigationManager().context;
-        showToast(appCtx, appCtx.l10n!.playlistUpdated);
-      }
+    if (result != null &&
+        await replaceCustomPlaylist(playlistData!['ytid'].toString(), result)) {
+      unawaited(syncOfflinePlaylistMetadata(result));
+      final appCtx = NavigationManager().context;
+      showToast(appCtx, appCtx.l10n!.playlistUpdated);
     }
   }
 

@@ -121,9 +121,11 @@ class DownloadManager {
 
   Timer? _idleTimer;
   final _runs = <DownloadRun>{};
-  var _batchFailed = 0;
-  var _batchUnavailable = 0;
+  // The songs that failed since everything was last idle, by ytid, and
+  // whether each is unavailable; one that later succeeds is not told.
+  final _batchFailed = <String, bool>{};
   var _batches = 0;
+  var _historyEpoch = 0;
   final _waiting = Queue<Completer<void>>();
   var _running = 0;
 
@@ -179,11 +181,16 @@ class DownloadManager {
     final earlier = entries.value
         .where((e) => e.ytid == song['ytid'].toString() && !_isActive(e))
         .firstOrNull;
+    final epoch = _historyEpoch;
     final entry = queued(song);
     await _acquire();
     try {
       if (request.askers.every((cancelled) => cancelled())) {
-        entries.value = [?earlier, ...entries.value.where((e) => e != entry)];
+        // The history it came from may have been cleared meanwhile.
+        entries.value = [
+          if (epoch == _historyEpoch) ?earlier,
+          ...entries.value.where((e) => e != entry),
+        ];
         _checkIdle();
         return false;
       }
@@ -245,6 +252,17 @@ class DownloadManager {
     return run;
   }
 
+  /// Runs [body] as one run: opened before it, closed after it, however it
+  /// ends.
+  Future<T> inRun<T>(Future<T> Function() body) async {
+    final run = openRun();
+    try {
+      return await body();
+    } finally {
+      run.close();
+    }
+  }
+
   void _closeRun(DownloadRun run) {
     if (_runs.remove(run)) _checkIdle();
   }
@@ -257,14 +275,14 @@ class DownloadManager {
     _idleTimer = Timer(idleMargin, () {
       if (_runs.isNotEmpty || entries.value.any(_isActive)) return;
       idle.value = true;
-      if (_batchFailed > 0) {
+      if (_batchFailed.isNotEmpty) {
         batch.value = (
-          failed: _batchFailed,
-          unavailable: _batchUnavailable,
+          failed: _batchFailed.length,
+          unavailable: _batchFailed.values.where((gone) => gone).length,
           id: ++_batches,
         );
       }
-      _batchFailed = _batchUnavailable = 0;
+      _batchFailed.clear();
     });
   }
 
@@ -272,6 +290,7 @@ class DownloadManager {
   void _track(DownloadEntry entry) => entries.value = [...entries.value];
 
   void finished(DownloadEntry entry) {
+    _batchFailed.remove(entry.ytid);
     unavailableSongs.markAvailable(entry.ytid);
     _settle(entry, DownloadStatus.done);
   }
@@ -280,17 +299,17 @@ class DownloadManager {
   /// remembered as unavailable, which only a download attempt does.
   void failed(DownloadEntry entry, Object? error) {
     entry.failure = failureFor(error);
-    _batchFailed++;
-    if (entry.failure == DownloadFailure.unavailable) {
-      _batchUnavailable++;
-      unavailableSongs.markUnavailable(entry.ytid);
-    }
+    final gone = entry.failure == DownloadFailure.unavailable;
+    _batchFailed[entry.ytid] = gone;
+    if (gone) unavailableSongs.markUnavailable(entry.ytid);
     _settle(entry, DownloadStatus.failed);
   }
 
   /// Drops the finished entries of [ytids]: songs that were replaced.
   void forget(Iterable<String> ytids) {
     final gone = ytids.toSet();
+    _historyEpoch++;
+    _batchFailed.removeWhere((ytid, _) => gone.contains(ytid));
     entries.value = [
       for (final entry in entries.value)
         if (_isActive(entry) || !gone.contains(entry.ytid)) entry,
@@ -321,10 +340,11 @@ class DownloadManager {
     entries.value = [];
     idle.value = true;
     batch.value = null;
-    _batchFailed = _batchUnavailable = 0;
+    _batchFailed.clear();
   }
 
   void clearHistory() {
+    _historyEpoch++;
     entries.value = active;
     _schedulePersist();
   }

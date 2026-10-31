@@ -29,6 +29,7 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/proxy_manager.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/utilities/formatter.dart';
 
@@ -61,7 +62,9 @@ bool isSameRecording(Map song, Map candidate) {
     return false;
   }
 
-  final artist = _words(song['artist'], minLength: 3);
+  // Very short names ("U2", "AC/DC") are still the credit to look for.
+  var artist = _words(song['artist'], minLength: 3);
+  if (artist.isEmpty) artist = _words(song['artist']);
   if (artist.isNotEmpty) {
     final credited = {
       ..._words(candidate['artist']),
@@ -197,6 +200,20 @@ class ReplacementPlan {
 /// started it must outlive the downloads that begin meanwhile.
 final replacing = ValueNotifier<bool>(false);
 
+/// What decides [canOfferReplacement]; rebuild when any of it changes.
+final replacementOffer = Listenable.merge([
+  DownloadManager.instance.idle,
+  replacing,
+  offlineMode,
+]);
+
+/// Whether the notices and buttons to replace unavailable songs show: online,
+/// and once every download is over (a song may be queued by another playlist
+/// and still fail), or while a replacement is under way.
+bool get canOfferReplacement =>
+    !offlineMode.value &&
+    (DownloadManager.instance.idle.value || replacing.value);
+
 /// Searches replacements for [songs], unavailable on YouTube, among those a
 /// playlist you made holds (only [playlistId] when given) and still flagged.
 /// Nothing is changed: see [applyReplacements]. Throws
@@ -213,51 +230,40 @@ Future<ReplacementPlan> planReplacements(
   final taken = songIdsOf(playlists);
 
   final searched = <Map>[];
-  final found = <String, Map>{};
-  final notSearched = <String>{};
-  var failures = 0;
   for (final song in songs) {
     final id = song['ytid'].toString();
     if (!taken.contains(id) || !unavailableSongs.contains(id)) continue;
     // A song kept twice is searched, and listed, once.
-    if (searched.any((s) => s['ytid'].toString() == id)) continue;
-    searched.add(song);
-    if (failures >= _failuresBeforeGivingUp) {
-      notSearched.add(id);
-      continue;
-    }
-    try {
-      final replacement = await findReplacement(
-        song,
-        exclude: {...taken, for (final r in found.values) r['ytid'].toString()},
-      );
-      if (replacement != null) found[id] = replacement;
-      failures = 0;
-    } on ReplacementSearchFailed {
-      notSearched.add(id);
-      failures++;
-    }
+    if (searched.every((s) => s['ytid'].toString() != id)) searched.add(song);
   }
+  final result = await _searchEach(searched, findReplacement, held: taken);
   // Every search failed: there is no telling whether replacements exist.
-  if (searched.isNotEmpty && notSearched.length == searched.length) {
+  if (searched.isNotEmpty && result.notSearched.length == searched.length) {
     throw const ReplacementSearchFailed();
   }
   return ReplacementPlan(
     songs: searched,
-    found: found,
+    found: result.found,
     playlistIds: {for (final p in playlists) p['ytid'].toString()},
     held: taken,
-    notSearched: notSearched,
+    notSearched: result.notSearched,
   );
 }
 
-/// Looks on YouTube for the songs of an import that YouTube Music did not
-/// find (asking YouTube Music again would only fail again). A match must pass
-/// [isSameRecording]; the ones it finds are returned by the id of the song of
-/// the file, and a song whose search could not be made is told apart from
-/// one that found nothing. [held] are the songs the playlist already has.
-Future<({Map<String, Map> found, Set<String> notSearched})> searchOnYoutube(
-  List<Map> songs, {
+typedef _Finder = Future<Map<String, dynamic>?> Function(
+  Map song, {
+  Set<String> exclude,
+});
+
+/// Looks for each of [songs] with [find], one after another. A match is never
+/// offered twice, nor a song of [held]. Searches that keep failing (YouTube
+/// limiting this device) are not pressed on: the rest are left for the
+/// person to try by hand. Returns the matches by the id of the song they
+/// are for, and the songs whose search could not be made, as opposed to
+/// those that found nothing.
+Future<({Map<String, Map> found, Set<String> notSearched})> _searchEach(
+  Iterable<Map> songs,
+  _Finder find, {
   Set<String> held = const {},
   VoidCallback? onSearched,
 }) async {
@@ -266,28 +272,37 @@ Future<({Map<String, Map> found, Set<String> notSearched})> searchOnYoutube(
   var failures = 0;
   for (final song in songs) {
     final id = song['ytid'].toString();
-    // Searches that keep failing (YouTube limiting this device) are not
-    // pressed on: the rest are left for the person to try by hand.
     if (failures >= _failuresBeforeGivingUp) {
       notSearched.add(id);
-      onSearched?.call();
-      continue;
-    }
-    try {
-      final match = await findFallback(
-        song,
-        exclude: {...held, for (final f in found.values) f['ytid'].toString()},
-      );
-      if (match != null) found[id] = match;
-      failures = 0;
-    } on ReplacementSearchFailed {
-      notSearched.add(id);
-      failures++;
+    } else {
+      try {
+        final match = await find(
+          song,
+          exclude: {
+            ...held,
+            for (final f in found.values) f['ytid'].toString(),
+          },
+        );
+        if (match != null) found[id] = match;
+        failures = 0;
+      } on ReplacementSearchFailed {
+        notSearched.add(id);
+        failures++;
+      }
     }
     onSearched?.call();
   }
   return (found: found, notSearched: notSearched);
 }
+
+/// Looks on YouTube for the songs of an import that YouTube Music did not
+/// find (asking YouTube Music again would only fail again). A match must pass
+/// [isSameRecording]. [held] are the songs the playlist already has.
+Future<({Map<String, Map> found, Set<String> notSearched})> searchOnYoutube(
+  List<Map> songs, {
+  Set<String> held = const {},
+  VoidCallback? onSearched,
+}) => _searchEach(songs, findFallback, held: held, onSearched: onSearched);
 
 /// Swaps in [plan]'s playlists the songs of [swaps] (the ytid to leave and
 /// the song to take its place) and starts downloading the replacements.
@@ -334,12 +349,15 @@ Future<int> applyReplacements(
     ..forEach(unavailableSongs.markAvailable);
   DownloadManager.instance.forget(settled);
 
-  final run = DownloadManager.instance.openRun();
   unawaited(
-    Future.wait([
-      for (final id in applied)
-        Future.sync(() => downloadReplacement(live[id])),
-    ]).then<void>((_) {}, onError: (Object _) {}).whenComplete(run.close),
+    DownloadManager.instance
+        .inRun(
+          () => Future.wait([
+            for (final id in applied)
+              Future.sync(() => downloadReplacement(live[id])),
+          ]),
+        )
+        .then<void>((_) {}, onError: (Object _) {}),
   );
   replacedSongs.value++;
   return applied.length;

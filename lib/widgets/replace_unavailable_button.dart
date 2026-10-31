@@ -25,12 +25,12 @@ import 'package:musify/screens/replace_review_page.dart';
 import 'package:musify/services/song_replacement.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 
-/// Searches replacements for unavailable [songs], shows them to be checked,
-/// and swaps and downloads those the person accepts (see [reviewAndReplace]). The same button in a playlist's notice, with
-/// its [playlistId], and in the Downloads tab, for every playlist.
-/// Searches, shows what was found for the person to check, and swaps what is
-/// accepted. Null when the person backed out; throws
-/// [ReplacementSearchFailed] when no search could be made.
+/// Searches replacements for unavailable [songs], shows what was found for
+/// the person to check, and swaps and downloads what is accepted. Null when
+/// the person backed out; throws [ReplacementSearchFailed] when no search
+/// could be made. [ReplaceUnavailableButton] runs it: in a playlist's
+/// notice, with its [playlistId], and in the Downloads tab, for every
+/// playlist.
 Future<int?> reviewAndReplace(
   BuildContext context,
   List<Map> songs, {

@@ -23,18 +23,14 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/common_services.dart';
-import 'package:musify/services/download_manager.dart';
-import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/song_replacement.dart';
 import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/widgets/replace_unavailable_button.dart';
 
 final _changes = Listenable.merge([
   unavailableSongs.ids,
-  offlineMode,
   userOfflineSongs,
-  DownloadManager.instance.idle,
-  replacing,
+  replacementOffer,
 ]);
 
 /// Tells, once a playlist's download is over, that some songs of it failed as
@@ -74,12 +70,7 @@ class UnavailableNotice extends StatelessWidget {
     return ListenableBuilder(
       listenable: _changes,
       builder: (context, _) {
-        // Only once every download is over: a song of this playlist may be
-        // queued by another one, and may still fail.
-        if (offlineMode.value ||
-            !(DownloadManager.instance.idle.value || replacing.value)) {
-          return const SizedBox.shrink();
-        }
+        if (!canOfferReplacement) return const SizedBox.shrink();
         final affected = _affected;
         if (affected.isEmpty) return const SizedBox.shrink();
         final l10n = context.l10n!;

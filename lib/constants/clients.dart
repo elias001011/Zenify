@@ -35,13 +35,12 @@ Future<StreamManifest> getManifestWithFallback(
 }
 
 /// Whether YouTube refused this device rather than the video: a video closed
-/// to the country, or the check that asks to sign in to prove it is no bot.
-/// Another address may get through; the song is not gone.
+/// to the country, or the check that asks to prove it is no bot. Another
+/// address may get through; the song is not gone. The age gate also asks to
+/// sign in, but it is closed to everyone, so it is not a block.
 bool isDeviceBlock(VideoUnplayableException error) {
   final text = error.message.toLowerCase();
-  return text.contains('country') ||
-      text.contains('not a bot') ||
-      text.contains('sign in');
+  return text.contains('country') || text.contains('not a bot');
 }
 
 /// Headers googlevideo.com expects for URLs minted by the client that served
