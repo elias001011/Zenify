@@ -78,11 +78,18 @@ bool isSameRecording(Map song, Map candidate) {
   return true;
 }
 
+/// Neither search could be made at all (no connection, YouTube refusing): not
+/// the same as a search that found nothing.
+class ReplacementSearchFailed implements Exception {
+  const ReplacementSearchFailed();
+}
+
 /// Another upload of [song] to take its place, or null when none is found.
 /// YouTube Music is asked first, for the song of the same artist and title;
 /// a plain YouTube search is the fallback. What is offered must be the same
 /// recording ([isSameRecording]); results in [exclude], the ones known to be
-/// unavailable and the song itself are never offered.
+/// unavailable and the song itself are never offered. Throws
+/// [ReplacementSearchFailed] when no search could be made.
 Future<Map<String, dynamic>?> findReplacementSong(
   Map song, {
   Set<String> exclude = const {},
@@ -92,6 +99,7 @@ Future<Map<String, dynamic>?> findReplacementSong(
   final skip = {...exclude, song['ytid'].toString()};
   bool usable(String? id) =>
       id != null && !skip.contains(id) && !unavailableSongs.contains(id);
+  var searched = false;
 
   try {
     final video = await ytMusicClient.music.searchSong(
@@ -99,6 +107,7 @@ Future<Map<String, dynamic>?> findReplacementSong(
       expectedArtist: song['artist']?.toString(),
       expectedTitle: song['title']?.toString(),
     );
+    searched = true;
     if (video != null && usable(video.id.value)) {
       final candidate = returnSongLayout(0, video);
       if (isSameRecording(song, candidate)) return candidate;
@@ -113,6 +122,7 @@ Future<Map<String, dynamic>?> findReplacementSong(
 
   try {
     final results = await ytClient.search.search(query);
+    searched = true;
     for (final video in results) {
       if (!usable(video.id.value) || video.isLive) continue;
       final candidate = returnSongLayout(0, video);
@@ -125,6 +135,7 @@ Future<Map<String, dynamic>?> findReplacementSong(
       stackTrace: stackTrace,
     );
   }
+  if (!searched) throw const ReplacementSearchFailed();
   return null;
 }
 
@@ -146,7 +157,8 @@ final replacedSongs = ValueNotifier<int>(0);
 ///
 /// A song no playlist or liked list of yours holds any more is no longer
 /// unavailable for the app: it leaves the record and the Downloads tab,
-/// wherever the swap was asked. Returns how many songs were swapped.
+/// wherever the swap was asked. Returns how many songs were swapped; throws
+/// [ReplacementSearchFailed] when no search could be made.
 Future<int> replaceUnavailableSongs(
   Iterable<Map> songs, {
   String? playlistId,
@@ -159,14 +171,24 @@ Future<int> replaceUnavailableSongs(
   final taken = songIdsOf(playlists);
 
   final found = <String, Map>{};
+  var searches = 0, failedSearches = 0;
   for (final song in songs) {
     final id = song['ytid'].toString();
     if (!taken.contains(id) || !unavailableSongs.contains(id)) continue;
-    final replacement = await findReplacement(
-      song,
-      exclude: {...taken, for (final r in found.values) r['ytid'].toString()},
-    );
-    if (replacement != null) found[id] = replacement;
+    searches++;
+    try {
+      final replacement = await findReplacement(
+        song,
+        exclude: {...taken, for (final r in found.values) r['ytid'].toString()},
+      );
+      if (replacement != null) found[id] = replacement;
+    } on ReplacementSearchFailed {
+      failedSearches++;
+    }
+  }
+  // Every search failed: there is no telling whether replacements exist.
+  if (searches > 0 && failedSearches == searches) {
+    throw const ReplacementSearchFailed();
   }
 
   // The searching took a while: a song may have played since, and the

@@ -118,6 +118,7 @@
   "dismiss": "Dispensar",
   "replaceUnavailable": "Substituir",
   "songsReplaced": "{count, plural, =1{1 música substituída} other{{count} músicas substituídas}}",
+  "replaceNoConnection": "Não deu para buscar substitutas. Verifique a conexão e tente de novo",
   "noReplacementFound": "Nenhuma substituição encontrada",
   "downloadsRetrying": "{count, plural, =1{Tentando baixar 1 música de novo} other{Tentando baixar {count} músicas de novo}}",
   "dynamicBackground": "Fundo dinâmico",

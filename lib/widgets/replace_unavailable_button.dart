@@ -55,20 +55,21 @@ class _ReplaceUnavailableButtonState extends State<ReplaceUnavailableButton> {
   Future<void> _replace() async {
     final l10n = context.l10n!;
     setState(() => _replacing = true);
-    var replaced = 0;
+    String message;
     try {
-      replaced = await widget.replace(
+      final replaced = await widget.replace(
         widget.songs,
         playlistId: widget.playlistId,
       );
+      message = replaced > 0
+          ? l10n.songsReplaced(replaced)
+          : l10n.noReplacementFound;
+    } on ReplacementSearchFailed {
+      message = l10n.replaceNoConnection;
     } finally {
       if (mounted) setState(() => _replacing = false);
     }
-    if (!mounted) return;
-    showToast(
-      context,
-      replaced > 0 ? l10n.songsReplaced(replaced) : l10n.noReplacementFound,
-    );
+    if (mounted) showToast(context, message);
   }
 
   @override

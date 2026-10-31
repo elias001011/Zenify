@@ -242,6 +242,31 @@ void main() {
       expect(downloaded, isEmpty);
     });
 
+    test('no search at all is told apart from nothing found', () async {
+      userCustomPlaylists.value = [
+        playlist('p', ['a', 'b', 'c']),
+      ];
+      unavailableSongs
+        ..markUnavailable('b')
+        ..markUnavailable('c');
+      findReplacement = (original, {Set<String> exclude = const {}}) async =>
+          throw const ReplacementSearchFailed();
+
+      await expectLater(
+        replaceUnavailableSongs([song('b'), song('c')]),
+        throwsA(isA<ReplacementSearchFailed>()),
+      );
+      expect(idsIn(userCustomPlaylists.value.single), ['a', 'b', 'c']);
+      expect(downloaded, isEmpty);
+
+      // One search made, even if it found nothing, is no failure of them all.
+      findReplacement = (original, {Set<String> exclude = const {}}) async =>
+          original['ytid'] == 'b'
+          ? throw const ReplacementSearchFailed()
+          : null;
+      expect(await replaceUnavailableSongs([song('b'), song('c')]), 0);
+    });
+
     test('asking twice swaps once', () async {
       userCustomPlaylists.value = [
         playlist('p', ['a', 'b']),
@@ -330,6 +355,33 @@ void main() {
       expect(swaps.single.$1, ['b', 'c']);
       expect(swaps.single.$2, 'p');
       // Lets the message go.
+      await tester.pump(const Duration(seconds: 5));
+    });
+
+    testWidgets('a search that cannot be made leaves Replace usable', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        app(
+          UnavailableNotice(
+            playlistId: 'p',
+            songs: [song('a'), song('b')],
+            replace: (songs, {playlistId}) async =>
+                throw const ReplacementSearchFailed(),
+          ),
+        ),
+      );
+      unavailableSongs.ids.value = {'b'};
+      await tester.pump();
+      await tester.tap(find.widgetWithText(FilledButton, 'Replace'));
+      for (var i = 0; i < 3; i++) {
+        await tester.pump();
+      }
+      expect(tester.takeException(), isNull);
+      expect(
+        tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
+        isNotNull,
+      );
       await tester.pump(const Duration(seconds: 5));
     });
 
