@@ -890,8 +890,11 @@ final _downloadsInFlight = <String, Future<bool>>{};
 Future<bool> makeSongOffline(dynamic song) {
   final ytid = song is Map ? songYtid(song) : null;
   if (ytid == null) return _downloadSong(song);
-  return _downloadsInFlight[ytid] ??= _downloadSong(song)
-      .whenComplete(() => _downloadsInFlight.remove(ytid));
+  // A block body: `remove` returns this very future, which whenComplete
+  // would then wait for for ever.
+  return _downloadsInFlight[ytid] ??= _downloadSong(song).whenComplete(() {
+    _downloadsInFlight.remove(ytid);
+  });
 }
 
 Future<bool> _downloadSong(dynamic song) async {

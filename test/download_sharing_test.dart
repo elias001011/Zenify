@@ -37,11 +37,11 @@ void main() {
         ),
         hasLength(1),
       );
-      await first.timeout(const Duration(seconds: 20), onTimeout: () => false);
+      expect(await first, isFalse);
 
       final later = makeSongOffline(song);
       expect(identical(first, later), isFalse);
-      await later.timeout(const Duration(seconds: 20), onTimeout: () => false);
+      expect(await later, isFalse);
     });
   });
 }
