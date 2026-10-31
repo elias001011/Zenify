@@ -45,21 +45,25 @@ Set<String> _words(Object? text, {int minLength = 1}) => {
     if (word.length >= minLength) word,
 };
 
-/// Whether [candidate] is the same recording as [song]: it carries every word
-/// of the title, its artist (in the artist, the title or the channel) and
-/// about the same length. A cover, a remix or an unrelated result differs in
-/// at least one, and a wrong swap is saved for good, so when in doubt the
-/// answer is no.
+/// Whether [candidate] is the same recording as [song]: its title says the
+/// same and no more (the artist's name apart), its own artist or channel is
+/// the song's artist, and it is about as long. A mention of the artist in the
+/// title does not count as a credit, and "(Queen cover)" or "Remix" are more
+/// than the title says. A wrong swap is saved for good, so when in doubt the
+/// answer is no. [candidate] has a cleaned title, as the layouts give.
 bool isSameRecording(Map song, Map candidate) {
   final title = _words(song['title']);
   if (title.isEmpty) return false;
+  final artistWords = _words(song['artist']);
   final candidateTitle = _words(candidate['title']);
   if (!candidateTitle.containsAll(title)) return false;
+  if (candidateTitle.difference(title).difference(artistWords).isNotEmpty) {
+    return false;
+  }
 
   final artist = _words(song['artist'], minLength: 3);
   if (artist.isNotEmpty) {
     final credited = {
-      ...candidateTitle,
       ..._words(candidate['artist']),
       ..._words(candidate['videoAuthor']),
     };
@@ -165,14 +169,21 @@ Future<int> replaceUnavailableSongs(
     if (replacement != null) found[id] = replacement;
   }
 
-  // The playlists may have changed while searching: only what is still there
-  // is swapped, and only that is counted and downloaded.
+  // The searching took a while: a song may have played since, and the
+  // playlists may have been edited, which replaces their maps. What is
+  // swapped is read again now, and only then.
+  final swaps = {
+    for (final entry in found.entries)
+      if (unavailableSongs.contains(entry.key)) entry.key: entry.value,
+  };
+  final scope = {for (final playlist in playlists) playlist['ytid'].toString()};
   final applied = <String>{};
-  for (final playlist in playlists) {
+  for (final playlist in getUserCustomPlaylists()) {
+    if (!scope.contains(playlist['ytid'].toString())) continue;
     final here = songIdsOf([playlist]);
     applied.addAll(
       replaceSongsInPlaylist(playlist, {
-        for (final entry in found.entries)
+        for (final entry in swaps.entries)
           if (here.contains(entry.key)) entry.key: entry.value,
       }),
     );
@@ -190,7 +201,7 @@ Future<int> replaceUnavailableSongs(
   DownloadManager.instance.forget(settled);
 
   for (final id in applied) {
-    unawaited(downloadReplacement(found[id]));
+    unawaited(downloadReplacement(swaps[id]));
   }
   replacedSongs.value++;
   return applied.length;

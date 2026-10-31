@@ -10,6 +10,7 @@ import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/song_replacement.dart';
 import 'package:musify/services/unavailable_songs.dart';
+import 'package:musify/utilities/formatter.dart';
 import 'package:musify/widgets/playlist_page/unavailable_notice.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
@@ -209,6 +210,38 @@ void main() {
       },
     );
 
+    test('an edit made while searching is not undone', () async {
+      userCustomPlaylists.value = [
+        playlist('p', ['a', 'b']),
+      ];
+      unavailableSongs.markUnavailable('b');
+      findReplacement = (original, {Set<String> exclude = const {}}) async {
+        // An edit replaces the playlist's map: a song is added meanwhile.
+        userCustomPlaylists.value = [
+          playlist('p', ['a', 'b', 'c']),
+        ];
+        return {...original, 'ytid': 'new-b'};
+      };
+
+      expect(await replaceUnavailableSongs([song('b')]), 1);
+      expect(idsIn(userCustomPlaylists.value.single), ['a', 'new-b', 'c']);
+    });
+
+    test('a song that plays during the search is left alone', () async {
+      userCustomPlaylists.value = [
+        playlist('p', ['a', 'b']),
+      ];
+      unavailableSongs.markUnavailable('b');
+      findReplacement = (original, {Set<String> exclude = const {}}) async {
+        unavailableSongs.markAvailable('b');
+        return {...original, 'ytid': 'new-b'};
+      };
+
+      expect(await replaceUnavailableSongs([song('b')]), 0);
+      expect(idsIn(userCustomPlaylists.value.single), ['a', 'b']);
+      expect(downloaded, isEmpty);
+    });
+
     test('asking twice swaps once', () async {
       userCustomPlaylists.value = [
         playlist('p', ['a', 'b']),
@@ -364,11 +397,12 @@ void main() {
     Map candidate(
       String title, {
       String artist = 'Queen',
+      String? channel,
       int? seconds = 355,
     }) => {
       'title': title,
       'artist': artist,
-      'videoAuthor': artist,
+      'videoAuthor': channel ?? artist,
       'duration': seconds,
     };
 
@@ -377,7 +411,11 @@ void main() {
       expect(
         isSameRecording(
           original,
-          candidate('Bohemian Rhapsody (Official Video)', seconds: 359),
+          candidate(
+            'Bohemian Rhapsody',
+            seconds: 359,
+            channel: 'Queen Official',
+          ),
         ),
         isTrue,
       );
@@ -385,6 +423,14 @@ void main() {
         isSameRecording(
           original,
           candidate('Bohemian Rhapsody', seconds: null),
+        ),
+        isTrue,
+      );
+      // The title the app keeps has no "(Official Video)" any more.
+      expect(
+        isSameRecording(
+          original,
+          candidate(formatSongTitle('Bohemian Rhapsody (Official Video)')),
         ),
         isTrue,
       );
@@ -402,24 +448,39 @@ void main() {
         ),
         isFalse,
       );
-      // A cover or a remix of it is not the recording.
       expect(
-        isSameRecording(
-          original,
-          candidate('Bohemian Rhapsody (Remix)', seconds: 240),
-        ),
+        isSameRecording(original, candidate('Bohemian Rhapsody', seconds: 240)),
         isFalse,
       );
       expect(isSameRecording({'ytid': 'x'}, candidate('Anything')), isFalse);
     });
 
-    test('the artist may be named in the title or the channel', () {
+    test('turns down covers and remixes, even as long as the original', () {
+      // Naming the artist in the title is no credit: the channel is Muse.
       expect(
-        isSameRecording(original, {
-          'title': 'Queen - Bohemian Rhapsody',
-          'artist': 'Topic',
-          'duration': 355,
-        }),
+        isSameRecording(
+          original,
+          candidate('Bohemian Rhapsody (Queen cover)', artist: 'Muse'),
+        ),
+        isFalse,
+      );
+      // A remix says more than the title does.
+      expect(
+        isSameRecording(original, candidate('Bohemian Rhapsody (Remix)')),
+        isFalse,
+      );
+      expect(
+        isSameRecording(
+          original,
+          candidate('Bohemian Rhapsody Live at Wembley'),
+        ),
+        isFalse,
+      );
+    });
+
+    test('the artist in the title is fine, when the channel is the artist', () {
+      expect(
+        isSameRecording(original, candidate('Queen Bohemian Rhapsody')),
         isTrue,
       );
     });
