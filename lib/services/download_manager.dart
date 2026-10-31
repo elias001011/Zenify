@@ -129,6 +129,10 @@ class DownloadManager {
   /// is again, whichever playlists the songs came from.
   final batch = ValueNotifier<DownloadBatch?>(null);
 
+  /// How far the songs of the current batch have come, for the notification
+  /// of downloads in the background. Back to zero when everything is idle.
+  final progress = ValueNotifier<BatchProgress>((done: 0, total: 0, failed: 0));
+
   @visibleForTesting
   var idleMargin = const Duration(seconds: 3);
 
@@ -142,6 +146,9 @@ class DownloadManager {
   // The songs that failed since everything was last idle, by ytid, and
   // whether each is unavailable; one that later succeeds is not told.
   final _batchFailed = <String, bool>{};
+  // Every song asked for since then, and those that were saved.
+  final _batchSongs = <String>{};
+  final _batchDone = <String>{};
   var _batches = 0;
   var _historyEpoch = 0;
   var _stopEpoch = 0;
@@ -214,6 +221,7 @@ class DownloadManager {
           if (epoch == _historyEpoch) ?earlier,
           ...entries.value.where((e) => e != entry),
         ];
+        _dropFromBatch(entry.ytid);
         _checkIdle();
         return false;
       }
@@ -226,6 +234,7 @@ class DownloadManager {
       return true;
     } on DownloadStopped {
       entries.value = entries.value.where((e) => e != entry).toList();
+      _dropFromBatch(entry.ytid);
       _checkIdle();
       return false;
     } catch (error) {
@@ -274,9 +283,24 @@ class DownloadManager {
       entry,
       ...entries.value.where((other) => other.ytid != entry.ytid),
     ];
+    _batchSongs.add(entry.ytid);
+    _updateProgress();
     _idleTimer?.cancel();
     idle.value = false;
     return entry;
+  }
+
+  void _updateProgress() => progress.value = (
+    done: _batchDone.length,
+    total: _batchSongs.length,
+    failed: _batchFailed.length,
+  );
+
+  // A song that was never tried to the end does not count in the batch.
+  void _dropFromBatch(String ytid) {
+    if (_batchDone.contains(ytid) || _batchFailed.containsKey(ytid)) return;
+    _batchSongs.remove(ytid);
+    _updateProgress();
   }
 
   /// Keeps a run of downloads open, for whoever starts one: from the tap,
@@ -323,6 +347,9 @@ class DownloadManager {
         );
       }
       _batchFailed.clear();
+      _batchSongs.clear();
+      _batchDone.clear();
+      _updateProgress();
     });
   }
 
@@ -331,6 +358,9 @@ class DownloadManager {
 
   void finished(DownloadEntry entry) {
     _batchFailed.remove(entry.ytid);
+    _batchSongs.add(entry.ytid);
+    _batchDone.add(entry.ytid);
+    _updateProgress();
     unavailableSongs.markAvailable(entry.ytid);
     _settle(entry, DownloadStatus.done);
   }
@@ -341,6 +371,9 @@ class DownloadManager {
     entry.failure = failureFor(error);
     final gone = entry.failure == DownloadFailure.unavailable;
     _batchFailed[entry.ytid] = gone;
+    _batchSongs.add(entry.ytid);
+    _batchDone.remove(entry.ytid);
+    _updateProgress();
     if (gone) unavailableSongs.markUnavailable(entry.ytid);
     _settle(entry, DownloadStatus.failed);
   }
@@ -350,6 +383,9 @@ class DownloadManager {
     final gone = ytids.toSet();
     _historyEpoch++;
     _batchFailed.removeWhere((ytid, _) => gone.contains(ytid));
+    _batchSongs.removeAll(gone);
+    _batchDone.removeAll(gone);
+    _updateProgress();
     entries.value = [
       for (final entry in entries.value)
         if (_isActive(entry) || !gone.contains(entry.ytid)) entry,
@@ -381,6 +417,9 @@ class DownloadManager {
     idle.value = true;
     batch.value = null;
     _batchFailed.clear();
+    _batchSongs.clear();
+    _batchDone.clear();
+    _updateProgress();
   }
 
   void clearHistory() {
@@ -435,6 +474,9 @@ final class DownloadRun {
 /// How many songs failed in a run of downloads, and how many of those are
 /// unavailable on YouTube. `id` tells one run from the next.
 typedef DownloadBatch = ({int failed, int unavailable, int id});
+
+/// The songs of a batch saved, asked for, and failed so far.
+typedef BatchProgress = ({int done, int total, int failed});
 
 /// A download that may be asked for by several callers, each with its own
 /// way to say it no longer wants it.

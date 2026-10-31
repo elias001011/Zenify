@@ -431,6 +431,133 @@ void main() {
       });
     });
 
+    group('the count of a batch', () {
+      BatchProgress now() => manager.progress.value;
+
+      test('counts what was asked for, saved and failed', () async {
+        final all = [
+          manager.download(song('fine1'), save),
+          manager.download(song('bad-a'), save),
+          manager.download(song('gone-a'), save),
+          manager.download(song('fine2'), save),
+        ];
+        expect(now(), (done: 0, total: 4, failed: 0));
+
+        open('fine1');
+        await Future<void>.delayed(Duration.zero);
+        expect(now(), (done: 1, total: 4, failed: 0));
+
+        open('bad-a');
+        await Future<void>.delayed(Duration.zero);
+        expect(now(), (done: 1, total: 4, failed: 1));
+
+        open('gone-a');
+        open('fine2');
+        await Future.wait(all);
+        expect(now(), (done: 2, total: 4, failed: 2));
+      });
+
+      test('starts again from zero once everything is idle', () async {
+        await (() async {
+          final download = manager.download(song('bad-z'), save);
+          open('bad-z');
+          await download;
+        })();
+        expect(now(), (done: 0, total: 1, failed: 1));
+
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        expect(manager.idle.value, isTrue);
+        expect(now(), (done: 0, total: 0, failed: 0));
+
+        final next = manager.download(song('fine-z'), save);
+        expect(now(), (done: 0, total: 1, failed: 0));
+        open('fine-z');
+        await next;
+        expect(now(), (done: 1, total: 1, failed: 0));
+      });
+
+      test('a download inside the margin joins the same count', () async {
+        final first = manager.download(song('m1'), save);
+        open('m1');
+        await first;
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+        final second = manager.download(song('m2'), save);
+        open('m2');
+        await second;
+        expect(now(), (done: 2, total: 2, failed: 0));
+      });
+
+      test('a song that failed and then worked counts once, as saved', () {
+        manager.failed(manager.started(song('r')), StateError('x'));
+        expect(now(), (done: 0, total: 1, failed: 1));
+        manager.finished(manager.started(song('r')));
+        expect(now(), (done: 1, total: 1, failed: 0));
+      });
+
+      test('a song asked for twice counts once', () async {
+        final first = manager.download(song('twice'), save);
+        unawaited(manager.download(song('twice'), save));
+        expect(now().total, 1);
+        open('twice');
+        await first;
+        expect(now(), (done: 1, total: 1, failed: 0));
+      });
+
+      test('a cancelled or stopped song does not count', () async {
+        final blockers = [
+          for (var i = 0; i < DownloadManager.maxConcurrent; i++)
+            manager.download(song('n$i'), save),
+        ];
+        final dropped = manager.download(
+          song('left'),
+          save,
+          cancelled: () => true,
+        );
+        expect(now().total, DownloadManager.maxConcurrent + 1);
+        for (var i = 0; i < DownloadManager.maxConcurrent; i++) {
+          open('n$i');
+        }
+        await Future.wait(blockers);
+        expect(await dropped, isFalse);
+        expect(now(), (
+          done: DownloadManager.maxConcurrent,
+          total: DownloadManager.maxConcurrent,
+          failed: 0,
+        ));
+
+        await Future<void>.delayed(const Duration(milliseconds: 60));
+        final stopping = manager.download(song('stopped'), save);
+        final stopped = manager.stopAll();
+        open('stopped');
+        await stopped;
+        expect(await stopping, isFalse);
+        expect(now().total, 0);
+      });
+
+      test(
+        'a failed retry that is cancelled stays counted as failed',
+        () async {
+          manager.failed(manager.started(song('again')), StateError('x'));
+          final blockers = [
+            for (var i = 0; i < DownloadManager.maxConcurrent; i++)
+              manager.download(song('p$i'), save),
+          ];
+          final retry = manager.download(
+            song('again'),
+            save,
+            cancelled: () => true,
+          );
+          for (var i = 0; i < DownloadManager.maxConcurrent; i++) {
+            open('p$i');
+          }
+          await Future.wait(blockers);
+          expect(await retry, isFalse);
+          expect(now().failed, 1);
+          expect(now().total, DownloadManager.maxConcurrent + 1);
+        },
+      );
+    });
+
     test('cancelling a new try keeps the earlier entry of the song', () async {
       manager.failed(manager.started(song('again')), StateError('x'));
       final blockers = [

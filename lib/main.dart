@@ -41,6 +41,7 @@ import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/desktop_media_artwork.dart';
 import 'package:musify/services/desktop_window_service.dart';
 import 'package:musify/services/download_manager.dart';
+import 'package:musify/services/download_notifications.dart';
 import 'package:musify/services/downloads_location_service.dart';
 import 'package:musify/services/install_config_service.dart';
 import 'package:musify/services/io_service.dart';
@@ -154,6 +155,10 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
 
     WidgetsBinding.instance.addObserver(this);
     DownloadManager.instance.batch.addListener(_onDownloadsEnded);
+    DownloadNotifications.instance.attach(
+      openDownloads: () =>
+          NavigationManager.router.go(NavigationManager.downloadsPath),
+    );
 
     if (isMobilePlatform) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

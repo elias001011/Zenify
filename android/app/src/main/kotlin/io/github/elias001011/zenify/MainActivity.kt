@@ -1,6 +1,7 @@
 package io.github.elias001011.zenify
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.audiofx.Visualizer
 import android.os.Build
@@ -20,6 +21,7 @@ import kotlin.math.sqrt
 class MainActivity : AudioServiceActivity() {
   private var visualizer: Visualizer? = null
   private var pendingPermission: MethodChannel.Result? = null
+  private val downloads = DownloadChannel(this)
 
   override fun onCreate(savedInstanceState: Bundle?) {
     // Aligns the Flutter view vertically with the window.
@@ -32,6 +34,13 @@ class MainActivity : AudioServiceActivity() {
     }
 
     super.onCreate(savedInstanceState)
+    // A recreated activity gets its first intent again; that tap was handled.
+    if (savedInstanceState == null) downloads.onIntent(intent)
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    downloads.onIntent(intent)
   }
 
   override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -50,6 +59,9 @@ class MainActivity : AudioServiceActivity() {
         result.notImplemented()
       }
     }
+
+    // Downloads in the background: a foreground service with notifications.
+    downloads.register(messenger)
 
     // The player's waves follow the music through Android's Visualizer, which
     // needs the audio recording permission even to read Zenify's own output.
@@ -96,6 +108,7 @@ class MainActivity : AudioServiceActivity() {
     grantResults: IntArray,
   ) {
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+    downloads.onPermissionResult(requestCode, grantResults)
     if (requestCode == AUDIO_PERMISSION_REQUEST) {
       pendingPermission?.success(
         grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED,
