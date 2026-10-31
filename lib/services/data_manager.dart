@@ -301,10 +301,25 @@ const _deviceSettings = [
   'equalizerBandGains',
 ];
 
+const _libraryBoxes = ['user', 'settings'];
+
+/// The backup file name each box was picked with: either box can be
+/// restored alone.
+Map<String, String> matchBackupFiles(Iterable<String> names) => {
+  for (final boxName in _libraryBoxes)
+    if (names
+            .where(
+              (name) =>
+                  name == '$boxName.hive' || name.startsWith('${boxName}_'),
+            )
+            .firstOrNull
+        case final name?)
+      boxName: name,
+};
+
 Future<({String message, bool success})> restoreData(
   BuildContext context,
 ) async {
-  final boxNames = ['user', 'settings'];
   final result = await FilePicker.pickFiles(
     type: FileType.custom,
     allowedExtensions: ['hive'],
@@ -314,23 +329,20 @@ Future<({String message, bool success})> restoreData(
     return (message: '${context.l10n!.chooseBackupFiles}!', success: false);
   }
 
-  final selectedFiles = <String, PlatformFile>{};
-  for (final boxName in boxNames) {
-    final backupFile = result
-        .where(
-          (file) =>
-              file.name == '$boxName.hive' ||
-              file.name.startsWith('${boxName}_'),
-        )
-        .firstOrNull;
-    if (backupFile == null) {
-      return (
-        message: '${context.l10n!.chooseBackupFiles} ($boxName.hive)!',
-        success: false,
-      );
-    }
-    selectedFiles[boxName] = backupFile;
+  final matched = matchBackupFiles(result.map((file) => file.name));
+  if (matched.isEmpty) {
+    return (
+      message:
+          '${context.l10n!.chooseBackupFiles} '
+          '(${_libraryBoxes.map((name) => '$name.hive').join(', ')})!',
+      success: false,
+    );
   }
+  final boxNames = matched.keys.toList();
+  final selectedFiles = {
+    for (final boxName in boxNames)
+      boxName: result.firstWhere((file) => file.name == matched[boxName]),
+  };
 
   final boxPaths = <String, String>{};
   for (final boxName in boxNames) {
@@ -402,7 +414,7 @@ Future<({String message, bool success})> restoreData(
     }
     return (message: '${context.l10n!.restoreError}: $e', success: false);
   } finally {
-    for (final boxName in boxNames) {
+    for (final boxName in _libraryBoxes) {
       try {
         final box = await _openBox(boxName);
         if (boxName == 'settings' && restoredBoxes.contains(boxName)) {

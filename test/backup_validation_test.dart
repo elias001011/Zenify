@@ -46,4 +46,14 @@ void main() {
       }
     },
   );
+
+  test('restores either backup file alone, or both', () {
+    expect(matchBackupFiles(['user.hive']).keys, ['user']);
+    expect(matchBackupFiles(['settings_2.hive']).keys, ['settings']);
+    expect(matchBackupFiles(['settings.hive', 'user.hive']).keys, [
+      'user',
+      'settings',
+    ]);
+    expect(matchBackupFiles(['favourites.hive']), isEmpty);
+  });
 }
