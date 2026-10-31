@@ -285,6 +285,7 @@ Future<({String message, bool success})> backupData(
 /// Musify (which has none of them) or from another device keeps them as they
 /// are here.
 const _deviceSettings = [
+  'offlineMode',
   'localSyncEnabled',
   'localSyncAutomatic',
   'localSyncCategories',

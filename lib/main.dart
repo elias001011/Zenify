@@ -617,6 +617,12 @@ void handleIncomingLink(Uri? uri) async {
 
   if (uri.pathSegments.length < 2 || uri.pathSegments[0] != 'custom') return;
 
+  // The songs of a shared playlist are fetched one by one.
+  if (offlineMode.value) {
+    _showPlaylistError();
+    return;
+  }
+
   try {
     final encodedPlaylist = uri.pathSegments[1];
     final playlist = await PlaylistSharingService.decodeAndExpandPlaylist(

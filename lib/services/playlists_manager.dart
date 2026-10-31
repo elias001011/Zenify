@@ -212,6 +212,10 @@ Future<String> addUserPlaylist(String input, BuildContext context) async {
       return '${context.l10n!.invalidYouTubePlaylist}!';
     }
 
+    // A second tap while this one was fetching got here too.
+    if (playlistExistsAnywhere(playlistId)) {
+      return '${context.l10n!.playlistAlreadyExists}!';
+    }
     userPlaylists.value = [...userPlaylists.value, playlistId];
     unawaited(addOrUpdateData<List>('user', 'playlists', userPlaylists.value));
     return '${context.l10n!.addedSuccess}!';

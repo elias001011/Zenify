@@ -21,6 +21,7 @@
 
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/formatter.dart';
 
 final _youtubeLinkRegex = RegExp(r'(youtube\.com|youtu\.be)');
@@ -30,7 +31,9 @@ Future<void> handleYoutubeSharedTextIntent(
   required MusifyAudioHandler audioHandler,
   required void Function(Object error, StackTrace stackTrace) onError,
 }) async {
-  if (value == null || !_youtubeLinkRegex.hasMatch(value)) {
+  if (value == null ||
+      !_youtubeLinkRegex.hasMatch(value) ||
+      offlineMode.value) {
     return;
   }
 

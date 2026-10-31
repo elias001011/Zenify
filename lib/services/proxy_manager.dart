@@ -54,7 +54,7 @@ class ProxyManager {
   ProxyManager._internal() {
     _defaultYt = YoutubeExplode();
     _sharedYt = _defaultYt;
-    if (useProxy.value) {
+    if (useProxy.value && !offlineMode.value) {
       unawaited(_initSharedProxyClient());
     }
     useProxy.addListener(() {
@@ -63,6 +63,8 @@ class ProxyManager {
         _disableProxyClient();
         return;
       }
+      // Offline mode keeps the app off the network, proxy lists included.
+      if (offlineMode.value) return;
       unawaited(_initializeForGeneration(generation));
     });
   }

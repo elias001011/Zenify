@@ -27,12 +27,18 @@ import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/clients.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/unavailable_songs.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 enum DownloadStatus { queued, downloading, done, failed }
 
 enum DownloadFailure { unavailable, network, other }
+
+/// Thrown into a download that was told to stop.
+class DownloadStopped implements Exception {
+  const DownloadStopped();
+}
 
 /// One song download, as shown in the Downloads tab.
 class DownloadEntry {
@@ -89,6 +95,18 @@ typedef SongSaver = Future<void> Function(
 class DownloadManager {
   DownloadManager._();
 
+  var _watchingOffline = false;
+
+  // Offline mode keeps the app off the network: what is downloading stops.
+  // Watched from the first download, when the settings are open.
+  void _watchOffline() {
+    if (_watchingOffline) return;
+    _watchingOffline = true;
+    offlineMode.addListener(() {
+      if (offlineMode.value) unawaited(stopAll());
+    });
+  }
+
   static final instance = DownloadManager._();
 
   static const maxConcurrent = 3;
@@ -126,6 +144,7 @@ class DownloadManager {
   final _batchFailed = <String, bool>{};
   var _batches = 0;
   var _historyEpoch = 0;
+  var _stopEpoch = 0;
   final _waiting = Queue<Completer<void>>();
   var _running = 0;
 
@@ -161,6 +180,8 @@ class DownloadManager {
     bool Function()? cancelled,
   }) {
     final ytid = song['ytid'].toString();
+    _watchOffline();
+    if (offlineMode.value) return Future.value(false);
     final asker = cancelled ?? _never;
     if (_inFlight[ytid] case final request?) {
       request.askers.add(asker);
@@ -182,10 +203,12 @@ class DownloadManager {
         .where((e) => e.ytid == song['ytid'].toString() && !_isActive(e))
         .firstOrNull;
     final epoch = _historyEpoch;
+    final stopEpoch = _stopEpoch;
     final entry = queued(song);
     await _acquire();
     try {
-      if (request.askers.every((cancelled) => cancelled())) {
+      if (stopEpoch != _stopEpoch ||
+          request.askers.every((cancelled) => cancelled())) {
         // The history it came from may have been cleared meanwhile.
         entries.value = [
           if (epoch == _historyEpoch) ?earlier,
@@ -195,14 +218,31 @@ class DownloadManager {
         return false;
       }
       _track(entry..status = DownloadStatus.downloading);
-      await save(entry.song, (value) => entry.progress.value = value);
+      await save(entry.song, (value) {
+        if (stopEpoch != _stopEpoch) throw const DownloadStopped();
+        entry.progress.value = value;
+      });
       finished(entry);
       return true;
+    } on DownloadStopped {
+      entries.value = entries.value.where((e) => e != entry).toList();
+      _checkIdle();
+      return false;
     } catch (error) {
       failed(entry, error);
       return false;
     } finally {
       _release();
+    }
+  }
+
+  /// Stops what is queued and what is downloading (offline mode, deleting
+  /// every download), and waits for it to let go of its files. What stopped
+  /// leaves no entry: it was not tried to the end.
+  Future<void> stopAll() async {
+    _stopEpoch++;
+    for (var i = 0; i < 100 && entries.value.any(_isActive); i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
     }
   }
 

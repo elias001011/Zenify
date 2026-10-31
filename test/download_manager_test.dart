@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:http/http.dart' as http;
 import 'package:musify/services/download_manager.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 void main() {
@@ -15,6 +16,7 @@ void main() {
     dir = await Directory.systemTemp.createTemp('musify_downloads');
     Hive.init(dir.path);
     await Hive.openBox('userNoBackup');
+    await Hive.openBox('settings');
   });
 
   tearDownAll(() async {
@@ -144,13 +146,14 @@ void main() {
 
     Future<void> save(
       Map<String, dynamic> song,
-      void Function(double) _,
+      void Function(double) onProgress,
     ) async {
       final id = song['ytid'] as String;
       running++;
       peak = running > peak ? running : peak;
       try {
         await (gates[id] ??= Completer<void>()).future;
+        onProgress(0.5);
         if (id.startsWith('bad')) throw StateError('no');
         if (id.startsWith('gone')) throw VideoUnavailableException('gone');
         saved.add(id);
@@ -195,6 +198,34 @@ void main() {
       expect(await first, isTrue);
       expect(saved, ['s']);
       expect(manager.entries.value.where((e) => e.ytid == 's'), hasLength(1));
+    });
+
+    test('stopping lets go of what runs and what waits', () async {
+      final all = [
+        for (var i = 0; i < 5; i++) manager.download(song('t$i'), save),
+      ];
+      await Future<void>.delayed(Duration.zero);
+      expect(running, DownloadManager.maxConcurrent);
+      final stopped = manager.stopAll();
+      // Those running notice at their next report; those waiting never start.
+      for (var i = 0; i < 5; i++) {
+        open('t$i');
+      }
+      await stopped;
+      expect(await Future.wait(all), everyElement(isFalse));
+      expect(
+        manager.entries.value.where((e) => e.ytid.startsWith('t')),
+        isEmpty,
+      );
+      expect(running, 0);
+    });
+
+    test('a download is not started in offline mode', () async {
+      offlineMode.value = true;
+      addTearDown(() => offlineMode.value = false);
+      expect(await manager.download(song('o'), save), isFalse);
+      expect(manager.entries.value, isEmpty);
+      expect(saved, isEmpty);
     });
 
     test('a cancelled song leaves the queue without being saved', () async {

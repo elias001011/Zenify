@@ -73,7 +73,12 @@ class SettingsPage extends StatelessWidget {
           activatedColor,
           inactivatedColor,
         ),
-        if (!offlineMode.value) _buildOnlineFeaturesSection(context),
+        ValueListenableBuilder<bool>(
+          valueListenable: offlineMode,
+          builder: (context, offline, _) => offline
+              ? const SizedBox.shrink()
+              : _buildOnlineFeaturesSection(context),
+        ),
         if (isDesktopPlatform) const DesktopSettingsSection(),
         const LocalSyncSettingsSection(),
         _buildOthersSection(context),

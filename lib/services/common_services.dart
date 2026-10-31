@@ -866,7 +866,7 @@ Future<Lyrics?> getSongLyricsResult(
   Duration? duration,
   String? album,
 }) async {
-  if (artist == null) return null;
+  if (artist == null || offlineMode.value) return null;
   final key = '$artist - $title';
   if (lastFetchedLyrics == key) return _lastLyricsResult;
 

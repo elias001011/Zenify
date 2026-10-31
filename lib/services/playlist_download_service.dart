@@ -22,6 +22,7 @@
  */
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -29,6 +30,7 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
@@ -437,6 +439,9 @@ class OfflinePlaylistService {
   }
 
   Future<void> deleteAllDownloads() async {
+    // What the manager is downloading stops first: a download that went on
+    // would register its song again after this has deleted them.
+    await DownloadManager.instance.stopAll();
     // Cancel all active downloads first and wait for them to stop
     final activeIds = List<String>.from(activeDownloads);
     for (final id in activeIds) {
@@ -466,6 +471,7 @@ class OfflinePlaylistService {
       userOfflineSongs.value = [];
 
       offlinePlaylists.value = [];
+      DownloadManager.instance.clearHistory();
 
       for (final notifier in downloadProgressNotifiers.values) {
         notifier.dispose();
@@ -502,6 +508,16 @@ class OfflinePlaylistService {
     }
   }
 
+  /// A registered song whose file is gone is not downloaded.
+  Future<bool> _hasAudioFile(dynamic ytid) {
+    final path = getOfflineSongByYtid(ytid)['audioPath'];
+    return File(
+      path is String && path.isNotEmpty
+          ? path
+          : FilePaths.getAudioPath(ytid.toString()),
+    ).exists();
+  }
+
   Future<void> _downloadSong(
     dynamic song,
     ValueNotifier<DownloadProgress> progressNotifier,
@@ -513,7 +529,8 @@ class OfflinePlaylistService {
           song['ytid'].toString().isEmpty) {
         logger.log('Invalid song data in playlist download');
         progress.failed++;
-      } else if (isSongAlreadyOffline(song['ytid'])) {
+      } else if (isSongAlreadyOffline(song['ytid']) &&
+          await _hasAudioFile(song['ytid'])) {
         // Update the song in the playlist with the correct offline properties
         final offlineSong = getOfflineSongByYtid(song['ytid']);
         if (offlineSong.isNotEmpty) {
