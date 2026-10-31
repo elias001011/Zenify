@@ -46,6 +46,10 @@ Taken from the app itself, running on Linux, with a real library.
 
 ![Zenify home on a desktop](assets/screenshots/desktop-home.jpg)
 
+Moods, a personal Mix and playlists made for you, on Home:
+
+![Zenify moods, Mix and playlists made for you](assets/screenshots/desktop-moods.jpg)
+
 | Player with synced lyrics | Playlist |
 |---|---|
 | ![Zenify player with synced lyrics](assets/screenshots/desktop-player-lyrics.jpg) | ![Zenify playlist](assets/screenshots/desktop-playlist.jpg) |
@@ -59,15 +63,17 @@ The same app at a phone's size (390 × 844).
 <table>
   <tr>
     <th>Home</th>
+    <th>Moods</th>
     <th>Library</th>
     <th>Playlist</th>
     <th>Player</th>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/mobile-home.jpg" width="200" alt="Zenify home on a phone"></td>
-    <td><img src="assets/screenshots/mobile-library.jpg" width="200" alt="Zenify library on a phone"></td>
-    <td><img src="assets/screenshots/mobile-playlist.jpg" width="200" alt="Zenify playlist on a phone"></td>
-    <td><img src="assets/screenshots/mobile-player.jpg" width="200" alt="Zenify player on a phone"></td>
+    <td><img src="assets/screenshots/mobile-home.jpg" width="160" alt="Zenify home on a phone"></td>
+    <td><img src="assets/screenshots/mobile-moods.jpg" width="160" alt="Zenify moods and made-for-you playlists on a phone"></td>
+    <td><img src="assets/screenshots/mobile-library.jpg" width="160" alt="Zenify library on a phone"></td>
+    <td><img src="assets/screenshots/mobile-playlist.jpg" width="160" alt="Zenify playlist on a phone"></td>
+    <td><img src="assets/screenshots/mobile-player.jpg" width="160" alt="Zenify player on a phone"></td>
   </tr>
 </table>
 
