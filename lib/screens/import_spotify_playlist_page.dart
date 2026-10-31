@@ -135,6 +135,7 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
     final foundByIndex = <int, Map>{};
     List<_ImportRow> missingRows;
     var rateLimited = false;
+    var notSearched = <String>{};
     try {
       final firstPass = await _searchBatch(
         rows,
@@ -146,19 +147,31 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
       missingRows = firstPass.missing;
       rateLimited = firstPass.rateLimited;
 
-      // Retry misses once, unless the service is actively rate-limiting us.
+      // What YouTube Music did not find is looked for on YouTube: asking
+      // YouTube Music again would fail again. Not while YouTube is limiting
+      // this device.
       if (!rateLimited && missingRows.isNotEmpty) {
-        // Include the retry work in the progress total.
+        // Include this work in the progress total.
         if (mounted) setState(() => _totalCount += missingRows.length);
-        final retryPass = await _searchBatch(
-          missingRows,
-          onProgress: (n) {
-            if (mounted) setState(() => _processedCount += n);
+        final fallback = await searchOnYoutube(
+          [for (final row in missingRows) _asSong(row)],
+          held: {
+            for (final song in foundByIndex.values) song['ytid'].toString(),
+          },
+          onSearched: () {
+            if (mounted) setState(() => _processedCount++);
           },
         );
-        foundByIndex.addAll(retryPass.found);
-        missingRows = retryPass.missing;
-        rateLimited = retryPass.rateLimited;
+        notSearched = fallback.notSearched;
+        for (final row in missingRows) {
+          if (fallback.found['file:${row.index}'] case final song?) {
+            foundByIndex[row.index] = song;
+          }
+        }
+        missingRows = [
+          for (final row in missingRows)
+            if (!foundByIndex.containsKey(row.index)) row,
+        ];
       }
     } finally {
       _importRunning = false;
@@ -172,42 +185,28 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
     if (!mounted) return;
     final (_, playlistId) = createCustomPlaylist(playlistName, null, context);
     addSongsInCustomPlaylist(context, playlistId, foundSongs);
-    // Still busy while the songs that were left out are looked for again.
-    if (missingRows.isEmpty || rateLimited) {
-      setState(() => _isImporting = false);
-    }
+    setState(() => _isImporting = false);
 
-    // The songs no search found are looked for once more (a plain YouTube
-    // search after YouTube Music) and shown beside what was found, to be read,
-    // searched by hand, copied or left out. Not while YouTube is limiting this
-    // device: the other searches would be refused too.
+    // Only what both searches missed is left for the person: the playlist is
+    // made with what was found, then each of these can be searched by hand,
+    // copied or left out.
     var stillMissing = missingRows;
     var imported = foundSongs.length;
     if (missingRows.isNotEmpty && !rateLimited) {
-      if (mounted) setState(() => _totalCount += missingRows.length);
-      final plan = await planMissingSongs(
-        [
-          for (final row in missingRows)
-            {
-              'ytid': 'file:${row.index}',
-              'title': row.title,
-              'artist': row.artist,
-            },
-        ],
-        playlistId: playlistId,
-        held: songIdsOf([
-          {'list': foundSongs},
-        ]),
-        onSearched: () {
-          if (mounted) setState(() => _processedCount++);
-        },
-      );
-      if (!mounted) return;
-      setState(() => _isImporting = false);
       final picked = await Navigator.of(context).push<Map<String, Map>>(
         MaterialPageRoute(
-          builder: (_) =>
-              ReplaceReviewPage(kind: ReviewKind.missing, plan: plan),
+          builder: (_) => ReplaceReviewPage(
+            kind: ReviewKind.missing,
+            plan: ReplacementPlan(
+              songs: [for (final row in missingRows) _asSong(row)],
+              found: const {},
+              playlistIds: {playlistId},
+              held: songIdsOf([
+                {'list': foundSongs},
+              ]),
+              notSearched: notSearched,
+            ),
+          ),
         ),
       );
       if (picked != null && picked.isNotEmpty && mounted) {
@@ -242,6 +241,13 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
       showToast(context, resultText);
     }
   }
+
+  /// A row of the file as a song, the way the search and the review take it.
+  Map<String, dynamic> _asSong(_ImportRow row) => {
+    'ytid': 'file:${row.index}',
+    'title': row.title,
+    'artist': row.artist,
+  };
 
   /// Resolves [rows] in batches and stops when rate limiting is detected.
   /// Results are keyed by the rows' original positions for retry merging.

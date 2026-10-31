@@ -93,6 +93,19 @@ class ReplacementSearchFailed implements Exception {
 Future<Map<String, dynamic>?> findReplacementSong(
   Map song, {
   Set<String> exclude = const {},
+}) => _find(song, exclude, youtubeMusic: true);
+
+/// The same, with the plain YouTube search only: for what YouTube Music was
+/// already asked and did not find.
+Future<Map<String, dynamic>?> findOnYoutube(
+  Map song, {
+  Set<String> exclude = const {},
+}) => _find(song, exclude, youtubeMusic: false);
+
+Future<Map<String, dynamic>?> _find(
+  Map song,
+  Set<String> exclude, {
+  required bool youtubeMusic,
 }) async {
   final query = replacementQuery(song);
   if (query.isEmpty) return null;
@@ -101,23 +114,25 @@ Future<Map<String, dynamic>?> findReplacementSong(
       id != null && !skip.contains(id) && !unavailableSongs.contains(id);
   var searched = false;
 
-  try {
-    final video = await ytMusicClient.music.searchSong(
-      query,
-      expectedArtist: song['artist']?.toString(),
-      expectedTitle: song['title']?.toString(),
-    );
-    searched = true;
-    if (video != null && usable(video.id.value)) {
-      final candidate = returnSongLayout(0, video);
-      if (isSameRecording(song, candidate)) return candidate;
+  if (youtubeMusic) {
+    try {
+      final video = await ytMusicClient.music.searchSong(
+        query,
+        expectedArtist: song['artist']?.toString(),
+        expectedTitle: song['title']?.toString(),
+      );
+      searched = true;
+      if (video != null && usable(video.id.value)) {
+        final candidate = returnSongLayout(0, video);
+        if (isSameRecording(song, candidate)) return candidate;
+      }
+    } catch (e, stackTrace) {
+      logger.log(
+        'YouTube Music search for a replacement failed',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
-  } catch (e, stackTrace) {
-    logger.log(
-      'YouTube Music search for a replacement failed',
-      error: e,
-      stackTrace: stackTrace,
-    );
   }
 
   try {
@@ -142,6 +157,9 @@ Future<Map<String, dynamic>?> findReplacementSong(
 /// Where the replacements come from and how they are downloaded.
 @visibleForTesting
 var findReplacement = findReplacementSong;
+
+@visibleForTesting
+var findFallback = findOnYoutube;
 
 @visibleForTesting
 var downloadReplacement = makeSongOffline;
@@ -223,14 +241,13 @@ Future<ReplacementPlan> planReplacements(
   );
 }
 
-/// Looks for the songs an imported file left out, YouTube Music first and a
-/// plain YouTube search after (the import itself only asked YouTube Music).
-/// What it finds is a suggestion, to be read before it is added; a song whose
-/// search could not be made is told apart from one that found nothing.
-/// [held] are the songs the playlist already has. Nothing here throws.
-Future<ReplacementPlan> planMissingSongs(
+/// Looks on YouTube for the songs of an import that YouTube Music did not
+/// find (asking YouTube Music again would only fail again). A match must pass
+/// [isSameRecording]; the ones it finds are returned by the id of the song of
+/// the file, and a song whose search could not be made is told apart from
+/// one that found nothing. [held] are the songs the playlist already has.
+Future<({Map<String, Map> found, Set<String> notSearched})> searchOnYoutube(
   List<Map> songs, {
-  required String playlistId,
   Set<String> held = const {},
   VoidCallback? onSearched,
 }) async {
@@ -239,7 +256,7 @@ Future<ReplacementPlan> planMissingSongs(
   for (final song in songs) {
     final id = song['ytid'].toString();
     try {
-      final match = await findReplacement(
+      final match = await findFallback(
         song,
         exclude: {...held, for (final f in found.values) f['ytid'].toString()},
       );
@@ -249,13 +266,7 @@ Future<ReplacementPlan> planMissingSongs(
     }
     onSearched?.call();
   }
-  return ReplacementPlan(
-    songs: songs,
-    found: found,
-    playlistIds: {playlistId},
-    held: held,
-    notSearched: notSearched,
-  );
+  return (found: found, notSearched: notSearched);
 }
 
 /// Swaps in [plan]'s playlists the songs of [swaps] (the ytid to leave and

@@ -344,34 +344,48 @@ void main() {
   });
 
   group('songs an import left out', () {
-    test('are searched again and the matches kept as suggestions', () async {
-      findReplacement = (original, {Set<String> exclude = const {}}) async =>
-          original['ytid'] == 'file:1'
-          ? null
-          : original['ytid'] == 'file:2'
-          ? throw const ReplacementSearchFailed()
-          : {...original, 'ytid': 'found-${original['ytid']}'};
-      var searched = 0;
-      final plan = await planMissingSongs(
-        [song('file:0'), song('file:1'), song('file:2')],
-        playlistId: 'p',
-        held: {'already'},
-        onSearched: () => searched++,
-      );
-      expect(plan.found.keys, {'file:0'});
-      expect(plan.notSearched, {'file:2'});
-      expect(plan.held, {'already'});
-      expect(searched, 3);
-    });
+    tearDown(() => findFallback = findOnYoutube);
 
-    test('a suggestion is never one the playlist already has', () async {
-      Set<String>? excluded;
-      findReplacement = (original, {Set<String> exclude = const {}}) async {
-        excluded = exclude;
-        return null;
-      };
-      await planMissingSongs([song('file:0')], playlistId: 'p', held: {'kept'});
-      expect(excluded, contains('kept'));
+    test(
+      'are looked for on YouTube, and a failed search is told apart',
+      () async {
+        findFallback = (original, {Set<String> exclude = const {}}) async =>
+            original['ytid'] == 'file:1'
+            ? null
+            : original['ytid'] == 'file:2'
+            ? throw const ReplacementSearchFailed()
+            : {...original, 'ytid': 'found-${original['ytid']}'};
+        var searched = 0;
+        final result = await searchOnYoutube(
+          [song('file:0'), song('file:1'), song('file:2')],
+          held: {'already'},
+          onSearched: () => searched++,
+        );
+        expect(result.found.keys, {'file:0'});
+        expect(result.found['file:0']!['ytid'], 'found-file:0');
+        expect(result.notSearched, {'file:2'});
+        expect(searched, 3);
+      },
+    );
+
+    test(
+      'never match a song the playlist has or another one matched',
+      () async {
+        final asked = <Set<String>>[];
+        findFallback = (original, {Set<String> exclude = const {}}) async {
+          asked.add(exclude);
+          return {...original, 'ytid': 'same'};
+        };
+        await searchOnYoutube([song('file:0'), song('file:1')], held: {'kept'});
+        expect(asked.first, {'kept'});
+        // The second search leaves out what the first one matched.
+        expect(asked.last, {'kept', 'same'});
+      },
+    );
+
+    test('YouTube Music is not asked again: only the plain search runs', () {
+      // The seam of this stage is the plain search, not the two-stage one.
+      expect(identical(findFallback, findReplacement), isFalse);
     });
   });
 

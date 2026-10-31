@@ -113,9 +113,9 @@ New in Zenify:
   unavailable get their own section in the Downloads tab and a notice in the
   playlists you made. Replace searches for another upload (YouTube Music, then
   YouTube) and opens a screen that shows each song beside its replacement:
-  play it, refuse a match, search by hand, then cancel or accept. The songs a
-  Spotify import could not find open the same screen, with Copy, Cancel and
-  Finish.
+  play it, refuse a match, search by hand, then cancel or accept. A Spotify
+  import tries YouTube Music, then YouTube; only the songs both missed open a
+  similar screen, with a manual search, Copy, Cancel and Finish.
 - **Local Sync**: pair Android, Linux and Windows devices with a PIN and keep
   your liked songs, playlists, history, listening recap, searches and radio
   stations in sync over Wi-Fi. No account or server, encrypted, off by default.
