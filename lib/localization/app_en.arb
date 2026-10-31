@@ -116,6 +116,8 @@
   "downloadsFolderUnavailable": "{path} is unavailable, so new downloads go to the default location for now.",
   "downloadsRetry": "Retry",
   "downloadsRetryAll": "Retry all",
+  "downloadsRetrying": "{count, plural, =1{Retrying 1 download} other{Retrying {count} downloads}}",
+  "downloadsRetriedFailed": "{count, plural, =1{1 download failed again} other{{count} downloads failed again}}",
   "dynamicBackground": "Dynamic background",
   "dynamicBackgroundDescription": "Album colours softly paint the page background.",
   "dynamicColor": "Dynamic accent color (Android 12+)",
@@ -447,6 +449,20 @@
   "songsRemoved": "{count, plural, =1{1 song removed} other{{count} songs removed}}",
   "songsAddedToOffline": "{count, plural, =1{1 song is now available offline} other{{count} songs are now available offline}}",
   "removeSelectedSongsQuestion": "{count, plural, =1{Remove this song?} other{Remove these {count} songs?}}",
+  "@downloadsRetrying": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@downloadsRetriedFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "@songsMoved": {
     "placeholders": {
       "count": {

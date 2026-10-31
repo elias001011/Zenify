@@ -107,6 +107,23 @@ void main() {
     },
   );
 
+  testWidgets('every artwork fills its cell of the cover', (tester) async {
+    await tester.pumpWidget(
+      _app(
+        SizedBox.square(
+          dimension: 220,
+          child: PlaylistCube(_playlist(0, zenify: true)),
+        ),
+      ),
+    );
+    final sizes = {
+      for (final image in tester.widgetList<Image>(find.byType(Image)))
+        tester.getSize(find.byWidget(image)),
+    };
+    expect(sizes, {const Size(110, 110)});
+    await tester.pumpWidget(const SizedBox());
+  });
+
   testWidgets('desktop cover keeps its existing size and typography', (
     tester,
   ) async {

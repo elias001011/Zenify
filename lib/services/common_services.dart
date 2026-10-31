@@ -78,6 +78,27 @@ Set<String> _songIds(Iterable songs) =>
 
 final _cachedLikedSongIds = _createSongIdCache(userLikedSongsList);
 final _cachedOfflineSongIds = _createSongIdCache(userOfflineSongs);
+final _offlineArtworkPaths = <String, String>{};
+List? _offlineArtworkIndexedFrom;
+
+/// The downloaded cover of a downloaded song. A list keeps its own copy of
+/// a song, made before the download, so rows ask the download instead. The
+/// index is made on the first ask after the downloads change.
+String? offlineArtworkPath(Object? ytid) {
+  final songs = userOfflineSongs.value;
+  if (!identical(songs, _offlineArtworkIndexedFrom)) {
+    _offlineArtworkIndexedFrom = songs;
+    _offlineArtworkPaths.clear();
+    for (final song in songs.whereType<Map>()) {
+      final id = songYtid(song);
+      final path = song['artworkPath'];
+      if (id != null && path is String && path.isNotEmpty) {
+        _offlineArtworkPaths[id] = path;
+      }
+    }
+  }
+  return _offlineArtworkPaths[ytid];
+}
 
 var _songLikeUpdateToken = 0;
 final _latestSongLikeUpdateTokens = <String, int>{};
@@ -861,7 +882,19 @@ Future<String?> getSongLyrics(
   return result == null ? null : formatPlainLyrics(result);
 }
 
-Future<bool> makeSongOffline(dynamic song) async {
+final _downloadsInFlight = <String, Future<bool>>{};
+
+/// Downloads [song], once at a time per song: a playlist, a retry and the
+/// player asking for the same song share one download instead of writing
+/// the same file together.
+Future<bool> makeSongOffline(dynamic song) {
+  final ytid = song is Map ? songYtid(song) : null;
+  if (ytid == null) return _downloadSong(song);
+  return _downloadsInFlight[ytid] ??= _downloadSong(song)
+      .whenComplete(() => _downloadsInFlight.remove(ytid));
+}
+
+Future<bool> _downloadSong(dynamic song) async {
   DownloadEntry? download;
   try {
     final String? ytid = song['ytid'];

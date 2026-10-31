@@ -12,7 +12,6 @@ import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/utilities/flutter_bottom_sheet.dart';
 import 'package:musify/widgets/now_playing/lyrics_panel.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
@@ -287,7 +286,7 @@ void main() {
     await tester.pump(const Duration(seconds: 30));
   });
 
-  testWidgets('lyrics opened upright hide sideways and come back', (
+  testWidgets('lyrics stay open, beside playback, when the phone turns', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(420, 860);
@@ -317,7 +316,9 @@ void main() {
     for (var i = 0; i < 4; i++) {
       await tester.pump(const Duration(milliseconds: 250));
     }
-    expect(find.byType(LyricsPanel), findsNothing);
+    expect(find.byType(LyricsPanel), findsOneWidget);
+    expect(find.byType(NowPlayingArtwork), findsNothing);
+    expect(find.byType(BottomSheet), findsNothing);
     expect(tester.takeException(), isNull);
 
     tester.view.physicalSize = const Size(420, 860);
@@ -497,9 +498,9 @@ void main() {
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
-    expect(find.byType(BottomSheet), findsOneWidget);
+    expect(find.byType(LyricsPanel), findsOneWidget);
     expect(changes.last, isTrue);
-    closeCurrentBottomSheet();
+    await tester.tap(find.byTooltip('Lyrics'));
     for (var i = 0; i < 8; i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }

@@ -99,16 +99,16 @@ class _PlaylistPageState extends State<PlaylistPage> {
   /// Maximum recommendations rendered at once to bound artwork loads per frame.
   static const _visibleRecommendedSongsCount = 5;
 
+  /// The playlist as stored: its own order, never the sorted one on screen.
+  Map get _storedPlaylist => {..._playlist, 'list': _originalPlaylistList};
+
   String? get _resolvedPlaylistId =>
       _playlist?['ytid']?.toString() ??
       widget.playlistData?['ytid']?.toString() ??
       widget.playlistId;
 
-  // Sorting
-  late PlaylistSortType _sortType = PlaylistSortType.values.firstWhere(
-    (e) => e.name == playlistSortSetting,
-    orElse: () => PlaylistSortType.default_,
-  );
+  // Every playlist opens in its own order; a sort lasts until it is left.
+  var _sortType = PlaylistSortType.default_;
 
   bool _reorderEnabled = false;
   final _selection = SongSelectionController();
@@ -306,7 +306,9 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   const SliverMiniPlayerBottomSpace(),
                 ],
               )
-            : EmptyPlaylistState(message: context.l10n!.error),
+            : CustomScrollView(
+                slivers: [EmptyPlaylistState(message: context.l10n!.error)],
+              ),
       ),
     );
   }
@@ -481,12 +483,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
               setState(() {
                 _sortType = type;
                 if (type != PlaylistSortType.default_) _reorderEnabled = false;
-                addOrUpdateData<String>(
-                  'settings',
-                  'playlistSortType',
-                  type.name,
-                );
-                playlistSortSetting = type.name;
                 _applySort();
               });
             },
@@ -533,7 +529,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
       onPressed: () async {
         final result = await showDialog<Map?>(
           context: context,
-          builder: (context) => EditPlaylistDialog(playlistData: _playlist),
+          builder: (context) => EditPlaylistDialog(
+            // Its result is saved, so it must carry the stored order, never
+            // the sorted one on screen.
+            playlistData: _storedPlaylist,
+          ),
         );
 
         if (result != null) {
@@ -551,7 +551,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
             ...result,
             'ytid': resolvedPlaylistYtid,
             'source': _playlist['source'] ?? result['source'],
-            'list': result['list'] ?? _playlist['list'],
+            'list': result['list'] ?? _originalPlaylistList,
           };
 
           // Search root list first, then inside folders.
@@ -719,7 +719,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
   Future<void> _removeSongs(List<Map> songs) async {
     // One write for the whole selection, not one per song.
-    final playlist = {..._playlist, 'list': _originalPlaylistList};
+    final playlist = _storedPlaylist;
     final removed = removeSongsFromPlaylist(playlist, songs);
     if (removed > 0) {
       _originalPlaylistList = List<dynamic>.from(playlist['list'] as List);
@@ -755,7 +755,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
     if (canonicalIndex == -1) return;
 
     // Persist in canonical order, never the sorted view order.
-    final canonicalPlaylist = {..._playlist, 'list': _originalPlaylistList};
+    final canonicalPlaylist = _storedPlaylist;
     if (!removeSongFromPlaylist(
       canonicalPlaylist,
       song,

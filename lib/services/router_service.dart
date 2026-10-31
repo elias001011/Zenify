@@ -85,9 +85,7 @@ class NavigationManager {
         final isOffline = offlineMode.value;
         final currentPath = state.matchedLocation;
 
-        if (isOffline) {
-          if (_offlineFallback(state) case final fallback?) return fallback;
-        }
+        if (_offlineFallback(state) case final fallback?) return fallback;
 
         if (isOffline && currentPath.startsWith(timeMachinePath)) {
           // Redirect unavailable pages to home in offline mode
@@ -115,6 +113,7 @@ class NavigationManager {
   /// Where an online-only page leads offline: the start of its own tab, so
   /// a page left in another tab's stack never sends that tab elsewhere.
   String? _offlineFallback(GoRouterState state) {
+    if (!offlineMode.value) return null;
     final location = state.matchedLocation;
     if (location.endsWith('/moods-tuning') ||
         location.endsWith('/radioStations')) {
@@ -129,11 +128,9 @@ class NavigationManager {
   void _onOfflineModeChanged() {
     // A pushed page has its own state; the top-level redirect sees the
     // branch's base location when that stack is refreshed.
-    if (offlineMode.value &&
-        router.routerDelegate.currentConfiguration.isNotEmpty) {
-      if (_offlineFallback(router.state) case final fallback?) {
-        router.go(fallback);
-      }
+    if (router.routerDelegate.currentConfiguration.isEmpty) return;
+    if (_offlineFallback(router.state) case final fallback?) {
+      router.go(fallback);
     }
   }
 

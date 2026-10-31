@@ -69,7 +69,7 @@ void main() {
       {'ytid': 'a', 'title': 'Song A'},
     ];
     Widget actions(MediaItem item) =>
-        app(PlayerActions(metadata: item, panel: null, onPanel: (_, _) {}));
+        app(PlayerActions(metadata: item, panel: null, onPanel: (_) {}));
     await tester.pumpWidget(actions(songA));
     await tester.pump();
     expect(find.byIcon(FluentIcons.heart_24_filled), findsOneWidget);

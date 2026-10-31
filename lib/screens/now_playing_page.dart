@@ -26,7 +26,6 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/app_utils.dart';
-import 'package:musify/utilities/flutter_bottom_sheet.dart';
 import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/floating_surface.dart';
@@ -96,39 +95,13 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     super.dispose();
   }
 
-  /// [sheetContext] sits under the page's scaffold, which sheets open in.
-  void _onPanel(
-    PlayerPanel panel,
-    MediaItem metadata,
-    BuildContext sheetContext,
-  ) {
-    final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
-    if (layout.showsInline(panel)) {
+  void _onPanel(PlayerPanel panel) =>
       setState(() => _panel = _panel == panel ? null : panel);
-      return;
-    }
-    // Sideways lyrics still need more vertical space than the stage offers.
-    if (_panel case final open? when !layout.showsInline(open)) {
-      setState(() => _panel = null);
-    }
-    showCustomBottomSheet(
-      sheetContext,
-      SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.6,
-        child: LyricsPanel(metadata: metadata),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
-    // Back closes a panel only when the layout shows it.
-    final open = _panel;
-    final panelShown =
-        open != null &&
-        _PlayerLayout.of(MediaQuery.sizeOf(context)).showsInline(open);
     return PopScope(
-      canPop: !panelShown,
+      canPop: _panel == null,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) setState(() => _panel = null);
       },
@@ -143,16 +116,11 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
               return const Center(child: CircularProgressIndicator());
             }
             final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
-            // What shows depends on the layout now: a phone turned sideways
-            // with the lyrics open shows none, and gets them back upright.
-            final panel = _panel != null && layout.showsInline(_panel!)
-                ? _panel
-                : null;
+            final panel = _panel;
             final actions = PlayerActions(
               metadata: metadata,
               panel: panel,
-              onPanel: (panel, sheetContext) =>
-                  _onPanel(panel, metadata, sheetContext),
+              onPanel: _onPanel,
             );
             // Its own group: during the slide its surfaces sit over the shell's.
             return BackdropGroup(
@@ -197,7 +165,7 @@ enum _PlayerLayout {
   /// Upright phones: lyrics and queue take the artwork's place.
   upright,
 
-  /// Phones on their side: queue beside playback; lyrics open as a sheet.
+  /// Phones on their side: queue or lyrics beside playback.
   sideways;
 
   static _PlayerLayout of(Size size) => size.width >= 900 && size.height >= 560
@@ -205,9 +173,6 @@ enum _PlayerLayout {
       : size.height >= size.width
       ? upright
       : sideways;
-
-  bool showsInline(PlayerPanel panel) =>
-      this != sideways || panel == PlayerPanel.queue;
 }
 
 class _CloseButton extends StatelessWidget {
@@ -274,9 +239,13 @@ class _CompactLayout extends StatelessWidget {
               Expanded(
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 300),
-                  child: panel == PlayerPanel.queue
-                      ? const QueueWidget(embedded: true)
-                      : LayoutBuilder(builder: (context, c) => artwork(c, 1)),
+                  child: switch (panel) {
+                    PlayerPanel.queue => const QueueWidget(embedded: true),
+                    PlayerPanel.lyrics => LyricsPanel(metadata: metadata),
+                    null => LayoutBuilder(
+                      builder: (context, c) => artwork(c, 1),
+                    ),
+                  },
                 ),
               ),
               const SizedBox(width: 24),

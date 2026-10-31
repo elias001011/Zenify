@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
@@ -297,7 +296,7 @@ void main() {
           'title': 'Daily',
           'list': <Map>[],
           'language': languageSetting.languageCode,
-          'tuning': jsonEncode(moodsTuning.value.toStorage()),
+          'tuning': moodsTuning.value.discovery.name,
           'until': DateTime.now()
               .add(const Duration(days: 1))
               .toIso8601String(),

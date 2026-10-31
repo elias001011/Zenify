@@ -20,7 +20,6 @@
  */
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
@@ -112,7 +111,10 @@ class MoodsService {
     return _worker.run(_musicTask(task));
   }
 
-  String get _tuningSignature => jsonEncode(moodsTuning.value.toStorage());
+  /// What the cached playlists were made with. Blocked artists and left-out
+  /// genres are filtered when a playlist is read, so only the discovery
+  /// asks for a new one.
+  String get _tuningSignature => moodsTuning.value.discovery.name;
   Box get _cache => Hive.box('cache');
 
   /// The device's region, for regional moods, genres and charts.
@@ -587,6 +589,7 @@ class MoodsService {
 
   Set<String> _cachedExcludedArtists() {
     final tuning = moodsTuning.value;
+    if (tuning.excludedGenres.isEmpty) return tuning.blockedArtists;
     final cached = _cache.get(_genresKey);
     final genres = cached is Map ? _maps(cached['genres']) : const <Map>[];
     final out = <String>{};
@@ -780,9 +783,11 @@ class MoodsService {
 
   Map _playlistMap(Map stored) {
     final blocked = _cachedExcludedArtists();
-    final songs = _maps(stored['list'])
-        .where((song) => !blocked.contains(artistKey(song['artist'])))
-        .toList();
+    final songs = blocked.isEmpty
+        ? _maps(stored['list'])
+        : _maps(stored['list'])
+              .where((song) => !blocked.contains(artistKey(song['artist'])))
+              .toList();
     // Recap songs may carry an empty artwork.
     final covers = {
       for (final song in songs.take(12))

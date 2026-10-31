@@ -41,7 +41,6 @@ void main() {
   });
   setUp(() {
     offlineMode.value = true;
-    playlistSortSetting = 'default_';
     userCustomPlaylists.value = [playlist('source')];
     userPlaylistFolders.value = [
       {

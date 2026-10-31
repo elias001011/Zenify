@@ -19,6 +19,9 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:collection';
+import 'dart:math';
+
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
@@ -28,6 +31,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/download_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
+import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/section_header.dart';
@@ -90,9 +94,14 @@ class DownloadsPage extends StatelessWidget {
                                 l10n.downloadsFailed,
                                 FluentIcons.error_circle_24_filled,
                                 failed,
-                                action: TextButton(
-                                  onPressed: () => _retryAll(failed),
-                                  child: Text(l10n.downloadsRetryAll),
+                                action: ValueListenableBuilder<bool>(
+                                  valueListenable: _retryingAll,
+                                  builder: (context, retrying, _) => TextButton(
+                                    onPressed: retrying
+                                        ? null
+                                        : () => _retryAll(context, failed),
+                                    child: Text(l10n.downloadsRetryAll),
+                                  ),
                                 ),
                               ),
                               ..._section(
@@ -177,21 +186,35 @@ class DownloadsPage extends StatelessWidget {
   }
 }
 
-bool _retryingAll = false;
+final _retryingAll = ValueNotifier(false);
 
-/// One at a time, like a playlist download, however many failed.
-Future<void> _retryAll(List<DownloadEntry> failed) async {
-  if (_retryingAll) return;
-  _retryingAll = true;
+/// Failed downloads again, three at a time like a playlist download.
+Future<void> _retryAll(BuildContext context, List<DownloadEntry> failed) async {
+  if (_retryingAll.value) return;
+  final l10n = context.l10n!;
+  _retryingAll.value = true;
+  showToast(context, l10n.downloadsRetrying(failed.length));
+  final pending = Queue.of(failed);
+  var failedAgain = 0;
   try {
-    for (final entry in failed) {
-      // Skips songs retried on their own meanwhile (a new entry replaced it).
-      if (DownloadManager.instance.entries.value.contains(entry)) {
-        await makeSongOffline(entry.song);
-      }
-    }
+    await Future.wait([
+      for (var i = 0; i < min(3, failed.length); i++)
+        () async {
+          while (pending.isNotEmpty) {
+            final entry = pending.removeFirst();
+            // A song retried on its own meanwhile has a new entry.
+            if (!DownloadManager.instance.entries.value.contains(entry)) {
+              continue;
+            }
+            if (!await makeSongOffline(entry.song)) failedAgain++;
+          }
+        }(),
+    ]);
   } finally {
-    _retryingAll = false;
+    _retryingAll.value = false;
+  }
+  if (failedAgain > 0 && context.mounted) {
+    showToast(context, l10n.downloadsRetriedFailed(failedAgain));
   }
 }
 

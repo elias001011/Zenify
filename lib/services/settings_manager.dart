@@ -22,7 +22,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/screens/playlist_page.dart';
 import 'package:musify/screens/user_songs_page.dart';
 import 'package:musify/services/keyboard_shortcuts_manager.dart';
 import 'package:musify/utilities/language_utils.dart';
@@ -193,9 +192,6 @@ Locale languageSetting = getLocaleFromLanguageCode(
 int themeModeSetting =
     Hive.box('settings').get('themeIndex', defaultValue: 0) as int;
 
-String playlistSortSetting = Hive.box('settings')
-    .get('playlistSortType', defaultValue: PlaylistSortType.default_.name);
-
 String offlineSortSetting = Hive.box('settings')
     .get('offlineSortType', defaultValue: OfflineSortType.default_.name);
 
@@ -301,14 +297,6 @@ void reloadSettingsFromStorage() {
   final restoredLanguageCode = settings.get('languageCode', defaultValue: 'en');
   if (restoredLanguageCode is String) {
     languageSetting = getLocaleFromLanguageCode(restoredLanguageCode);
-  }
-
-  final restoredPlaylistSort = settings.get(
-    'playlistSortType',
-    defaultValue: PlaylistSortType.default_.name,
-  );
-  if (restoredPlaylistSort is String) {
-    playlistSortSetting = restoredPlaylistSort;
   }
 
   final restoredOfflineSort = settings.get(

@@ -560,6 +560,7 @@ class _SongBarState extends State<SongBar> {
         alignment: Alignment.center,
         children: [
           _ArtworkDisplay(
+            ytid: _ytid,
             lowResImageUrl: _lowResImageUrl,
             artworkPath: _artworkPath,
             size: size,
@@ -939,6 +940,7 @@ class _OnlineArtwork extends StatelessWidget {
 
 class _ArtworkDisplay extends StatelessWidget {
   const _ArtworkDisplay({
+    required this.ytid,
     required this.lowResImageUrl,
     required this.artworkPath,
     required this.size,
@@ -949,6 +951,7 @@ class _ArtworkDisplay extends StatelessWidget {
     required this.duration,
   });
 
+  final String ytid;
   final String lowResImageUrl;
   final String? artworkPath;
   final double size;
@@ -963,9 +966,10 @@ class _ArtworkDisplay extends StatelessWidget {
     return ValueListenableBuilder<bool>(
       valueListenable: offlineStatus,
       builder: (_, isOffline, __) {
-        if (isOffline && artworkPath != null) {
+        final path = isOffline ? offlineArtworkPath(ytid) ?? artworkPath : null;
+        if (path != null) {
           return _OfflineArtwork(
-            artworkPath: artworkPath!,
+            artworkPath: path,
             size: size,
             colorScheme: colorScheme,
           );

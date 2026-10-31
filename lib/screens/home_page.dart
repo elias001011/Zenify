@@ -58,14 +58,17 @@ class _HomePageState extends State<HomePage> {
   Stream<List<Map>>? _zenifyPlaylists;
   DateTime _zenifyLoadedAt = DateTime.now();
   late final AppLifecycleListener _lifecycle;
+  final _moodsInputs = Listenable.merge([
+    moodsEnabled,
+    offlineMode,
+    moodsTuning,
+  ]);
 
   @override
   void initState() {
     super.initState();
     _loadZenifyPlaylists();
-    moodsEnabled.addListener(_onMoodsToggled);
-    offlineMode.addListener(_onMoodsToggled);
-    moodsTuning.addListener(_onMoodsToggled);
+    _moodsInputs.addListener(_onMoodsToggled);
     _lifecycle = AppLifecycleListener(onResume: _refreshIfStale);
     _suggestedPlaylistsFuture = getPlaylists(
       playlistsNum: suggestedPlaylistsNumber,
@@ -77,18 +80,16 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     externalRecommendations.removeListener(_refreshRecommendedSongs);
-    moodsEnabled.removeListener(_onMoodsToggled);
-    offlineMode.removeListener(_onMoodsToggled);
-    moodsTuning.removeListener(_onMoodsToggled);
+    _moodsInputs.removeListener(_onMoodsToggled);
     _lifecycle.dispose();
     super.dispose();
   }
 
+  bool get _showsMoods => moodsEnabled.value && !offlineMode.value;
+
   void _loadZenifyPlaylists() {
     _zenifyLoadedAt = DateTime.now();
-    _zenifyPlaylists = moodsEnabled.value && !offlineMode.value
-        ? moodsService.playlists()
-        : null;
+    _zenifyPlaylists = _showsMoods ? moodsService.playlists() : null;
   }
 
   void _onMoodsToggled() {
@@ -101,9 +102,7 @@ class _HomePageState extends State<HomePage> {
     final now = DateTime.now();
     final crossedSlot =
         now.hour ~/ 4 != _zenifyLoadedAt.hour ~/ 4 ||
-        now.day != _zenifyLoadedAt.day ||
-        now.month != _zenifyLoadedAt.month ||
-        now.year != _zenifyLoadedAt.year;
+        !DateUtils.isSameDay(now, _zenifyLoadedAt);
     if (crossedSlot) _onMoodsToggled();
   }
 
@@ -150,7 +149,7 @@ class _HomePageState extends State<HomePage> {
             _buildSuggestedPlaylists(playlistHeight),
             _buildSuggestedPlaylists(playlistHeight, showOnlyLiked: true),
             _buildCurrentMonthRecapSection(),
-            if (moodsEnabled.value && !offlineMode.value) ...[
+            if (_showsMoods) ...[
               const MoodsRow(),
               _buildZenifyPlaylists(playlistHeight),
             ],

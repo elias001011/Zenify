@@ -28,6 +28,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
+import 'package:musify/services/common_services.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/no_artwork_cube.dart';
 
@@ -501,7 +502,8 @@ class _ArtworkThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final artworkPath = song['artworkPath'] as String?;
+    final artworkPath =
+        offlineArtworkPath(song['ytid']) ?? song['artworkPath'] as String?;
     if (artworkPath != null && artworkPath.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(radius),

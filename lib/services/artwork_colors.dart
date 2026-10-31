@@ -21,6 +21,7 @@
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -104,13 +105,8 @@ class ArtworkColors {
     for (var i = 0; i + 3 < pixels.length; i += 4) {
       if (pixels[i + 3] < 128) continue;
       final red = pixels[i], green = pixels[i + 1], blue = pixels[i + 2];
-      final high = red > green
-          ? (red > blue ? red : blue)
-          : (green > blue ? green : blue);
-      final low = red < green
-          ? (red < blue ? red : blue)
-          : (green < blue ? green : blue);
-      final delta = high - low;
+      final high = max(red, max(green, blue));
+      final delta = high - min(red, min(green, blue));
       // saturation² × value, without constructing an HSV object per pixel.
       final weight = (high == 0 ? 0 : delta * delta / (high * 255)) + 0.002;
       r += pixels[i] * weight;

@@ -41,8 +41,12 @@ class ZenifyCover extends StatelessWidget {
     ];
     final tile = covers.length >= 4 ? size / 2 : size;
 
+    // Sized outright: left to its own aspect, a wide thumbnail would stop
+    // short of its cell and show the background beside it.
     Widget art(String url) => Image(
       image: ArtworkProvider.thumbnail(url, tile, context),
+      width: tile,
+      height: tile,
       fit: BoxFit.cover,
       errorBuilder: (_, _, _) =>
           ColoredBox(color: theme.colorScheme.surfaceContainerHigh),

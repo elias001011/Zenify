@@ -98,6 +98,12 @@ class _LibraryPageState extends State<LibraryPage> {
     });
   }
 
+  /// A downloaded playlist the Library lists: Zenify's own are made online.
+  static bool _isOfflinePlaylist(Object? playlist) =>
+      playlist is Map &&
+      !PlaylistUtils.isArtistPlaylist(playlist) &&
+      !MoodsService.isZenifyPlaylist(playlist['ytid']);
+
   void _invalidateAddedPlaylists() {
     _addedPlaylists = null;
   }
@@ -150,12 +156,7 @@ class _LibraryPageState extends State<LibraryPage> {
           userPlaylists.value.isNotEmpty ||
           userCustomPlaylists.value.isNotEmpty;
       final hasOfflinePlaylists = offlinePlaylistService.offlinePlaylists.value
-          .any(
-            (p) =>
-                p is Map &&
-                !PlaylistUtils.isArtistPlaylist(p) &&
-                !MoodsService.isZenifyPlaylist(p['ytid']),
-          );
+          .any(_isOfflinePlaylist);
       final hasOfflineArtists = getLikedArtistItems(offlineOnly: true)
           .isNotEmpty;
       final hasOfflineSongs = userOfflineSongs.value.isNotEmpty;
@@ -324,12 +325,7 @@ class _LibraryPageState extends State<LibraryPage> {
 
     final rawOfflinePlaylists = offlinePlaylistService.offlinePlaylists.value;
     final visibleOfflinePlaylists = rawOfflinePlaylists
-        .where(
-          (p) =>
-              p is Map &&
-              !PlaylistUtils.isArtistPlaylist(p) &&
-              !MoodsService.isZenifyPlaylist(p['ytid']),
-        )
+        .where(_isOfflinePlaylist)
         .toList();
     final folders =
         (isOffline

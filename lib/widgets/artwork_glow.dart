@@ -71,10 +71,7 @@ class GlowColors {
         duration: const Duration(milliseconds: 1400),
       ) {
     _transition.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        _from = {};
-        _indices = _to.keys.toSet();
-      }
+      if (status == AnimationStatus.completed) _from = {};
     });
   }
 
@@ -87,10 +84,6 @@ class GlowColors {
   Color? _appColor;
   int _generation = 0;
   Timer? _flush;
-  Set<int> _indices = {};
-
-  /// Indices that have a glow now or are easing out of one.
-  Iterable<int> get indices => _indices;
 
   /// 0 to 1 while the glow first expands; painters fade it in with this.
   double get reveal => Curves.easeOutCubic.transform(_reveal.value);
@@ -181,11 +174,10 @@ class GlowColors {
       return;
     }
     _from = {
-      for (final i in indices)
+      for (final i in {..._from.keys, ..._to.keys})
         if (colorAt(i) case final color? when color.a > 0) i: color,
     };
     _to = next;
-    _indices = {..._from.keys, ..._to.keys};
     _transition.forward(from: 0);
     _maybeReveal();
   }
