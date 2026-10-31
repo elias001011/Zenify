@@ -54,7 +54,7 @@ Everything from Musify:
 - Online song search with suggestions
 - Offline listening support
 - Import & export your data and never lose it
-- Custom playlists from a link, and Spotify playlist import
+- Custom playlists from a link, and Spotify playlist import (the songs it could not find can be matched by hand)
 - Listening recaps
 - Radio stations
 - Synced lyrics
@@ -85,6 +85,9 @@ New in Zenify:
   Saved Zenify playlists and tuning travel with backups and Local Sync.
 - **Artist and playlist radios**: start a radio from an artist or playlist;
   YouTube Music supplies the queue, with the automatic picker as a fallback.
+  The automatic picker and the suggestions at the end of a playlist also ask
+  the YouTube Music radio first, and fall back to related videos when it has
+  nothing (offline, sounds, long mixes). Home's recommendations are unchanged.
 - **Multi-selection**: long-press a song to select several tracks in the order
   you tap them. Play next, add to the queue or another playlist, like, download
   or remove a batch. Custom playlists also support moving songs to another
@@ -101,16 +104,30 @@ New in Zenify:
   artists and songs, and the global search lists what you already have
   first. Both keep working offline.
 - **Top artists** in the listening recap, worked out from what you play.
-- **Download manager**: follow downloads in progress, see what failed and why,
-  and retry.
+- **Download manager**: every download goes through one queue, three at a
+  time, and a song is never downloaded twice at once. Follow what waits, what
+  is downloading and what failed and why, retry one or all, and get a single
+  message at the end with what failed. A download is only cut when no data
+  arrives for a minute, so very long videos can finish.
+- **Unavailable songs and replacing them**: songs YouTube reports as
+  unavailable get their own section in the Downloads tab and a notice in the
+  playlists you made. Replace searches for another upload (YouTube Music, then
+  YouTube) and opens a screen that shows each song beside its replacement:
+  play it, refuse a match, search by hand, then cancel or accept. The songs a
+  Spotify import could not find open the same screen, with Copy, Cancel and
+  Finish.
 - **Local Sync**: pair Android, Linux and Windows devices with a PIN and keep
   your liked songs, playlists, history, listening recap, searches and radio
   stations in sync over Wi-Fi. No account or server, encrypted, off by default.
+  An always-on computer or server on your network can take part too with the
+  screenless [sync peer](tools/sync_peer/README.md), so a phone and a computer
+  that are never on together keep the same library.
 - **Desktop settings**: interface scale that zooms the whole app, start
   maximized, a title bar in the app colors and a compact player layout.
 - **Keyboard shortcuts** for playback and navigation, all of them remappable.
 - **Downloads folder** of your choice on desktop.
-- **Built-in updater** for Android, Linux and Windows.
+- **Built-in updater** for Android, Linux and Windows. Update checks are on
+  by default and can be turned off in Settings.
 
 New features are translated into English and Portuguese for now.
 
@@ -166,6 +183,9 @@ Get the files for your platform from the
 
 Every release includes `SHA256SUMS.txt` to verify the files. iOS is not
 supported.
+
+Releases marked as pre-release are for trying new things: the app's updater
+never offers them, so install them by hand.
 
 ---
 
