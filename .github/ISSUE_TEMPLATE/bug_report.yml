@@ -48,6 +48,7 @@ body:
       required: false
 
   - type: input
+    id: zenify-version
     attributes:
       label: Zenify Version
       description: Mention the version of Zenify in which you encountered this bug.

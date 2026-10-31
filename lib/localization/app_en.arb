@@ -457,6 +457,8 @@
   "topSongs": "Top songs",
   "translate": "Translate",
   "translateDescription": "Help translate Zenify by editing the translation files. Tap for files and contribution instructions.",
+  "reportBug": "Report a bug",
+  "reportBugDescription": "Opens a new issue on Zenify's GitHub with the version filled in.",
   "understand": "I understand",
   "undo": "Undo",
   "unpinFromLibrary": "Unpin from library",

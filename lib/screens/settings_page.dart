@@ -41,6 +41,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/update_manager.dart';
 import 'package:musify/theme/app_colors.dart';
 import 'package:musify/theme/app_themes.dart';
+import 'package:musify/utilities/bug_report.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/language_utils.dart';
@@ -553,6 +554,12 @@ class SettingsPage extends StatelessWidget {
               'https://github.com/elias001011/Zenify/blob/master/CONTRIBUTING.md',
             ),
           ),
+        ),
+        CustomBar(
+          context.l10n!.reportBug,
+          FluentIcons.bug_24_regular,
+          description: context.l10n!.reportBugDescription,
+          onTap: () => launchURL(bugReportUri()),
         ),
         ValueListenableBuilder<int>(
           valueListenable: logger.logCount,
