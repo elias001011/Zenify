@@ -34,6 +34,7 @@ final _changes = Listenable.merge([
   offlineMode,
   userOfflineSongs,
   DownloadManager.instance.idle,
+  replacing,
 ]);
 
 /// Tells, once a playlist's download is over, that some songs of it failed as
@@ -45,12 +46,17 @@ class UnavailableNotice extends StatelessWidget {
     super.key,
     required this.playlistId,
     required this.songs,
-    this.replace = replaceUnavailableSongs,
+    this.replace = reviewAndReplace,
   });
 
   final String playlistId;
   final List songs;
-  final Future<int> Function(List<Map> songs, {String? playlistId}) replace;
+  final Future<int?> Function(
+    BuildContext context,
+    List<Map> songs, {
+    String? playlistId,
+  })
+  replace;
 
   List<Map> get _affected {
     final dismissed = unavailableSongs.dismissed(playlistId);
@@ -70,7 +76,8 @@ class UnavailableNotice extends StatelessWidget {
       builder: (context, _) {
         // Only once every download is over: a song of this playlist may be
         // queued by another one, and may still fail.
-        if (offlineMode.value || !DownloadManager.instance.idle.value) {
+        if (offlineMode.value ||
+            !(DownloadManager.instance.idle.value || replacing.value)) {
           return const SizedBox.shrink();
         }
         final affected = _affected;

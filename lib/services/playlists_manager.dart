@@ -519,7 +519,7 @@ Set<String> replaceSongsInPlaylist(
   for (final song in songs) {
     final id = song['ytid']?.toString();
     final replacement = replacements[id];
-    if (replacement == null) {
+    if (replacement == null || replacement['ytid']?.toString() == id) {
       result.add(song);
       continue;
     }

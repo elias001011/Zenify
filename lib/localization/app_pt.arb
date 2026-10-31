@@ -119,6 +119,16 @@
   "replaceUnavailable": "Substituir",
   "songsReplaced": "{count, plural, =1{1 música substituída} other{{count} músicas substituídas}}",
   "replaceNoConnection": "Não deu para buscar substitutas. Verifique a conexão e tente de novo",
+  "replaceReviewTitle": "Revisar substituições",
+  "replaceReviewOld": "Indisponível",
+  "replaceReviewNew": "Substituta",
+  "replaceChosenByYou": "Escolhida por você",
+  "replaceSearchManually": "Buscar manualmente",
+  "replaceManualHint": "Busque a música",
+  "replaceSwapAction": "{count, plural, =1{Substituir 1 música} other{Substituir {count} músicas}}",
+  "replaceKeepAsIs": "Não substituir",
+  "replaceNotReplaced": "Não será substituída",
+  "replaceSearchFailed": "A busca falhou. Tente à mão",
   "noReplacementFound": "Nenhuma substituição encontrada",
   "downloadsRetrying": "{count, plural, =1{Tentando baixar 1 música de novo} other{Tentando baixar {count} músicas de novo}}",
   "dynamicBackground": "Fundo dinâmico",
@@ -478,6 +488,13 @@
         "type": "int"
       },
       "unavailable": {
+        "type": "int"
+      }
+    }
+  },
+  "@replaceSwapAction": {
+    "placeholders": {
+      "count": {
         "type": "int"
       }
     }

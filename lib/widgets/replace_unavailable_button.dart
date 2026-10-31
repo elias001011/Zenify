@@ -21,19 +21,44 @@
 
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/screens/replace_review_page.dart';
 import 'package:musify/services/song_replacement.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 
-/// Swaps unavailable [songs] for other uploads and downloads those (see
-/// [replaceUnavailableSongs]). The same button in a playlist's notice, with
+/// Searches replacements for unavailable [songs], shows them to be checked,
+/// and swaps and downloads those the person accepts (see [reviewAndReplace]). The same button in a playlist's notice, with
 /// its [playlistId], and in the Downloads tab, for every playlist.
+/// Searches, shows what was found for the person to check, and swaps what is
+/// accepted. Null when the person backed out; throws
+/// [ReplacementSearchFailed] when no search could be made.
+Future<int?> reviewAndReplace(
+  BuildContext context,
+  List<Map> songs, {
+  String? playlistId,
+}) async {
+  if (replacing.value) return null;
+  replacing.value = true;
+  try {
+    final plan = await planReplacements(songs, playlistId: playlistId);
+    // Nothing held, or flagged: nothing to show.
+    if (plan.songs.isEmpty) return 0;
+    if (!context.mounted) return null;
+    final swaps = await Navigator.of(context).push<Map<String, Map>>(
+      MaterialPageRoute(builder: (_) => ReplaceReviewPage(plan: plan)),
+    );
+    return swaps == null ? null : await applyReplacements(plan, swaps);
+  } finally {
+    replacing.value = false;
+  }
+}
+
 class ReplaceUnavailableButton extends StatefulWidget {
   const ReplaceUnavailableButton({
     super.key,
     required this.songs,
     this.playlistId,
     this.filled = true,
-    this.replace = replaceUnavailableSongs,
+    this.replace = reviewAndReplace,
   });
 
   final List<Map> songs;
@@ -41,8 +66,14 @@ class ReplaceUnavailableButton extends StatefulWidget {
 
   final bool filled;
 
-  /// What does the swap; a stand-in lets tests leave storage alone.
-  final Future<int> Function(List<Map> songs, {String? playlistId}) replace;
+  /// What does the swap: null when the person backed out. A stand-in lets
+  /// tests leave storage alone.
+  final Future<int?> Function(
+    BuildContext context,
+    List<Map> songs, {
+    String? playlistId,
+  })
+  replace;
 
   @override
   State<ReplaceUnavailableButton> createState() =>
@@ -58,9 +89,11 @@ class _ReplaceUnavailableButtonState extends State<ReplaceUnavailableButton> {
     String message;
     try {
       final replaced = await widget.replace(
+        context,
         widget.songs,
         playlistId: widget.playlistId,
       );
+      if (replaced == null) return;
       message = replaced > 0
           ? l10n.songsReplaced(replaced)
           : l10n.noReplacementFound;

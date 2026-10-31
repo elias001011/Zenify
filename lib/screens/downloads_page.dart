@@ -28,6 +28,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/song_replacement.dart';
 import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
@@ -123,10 +124,14 @@ class DownloadsPage extends StatelessWidget {
                                 unavailable,
                                 // Once every download is over, one swap
                                 // covers every playlist.
-                                action: ValueListenableBuilder<bool>(
-                                  valueListenable: manager.idle,
-                                  builder: (context, idle, _) {
-                                    final songs = idle
+                                action: ListenableBuilder(
+                                  listenable: Listenable.merge([
+                                    manager.idle,
+                                    replacing,
+                                  ]),
+                                  builder: (context, _) {
+                                    final songs =
+                                        manager.idle.value || replacing.value
                                         ? _inPlaylists(unavailable)
                                         : const <Map>[];
                                     return songs.isEmpty

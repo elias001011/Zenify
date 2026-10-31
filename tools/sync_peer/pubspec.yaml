@@ -1,0 +1,12 @@
+# The name is the app's, so the shared sync code imports the same paths.
+name: musify
+description: A Zenify device with no screen, only to keep the synced library on a server.
+publish_to: none
+
+environment:
+  sdk: '>=3.13.0 <4.0.0'
+
+dependencies:
+  crypto: ^3.0.7
+  cryptography: ^2.9.0
+  dsrp: ^0.5.5

@@ -14,6 +14,12 @@ import 'package:musify/utilities/formatter.dart';
 import 'package:musify/widgets/playlist_page/unavailable_notice.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+/// Searches and swaps everything found, as accepting the review does.
+Future<int> swap(Iterable<Map> songs, {String? playlistId}) async {
+  final plan = await planReplacements(songs, playlistId: playlistId);
+  return applyReplacements(plan, plan.found);
+}
+
 Map song(String id) => {'ytid': id, 'title': 'Track $id', 'artist': 'Artist'};
 
 void main() {
@@ -120,7 +126,7 @@ void main() {
         );
         expect(unavailableSongs.contains('b'), isTrue);
 
-        final replaced = await replaceUnavailableSongs([song('b')]);
+        final replaced = await swap([song('b')]);
 
         expect(replaced, 1);
         expect(idsIn(one), ['a', 'new-b']);
@@ -144,10 +150,7 @@ void main() {
         userCustomPlaylists.value = [one, two];
         unavailableSongs.markUnavailable('b');
 
-        expect(
-          await replaceUnavailableSongs([song('b')], playlistId: 'one'),
-          1,
-        );
+        expect(await swap([song('b')], playlistId: 'one'), 1);
 
         expect(idsIn(one), ['a', 'new-b']);
         expect(idsIn(two), ['b']);
@@ -161,7 +164,7 @@ void main() {
       findReplacement = (song, {Set<String> exclude = const {}}) async => null;
       unavailableSongs.markUnavailable('b');
 
-      expect(await replaceUnavailableSongs([song('b'), song('x')]), 0);
+      expect(await swap([song('b'), song('x')]), 0);
 
       expect(idsIn(one), ['a', 'b']);
       expect(unavailableSongs.contains('b'), isTrue);
@@ -186,7 +189,7 @@ void main() {
         playlist('p', ['a', 'b']),
       ];
       // Never flagged, or flagged and then cleared by a download.
-      expect(await replaceUnavailableSongs([song('b')]), 0);
+      expect(await swap([song('b')]), 0);
       expect(idsIn(userCustomPlaylists.value.single), ['a', 'b']);
       expect(downloaded, isEmpty);
     });
@@ -203,7 +206,7 @@ void main() {
           return {...original, 'ytid': 'new-b'};
         };
 
-        expect(await replaceUnavailableSongs([song('b')]), 0);
+        expect(await swap([song('b')]), 0);
         expect(idsIn(mine), ['a']);
         expect(downloaded, isEmpty);
         expect(unavailableSongs.contains('b'), isTrue);
@@ -223,7 +226,7 @@ void main() {
         return {...original, 'ytid': 'new-b'};
       };
 
-      expect(await replaceUnavailableSongs([song('b')]), 1);
+      expect(await swap([song('b')]), 1);
       expect(idsIn(userCustomPlaylists.value.single), ['a', 'new-b', 'c']);
     });
 
@@ -237,7 +240,7 @@ void main() {
         return {...original, 'ytid': 'new-b'};
       };
 
-      expect(await replaceUnavailableSongs([song('b')]), 0);
+      expect(await swap([song('b')]), 0);
       expect(idsIn(userCustomPlaylists.value.single), ['a', 'b']);
       expect(downloaded, isEmpty);
     });
@@ -253,7 +256,7 @@ void main() {
           throw const ReplacementSearchFailed();
 
       await expectLater(
-        replaceUnavailableSongs([song('b'), song('c')]),
+        swap([song('b'), song('c')]),
         throwsA(isA<ReplacementSearchFailed>()),
       );
       expect(idsIn(userCustomPlaylists.value.single), ['a', 'b', 'c']);
@@ -264,7 +267,44 @@ void main() {
           original['ytid'] == 'b'
           ? throw const ReplacementSearchFailed()
           : null;
-      expect(await replaceUnavailableSongs([song('b'), song('c')]), 0);
+      expect(await swap([song('b'), song('c')]), 0);
+    });
+
+    test('a song is never swapped for itself', () async {
+      userCustomPlaylists.value = [
+        playlist('p', ['a', 'b']),
+      ];
+      unavailableSongs.markUnavailable('b');
+      final plan = await planReplacements([song('b')]);
+      expect(await applyReplacements(plan, {'b': song('b')}), 0);
+      expect(idsIn(userCustomPlaylists.value.single), ['a', 'b']);
+    });
+
+    test('a song kept twice is searched once', () async {
+      userCustomPlaylists.value = [
+        playlist('p', ['a', 'b']),
+        playlist('q', ['b']),
+      ];
+      unavailableSongs.markUnavailable('b');
+      final plan = await planReplacements([song('b'), song('b')]);
+      expect(plan.songs, hasLength(1));
+    });
+
+    test('songs whose search could not be made are told apart', () async {
+      userCustomPlaylists.value = [
+        playlist('p', ['a', 'b', 'c']),
+      ];
+      unavailableSongs
+        ..markUnavailable('b')
+        ..markUnavailable('c');
+      findReplacement = (original, {Set<String> exclude = const {}}) async =>
+          original['ytid'] == 'b'
+          ? throw const ReplacementSearchFailed()
+          : {...original, 'ytid': 'new-c'};
+      final plan = await planReplacements([song('b'), song('c')]);
+      expect(plan.notSearched, {'b'});
+      expect(plan.found.keys, {'c'});
+      expect(plan.held, {'a', 'b', 'c'});
     });
 
     test('asking twice swaps once', () async {
@@ -273,8 +313,8 @@ void main() {
       ];
       unavailableSongs.markUnavailable('b');
       final both = await Future.wait([
-        replaceUnavailableSongs([song('b')]),
-        replaceUnavailableSongs([song('b')]),
+        swap([song('b')]),
+        swap([song('b')]),
       ]);
       expect(both.reduce((a, b) => a + b), 1);
       expect(downloaded, ['new-b']);
@@ -288,7 +328,7 @@ void main() {
       addTearDown(() => userLikedSongsList.value = []);
       unavailableSongs.markUnavailable('b');
 
-      expect(await replaceUnavailableSongs([song('b')]), 1);
+      expect(await swap([song('b')]), 1);
       expect(unavailableSongs.contains('b'), isTrue);
     });
 
@@ -298,7 +338,7 @@ void main() {
       ];
       unavailableSongs.markUnavailable('b');
       final before = replacedSongs.value;
-      await replaceUnavailableSongs([song('b')]);
+      await swap([song('b')]);
       expect(replacedSongs.value, before + 1);
     });
   });
@@ -332,7 +372,7 @@ void main() {
     UnavailableNotice notice() => UnavailableNotice(
       playlistId: 'p',
       songs: [song('a'), song('b'), song('c')],
-      replace: (songs, {playlistId}) async {
+      replace: (context, songs, {playlistId}) async {
         swaps.add(([for (final s in songs) s['ytid'] as String], playlistId));
         return songs.length;
       },
@@ -366,7 +406,7 @@ void main() {
           UnavailableNotice(
             playlistId: 'p',
             songs: [song('a'), song('b')],
-            replace: (songs, {playlistId}) async =>
+            replace: (context, songs, {playlistId}) async =>
                 throw const ReplacementSearchFailed(),
           ),
         ),

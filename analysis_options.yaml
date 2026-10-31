@@ -2,6 +2,7 @@ analyzer:
   exclude:
     - packages/**
     - scripts/**
+    - tools/**
     - test/_scratch/**
     - build/**
     - android/**

@@ -120,7 +120,7 @@ class DownloadManager {
   var persist = true;
 
   Timer? _idleTimer;
-  var _openRuns = 0;
+  final _runs = <DownloadRun>{};
   var _batchFailed = 0;
   var _batchUnavailable = 0;
   var _batches = 0;
@@ -238,24 +238,24 @@ class DownloadManager {
   /// is queued or downloading. Downloads that no run holds (a single song)
   /// are grouped by the margin alone.
   DownloadRun openRun() {
-    _openRuns++;
+    final run = DownloadRun._(this);
+    _runs.add(run);
     _idleTimer?.cancel();
     idle.value = false;
-    return DownloadRun._(this);
+    return run;
   }
 
-  void _closeRun() {
-    _openRuns--;
-    _checkIdle();
+  void _closeRun(DownloadRun run) {
+    if (_runs.remove(run)) _checkIdle();
   }
 
   /// Starts the wait that ends in [idle] and the [batch] notice, if nothing
   /// is left to do.
   void _checkIdle() {
-    if (_openRuns > 0 || entries.value.any(_isActive)) return;
+    if (_runs.isNotEmpty || entries.value.any(_isActive)) return;
     _idleTimer?.cancel();
     _idleTimer = Timer(idleMargin, () {
-      if (_openRuns > 0 || entries.value.any(_isActive)) return;
+      if (_runs.isNotEmpty || entries.value.any(_isActive)) return;
       idle.value = true;
       if (_batchFailed > 0) {
         batch.value = (
@@ -317,7 +317,7 @@ class DownloadManager {
   @visibleForTesting
   void reset() {
     _idleTimer?.cancel();
-    _openRuns = 0;
+    _runs.clear();
     entries.value = [];
     idle.value = true;
     batch.value = null;
@@ -367,14 +367,9 @@ final class DownloadRun {
   DownloadRun._(this._manager);
 
   final DownloadManager _manager;
-  var _open = true;
 
   /// Ends the run; closing it again does nothing.
-  void close() {
-    if (!_open) return;
-    _open = false;
-    _manager._closeRun();
-  }
+  void close() => _manager._closeRun(this);
 }
 
 /// How many songs failed in a run of downloads, and how many of those are

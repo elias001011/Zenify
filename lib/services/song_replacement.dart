@@ -149,17 +149,38 @@ var downloadReplacement = makeSongOffline;
 /// Tells the playlist pages that are open that songs were swapped in storage.
 final replacedSongs = ValueNotifier<int>(0);
 
-/// Swaps [songs], unavailable on YouTube, for other uploads in the
-/// playlists you made, and starts downloading the replacements. Every
-/// playlist that holds a song gets the same replacement, unless [playlistId]
-/// limits it to one. A song nothing is found for stays where it is, and so
-/// does one that plays after all.
-///
-/// A song no playlist or liked list of yours holds any more is no longer
-/// unavailable for the app: it leaves the record and the Downloads tab,
-/// wherever the swap was asked. Returns how many songs were swapped; throws
+/// What a swap would do, for the person to see before it is made: the
+/// unavailable [songs] searched for, what was [found] for each (by the
+/// ytid of the song to leave) and the playlists it would touch.
+class ReplacementPlan {
+  const ReplacementPlan({
+    required this.songs,
+    required this.found,
+    required this.playlistIds,
+    this.held = const {},
+    this.notSearched = const {},
+  });
+
+  final List<Map> songs;
+  final Map<String, Map> found;
+  final Set<String> playlistIds;
+
+  /// Every song those playlists hold: none of them is a replacement.
+  final Set<String> held;
+
+  /// Songs whose search could not be made, as opposed to finding nothing.
+  final Set<String> notSearched;
+}
+
+/// Whether a replacement search or its review is under way: the button that
+/// started it must outlive the downloads that begin meanwhile.
+final replacing = ValueNotifier<bool>(false);
+
+/// Searches replacements for [songs], unavailable on YouTube, among those a
+/// playlist you made holds (only [playlistId] when given) and still flagged.
+/// Nothing is changed: see [applyReplacements]. Throws
 /// [ReplacementSearchFailed] when no search could be made.
-Future<int> replaceUnavailableSongs(
+Future<ReplacementPlan> planReplacements(
   Iterable<Map> songs, {
   String? playlistId,
 }) async {
@@ -170,12 +191,15 @@ Future<int> replaceUnavailableSongs(
   ];
   final taken = songIdsOf(playlists);
 
+  final searched = <Map>[];
   final found = <String, Map>{};
-  var searches = 0, failedSearches = 0;
+  final notSearched = <String>{};
   for (final song in songs) {
     final id = song['ytid'].toString();
     if (!taken.contains(id) || !unavailableSongs.contains(id)) continue;
-    searches++;
+    // A song kept twice is searched, and listed, once.
+    if (searched.any((s) => s['ytid'].toString() == id)) continue;
+    searched.add(song);
     try {
       final replacement = await findReplacement(
         song,
@@ -183,29 +207,51 @@ Future<int> replaceUnavailableSongs(
       );
       if (replacement != null) found[id] = replacement;
     } on ReplacementSearchFailed {
-      failedSearches++;
+      notSearched.add(id);
     }
   }
   // Every search failed: there is no telling whether replacements exist.
-  if (searches > 0 && failedSearches == searches) {
+  if (searched.isNotEmpty && notSearched.length == searched.length) {
     throw const ReplacementSearchFailed();
   }
+  return ReplacementPlan(
+    songs: searched,
+    found: found,
+    playlistIds: {for (final p in playlists) p['ytid'].toString()},
+    held: taken,
+    notSearched: notSearched,
+  );
+}
 
-  // The searching took a while: a song may have played since, and the
-  // playlists may have been edited, which replaces their maps. What is
-  // swapped is read again now, and only then.
-  final swaps = {
-    for (final entry in found.entries)
-      if (unavailableSongs.contains(entry.key)) entry.key: entry.value,
+/// Swaps in [plan]'s playlists the songs of [swaps] (the ytid to leave and
+/// the song to take its place) and starts downloading the replacements.
+/// Every playlist that holds a song gets the same replacement. A song that
+/// plays after all stays.
+///
+/// A song no playlist or liked list of yours holds any more is no longer
+/// unavailable for the app: it leaves the record and the Downloads tab,
+/// wherever the swap was asked. Returns how many songs were swapped.
+Future<int> applyReplacements(
+  ReplacementPlan plan,
+  Map<String, Map> swaps,
+) async {
+  // The searching, and the person's reading, took a while: a song may have
+  // played since, and the playlists may have been edited, which replaces
+  // their maps. What is swapped is read again now, and only then.
+  final live = {
+    for (final entry in swaps.entries)
+      // Never a song for itself: it would only remove it.
+      if (unavailableSongs.contains(entry.key) &&
+          entry.value['ytid'].toString() != entry.key)
+        entry.key: entry.value,
   };
-  final scope = {for (final playlist in playlists) playlist['ytid'].toString()};
   final applied = <String>{};
   for (final playlist in getUserCustomPlaylists()) {
-    if (!scope.contains(playlist['ytid'].toString())) continue;
+    if (!plan.playlistIds.contains(playlist['ytid'].toString())) continue;
     final here = songIdsOf([playlist]);
     applied.addAll(
       replaceSongsInPlaylist(playlist, {
-        for (final entry in swaps.entries)
+        for (final entry in live.entries)
           if (here.contains(entry.key)) entry.key: entry.value,
       }),
     );
@@ -224,9 +270,15 @@ Future<int> replaceUnavailableSongs(
 
   final run = DownloadManager.instance.openRun();
   unawaited(
-    Future.wait([for (final id in applied) downloadReplacement(swaps[id])])
-        .whenComplete(run.close),
+    Future.wait([
+      for (final id in applied)
+        Future.sync(() => downloadReplacement(live[id])),
+    ]).then<void>((_) {}, onError: (Object _) {}).whenComplete(run.close),
   );
   replacedSongs.value++;
   return applied.length;
 }
+
+/// Songs for [query], for choosing a replacement by hand.
+Future<List<Map>> searchReplacementCandidates(String query) async =>
+    (await fetchSongsList(query)).whereType<Map>().toList();
