@@ -2,8 +2,6 @@ name: Validate Windows package
 
 on:
   workflow_dispatch:
-  push:
-    branches: [Dev]
 
 concurrency:
   group: windows-validation-${{ github.ref }}

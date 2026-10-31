@@ -8,11 +8,68 @@ A calm, modern music app: the community edition of
 Musify, with first-class desktop support,
 a redesigned interface and syncing between your devices.
 
-[![GitHub release](https://img.shields.io/github/v/release/elias001011/Zenify?color=2196F3)](https://github.com/elias001011/Zenify/releases)
+[![Download Zenify](https://img.shields.io/badge/Download-Zenify-2196F3?style=for-the-badge&logo=github&logoColor=white)](https://github.com/elias001011/Zenify/releases/latest)
+
+[![GitHub release](https://img.shields.io/github/v/release/elias001011/Zenify?color=2196F3)](https://github.com/elias001011/Zenify/releases/latest)
+[![Downloads, all versions](https://img.shields.io/github/downloads/elias001011/Zenify/total?color=2196F3&label=downloads)](https://github.com/elias001011/Zenify/releases)
 [![License](https://img.shields.io/github/license/elias001011/Zenify?color=2196F3)](LICENSE)
 [![Desktop features from Musify Desktop Port](https://img.shields.io/badge/desktop%20features-Musify%20Desktop%20Port-2196F3)](https://github.com/elias001011/Musify-Desktop-Port)
 
+**Android** · **Linux** · **Windows**
+
 </div>
+
+---
+
+## Download
+
+| Platform | File | Notes |
+|---|---|---|
+| Android | [`Zenify-arm64-v8a.apk`](https://github.com/elias001011/Zenify/releases/latest/download/Zenify-arm64-v8a.apk) | Most phones. [`Zenify.apk`](https://github.com/elias001011/Zenify/releases/latest/download/Zenify.apk) works on every device. |
+| Linux (Debian, Ubuntu) | [`Zenify-linux-x64.deb`](https://github.com/elias001011/Zenify/releases/latest/download/Zenify-linux-x64.deb) | Installs `libmpv` for you. |
+| Linux (other) | [`Zenify-linux-x64.tar.gz`](https://github.com/elias001011/Zenify/releases/latest/download/Zenify-linux-x64.tar.gz) | Needs `libmpv`; run `install-linux-desktop.sh` to add it to your menu. |
+| Windows | [`Zenify-windows-x64-setup.exe`](https://github.com/elias001011/Zenify/releases/latest/download/Zenify-windows-x64-setup.exe) | Lets you choose where data and downloads go. |
+| Windows (portable) | [`Zenify-windows-x64-portable.zip`](https://github.com/elias001011/Zenify/releases/latest/download/Zenify-windows-x64-portable.zip) | No installation. |
+
+Every release includes `SHA256SUMS.txt` to verify the files. iOS is not
+supported. All releases, with their notes, are on the
+[releases page](https://github.com/elias001011/Zenify/releases).
+
+Releases marked as pre-release are for trying new things: the app's updater
+never offers them, so install them by hand.
+
+---
+
+## Screenshots
+
+Taken from the app itself, running on Linux, with a real library.
+
+![Zenify home on a desktop](assets/screenshots/desktop-home.jpg)
+
+| Player with synced lyrics | Playlist |
+|---|---|
+| ![Zenify player with synced lyrics](assets/screenshots/desktop-player-lyrics.jpg) | ![Zenify playlist](assets/screenshots/desktop-playlist.jpg) |
+
+![Zenify library](assets/screenshots/desktop-library.jpg)
+
+### On a phone
+
+The same app at a phone's size (390 × 844).
+
+<table>
+  <tr>
+    <th>Home</th>
+    <th>Library</th>
+    <th>Playlist</th>
+    <th>Player</th>
+  </tr>
+  <tr>
+    <td><img src="assets/screenshots/mobile-home.jpg" width="200" alt="Zenify home on a phone"></td>
+    <td><img src="assets/screenshots/mobile-library.jpg" width="200" alt="Zenify library on a phone"></td>
+    <td><img src="assets/screenshots/mobile-playlist.jpg" width="200" alt="Zenify playlist on a phone"></td>
+    <td><img src="assets/screenshots/mobile-player.jpg" width="200" alt="Zenify player on a phone"></td>
+  </tr>
+</table>
 
 ---
 
@@ -133,59 +190,27 @@ New features are translated into English and Portuguese for now.
 
 ---
 
-## Screenshots
+## Inside the repository
 
-### Desktop
+What is here besides the app itself, and what it is for.
 
-Home, album colours and the listening recap on a wide screen:
-
-![Zenify home on a wide desktop](assets/screenshots/desktop-home.png)
-
-| Player and queue | Sound waves and synced lyrics |
+| Path | What it is for |
 |---|---|
-| ![Zenify desktop player with queue](assets/screenshots/desktop-player-queue.png) | ![Zenify sound waves with synced lyrics](assets/screenshots/desktop-waves-lyrics.png) |
-
-![Zenify playlist and floating dock](assets/screenshots/desktop-playlist.png)
-
-### Compact and mobile layouts
-
-<table>
-  <tr>
-    <th>Compact lyrics</th>
-    <th>Integrated mobile queue</th>
-    <th>Song selection</th>
-  </tr>
-  <tr>
-    <td><img src="assets/screenshots/compact-lyrics.png" width="260" alt="Zenify lyrics in a compact window"></td>
-    <td><img src="assets/screenshots/mobile-queue.png" width="260" alt="Zenify mobile queue with playback controls"></td>
-    <td><img src="assets/screenshots/mobile-selection.png" width="260" alt="Zenify song selection and floating batch actions"></td>
-  </tr>
-</table>
-
-Desktop and compact captures come from the local Linux app. The mobile queue
-and selection previews are rendered from the current Flutter interface at
-390 × 844 with sample data.
-
----
-
-## Download
-
-Get the files for your platform from the
-[latest release](https://github.com/elias001011/Zenify/releases/latest).
-
-| Platform | File | Notes |
-|---|---|---|
-| Android | `Zenify-arm64-v8a.apk` | Most phones. `Zenify.apk` works on every device. |
-| Linux (Debian, Ubuntu) | `Zenify-linux-x64.deb` | Installs `libmpv` for you. |
-| Linux (other) | `Zenify-linux-x64.tar.gz` | Needs `libmpv`; run `install-linux-desktop.sh` to add it to your menu. |
-| Windows | `Zenify-windows-x64-setup.exe` | Lets you choose where data and downloads go. |
-| Windows (portable) | `Zenify-windows-x64-portable.zip` | No installation. |
-
-Every release includes `SHA256SUMS.txt` to verify the files. iOS is not
-supported.
-
-Releases marked as pre-release are for trying new things: the app's updater
-never offers them, so install them by hand.
+| `lib/`, `test/` | The app and its tests (`flutter test`). |
+| `lib/localization/`, `l10n.yaml` | The strings, one `.arb` file per language; `app_en.arb` is the template. See [translations](CONTRIBUTING.md#translations). |
+| `packages/youtube_explode_dart` | The YouTube client the app uses for search, streams and playlists, kept here so fixes do not wait for a release of the package. |
+| `packages/youtube_music_explode_dart` | A small YouTube Music client: radios, mixes, artist pages, charts and moods. |
+| `packages/just_audio_media_kit` | Plays audio on Linux and Windows (`just_audio` over `media_kit` and libmpv). |
+| `packages/receive_sharing_intent` | Lets Android hand a shared YouTube link to the app. |
+| [`tools/sync_peer/`](tools/sync_peer/README.md) | The screenless Local Sync peer, for a server that is always on. |
+| `tool/generate_icons_test.dart` | Draws the Zenify icon in every size the platforms need: `flutter test tool/generate_icons_test.dart`. |
+| `scripts/release_version.sh`, `update.sh` | Read the version from `pubspec.yaml` (`release_version` adds a hotfix number) and write it to `lib/constants/version.dart`. The release workflow and the packaging use them. |
+| `scripts/checker.dart`, `scripts/checkdb.sh` | Check that the built-in playlists and albums still exist on YouTube and have artwork; the report goes to `checker.txt`. |
+| `announcement.json` | A link the home page shows as an announcement while it is set; the app reads it from this branch. |
+| `.github/workflows/release.yml` | Builds the Android, Linux and Windows files and publishes them as a draft release. |
+| `.github/workflows/debug.yml`, `validate_windows.yml` | Run by hand: a debug APK, and a full check of the Windows package (tests, startup, icons, installer). |
+| `.github/scripts/`, `.github/installer/` | The release's helpers: startup and icon checks, the `.deb` and `.tar.gz` packaging, the Windows installer (Inno Setup). |
+| `fastlane/metadata/` | The store texts and icon, for catalogs that read them (F-Droid style). |
 
 ---
 
