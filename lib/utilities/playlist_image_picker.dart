@@ -25,17 +25,21 @@ import 'package:file_picker/file_picker.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/utilities/cover_image.dart';
 
 Future<String?> pickImage() async {
   final file = await FilePicker.pickFile(type: FileType.image);
 
   if (file != null) {
-    final bytes = await file.readAsBytes();
+    final picked = await file.readAsBytes();
+    final bytes = await shrinkCoverInBackground(picked);
     String? mimeType;
 
     final fileName = file.name;
     final extensionStart = fileName.lastIndexOf('.') + 1;
-    if (extensionStart > 0 && extensionStart < fileName.length) {
+    if (!identical(bytes, picked)) {
+      mimeType = 'image/jpeg';
+    } else if (extensionStart > 0 && extensionStart < fileName.length) {
       switch (fileName.substring(extensionStart).toLowerCase()) {
         case 'jpg':
         case 'jpeg':

@@ -57,6 +57,7 @@ import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/services/update_manager.dart';
 import 'package:musify/services/windows_media_controls.dart';
 import 'package:musify/theme/app_themes.dart';
+import 'package:musify/utilities/cover_image.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/language_utils.dart';
 import 'package:musify/utilities/platform_utils.dart';
@@ -211,6 +212,10 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
     }
 
     if (!offlineMode.value) unawaited(fetchAnnouncement());
+    // Once the app has settled: covers picked by older versions are large.
+    unawaited(
+      Future<void>.delayed(const Duration(seconds: 20), shrinkStoredCovers),
+    );
 
     if (!isFdroidBuild &&
         shouldWeCheckUpdates.value &&
