@@ -34,6 +34,7 @@ import 'package:musify/services/audio_service_android_auto.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/listening_stats_service.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/music_radio.dart';
 import 'package:musify/services/queue_persistence_service.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -1001,7 +1002,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     }
 
     final baseYtid = _getCurrentSongForRecommendations()?['ytid']?.toString();
-    if (baseYtid == null || baseYtid.isEmpty) return;
+    if (baseYtid == null || baseYtid.isEmpty || isLocalSongId(baseYtid)) {
+      return;
+    }
 
     try {
       final knownYtids = <String>{};

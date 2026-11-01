@@ -29,6 +29,7 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/proxy_manager.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -139,6 +140,9 @@ Map? _searchAppPlaylistsById(String id) {
   for (final p in playlists) {
     if (p['ytid']?.toString() == id) return p;
   }
+  // Zenify's own playlists are made by the Moods and kept in its cache, not
+  // in the library: a pin on one would be dropped as gone otherwise.
+  if (MoodsService.isZenifyPlaylist(id)) return moodsService.cachedPlaylist(id);
   return null;
 }
 

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 
 void main() {
@@ -49,5 +50,31 @@ void main() {
     ];
     expect(togglePinnedPlaylist('p6', context), isFalse);
     expect(pinnedPlaylistIds.value, hasLength(pinnedPlaylistsLimit));
+  });
+
+  testWidgets('a pinned Zenify playlist is kept and listed', (tester) async {
+    late BuildContext context;
+    await tester.pumpWidget(
+      Builder(
+        builder: (c) {
+          context = c;
+          return const SizedBox();
+        },
+      ),
+    );
+    userCustomPlaylists.value = [];
+    pinnedPlaylistIds.value = [];
+
+    expect(togglePinnedPlaylist('zenify:daily', context), isTrue);
+    // Another pin later must not sweep it away as a playlist that is gone.
+    userCustomPlaylists.value = [
+      {'ytid': 'p1', 'title': 'Playlist 1', 'list': <Map>[]},
+    ];
+    expect(togglePinnedPlaylist('p1', context), isTrue);
+
+    expect(pinnedPlaylistIds.value, ['zenify:daily', 'p1']);
+    final listed = resolvePinnedPlaylists(pinnedPlaylistIds.value);
+    expect(listed.map((p) => p['ytid']), ['zenify:daily', 'p1']);
+    expect(MoodsService.isZenifyPlaylist('zenify:daily'), isTrue);
   });
 }

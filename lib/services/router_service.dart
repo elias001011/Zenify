@@ -34,6 +34,7 @@ import 'package:musify/screens/home_page.dart';
 import 'package:musify/screens/import_spotify_playlist_page.dart';
 import 'package:musify/screens/keyboard_shortcuts_page.dart';
 import 'package:musify/screens/library_page.dart';
+import 'package:musify/screens/local_files_page.dart';
 import 'package:musify/screens/local_sync_page.dart';
 import 'package:musify/screens/moods_tuning_page.dart';
 import 'package:musify/screens/playlist_folder_page.dart';
@@ -298,6 +299,11 @@ class NavigationManager {
                 path: 'moods-tuning',
                 pageBuilder: (context, state) =>
                     _pushPage(child: const MoodsTuningPage(), state: state),
+              ),
+              GoRoute(
+                path: 'local-files',
+                pageBuilder: (context, state) =>
+                    _pushPage(child: const LocalFilesPage(), state: state),
               ),
               GoRoute(
                 path: 'radioStations',

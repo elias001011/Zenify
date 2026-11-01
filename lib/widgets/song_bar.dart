@@ -31,6 +31,7 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
@@ -54,6 +55,8 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
   bool canRename = false,
   bool canRemove = false,
   bool showGoToArtist = false,
+  // Local files are only played: no like, offline copy or playlist for them.
+  bool isLocal = false,
 }) {
   final l10n = context.l10n!;
   final playNextText = l10n.playNext;
@@ -89,7 +92,7 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
         label: addToQueueText,
         colorScheme: colorScheme,
       ),
-    if (!offlineMode.value)
+    if (!offlineMode.value && !isLocal)
       PopupMenuItem<String>(
         value: 'like',
         child: ValueListenableBuilder<bool>(
@@ -125,7 +128,7 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
         label: removeFromPlaylistText,
         colorScheme: colorScheme,
       ),
-    if (!offlineMode.value)
+    if (!offlineMode.value && !isLocal)
       buildPopupMenuItem<String>(
         value: 'add_to_playlist',
         icon: FluentIcons.album_add_24_regular,
@@ -139,7 +142,7 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
         label: removeFromRecentlyPlayedText,
         colorScheme: colorScheme,
       ),
-    if (!offlineMode.value || songOfflineStatus.value)
+    if ((!offlineMode.value || songOfflineStatus.value) && !isLocal)
       PopupMenuItem<String>(
         value: 'offline',
         child: ValueListenableBuilder<bool>(
@@ -672,6 +675,7 @@ class _SongBarState extends State<SongBar> {
       canRename: canRename,
       canRemove: widget.onRemove != null,
       showGoToArtist: !offlineMode.value && _songArtist.isNotEmpty,
+      isLocal: isLocalSongId(_ytid),
     );
   }
 }

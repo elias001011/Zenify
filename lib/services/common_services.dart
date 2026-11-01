@@ -32,6 +32,7 @@ import 'package:musify/main.dart' show logger;
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/io_service.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/lyrics_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/proxy_manager.dart';
@@ -1196,6 +1197,7 @@ const recentlyPlayedSongsLimit = 100;
 /// request when registering offline songs whose metadata is already available
 /// locally (e.g. from [userOfflineSongs]).
 Future<void> updateRecentlyPlayed(dynamic songId, {Map? songFallback}) async {
+  if (isLocalSongId(songId)) return;
   try {
     final now = DateTime.now();
 

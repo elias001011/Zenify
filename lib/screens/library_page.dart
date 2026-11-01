@@ -244,6 +244,7 @@ class _LibraryPageState extends State<LibraryPage> {
             ..._buildZenifySlivers(),
             if (!offlineMode.value) ..._buildLikedPlaylistsSlivers(),
             ..._buildLikedArtistsSlivers(),
+            ..._buildLocalFilesSlivers(),
           ];
           return _shownBody = Padding(
             padding: commonSingleChildScrollViewPadding,
@@ -299,6 +300,9 @@ class _LibraryPageState extends State<LibraryPage> {
     final isOff = offlineMode.value;
     final items = resolvePinnedPlaylists(ids).where((p) {
       if (isOff && MoodsService.isZenifyPlaylist(p['ytid'])) return false;
+      if (!moodsEnabled.value && MoodsService.isZenifyPlaylist(p['ytid'])) {
+        return false;
+      }
       return _matches(p) &&
           (!isOff ||
               offlinePlaylistService.isPlaylistDownloaded(
@@ -597,6 +601,21 @@ class _LibraryPageState extends State<LibraryPage> {
             );
           },
         ),
+    ];
+  }
+
+  /// The audio files kept on this device, apart from the rest of the library.
+  List<Widget> _buildLocalFilesSlivers() {
+    if (_query.isNotEmpty || _filter != _LibraryFilter.all) return [];
+    return [
+      SliverToBoxAdapter(
+        child: CustomBar(
+          context.l10n!.localFiles,
+          FluentIcons.music_note_2_24_regular,
+          borderRadius: commonCustomBarRadius,
+          onTap: () => context.push('/library/local-files'),
+        ),
+      ),
     ];
   }
 

@@ -25,6 +25,7 @@ import 'package:hive/hive.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/local_sync/sync_security.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
@@ -184,7 +185,7 @@ class ListeningStatsService {
     if (!wrappedEnabled.value) return;
 
     final ytid = song['ytid']?.toString();
-    if (ytid == null || ytid.isEmpty) return;
+    if (ytid == null || ytid.isEmpty || isLocalSongId(ytid)) return;
 
     _sessionSong = cloneMap(song);
     _sessionSongId = ytid;

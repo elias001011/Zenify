@@ -25,6 +25,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
@@ -141,6 +142,8 @@ class _PlayerActionsState extends State<PlayerActions> {
   Widget build(BuildContext context) {
     final l10n = context.l10n!;
     final online = !offlineMode.value;
+    // Local files are only played: no offline copy, playlist or like.
+    final local = isLocalSongId(audioId);
     final actionAudioId = audioId;
 
     return StreamBuilder<List<Map>>(
@@ -175,7 +178,7 @@ class _PlayerActionsState extends State<PlayerActions> {
                 onPressed: () => _onSleepTimer(context, timer != null),
               ),
             ),
-            if (!isRadioStation)
+            if (!isRadioStation && !local)
               ValueListenableBuilder<bool>(
                 valueListenable: _songOfflineStatus,
                 builder: (context, offline, _) => PlayerActionButton(
@@ -193,7 +196,7 @@ class _PlayerActionsState extends State<PlayerActions> {
                         ),
                 ),
               ),
-            if (online && !isRadioStation)
+            if (online && !isRadioStation && !local)
               PlayerActionButton(
                 icon: FluentIcons.album_add_24_regular,
                 tooltip: l10n.addToPlaylist,
@@ -202,7 +205,7 @@ class _PlayerActionsState extends State<PlayerActions> {
                   song: mediaItemToMap(widget.metadata),
                 ),
               ),
-            if (online)
+            if (online && !local)
               ValueListenableBuilder<bool>(
                 valueListenable: _songLikeStatus,
                 builder: (context, liked, _) => PlayerActionButton(
