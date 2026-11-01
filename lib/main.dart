@@ -402,7 +402,7 @@ Future<String?> initialisation() async {
     ]);
     if (importedLibrary) await forgetImportedSyncIdentity();
     // Copies older builds left pointing at the picker's cache.
-    unawaited(keepLocalFileCopies());
+    unawaited(keepLocalFileCopies().then((_) => removeUnlistedLocalCopies()));
 
     try {
       await LocalSyncService.instance.initialise();

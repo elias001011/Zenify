@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and newer: same rules for the cloud backup and a device-to-device
+     transfer. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_flutter/userNoBackup.hive" />
+        <exclude domain="root" path="app_flutter/userNoBackup.lock" />
+        <exclude domain="root" path="app_flutter/tracks" />
+        <exclude domain="root" path="app_flutter/artworks" />
+        <exclude domain="root" path="app_flutter/local_files" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="app_flutter/userNoBackup.hive" />
+        <exclude domain="root" path="app_flutter/userNoBackup.lock" />
+        <exclude domain="root" path="app_flutter/tracks" />
+        <exclude domain="root" path="app_flutter/artworks" />
+        <exclude domain="root" path="app_flutter/local_files" />
+    </device-transfer>
+</data-extraction-rules>

@@ -234,6 +234,27 @@ Future<void> keepLocalFileCopies() => _serialized(() async {
   await Hive.box('userNoBackup').put(_storageKey, updated);
 });
 
+/// Deletes the copies in the app's storage that no entry points to: what a
+/// removal could not delete (Windows keeps a playing file open) and what an
+/// interrupted copy left behind. A list that could not be read deletes
+/// nothing.
+Future<void> removeUnlistedLocalCopies() => _serialized(() async {
+  if (Hive.box('userNoBackup').get(_storageKey) is! List) return;
+  final directory = _storageDirectory();
+  if (!await directory.exists()) return;
+  final listed = {
+    for (final file in localFiles.value)
+      if (file['audioPath']?.toString() case final path?) _baseName(path),
+  };
+  await for (final entity in directory.list()) {
+    if (entity is File && !listed.contains(_baseName(entity.path))) {
+      await _deleteQuietly(entity);
+    }
+  }
+});
+
+String _baseName(String path) => path.split(RegExp(r'[\\/]')).last;
+
 /// Takes a file out of the list. Its copy in the app's storage is deleted;
 /// the file the user picked is left alone.
 Future<void> removeLocalFile(String id) => _serialized(() async {

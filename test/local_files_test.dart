@@ -198,6 +198,32 @@ void main() {
     },
   );
 
+  test('copies no entry points to are deleted, listed ones are kept', () async {
+    await addLocalFiles([makeFile('listed.mp3', 'listed song')]);
+    final kept = File(localFiles.value.single['audioPath'].toString());
+    final stray = File('${kept.parent.path}/stray.mp3')
+      ..writeAsStringSync('left behind');
+    final partial = File('${kept.parent.path}/half.mp3.123.part')
+      ..writeAsStringSync('cut off');
+
+    await removeUnlistedLocalCopies();
+
+    expect(kept.existsSync(), isTrue);
+    expect(stray.existsSync(), isFalse);
+    expect(partial.existsSync(), isFalse);
+  });
+
+  test('an unreadable list deletes nothing', () async {
+    await addLocalFiles([makeFile('safe.mp3', 'safe song')]);
+    final kept = File(localFiles.value.single['audioPath'].toString());
+    await Hive.box('userNoBackup').put('localFiles', 'broken');
+    localFiles.value = [];
+
+    await removeUnlistedLocalCopies();
+
+    expect(kept.existsSync(), isTrue);
+  });
+
   test('a local file never becomes recently played', () async {
     await addLocalFiles([makeFile('recent.mp3', 'recent')]);
     final file = localFiles.value.single;
