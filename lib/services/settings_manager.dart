@@ -138,6 +138,11 @@ final showAudioQualityBadge = ValueNotifier<bool>(
   Hive.box('settings').get('showAudioQualityBadge', defaultValue: false),
 );
 
+/// Shows the audio files kept on this device in the library.
+final showLocalFiles = ValueNotifier<bool>(
+  Hive.box('settings').get('showLocalFiles', defaultValue: true),
+);
+
 const double minInterfaceScale = 0.8;
 const double maxInterfaceScale = 1.6;
 
@@ -273,6 +278,7 @@ void reloadSettingsFromStorage() {
     'showAudioQualityBadge',
     defaultValue: false,
   );
+  showLocalFiles.value = settings.get('showLocalFiles', defaultValue: true);
   interfaceScale.value = _readInterfaceScale();
   startMaximized.value = settings.get('startMaximized', defaultValue: false);
   customTitleBar.value = settings.get('customTitleBar', defaultValue: true);

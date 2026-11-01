@@ -228,6 +228,7 @@ class _LibraryPageState extends State<LibraryPage> {
           userLikedSongsList,
           moodsEnabled,
           savedZenifyPlaylists,
+          showLocalFiles,
         ]),
         builder: (context, _) {
           // In another tab (built early, see the router), a like or a
@@ -244,13 +245,13 @@ class _LibraryPageState extends State<LibraryPage> {
             ..._buildZenifySlivers(),
             if (!offlineMode.value) ..._buildLikedPlaylistsSlivers(),
             ..._buildLikedArtistsSlivers(),
-            ..._buildLocalFilesSlivers(),
           ];
           return _shownBody = Padding(
             padding: commonSingleChildScrollViewPadding,
             child: CustomScrollView(
               slivers: [
                 const SliverIslandTopSpace(),
+                ..._buildLocalFilesSlivers(),
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -604,16 +605,25 @@ class _LibraryPageState extends State<LibraryPage> {
     ];
   }
 
-  /// The audio files kept on this device, apart from the rest of the library.
+  /// The audio files kept on this device. They sit above the filters, in the
+  /// primary colours, so they are found before the playlists. Hidden while
+  /// searching, and when turned off in Settings.
   List<Widget> _buildLocalFilesSlivers() {
-    if (_query.isNotEmpty || _filter != _LibraryFilter.all) return [];
+    if (!showLocalFiles.value || _query.isNotEmpty) return [];
+    final colorScheme = Theme.of(context).colorScheme;
     return [
       SliverToBoxAdapter(
-        child: CustomBar(
-          context.l10n!.localFiles,
-          FluentIcons.music_note_2_24_regular,
-          borderRadius: commonCustomBarRadius,
-          onTap: () => context.push('/library/local-files'),
+        child: Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 8),
+          child: CustomBar(
+            context.l10n!.localFiles,
+            FluentIcons.music_note_2_24_filled,
+            backgroundColor: colorScheme.primaryContainer,
+            iconColor: colorScheme.onPrimaryContainer,
+            textColor: colorScheme.onPrimaryContainer,
+            borderRadius: commonCustomBarRadius,
+            onTap: () => context.push('/library/local-files'),
+          ),
         ),
       ),
     ];

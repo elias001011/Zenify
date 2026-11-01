@@ -202,6 +202,20 @@ class SettingsPage extends StatelessWidget {
           },
         ),
         ValueListenableBuilder<bool>(
+          valueListenable: showLocalFiles,
+          builder: (_, value, __) {
+            return CustomBar(
+              context.l10n!.localFilesToggle,
+              FluentIcons.music_note_2_24_regular,
+              description: context.l10n!.localFilesToggleDescription,
+              trailing: Switch(
+                value: value,
+                onChanged: (value) => _toggleLocalFiles(context, value),
+              ),
+            );
+          },
+        ),
+        ValueListenableBuilder<bool>(
           valueListenable: syncedLyricsEnabled,
           builder: (_, value, __) {
             return CustomBar(
@@ -903,6 +917,12 @@ class SettingsPage extends StatelessWidget {
   void _toggleAudioQualityBadge(BuildContext context, bool value) {
     addOrUpdateData<bool>('settings', 'showAudioQualityBadge', value);
     showAudioQualityBadge.value = value;
+    showToast(context, context.l10n!.settingChangedMsg);
+  }
+
+  void _toggleLocalFiles(BuildContext context, bool value) {
+    addOrUpdateData<bool>('settings', 'showLocalFiles', value);
+    showLocalFiles.value = value;
     showToast(context, context.l10n!.settingChangedMsg);
   }
 
