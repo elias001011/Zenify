@@ -37,6 +37,7 @@ import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
 import 'package:musify/widgets/playlist_page/empty_playlist_state.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
@@ -305,13 +306,31 @@ class _UserSongsPageState extends State<UserSongsPage> {
               ],
             ),
           ),
-          if (isRecentlyPlayed) ...[
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [_buildClearRecentsButton(colorScheme.primary)],
-            ),
-          ],
+          ValueListenableBuilder<bool>(
+            valueListenable: offlineMode,
+            builder: (_, offline, __) {
+              if (offline && !isRecentlyPlayed) return const SizedBox.shrink();
+              return Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  spacing: 5,
+                  children: [
+                    if (!offline)
+                      PlaylistAddToPlaylistButton(
+                        resolvePlaylist: () async => {
+                          'list': List<Map>.of(
+                            _currentSongsList.whereType<Map>(),
+                          ),
+                        },
+                      ),
+                    if (isRecentlyPlayed)
+                      _buildClearRecentsButton(colorScheme.primary),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
         if (isOfflineSongs && songsLength > 1) ...[
           const SizedBox(height: 20),
