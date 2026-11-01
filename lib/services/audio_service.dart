@@ -2360,6 +2360,8 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }) async {
     final songId = song['ytid']?.toString();
     if (songId == null || songId.isEmpty) return false;
+    // A local file has no stream to fetch, and its id is never sent out.
+    if (isLocalSongId(songId)) return false;
 
     if (invalidateCache) await invalidateSongStreamCache(songId);
 

@@ -627,6 +627,8 @@ Future<List<String>> getSearchSuggestions(String query) async {
 // fetch" (e.g. the offline cache, which must not persist a false negative)
 // can do so.
 Future<List<Map<String, int>>> _fetchSkipSegments(String id) async {
+  // A local file's id is never sent out, so it has no segments to fetch.
+  if (isLocalSongId(id)) return [];
   final res = await ProxyManager().getProxiedResponse(
     Uri(
       scheme: 'https',
@@ -1110,6 +1112,7 @@ Future<T> _sponsorSerialCall<T>(Future<T> Function() action) {
 /// is never fetched again.
 Future<void> cacheSponsorBlockSegments(String ytid) async {
   try {
+    if (isLocalSongId(ytid)) return;
     if (getOfflineSongByYtid(ytid)['sponsorSegments'] != null) return;
 
     // Two attempts, spaced out by the queue above; a failure stores nothing so
