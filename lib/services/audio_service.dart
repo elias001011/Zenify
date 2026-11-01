@@ -1583,6 +1583,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
             final ytid = nextSong['ytid'];
 
             if (ytid != null &&
+                !isLocalSongId(ytid) &&
                 !isSongAlreadyOffline(ytid) &&
                 !_preloadedYtIds.contains(ytid) &&
                 !_preloadingYtIds.contains(ytid)) {
@@ -1619,7 +1620,8 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   Future<void> _preloadSingleSongControlled(Map nextSong) async {
     final ytid = nextSong['ytid'];
-    if (ytid == null) return;
+    // A local file is never looked up as a stream.
+    if (ytid == null || isLocalSongId(ytid)) return;
 
     _preloadingYtIds.add(ytid);
     _activePreloadCount++;
