@@ -134,11 +134,11 @@ String _lastSyncText(BuildContext context, DateTime? lastSynced) {
 
 /// Shows the PIN another device must type; listens to
 /// [LocalSyncService.incomingPairingRequest].
-void showIncomingPairingDialog() {
+void showIncomingPairingDialog({BuildContext? inContext}) {
   final request = LocalSyncService.instance.incomingPairingRequest.value;
   if (request == null) return;
 
-  final context = NavigationManager().context;
+  final context = inContext ?? NavigationManager().context;
   BuildContext? openDialog;
 
   unawaited(
@@ -171,6 +171,8 @@ void showIncomingPairingDialog() {
           actions: [
             OutlinedButton(
               onPressed: () {
+                // Closed here, so the rejection below does not close it again.
+                openDialog = null;
                 LocalSyncService.instance.rejectIncomingPairing();
                 Navigator.pop(dialogContext);
               },
