@@ -1034,7 +1034,7 @@ Future<void> saveSongFiles(
 /// The path of the cover saved from [url], or null when it could not be.
 Future<String?> _saveArtwork(String url, String path) async {
   // Set when the wait gives up. The download itself cannot be stopped, so it
-  // checks this before it writes, and removes what it wrote if it was late.
+  // checks this before it keeps what it wrote.
   var abandoned = false;
   try {
     final file =
@@ -1204,6 +1204,32 @@ List<Map<String, int>>? getCachedSponsorBlockSegments(String ytid) {
   return [for (final segment in stored) Map<String, int>.from(segment as Map)];
 }
 
+/// Writes [bytes] to [filePath] through a temporary name of its own, so a
+/// late attempt that was [abandoned] never touches what a newer attempt saved.
+/// Returns null when nothing was kept.
+@visibleForTesting
+Future<File?> writeArtworkFile(
+  String filePath,
+  List<int> bytes, {
+  bool Function()? abandoned,
+}) async {
+  final partial = File(
+    '$filePath.${DateTime.now().microsecondsSinceEpoch}.part',
+  );
+  try {
+    await partial.parent.create(recursive: true);
+    await partial.writeAsBytes(bytes);
+    if ((abandoned?.call() ?? false) || bytes.isEmpty) {
+      await _deleteFileIfExists(partial, 'late artwork file');
+      return null;
+    }
+    return await partial.rename(filePath);
+  } catch (_) {
+    await _deleteFileIfExists(partial, 'artwork file');
+    rethrow;
+  }
+}
+
 Future<File?> _downloadAndSaveArtworkFile(
   String url,
   String filePath, {
@@ -1214,21 +1240,15 @@ Future<File?> _downloadAndSaveArtworkFile(
     if (abandoned?.call() ?? false) return null;
 
     if (response.statusCode == 200) {
-      final file = File(filePath);
-      await file.parent.create(recursive: true);
-      await file.writeAsBytes(response.bodyBytes);
-      if (abandoned?.call() ?? false) {
-        await _deleteFileIfExists(file, 'late artwork file');
-        return null;
+      final file = await writeArtworkFile(
+        filePath,
+        response.bodyBytes,
+        abandoned: abandoned,
+      );
+      if (file == null) {
+        logger.log('Artwork file was not kept: $filePath');
       }
-
-      // Validate that the file was actually written
-      if (await file.exists() && await file.length() > 0) {
-        return file;
-      } else {
-        logger.log('Artwork file was not written properly: $filePath');
-        return null;
-      }
+      return file;
     } else {
       logger.log(
         'Failed to download file. Status code: ${response.statusCode}',
