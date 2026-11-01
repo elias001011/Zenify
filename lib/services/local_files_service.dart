@@ -103,43 +103,64 @@ Future<String> _copyTo(String source, Digest digest) async {
   return target.path;
 }
 
-/// Adds the audio files at [paths] that are not in the list yet, and returns
-/// how many were added. A file is recognised by its content, so the same
-/// song picked twice, even under another extension, is added once and
-/// copied once. Files that cannot be read are skipped.
-Future<int> addLocalFiles(Iterable<String> paths) => _serialized(() async {
-  final known = {for (final file in localFiles.value) _digestKey(file)};
-  final added = <Map>[];
-  for (final path in paths) {
-    final extension = path.split('.').last.toLowerCase();
-    if (!_audioExtensions.contains(extension)) continue;
-    final digest = await _digestOrNull(path);
-    if (digest == null) continue;
-    final key = digest.toString();
-    if (known.contains(key)) continue;
-    final String copy;
-    try {
-      copy = await _copyTo(path, digest);
-    } catch (_) {
-      continue;
-    }
-    known.add(key);
-    final name = path.split(RegExp(r'[\\/]')).last;
-    final dot = name.lastIndexOf('.');
-    added.add({
-      'ytid': '$localSongPrefix$key',
-      'digest': key,
-      'title': dot > 0 ? name.substring(0, dot) : name,
-      'artist': '',
-      'audioPath': copy,
+/// Adds the audio files at [paths] that are not in the list yet. A file is
+/// recognised by its content, so the same song picked twice, even under
+/// another extension, is added once and copied once; a song already in the
+/// list is not a failure. Files that are not audio, or cannot be read or
+/// copied, are counted as failed.
+Future<({int added, int failed})> addLocalFiles(Iterable<String> paths) =>
+    _serialized(() async {
+      final known = {for (final file in localFiles.value) _digestKey(file)};
+      final added = <Map>[];
+      var failed = 0;
+      for (final path in paths) {
+        final extension = path.split('.').last.toLowerCase();
+        if (!_audioExtensions.contains(extension)) {
+          failed++;
+          continue;
+        }
+        final digest = await _digestOrNull(path);
+        if (digest == null) {
+          failed++;
+          continue;
+        }
+        final key = digest.toString();
+        if (known.contains(key)) continue;
+        final String copy;
+        try {
+          copy = await _copyTo(path, digest);
+        } catch (_) {
+          failed++;
+          continue;
+        }
+        known.add(key);
+        final name = path.split(RegExp(r'[\\/]')).last;
+        final dot = name.lastIndexOf('.');
+        added.add({
+          'ytid': '$localSongPrefix$key',
+          'digest': key,
+          'title': dot > 0 ? name.substring(0, dot) : name,
+          'artist': '',
+          'audioPath': copy,
+        });
+      }
+      if (added.isNotEmpty) {
+        final updated = [...localFiles.value, ...added];
+        localFiles.value = updated;
+        await Hive.box('userNoBackup').put(_storageKey, updated);
+      }
+      return (added: added.length, failed: failed);
     });
+
+/// Where the copy of the local file [id] is now, or null if it is not listed.
+/// Playback asks here rather than trusting the path a queue kept, which may
+/// still point into the picker's cache.
+String? localFileCopyPath(String id) {
+  for (final file in localFiles.value) {
+    if (file['ytid'] == id) return file['audioPath']?.toString();
   }
-  if (added.isEmpty) return 0;
-  final updated = [...localFiles.value, ...added];
-  localFiles.value = updated;
-  await Hive.box('userNoBackup').put(_storageKey, updated);
-  return added.length;
-});
+  return null;
+}
 
 /// Moves entries saved by earlier builds, which pointed at the picker's cache,
 /// into the app's own storage. An entry that is a copy of a song already in

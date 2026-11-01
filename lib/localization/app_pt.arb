@@ -451,6 +451,7 @@
   "localFilesToggle": "Mostrar arquivos locais",
   "localFilesToggleDescription": "Arquivos de áudio guardados neste aparelho, mostrados na biblioteca. Nunca são baixados, curtidos, sincronizados nem contados no seu resumo.",
   "localFilesEmpty": "Nenhum arquivo local ainda. Adicione arquivos de áudio deste aparelho para tocá-los aqui.",
+  "localFilesImportResult": "{added} adicionados, {failed} não puderam ser adicionados.",
   "removeLocalFile": "Remover desta lista",
   "reportBug": "Reportar um bug",
   "reportBugDescription": "Abre uma nova issue no GitHub do Zenify com a versão preenchida.",

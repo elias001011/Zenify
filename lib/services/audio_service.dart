@@ -2019,7 +2019,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     // Fallback: prefer an existing local `audioPath` on the passed song
     // object if the file exists.
     try {
-      final path = songData['audioPath']?.toString();
+      final path = _playablePath(songData);
       if (path != null && path.isNotEmpty) {
         final f = File(path);
         if (await f.exists()) return true;
@@ -2185,8 +2185,19 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     return fetchSongStreamUrl(song['ytid'], song['isLive'] ?? false);
   }
 
+  /// The file a song plays from: a local file's current copy, which survives
+  /// a moved copy, or the path its entry saved.
+  String? _playablePath(Map song) {
+    final id = song['ytid']?.toString() ?? '';
+    if (isLocalSongId(id)) {
+      final current = localFileCopyPath(id);
+      if (current != null) return current;
+    }
+    return song['audioPath']?.toString();
+  }
+
   Future<String?> _getOfflineSongUrl(Map song) async {
-    final audioPath = song['audioPath']?.toString();
+    final audioPath = _playablePath(song);
     if (audioPath == null || audioPath.isEmpty) {
       logger.log('Missing audioPath for offline song: ${song['ytid']}');
       return null;

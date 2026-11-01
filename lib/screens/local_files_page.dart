@@ -6,6 +6,7 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/utilities/app_utils.dart';
+import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
@@ -22,7 +23,12 @@ class LocalFilesPage extends StatelessWidget {
         if (file.path != null) file.path!,
     ];
     if (paths.isEmpty) return;
-    await addLocalFiles(paths);
+    final result = await addLocalFiles(paths);
+    if (!context.mounted) return;
+    showToast(
+      context,
+      context.l10n!.localFilesImportResult(result.added, result.failed),
+    );
   }
 
   @override

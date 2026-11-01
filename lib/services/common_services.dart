@@ -1033,11 +1033,22 @@ Future<void> saveSongFiles(
 
 /// The path of the cover saved from [url], or null when it could not be.
 Future<String?> _saveArtwork(String url, String path) async {
+  // Set when the wait gives up. The download itself cannot be stopped, so it
+  // checks this before it writes, and removes what it wrote if it was late.
+  var abandoned = false;
   try {
-    final file = await _downloadAndSaveArtworkFile(
-      url,
-      path,
-    ).timeout(_transferStall);
+    final file =
+        await _downloadAndSaveArtworkFile(
+          url,
+          path,
+          abandoned: () => abandoned,
+        ).timeout(
+          _transferStall,
+          onTimeout: () {
+            abandoned = true;
+            return null;
+          },
+        );
     if (file != null && await file.exists()) return path;
   } catch (e, stackTrace) {
     logger.log('Error downloading artwork', error: e, stackTrace: stackTrace);
@@ -1193,14 +1204,23 @@ List<Map<String, int>>? getCachedSponsorBlockSegments(String ytid) {
   return [for (final segment in stored) Map<String, int>.from(segment as Map)];
 }
 
-Future<File?> _downloadAndSaveArtworkFile(String url, String filePath) async {
+Future<File?> _downloadAndSaveArtworkFile(
+  String url,
+  String filePath, {
+  bool Function()? abandoned,
+}) async {
   try {
     final response = await ProxyManager().getProxiedResponse(Uri.parse(url));
+    if (abandoned?.call() ?? false) return null;
 
     if (response.statusCode == 200) {
       final file = File(filePath);
       await file.parent.create(recursive: true);
       await file.writeAsBytes(response.bodyBytes);
+      if (abandoned?.call() ?? false) {
+        await _deleteFileIfExists(file, 'late artwork file');
+        return null;
+      }
 
       // Validate that the file was actually written
       if (await file.exists() && await file.length() > 0) {

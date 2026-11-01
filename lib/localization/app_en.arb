@@ -462,6 +462,13 @@
   "localFilesToggle": "Show local files",
   "localFilesToggleDescription": "Audio files kept on this device, shown in the library. They are never downloaded, liked, synced or counted in your recap.",
   "localFilesEmpty": "No local files yet. Add audio files from this device to play them here.",
+  "localFilesImportResult": "{added} added, {failed} could not be added.",
+  "@localFilesImportResult": {
+    "placeholders": {
+      "added": {"type": "int"},
+      "failed": {"type": "int"}
+    }
+  },
   "removeLocalFile": "Remove from this list",
   "reportBug": "Report a bug",
   "reportBugDescription": "Opens a new issue on Zenify's GitHub with the version filled in.",
