@@ -40,15 +40,16 @@ void main() {
     final notes = makeFile('notes.txt', 'not audio');
     final b = makeFile('B.FLAC', 'second song');
 
-    final added = await addLocalFiles([a, notes, a, b]);
+    final result = await addLocalFiles([a, notes, a, b]);
 
-    expect(added, 2);
+    expect(result.added, 2);
+    expect(result.failed, 1);
     expect(localFiles.value.map((f) => f['title']), ['a', 'B']);
     for (final file in localFiles.value) {
       expect(isLocalSong(file), isTrue);
       expect(file['ytid'].toString(), startsWith(localSongPrefix));
     }
-    expect(await addLocalFiles([a]), 0);
+    expect((await addLocalFiles([a])).added, 0);
     // Kept on the device only: not in the library's backed-up box.
     expect((Hive.box('userNoBackup').get('localFiles') as List).length, 2);
   });
@@ -106,7 +107,7 @@ void main() {
       final mp3 = makeFile('same.mp3', 'identical audio');
       final flac = makeFile('same.flac', 'identical audio');
 
-      expect(await addLocalFiles([mp3, flac]), 1);
+      expect((await addLocalFiles([mp3, flac])).added, 1);
 
       final digest = sha1.convert(utf8.encode('identical audio')).toString();
       final storage = Directory('${directory.path}/$localFilesDirName');
@@ -152,6 +153,25 @@ void main() {
       );
     },
   );
+
+  test('playback finds the current copy of a file a queue saved', () async {
+    final original = makeFile('queued.mp3', 'queued audio');
+    localFiles.value = [
+      {
+        'ytid': 'local:queuedold',
+        'title': 'queued',
+        'artist': '',
+        'audioPath': original,
+      },
+    ];
+
+    await keepLocalFileCopies();
+
+    final current = localFileCopyPath('local:queuedold');
+    expect(current, startsWith(directory.path));
+    expect(current, isNot(original));
+    expect(localFileCopyPath('local:unknown'), isNull);
+  });
 
   test('a local file never becomes recently played', () async {
     await addLocalFiles([makeFile('recent.mp3', 'recent')]);
