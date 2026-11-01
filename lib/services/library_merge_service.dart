@@ -110,6 +110,22 @@ class LibraryMergeService {
     return written != null && written == syncDigest(value);
   }
 
+  /// A `user` box without a single key, next to a baseline that remembers
+  /// items, is a library that went missing: capturing it would send the
+  /// deletion of everything to every device.
+  static void _refuseMissingLibrary() {
+    final baseline = _baseline();
+    if (baseline == null || Hive.box('user').isNotEmpty) return;
+    final remembersItems = baseline.values.any(
+      (value) =>
+          (value is List && value.isNotEmpty) ||
+          (value is Map && value.isNotEmpty),
+    );
+    if (remembersItems) {
+      throw StateError('The library is missing; sync is stopped.');
+    }
+  }
+
   static Map<String, dynamic> _snapshot() {
     final user = Hive.box('user');
     return {
@@ -153,6 +169,7 @@ class LibraryMergeService {
   static Future<Map<String, dynamic>> exportLibrary({
     Set<SyncCategory>? categories,
   }) => _locked(() async {
+    _refuseMissingLibrary();
     await listeningStatsService.prepareForSync();
     final current = _snapshot();
     final document = _document();
@@ -178,6 +195,7 @@ class LibraryMergeService {
         if (!selected.containsAll(incomingCategories)) {
           throw const FormatException('Sync categories changed');
         }
+        _refuseMissingLibrary();
         final incoming = SyncDocument.fromMap(remote['document']);
         if (incoming.select(incomingCategories).records.length !=
             incoming.records.length) {

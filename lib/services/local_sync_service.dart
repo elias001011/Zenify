@@ -286,9 +286,11 @@ class LocalSyncService {
     await LibraryMergeService.awaitIdle();
   }
 
-  Future<void> resumeAfterStorageRestore() async {
+  /// [storageChanged] is false when the restore was cancelled or rolled back:
+  /// the library is as it was, so the baseline still describes it.
+  Future<void> resumeAfterStorageRestore({bool storageChanged = true}) async {
     reloadSettingsFromStorage();
-    await LibraryMergeService.forgetBaseline();
+    if (storageChanged) await LibraryMergeService.forgetBaseline();
     await rebindStorageListeners();
     if (localSyncEnabled.value) await startServer();
   }

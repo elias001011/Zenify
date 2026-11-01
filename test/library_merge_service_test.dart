@@ -7,6 +7,7 @@ import 'package:musify/services/library_merge_service.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/local_sync/sync_data.dart';
 import 'package:musify/services/local_sync/sync_merge.dart';
+import 'package:musify/services/local_sync_service.dart';
 import 'package:musify/services/settings_manager.dart';
 
 import 'local_sync/fixtures.dart';
@@ -52,6 +53,39 @@ void main() {
       expect(text, isNot(contains('language')));
     },
   );
+
+  test('a restore that changed nothing keeps the sync baseline', () async {
+    await Hive.box('user').put('likedSongs', [song('a')]);
+    await LibraryMergeService.exportLibrary();
+    final store = Hive.box('userNoBackup');
+    // Resuming watches the box, which would also consume later merge writes.
+    addTearDown(LocalSyncService.instance.dispose);
+
+    await LocalSyncService.instance.resumeAfterStorageRestore(
+      storageChanged: false,
+    );
+    expect(store.get('localSyncBaselineV2'), isNotNull);
+
+    await LocalSyncService.instance.resumeAfterStorageRestore();
+    expect(store.get('localSyncBaselineV2'), isNull);
+  });
+
+  test('a library that went missing is not synced as deleted', () async {
+    await Hive.box('user').put('likedSongs', [song('a')]);
+    await LibraryMergeService.exportLibrary();
+
+    await Hive.box('user').clear();
+
+    await expectLater(
+      LibraryMergeService.exportLibrary(),
+      throwsA(isA<StateError>()),
+    );
+  });
+
+  test('a library that was always empty still syncs', () async {
+    await LibraryMergeService.exportLibrary();
+    await LibraryMergeService.exportLibrary();
+  });
 
   test('writes made by a merge are told apart from later user edits', () async {
     final box = Hive.box('user');

@@ -488,12 +488,14 @@ class SettingsPage extends StatelessWidget {
           context.l10n!.restoreUserData,
           FluentIcons.cloud_add_24_regular,
           onTap: () async {
+            var storageChanged = true;
             try {
               // Readers must not access Hive while restore closes its boxes.
               await moodsService.clearCache();
               await LocalSyncService.instance.pauseForStorageRestore();
               if (!context.mounted) return;
               final result = await restoreData(context);
+              storageChanged = result.success;
               if (result.success) {
                 // Generated playlists belonged to the previous library.
                 await moodsService.clearCache();
@@ -541,7 +543,9 @@ class SettingsPage extends StatelessWidget {
                 );
               }
             } finally {
-              await LocalSyncService.instance.resumeAfterStorageRestore();
+              await LocalSyncService.instance.resumeAfterStorageRestore(
+                storageChanged: storageChanged,
+              );
             }
           },
         ),
