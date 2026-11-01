@@ -202,17 +202,21 @@ class _SkipSlideState extends State<_SkipSlide> {
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 350),
+      duration: const Duration(milliseconds: 300),
       transitionBuilder: (child, animation) {
         final incoming = child.key == ValueKey(widget.trackId);
         return AnimatedBuilder(
           animation: animation,
           child: child,
           builder: (context, child) {
-            final t = Curves.easeOutCubic.transform(animation.value);
+            // Linear on purpose: both covers ride one rail at a steady speed.
+            // The rail's step is a whole screen, so the leaving cover is
+            // off screen before the arriving one comes in, and they never meet.
+            final t = animation.value;
             final shift = incoming ? 1 - t : t - 1;
-            return FractionalTranslation(
-              translation: Offset(shift * _direction, 0),
+            final step = MediaQuery.sizeOf(context).width;
+            return Transform.translate(
+              offset: Offset(shift * _direction * step, 0),
               child: child,
             );
           },

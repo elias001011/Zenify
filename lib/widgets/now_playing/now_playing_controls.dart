@@ -33,9 +33,9 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/now_playing/marquee_text_widget.dart';
-import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
 import 'package:musify/widgets/position_slider.dart';
+import 'package:musify/widgets/skip_icon_button.dart';
 
 class NowPlayingControls extends StatelessWidget {
   const NowPlayingControls({
@@ -521,7 +521,7 @@ class _PlaybackControlsRow extends StatelessWidget {
   }
 }
 
-class _PlaybackControlButton extends StatefulWidget {
+class _PlaybackControlButton extends StatelessWidget {
   const _PlaybackControlButton({
     required this.icon,
     required this.forward,
@@ -547,64 +547,23 @@ class _PlaybackControlButton extends StatefulWidget {
   final double minButtonSize;
 
   @override
-  State<_PlaybackControlButton> createState() => _PlaybackControlButtonState();
-}
-
-class _PlaybackControlButtonState extends State<_PlaybackControlButton>
-    with SingleTickerProviderStateMixin {
-  /// The icon leans a little in the skip's direction, then comes back.
-  late final _nudge = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 320),
-  );
-  late final _lean = TweenSequence<double>([
-    TweenSequenceItem(tween: Tween(begin: 0, end: 1), weight: 35),
-    TweenSequenceItem(tween: Tween(begin: 1, end: 0), weight: 65),
-  ]).animate(CurvedAnimation(parent: _nudge, curve: Curves.easeOut));
-
-  @override
-  void dispose() {
-    _nudge.dispose();
-    super.dispose();
-  }
-
-  Future<void> _onPressed() async {
-    skipDirection = widget.forward ? 1 : -1;
-    _nudge.forward(from: 0);
-    final before = audioHandler.mediaItem.value?.id;
-    await widget.onPressed();
-    // A skip that stays on the same song has nothing to slide, so its
-    // direction is dropped rather than left for the next song change.
-    if (audioHandler.mediaItem.value?.id == before) skipDirection = 1;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final colorScheme = widget.colorScheme;
-    return IconButton(
-      icon: AnimatedBuilder(
-        animation: _lean,
-        builder: (context, child) => Transform.translate(
-          offset: Offset((widget.forward ? 4 : -4) * _lean.value, 0),
-          child: child,
-        ),
-        child: Icon(
-          widget.icon,
-          color: widget.isEnabled
-              ? colorScheme.onSurface
-              : colorScheme.onSurface.withValues(alpha: 0.3),
-        ),
-      ),
-      tooltip: widget.tooltip,
-      constraints: widget.buttonConstraints,
-      iconSize: widget.controlIconSize * 0.65,
-      onPressed: widget.isEnabled ? _onPressed : null,
+    return SkipIconButton(
+      forward: forward,
+      icon: icon,
+      color: isEnabled
+          ? colorScheme.onSurface
+          : colorScheme.onSurface.withValues(alpha: 0.3),
+      tooltip: tooltip,
+      constraints: buttonConstraints,
+      iconSize: controlIconSize * 0.65,
+      onPressed: isEnabled ? onPressed : null,
       style: IconButton.styleFrom(
         backgroundColor: colorScheme.surfaceContainerHighest,
         disabledBackgroundColor: colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        padding: widget.buttonPadding,
-        minimumSize: Size(widget.minButtonSize, widget.minButtonSize),
+        padding: buttonPadding,
+        minimumSize: Size(minButtonSize, minButtonSize),
       ),
     );
   }

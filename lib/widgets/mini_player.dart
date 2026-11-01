@@ -31,6 +31,8 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/marquee.dart';
 import 'package:musify/widgets/now_playing/wave_visualizer.dart';
+import 'package:musify/widgets/playback_icon_button.dart';
+import 'package:musify/widgets/skip_icon_button.dart';
 import 'package:musify/widgets/song_artwork.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -356,15 +358,14 @@ class _ControlsWidget extends StatelessWidget {
         ),
         if (hasNext) ...[
           const SizedBox(width: 4),
-          IconButton(
+          SkipIconButton(
+            forward: true,
             onPressed: audioHandler.skipToNext,
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
-            icon: Icon(
-              FluentIcons.next_24_filled,
-              color: colorScheme.onSurfaceVariant,
-              size: 24,
-            ),
+            icon: FluentIcons.next_24_filled,
+            color: colorScheme.onSurfaceVariant,
+            iconSize: 24,
             visualDensity: VisualDensity.compact,
           ),
         ],
@@ -443,14 +444,17 @@ class _CircularPlayButton extends StatelessWidget {
                   : (isPlaying ? audioHandler.pause : audioHandler.play),
               splashColor: Colors.transparent,
               highlightColor: Colors.transparent,
-              icon: Icon(
-                isCompleted
-                    ? FluentIcons.arrow_counterclockwise_24_filled
-                    : (isPlaying
-                          ? FluentIcons.pause_16_filled
-                          : FluentIcons.play_16_filled),
-                color: colorScheme.primary,
-                size: 22,
+              icon: PlaybackIconSwitcher(
+                stateKey: (isCompleted, isPlaying),
+                child: Icon(
+                  isCompleted
+                      ? FluentIcons.arrow_counterclockwise_24_filled
+                      : (isPlaying
+                            ? FluentIcons.pause_16_filled
+                            : FluentIcons.play_16_filled),
+                  color: colorScheme.primary,
+                  size: 22,
+                ),
               ),
               visualDensity: VisualDensity.compact,
             ),

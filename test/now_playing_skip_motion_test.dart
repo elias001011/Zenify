@@ -82,17 +82,13 @@ void main() {
 
   Finder artwork() => find.byType(NowPlayingArtwork);
 
-  /// The horizontal shifts of the covers while one is sliding, in fractions of
-  /// the cover's width.
+  /// The horizontal offsets, in pixels, of the covers that are moving.
   List<double> coverShifts(WidgetTester tester) => [
-    for (final t in tester.widgetList<FractionalTranslation>(
-      find.descendant(
-        of: artwork(),
-        matching: find.byType(FractionalTranslation),
-      ),
+    for (final t in tester.widgetList<Transform>(
+      find.descendant(of: artwork(), matching: find.byType(Transform)),
     ))
-      t.translation.dx,
-  ];
+      t.transform.getTranslation().x,
+  ].where((dx) => dx != 0).toList();
 
   testWidgets('a phone slides the cover forward on next and back on previous', (
     tester,

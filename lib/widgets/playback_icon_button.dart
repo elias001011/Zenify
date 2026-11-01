@@ -93,24 +93,48 @@ Widget buildPlaybackIconButton(
         child: Semantics(
           label: semanticLabel,
           button: true,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.7, end: 1).animate(animation),
-                child: child,
-              ),
-            ),
-            child: KeyedSubtree(
-              key: ValueKey((processingState, isPlaying)),
-              child: iconWidget,
-            ),
+          child: PlaybackIconSwitcher(
+            stateKey: (processingState, isPlaying),
+            child: iconWidget,
           ),
         ),
       );
     },
   );
+}
+
+/// Cross-fades a play, pause or replay icon as the state it shows changes.
+/// `stateKey` names that state; the icon swaps when it changes.
+class PlaybackIconSwitcher extends StatelessWidget {
+  const PlaybackIconSwitcher({
+    super.key,
+    required this.stateKey,
+    required this.child,
+  });
+
+  final Object stateKey;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      transitionBuilder: (child, animation) => FadeTransition(
+        opacity: Tween<double>(
+          begin: 0,
+          end: 1,
+        ).chain(CurveTween(curve: Curves.easeInOut)).animate(animation),
+        child: ScaleTransition(
+          scale: Tween<double>(
+            begin: 0.85,
+            end: 1,
+          ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(animation),
+          child: child,
+        ),
+      ),
+      child: KeyedSubtree(key: ValueKey(stateKey), child: child),
+    );
+  }
 }
 
 class PlaybackIconButton extends StatelessWidget {
