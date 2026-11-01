@@ -251,7 +251,6 @@ class _LibraryPageState extends State<LibraryPage> {
             child: CustomScrollView(
               slivers: [
                 const SliverIslandTopSpace(),
-                ..._buildLocalFilesSlivers(),
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 4),
@@ -362,9 +361,13 @@ class _LibraryPageState extends State<LibraryPage> {
     final hasCustomPlaylists = playlistsNotInFolders.isNotEmpty;
     // Liked, recent, offline songs and radio: shown unless filtering.
     final showFixedRows = !isOffline && _query.isEmpty;
+    // The local files are a row of this list, kept on the device, so they stay
+    // with the offline library too.
+    final showLocalRow =
+        showLocalFiles.value && _query.isEmpty && _shows(_LibraryFilter.custom);
     final hasLibraryContent =
         _shows(_LibraryFilter.custom) &&
-        (showFixedRows || hasFolders || hasCustomPlaylists);
+        (showFixedRows || hasFolders || hasCustomPlaylists || showLocalRow);
 
     final slivers = <Widget>[];
 
@@ -401,13 +404,23 @@ class _LibraryPageState extends State<LibraryPage> {
                         ],
                       ),
               ),
+              if (showLocalRow)
+                PlaylistBar(
+                  context.l10n!.localFiles,
+                  onPressed: () => context.push('/library/local-files'),
+                  cubeIcon: FluentIcons.music_note_2_24_filled,
+                  borderRadius: commonCustomBarRadiusFirst,
+                  showBuildActions: false,
+                ),
               if (showFixedRows) ...[
                 PlaylistBar(
                   context.l10n!.recentlyPlayed,
                   onPressed: () =>
                       NavigationManager.router.go('/library/userSongs/recents'),
                   cubeIcon: FluentIcons.history_24_regular,
-                  borderRadius: commonCustomBarRadiusFirst,
+                  borderRadius: showLocalRow
+                      ? BorderRadius.zero
+                      : commonCustomBarRadiusFirst,
                   showBuildActions: false,
                 ),
                 PlaylistBar(
@@ -602,30 +615,6 @@ class _LibraryPageState extends State<LibraryPage> {
             );
           },
         ),
-    ];
-  }
-
-  /// The audio files kept on this device. They sit above the filters, in the
-  /// primary colours, so they are found before the playlists. Hidden while
-  /// searching, and when turned off in Settings.
-  List<Widget> _buildLocalFilesSlivers() {
-    if (!showLocalFiles.value || _query.isNotEmpty) return [];
-    final colorScheme = Theme.of(context).colorScheme;
-    return [
-      SliverToBoxAdapter(
-        child: Padding(
-          padding: const EdgeInsets.only(top: 4, bottom: 8),
-          child: CustomBar(
-            context.l10n!.localFiles,
-            FluentIcons.music_note_2_24_filled,
-            backgroundColor: colorScheme.primaryContainer,
-            iconColor: colorScheme.onPrimaryContainer,
-            textColor: colorScheme.onPrimaryContainer,
-            borderRadius: commonCustomBarRadius,
-            onTap: () => context.push('/library/local-files'),
-          ),
-        ),
-      ),
     ];
   }
 
