@@ -100,25 +100,41 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
         return;
       }
       if (!isDesktopPlatform) {
-        await SharePlus.instance.share(
-          ShareParams(
-            files: [
-              for (final path in result.files)
-                XFile(path, mimeType: 'text/csv'),
-            ],
-          ),
+        // Not awaited: a share sheet with no app to receive the files may
+        // never answer, and the button must not wait for it.
+        unawaited(
+          SharePlus.instance
+              .share(
+                ShareParams(
+                  files: [
+                    for (final path in result.files)
+                      XFile(path, mimeType: 'text/csv'),
+                  ],
+                ),
+              )
+              .then<void>(
+                (_) {},
+                onError: (Object e, StackTrace stackTrace) => logger.log(
+                  'Error sharing the playlist files',
+                  error: e,
+                  stackTrace: stackTrace,
+                ),
+              ),
         );
       }
       if (!mounted) return;
-      showToast(
-        context,
-        result.failed == 0
-            ? context.l10n!.exportPlaylistsDone(result.files.length)
-            : context.l10n!.exportPlaylistsPartial(
-                result.files.length,
-                result.failed,
-              ),
-      );
+      // On a phone the share sheet is the answer; only a loss needs saying.
+      if (isDesktopPlatform || result.failed > 0) {
+        showToast(
+          context,
+          result.failed == 0
+              ? context.l10n!.exportPlaylistsDone(result.files.length)
+              : context.l10n!.exportPlaylistsPartial(
+                  result.files.length,
+                  result.failed,
+                ),
+        );
+      }
     } catch (e, stackTrace) {
       logger.log('Error exporting playlists', error: e, stackTrace: stackTrace);
       if (mounted) showToast(context, context.l10n!.error);
