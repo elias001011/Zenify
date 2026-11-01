@@ -934,8 +934,13 @@ Future<void> saveSongFiles(
   final ytid = song['ytid'].toString();
   final audioFile = File(FilePaths.getAudioPath(ytid));
   await audioFile.parent.create(recursive: true);
+  // Offline mode or deleting every download stops this transfer, even before
+  // the first byte: the manifest lookup comes first and can take a while.
+  final stopEpoch = DownloadManager.instance.stopEpoch;
+  bool stopped() => DownloadManager.instance.stopEpoch != stopEpoch;
 
   final audio = await resolveBestAudioStream(ytid).timeout(_resolveLimit);
+  if (stopped()) throw const DownloadStopped();
   IOSink? fileStream;
   try {
     final total = audio.size.totalBytes;
@@ -951,6 +956,7 @@ Future<void> saveSongFiles(
             ..close(),
         )
         .map((chunk) {
+          if (stopped()) throw const DownloadStopped();
           received += chunk.length;
           // Whole percents only, so listeners do not rebuild per chunk.
           final percent = total > 0 ? received * 100 ~/ total : reported;

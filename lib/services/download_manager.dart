@@ -245,6 +245,10 @@ class DownloadManager {
     }
   }
 
+  /// Counts every stop. A transfer that started under one count is over once
+  /// the count changes.
+  int get stopEpoch => _stopEpoch;
+
   /// Stops what is queued and what is downloading (offline mode, deleting
   /// every download), and waits for it to let go of its files. What stopped
   /// leaves no entry: it was not tried to the end.

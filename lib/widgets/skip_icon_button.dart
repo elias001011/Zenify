@@ -22,7 +22,6 @@
 import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/main.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 
 /// A skip button. Tapped, its icon leans a few pixels towards the skip and
@@ -78,11 +77,11 @@ class _SkipIconButtonState extends State<SkipIconButton>
     if (onPressed == null) return;
     skipDirection = widget.forward ? 1 : -1;
     _nudge.forward(from: 0);
-    final before = audioHandler.mediaItem.value?.id;
     await onPressed();
-    // A skip that stays on the same song has nothing to slide, so its
-    // direction is dropped rather than left for the next song change.
-    if (audioHandler.mediaItem.value?.id == before) skipDirection = 1;
+    // The song change draws in a frame after this. A cover that is built takes
+    // the direction then; one that is not (waves, a panel) drops it here, so
+    // it cannot reach a later change.
+    WidgetsBinding.instance.addPostFrameCallback((_) => skipDirection = 1);
   }
 
   @override
