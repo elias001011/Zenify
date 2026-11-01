@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:musify/services/common_services.dart';
@@ -97,6 +99,59 @@ void main() {
     expect(isLocalSong(file), isTrue);
     expect(File(file['audioPath'].toString()).readAsStringSync(), 'old audio');
   });
+
+  test(
+    'the same song under another extension is one entry and one copy',
+    () async {
+      final mp3 = makeFile('same.mp3', 'identical audio');
+      final flac = makeFile('same.flac', 'identical audio');
+
+      expect(await addLocalFiles([mp3, flac]), 1);
+
+      final digest = sha1.convert(utf8.encode('identical audio')).toString();
+      final storage = Directory('${directory.path}/$localFilesDirName');
+      final copies = storage
+          .listSync()
+          .whereType<File>()
+          .map((file) => file.uri.pathSegments.last)
+          .where((name) => name.startsWith(digest));
+      expect(localFiles.value, hasLength(1));
+      expect(copies, ['$digest.mp3']);
+    },
+  );
+
+  test(
+    'a removal made while the old entries are moved is not undone',
+    () async {
+      final keep = makeFile('race-keep.mp3', 'keep me');
+      final gone = makeFile('race-gone.mp3', 'remove me');
+      localFiles.value = [
+        {
+          'ytid': 'local:racekeep',
+          'title': 'keep',
+          'artist': '',
+          'audioPath': keep,
+        },
+        {
+          'ytid': 'local:racegone',
+          'title': 'gone',
+          'artist': '',
+          'audioPath': gone,
+        },
+      ];
+
+      final migration = keepLocalFileCopies();
+      final removal = removeLocalFile('local:racegone');
+      await Future.wait([migration, removal]);
+
+      expect(localFiles.value.map((f) => f['title']), ['keep']);
+      expect(
+        File(localFiles.value.single['audioPath'].toString())
+            .readAsStringSync(),
+        'keep me',
+      );
+    },
+  );
 
   test('a local file never becomes recently played', () async {
     await addLocalFiles([makeFile('recent.mp3', 'recent')]);

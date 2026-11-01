@@ -942,13 +942,18 @@ Future<void> saveSongFiles(
   Map<String, dynamic> song,
   void Function(double) onProgress,
 ) async {
+  // Read before anything waits: the caller has just checked that no stop came,
+  // so a stop from here on is one this transfer must honour, even one that
+  // arrives while the folder is being created.
+  final stopEpoch = DownloadManager.instance.stopEpoch;
+  bool stopped() => DownloadManager.instance.stopEpoch != stopEpoch;
+
   final ytid = song['ytid'].toString();
   final audioFile = File(FilePaths.getAudioPath(ytid));
   await audioFile.parent.create(recursive: true);
   // Offline mode or deleting every download stops this transfer, even before
   // the first byte: the manifest lookup comes first and can take a while.
-  final stopEpoch = DownloadManager.instance.stopEpoch;
-  bool stopped() => DownloadManager.instance.stopEpoch != stopEpoch;
+  if (stopped()) throw const DownloadStopped();
 
   final audio = await resolveBestAudioStream(ytid).timeout(_resolveLimit);
   if (stopped()) throw const DownloadStopped();

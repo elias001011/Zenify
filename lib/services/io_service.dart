@@ -27,6 +27,9 @@ late String applicationDirPath;
 /// user chose another folder (see `downloads_location_service.dart`).
 late String downloadsDirPath;
 
+/// Where local files are copied to, under [applicationDirPath]. Not a download.
+const localFilesDirName = 'local_files';
+
 class FilePaths {
   // File extensions
   static const String audioExtension = '.m4a';
@@ -66,6 +69,10 @@ class FilePaths {
     }
 
     final file = normalize(path);
+    // Copies of local files live in the app's storage, but are not downloads.
+    if (file.startsWith(normalize('$applicationDirPath/$localFilesDirName/'))) {
+      return false;
+    }
     return {downloadsDirPath, applicationDirPath}.any((root) {
       final prefix = normalize(root);
       return file.startsWith(prefix.endsWith('/') ? prefix : '$prefix/');

@@ -16,8 +16,6 @@ import 'package:musify/services/io_service.dart';
 /// the copy is what keeps the song playable.
 const localSongPrefix = 'local:';
 
-const localFilesDirName = 'local_files';
-
 const _storageKey = 'localFiles';
 
 const _audioExtensions = {'mp3', 'm4a', 'aac', 'flac', 'ogg', 'opus', 'wav'};
@@ -45,6 +43,17 @@ List<Map> _load() {
   return [];
 }
 
+Future<void> _queue = Future.value();
+
+/// Runs [action] after every earlier change to the list. Adding, removing and
+/// the startup migration all read and then write the list, so they run one
+/// at a time: none can overwrite what another just saved.
+Future<T> _serialized<T>(Future<T> Function() action) {
+  final result = _queue.then((_) => action());
+  _queue = result.then<void>((_) {}, onError: (_) {});
+  return result;
+}
+
 Directory _storageDirectory() =>
     Directory('$applicationDirPath/$localFilesDirName');
 
@@ -52,51 +61,77 @@ Directory _storageDirectory() =>
 bool _isKeptCopy(String path) =>
     path.startsWith('$applicationDirPath/$localFilesDirName/');
 
-/// Copies [source] into the app's own storage, named by its content, and
-/// returns the new id and path. The same file added twice is one copy and one
-/// entry. The original is never changed.
-Future<({String id, String path})> _keepCopy(String source) async {
-  final extension = source.split('.').last.toLowerCase();
-  final digest = await sha1.bind(File(source).openRead()).first;
-  final directory = _storageDirectory();
-  await directory.create(recursive: true);
-  final target = File('${directory.path}/$digest.$extension');
-  if (!await target.exists()) {
-    // Copy under a temporary name, so an interrupted copy is never kept.
-    final partial = File('${target.path}.part');
-    await File(source).copy(partial.path);
-    await partial.rename(target.path);
-  }
-  return (id: '$localSongPrefix$digest', path: target.path);
-}
+/// What makes two entries the same song: the content digest they were stored
+/// with. Entries from earlier builds have none, so their id stands in.
+String _digestKey(Map file) => (file['digest'] ?? file['ytid']).toString();
 
-/// [_keepCopy], or null when the file cannot be read.
-Future<({String id, String path})?> _keepCopyOrNull(String source) async {
+/// The SHA-1 of the file's content, or null when it cannot be read.
+Future<Digest?> _digestOrNull(String source) async {
   try {
-    return await _keepCopy(source);
+    return await sha1.bind(File(source).openRead()).first;
   } catch (_) {
     return null;
   }
 }
 
+/// Copies [source] into the app's own storage under its content's [digest],
+/// and returns the copy's path. An existing copy is reused. The copy is checked
+/// against the digest, so a source that changed meanwhile is never kept. The
+/// original is never changed.
+Future<String> _copyTo(String source, Digest digest) async {
+  final extension = source.split('.').last.toLowerCase();
+  final directory = _storageDirectory();
+  await directory.create(recursive: true);
+  final target = File('${directory.path}/$digest.$extension');
+  if (await target.exists()) return target.path;
+
+  // A name of its own, so two copies of the same song never share a file.
+  final partial = File(
+    '${target.path}.${DateTime.now().microsecondsSinceEpoch}.part',
+  );
+  try {
+    await File(source).copy(partial.path);
+    final copied = await sha1.bind(partial.openRead()).first;
+    if (copied.toString() != digest.toString()) {
+      throw StateError('The file changed while it was copied');
+    }
+    await partial.rename(target.path);
+  } catch (_) {
+    await _deleteQuietly(partial);
+    rethrow;
+  }
+  return target.path;
+}
+
 /// Adds the audio files at [paths] that are not in the list yet, and returns
-/// how many were added. Other files, and files that cannot be read, are
-/// skipped.
-Future<int> addLocalFiles(Iterable<String> paths) async {
-  final known = {for (final file in localFiles.value) file['ytid']};
+/// how many were added. A file is recognised by its content, so the same
+/// song picked twice, even under another extension, is added once and
+/// copied once. Files that cannot be read are skipped.
+Future<int> addLocalFiles(Iterable<String> paths) => _serialized(() async {
+  final known = {for (final file in localFiles.value) _digestKey(file)};
   final added = <Map>[];
   for (final path in paths) {
     final extension = path.split('.').last.toLowerCase();
     if (!_audioExtensions.contains(extension)) continue;
-    final kept = await _keepCopyOrNull(path);
-    if (kept == null || !known.add(kept.id)) continue;
+    final digest = await _digestOrNull(path);
+    if (digest == null) continue;
+    final key = digest.toString();
+    if (known.contains(key)) continue;
+    final String copy;
+    try {
+      copy = await _copyTo(path, digest);
+    } catch (_) {
+      continue;
+    }
+    known.add(key);
     final name = path.split(RegExp(r'[\\/]')).last;
     final dot = name.lastIndexOf('.');
     added.add({
-      'ytid': kept.id,
+      'ytid': '$localSongPrefix$key',
+      'digest': key,
       'title': dot > 0 ? name.substring(0, dot) : name,
       'artist': '',
-      'audioPath': kept.path,
+      'audioPath': copy,
     });
   }
   if (added.isEmpty) return 0;
@@ -104,37 +139,69 @@ Future<int> addLocalFiles(Iterable<String> paths) async {
   localFiles.value = updated;
   await Hive.box('userNoBackup').put(_storageKey, updated);
   return added.length;
-}
+});
 
 /// Moves entries saved by earlier builds, which pointed at the picker's cache,
-/// into the app's own storage. An entry whose file is gone stays in the list
-/// as it is, so the user can see it and remove it.
-Future<void> keepLocalFileCopies() async {
-  final updated = <Map>[];
-  var changed = false;
-  for (final file in localFiles.value) {
+/// into the app's own storage. An entry that is a copy of a song already in
+/// the list is dropped, so a file saved twice is kept once. An entry whose file
+/// is gone stays in the list as it is, so the user can see it and remove it.
+Future<void> keepLocalFileCopies() => _serialized(() async {
+  final snapshot = List<Map>.of(localFiles.value);
+  final needsCopy = <bool>[];
+  for (final file in snapshot) {
     final path = file['audioPath']?.toString() ?? '';
-    if (path.isEmpty || _isKeptCopy(path) || !await File(path).exists()) {
-      updated.add(file);
-      continue;
-    }
-    final kept = await _keepCopyOrNull(path);
-    if (kept == null) {
-      updated.add(file);
-      continue;
-    }
-    changed = true;
-    if (updated.any((other) => other['ytid'] == kept.id)) continue;
-    updated.add({...file, 'ytid': kept.id, 'audioPath': kept.path});
+    needsCopy.add(
+      path.isNotEmpty && !_isKeptCopy(path) && await File(path).exists(),
+    );
   }
-  if (!changed) return;
+  if (!needsCopy.contains(true)) return;
+
+  // Entries that stay as they are claim their songs first.
+  final taken = {
+    for (var i = 0; i < snapshot.length; i++)
+      if (!needsCopy[i]) _digestKey(snapshot[i]),
+  };
+  // Each moved entry keeps its id, so a removal that is already on its way
+  // still finds it. It becomes its copy, or is dropped as a duplicate; a
+  // failed copy leaves the entry as it was.
+  final outcome = <Map?>[];
+  for (var i = 0; i < snapshot.length; i++) {
+    final file = snapshot[i];
+    if (!needsCopy[i]) {
+      outcome.add(file);
+      continue;
+    }
+    final digest = await _digestOrNull(file['audioPath'].toString());
+    if (digest == null) {
+      outcome.add(file);
+      continue;
+    }
+    final key = digest.toString();
+    if (taken.contains(key)) {
+      outcome.add(null);
+      continue;
+    }
+    try {
+      final copy = await _copyTo(file['audioPath'].toString(), digest);
+      taken.add(key);
+      outcome.add({...file, 'digest': key, 'audioPath': copy});
+    } catch (_) {
+      outcome.add(file);
+    }
+  }
+
+  // Only this queue writes the list, so it still matches the snapshot here.
+  final updated = [
+    for (final replacement in outcome)
+      if (replacement != null) replacement,
+  ];
   localFiles.value = updated;
   await Hive.box('userNoBackup').put(_storageKey, updated);
-}
+});
 
 /// Takes a file out of the list. Its copy in the app's storage is deleted;
 /// the file the user picked is left alone.
-Future<void> removeLocalFile(String id) async {
+Future<void> removeLocalFile(String id) => _serialized(() async {
   final removed = [
     for (final file in localFiles.value)
       if (file['ytid'] == id) file,
@@ -150,7 +217,7 @@ Future<void> removeLocalFile(String id) async {
     final path = file['audioPath']?.toString() ?? '';
     if (_isKeptCopy(path)) await _deleteQuietly(File(path));
   }
-}
+});
 
 Future<void> _deleteQuietly(File file) async {
   try {
