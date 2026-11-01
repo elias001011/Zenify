@@ -33,7 +33,7 @@ Map mediaItemToMap(MediaItem mediaItem) {
     'title': mediaItem.title,
     'artistId': extras?['artistId'],
     'videoAuthor': extras?['videoAuthor'],
-    'highResImage': extras?['highResImage'] ?? mediaItem.artUri.toString(),
+    'highResImage': extras?['highResImage'] ?? mediaItem.artUri?.toString(),
     'lowResImage': extras?['lowResImage'],
     'isLive': extras?['isLive'] ?? false,
     if (mediaItem.duration case final duration?) 'duration': duration.inSeconds,
@@ -47,9 +47,12 @@ MediaItem mapToMediaItem(Map song) {
       : <String, dynamic>{};
   final isOffline = offlineSong.isNotEmpty;
 
+  final highResImage = song['highResImage']?.toString();
   final artUri = isOffline && offlineSong['artworkPath'] != null
       ? Uri.file(offlineSong['artworkPath'].toString())
-      : Uri.parse(song['highResImage'].toString());
+      : highResImage == null || highResImage.isEmpty
+      ? null
+      : Uri.parse(highResImage);
 
   return MediaItem(
     id: song['id'].toString(),

@@ -75,13 +75,8 @@ class _SkipIconButtonState extends State<SkipIconButton>
   Future<void> _onPressed() async {
     final onPressed = widget.onPressed;
     if (onPressed == null) return;
-    skipDirection = widget.forward ? 1 : -1;
     _nudge.forward(from: 0);
-    await onPressed();
-    // The song change draws in a frame after this. A cover that is built takes
-    // the direction then; one that is not (waves, a panel) drops it here, so
-    // it cannot reach a later change.
-    WidgetsBinding.instance.addPostFrameCallback((_) => skipDirection = 1);
+    await skipWithDirection(widget.forward ? 1 : -1, onPressed);
   }
 
   @override

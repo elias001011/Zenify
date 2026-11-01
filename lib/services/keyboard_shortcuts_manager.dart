@@ -35,6 +35,7 @@ import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 
 /// Every action that can be bound to a desktop keyboard shortcut.
 enum ShortcutAction {
@@ -277,9 +278,9 @@ class KeyboardShortcutsManager {
           audioHandler.play();
         }
       case ShortcutAction.nextTrack:
-        audioHandler.skipToNext();
+        unawaited(skipWithDirection(1, audioHandler.skipToNext));
       case ShortcutAction.previousTrack:
-        audioHandler.skipToPrevious();
+        unawaited(skipWithDirection(-1, audioHandler.skipToPrevious));
       case ShortcutAction.seekForward:
         audioHandler.fastForward();
       case ShortcutAction.seekBackward:

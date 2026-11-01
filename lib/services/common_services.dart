@@ -749,6 +749,9 @@ Future<void> invalidateSongStreamCache(String songId) async {
 /// The best audio stream of a song. Throws what YouTube answered: a
 /// [VideoUnplayableException] means the song itself is unavailable.
 Future<AudioOnlyStreamInfo> resolveBestAudioStream(String songId) async {
+  if (isLocalSongId(songId)) {
+    throw ArgumentError.value(songId, 'songId', 'a local file has no stream');
+  }
   final cachedStream = _getSelectedAudioStream(songId);
   if (cachedStream != null) return cachedStream;
 
@@ -790,6 +793,8 @@ Future<AudioOnlyStreamInfo?> fetchBestAudioStream(String? songId) async {
 
 /// Resolves a playable stream URL for a song (cached when possible).
 Future<String?> fetchSongStreamUrl(String songId, bool isLive) async {
+  // A local file has no stream, and its id is never sent out.
+  if (isLocalSongId(songId)) return null;
   try {
     if (songId.isEmpty) {
       logger.log('fetchSongStreamUrl: songId is empty');
@@ -839,6 +844,7 @@ Future<Map<String, dynamic>> getSongDetails(
   int songIndex,
   String songId,
 ) async {
+  if (isLocalSongId(songId)) return {};
   try {
     final song = await ytClient.videos.get(songId);
     return returnSongLayout(songIndex, song);
@@ -972,6 +978,7 @@ Future<void> saveSongFiles(
     await fileStream.flush();
     await fileStream.close();
     fileStream = null;
+    if (stopped()) throw const DownloadStopped();
   } catch (_) {
     try {
       await fileStream?.close();
@@ -995,6 +1002,13 @@ Future<void> saveSongFiles(
       cover,
       FilePaths.getArtworkPath(ytid),
     );
+  }
+
+  // Stopped while the artwork was saved: drop the audio so it is not left
+  // behind without a song entry.
+  if (stopped()) {
+    if (await audioFile.exists()) await audioFile.delete();
+    throw const DownloadStopped();
   }
 
   final updated = List.of(userOfflineSongs.value);

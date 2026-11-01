@@ -28,6 +28,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
@@ -171,6 +172,8 @@ class NowPlayingTitle extends StatelessWidget {
 
   bool _canOpenArtist(MediaItem metadata) {
     final info = _extractArtistInfo(metadata);
+    // A local file has no artist page, and its id is never sent to YouTube.
+    if (isLocalSongId(info.sourceSongId)) return false;
     return !offlineMode.value &&
         (info.artist.isNotEmpty ||
             info.artistId.isNotEmpty ||
