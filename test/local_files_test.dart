@@ -173,6 +173,31 @@ void main() {
     expect(localFileCopyPath('local:unknown'), isNull);
   });
 
+  test(
+    'a queue entry for a dropped duplicate still finds the kept copy',
+    () async {
+      final first = makeFile('twin1.mp3', 'same song');
+      final second = makeFile('twin2.mp3', 'same song');
+      localFiles.value = [
+        {'ytid': 'local:twin1', 'title': 'twin', 'audioPath': first},
+        {'ytid': 'local:twin2', 'title': 'twin', 'audioPath': second},
+      ];
+
+      await keepLocalFileCopies();
+
+      final kept = localFiles.value.single;
+      final copy = kept['audioPath'].toString();
+      expect(copy, startsWith(directory.path));
+      expect(localFileCopyPath('local:twin1'), copy);
+      expect(localFileCopyPath('local:twin2'), copy);
+
+      await removeLocalFile(kept['ytid'].toString());
+
+      expect(localFileCopyPath('local:twin1'), isNull);
+      expect(localFileCopyPath('local:twin2'), isNull);
+    },
+  );
+
   test('a local file never becomes recently played', () async {
     await addLocalFiles([makeFile('recent.mp3', 'recent')]);
     final file = localFiles.value.single;

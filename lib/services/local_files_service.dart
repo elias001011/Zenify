@@ -157,15 +157,20 @@ Future<({int added, int failed})> addLocalFiles(Iterable<String> paths) =>
 /// still point into the picker's cache.
 String? localFileCopyPath(String id) {
   for (final file in localFiles.value) {
-    if (file['ytid'] == id) return file['audioPath']?.toString();
+    final aliases = file['aliases'];
+    if (file['ytid'] == id || (aliases is List && aliases.contains(id))) {
+      return file['audioPath']?.toString();
+    }
   }
   return null;
 }
 
 /// Moves entries saved by earlier builds, which pointed at the picker's cache,
 /// into the app's own storage. An entry that is a copy of a song already in
-/// the list is dropped, so a file saved twice is kept once. An entry whose file
-/// is gone stays in the list as it is, so the user can see it and remove it.
+/// the list is dropped, so a file saved twice is kept once; the entry kept
+/// remembers the dropped id, so a queue saved with it still plays. An entry
+/// whose file is gone stays in the list as it is, so the user can see it and
+/// remove it.
 Future<void> keepLocalFileCopies() => _serialized(() async {
   final snapshot = List<Map>.of(localFiles.value);
   final needsCopy = <bool>[];
@@ -186,6 +191,7 @@ Future<void> keepLocalFileCopies() => _serialized(() async {
   // still finds it. It becomes its copy, or is dropped as a duplicate; a
   // failed copy leaves the entry as it was.
   final outcome = <Map?>[];
+  final dropped = <String, List<String>>{};
   for (var i = 0; i < snapshot.length; i++) {
     final file = snapshot[i];
     if (!needsCopy[i]) {
@@ -199,6 +205,7 @@ Future<void> keepLocalFileCopies() => _serialized(() async {
     }
     final key = digest.toString();
     if (taken.contains(key)) {
+      dropped.putIfAbsent(key, () => []).add(file['ytid'].toString());
       outcome.add(null);
       continue;
     }
@@ -214,7 +221,14 @@ Future<void> keepLocalFileCopies() => _serialized(() async {
   // Only this queue writes the list, so it still matches the snapshot here.
   final updated = [
     for (final replacement in outcome)
-      if (replacement != null) replacement,
+      if (replacement != null)
+        if (dropped[_digestKey(replacement)] case final ids?)
+          {
+            ...replacement,
+            'aliases': [...?(replacement['aliases'] as List?), ...ids],
+          }
+        else
+          replacement,
   ];
   localFiles.value = updated;
   await Hive.box('userNoBackup').put(_storageKey, updated);
