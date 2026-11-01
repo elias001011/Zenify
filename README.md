@@ -67,6 +67,7 @@ The same app at a phone's size (390 × 844).
     <th>Library</th>
     <th>Playlist</th>
     <th>Player</th>
+    <th>Lyrics</th>
   </tr>
   <tr>
     <td><img src="assets/screenshots/mobile-home.jpg" width="160" alt="Zenify home on a phone"></td>
@@ -74,6 +75,7 @@ The same app at a phone's size (390 × 844).
     <td><img src="assets/screenshots/mobile-library.jpg" width="160" alt="Zenify library on a phone"></td>
     <td><img src="assets/screenshots/mobile-playlist.jpg" width="160" alt="Zenify playlist on a phone"></td>
     <td><img src="assets/screenshots/mobile-player.jpg" width="160" alt="Zenify player on a phone"></td>
+    <td><img src="assets/screenshots/mobile-lyrics.jpg" width="160" alt="Zenify synced lyrics on a phone"></td>
   </tr>
 </table>
 
