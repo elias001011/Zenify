@@ -153,7 +153,8 @@ class _PlayerActionsState extends State<PlayerActions> {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (online && !isRadioStation)
+            // A local file has no lyrics to look up, so it gets no button.
+            if (online && !isRadioStation && !local)
               PlayerActionButton(
                 icon: FluentIcons.text_quote_24_regular,
                 tooltip: l10n.lyrics,
