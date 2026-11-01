@@ -5,7 +5,7 @@ repository: https://github.com/elias001011/Zenify
 issue_tracker: https://github.com/elias001011/Zenify/issues
 
 publish_to: 'none'
-version: 0.2.1+15 # Flutter semantic version and Android versionCode
+version: 0.2.1+16 # Flutter semantic version and Android versionCode
 release_version: 0.2.1 # Display and package version; run update.sh after changing
 
 environment:
