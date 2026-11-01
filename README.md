@@ -81,8 +81,9 @@ The same app at a phone's size (390 × 844).
 
 ## A community edition of Musify
 
-Zenify is a modified version of Musify by Valeri Gokadze, maintained by the
-community since October 2026. It keeps Musify's code, features and license,
+Zenify is a modified version of Musify by Valeri Gokadze, developed and
+maintained by Elias Juriatti since October 2026, with contributions from the
+community. It keeps Musify's code, features and license,
 and goes further where Musify stops: the desktop, the look of the app and
 moving your library between devices.
 
@@ -271,14 +272,16 @@ notices and make the source code of what you distribute available.
 ## Disclaimer
 
 ```
-Zenify and its contributors do not host, own, or distribute any copyrighted
-audio content. The app provides access to content through plugins and external
-sources. All trademarks, songs, audio files, and related content remain the
-property of their respective owners and are protected by applicable copyright laws.
-Included plugins are provided for interoperability and educational purposes only.
-Users are solely responsible for ensuring that their use of the app complies with
-local laws, copyright regulations, and the terms of service of the respective
-content providers. The developers of Zenify do not encourage or endorse
-copyright infringement and assume no liability for misuse of the software or
-third-party plugins.
+Zenify does not host, store or distribute copyrighted audio. It has no server
+of its own that handles music. Songs are read from YouTube and YouTube Music
+and, when you download them, saved on your own device. Zenify is made for
+personal use.
+
+Whoever uses the app is responsible for following the copyright law of their
+country and the terms of service of YouTube and YouTube Music. Songs, artwork,
+trademarks and other content belong to their owners.
+
+To report content that should not be in the project, open an issue at
+https://github.com/elias001011/Zenify/issues. The developers do not encourage
+or endorse copyright infringement and are not liable for how the software is used.
 ```
