@@ -434,7 +434,7 @@ void _showSleepTimerDialog(BuildContext context) {
                   children: [
                     ...[15, 30, 45, 60].map((mins) {
                       return ActionChip(
-                        label: Text('$mins min'),
+                        label: Text(context.l10n!.minutesShort(mins)),
                         backgroundColor: colorScheme.surfaceContainerHighest,
                         labelStyle: TextStyle(
                           color: colorScheme.onSurfaceVariant,

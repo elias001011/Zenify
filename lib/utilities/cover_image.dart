@@ -81,29 +81,31 @@ typedef _Pixels = ({Uint8List rgba, int width, int height});
 
 Future<_Pixels?> _decodeScaled(Uint8List bytes) async {
   final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
+  ui.ImageDescriptor? descriptor;
+  ui.Codec? codec;
+  ui.Image? image;
   try {
-    final descriptor = await ui.ImageDescriptor.encoded(buffer);
+    descriptor = await ui.ImageDescriptor.encoded(buffer);
     final landscape = descriptor.width >= descriptor.height;
-    final codec = await descriptor.instantiateCodec(
+    codec = await descriptor.instantiateCodec(
       targetWidth: landscape && descriptor.width > coverSide ? coverSide : null,
       targetHeight: !landscape && descriptor.height > coverSide
           ? coverSide
           : null,
     );
-    final image = (await codec.getNextFrame()).image;
+    image = (await codec.getNextFrame()).image;
     final data = await image.toByteData();
-    final result = data == null
+    return data == null
         ? null
         : (
             rgba: data.buffer.asUint8List(),
             width: image.width,
             height: image.height,
           );
-    image.dispose();
-    codec.dispose();
-    descriptor.dispose();
-    return result;
   } finally {
+    image?.dispose();
+    codec?.dispose();
+    descriptor?.dispose();
     buffer.dispose();
   }
 }

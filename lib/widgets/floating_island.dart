@@ -302,7 +302,7 @@ class _IslandState extends State<_Island> {
     final canPop = !(ModalRoute.of(context)?.isFirst ?? true);
 
     final titleText = Padding(
-      padding: EdgeInsets.only(left: canPop ? 2 : 14, right: 10),
+      padding: EdgeInsetsDirectional.only(start: canPop ? 2 : 14, end: 10),
       child: Text(
         widget.title,
         maxLines: 1,

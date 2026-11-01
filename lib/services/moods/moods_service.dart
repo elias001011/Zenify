@@ -693,7 +693,9 @@ class MoodsService {
 
   bool get _genresFresh {
     final cached = _cache.get(_genresKey);
-    return cached is Map && _fresh(cached, const Duration(days: 7));
+    return cached is Map &&
+        cached['language'] == languageSetting.languageCode &&
+        _fresh(cached, const Duration(days: 7));
   }
 
   /// The detected genres when they are already known, without reading them.

@@ -208,31 +208,36 @@ class _PinDigits extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     // Narrow dialogs on small phones shrink the digits instead of cutting
     // them off.
-    return FittedBox(
-      fit: BoxFit.scaleDown,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (var i = 0; i < pin.length; i++)
-            Container(
-              width: 40,
-              height: 52,
-              margin: EdgeInsets.only(left: i == 0 ? 0 : (i == 3 ? 14 : 6)),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: colorScheme.secondaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                pin[i],
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: colorScheme.onSecondaryContainer,
+    // Digits read left to right, and the gap sits after the third, in every
+    // language.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < pin.length; i++)
+              Container(
+                width: 40,
+                height: 52,
+                margin: EdgeInsets.only(left: i == 0 ? 0 : (i == 3 ? 14 : 6)),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  pin[i],
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSecondaryContainer,
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

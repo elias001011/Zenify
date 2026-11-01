@@ -45,7 +45,9 @@ _ControlsState _controlsState(PlaybackState playback, List<MediaItem> queue) =>
     (
       playback: playback,
       hasNext:
-          queue.length > 1 && (playback.queueIndex ?? 0) < queue.length - 1,
+          queue.length > 1 &&
+          ((playback.queueIndex ?? 0) < queue.length - 1 ||
+              playback.repeatMode == AudioServiceRepeatMode.all),
     );
 
 /// The stream doesn't replay, so a mini player built later (the layout

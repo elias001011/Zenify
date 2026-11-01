@@ -334,7 +334,13 @@ class _ManualSearchState extends State<_ManualSearch> {
   Future<void> _run() async {
     final search = ++_searches;
     setState(() => _searching = true);
-    final results = await widget.search(_query.text.trim());
+    final List<Map> results;
+    try {
+      results = await widget.search(_query.text.trim());
+    } catch (_) {
+      if (mounted && search == _searches) setState(() => _searching = false);
+      return;
+    }
     // A newer search is under way: its answer is the one to show.
     if (!mounted || search != _searches) return;
     setState(() {

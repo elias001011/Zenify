@@ -409,7 +409,10 @@ class _LibraryPageState extends State<LibraryPage> {
                   context.l10n!.localFiles,
                   onPressed: () => context.push('/library/local-files'),
                   cubeIcon: FluentIcons.music_note_2_24_filled,
-                  borderRadius: commonCustomBarRadiusFirst,
+                  borderRadius:
+                      showFixedRows || hasFolders || hasCustomPlaylists
+                      ? commonCustomBarRadiusFirst
+                      : commonCustomBarRadius,
                   showBuildActions: false,
                 ),
               if (showFixedRows) ...[
@@ -457,7 +460,7 @@ class _LibraryPageState extends State<LibraryPage> {
         slivers.add(
           _buildFolderSliverList(
             folders,
-            hasItemsBefore: showFixedRows,
+            hasItemsBefore: showFixedRows || showLocalRow,
             hasItemsAfter: hasCustomPlaylists,
           ),
         );
@@ -466,7 +469,7 @@ class _LibraryPageState extends State<LibraryPage> {
         slivers.add(
           _buildSliverPlaylistList(
             playlistsNotInFolders,
-            hasItemsBefore: showFixedRows || hasFolders,
+            hasItemsBefore: showFixedRows || showLocalRow || hasFolders,
           ),
         );
       }

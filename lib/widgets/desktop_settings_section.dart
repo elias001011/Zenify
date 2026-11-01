@@ -202,7 +202,7 @@ class _InterfaceScaleBarState extends State<_InterfaceScaleBar> {
                   ],
                 ),
                 Padding(
-                  padding: const EdgeInsets.only(left: 54),
+                  padding: const EdgeInsetsDirectional.only(start: 54),
                   child: SliderTheme(
                     data: SliderTheme.of(
                       context,

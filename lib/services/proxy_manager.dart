@@ -67,6 +67,14 @@ class ProxyManager {
       if (offlineMode.value) return;
       unawaited(_initializeForGeneration(generation));
     });
+    // Started offline, the proxy never began: it does once the app is online.
+    offlineMode.addListener(() {
+      if (!offlineMode.value &&
+          useProxy.value &&
+          identical(_sharedYt, _defaultYt)) {
+        unawaited(_initializeForGeneration(++_proxySettingsGeneration));
+      }
+    });
   }
   // Timeout constants
   static const int _validateDirectTimeout = 5;

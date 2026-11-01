@@ -165,6 +165,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     _hydrateQueueEntryIds();
     _resumePosition = saved.position;
     _resumeEntryId = _queueEntryIds.ensureId(currentSong!);
+    _rebuildOriginalQueueEntryIndex();
     _updateQueueMediaItems();
     _updatePlaybackState(force: true);
   }
@@ -605,7 +606,16 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   Future<void> _initialize() async {
     try {
-      _restoreQueue();
+      try {
+        _restoreQueue();
+      } catch (e, stackTrace) {
+        // A damaged saved queue must not keep the player from starting.
+        logger.log(
+          'Could not restore the queue',
+          error: e,
+          stackTrace: stackTrace,
+        );
+      }
       if (isMobilePlatform) {
         final session = await AudioSession.instance;
         await session.configure(const AudioSessionConfiguration.music());

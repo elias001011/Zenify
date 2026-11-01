@@ -75,10 +75,6 @@ MediaItem mapToMediaItem(Map song) {
   );
 }
 
-/// Compares two Duration objects with tolerance for minor differences.
-///
-/// This prevents unnecessary updates when duration values have minor variations
-/// (e.g., due to buffering or precision differences).
 /// Where [item]'s artwork is: a file path for a downloaded song, otherwise
 /// its URL; null without one.
 String? mediaItemArtworkSource(MediaItem item) {
@@ -90,6 +86,10 @@ String? mediaItemArtworkSource(MediaItem item) {
   return uri.toString();
 }
 
+/// Compares two Duration objects with tolerance for minor differences.
+///
+/// This prevents unnecessary updates when duration values have minor variations
+/// (e.g., due to buffering or precision differences).
 bool durationEquals(Duration? prev, Duration? curr) {
   if (prev == curr) return true;
   if (prev == null || curr == null) return prev == curr;

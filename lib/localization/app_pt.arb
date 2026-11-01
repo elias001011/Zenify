@@ -244,6 +244,7 @@
   "lyrics": "Letras",
   "lyricsNotAvailable": "Letras não disponíveis",
   "makeOffline": "Disponibilizar offline",
+  "minutesShort": "{minutes} min",
   "minutes": "Minutos",
   "minutesListened": "minutos ouvidos",
   "monthlyListeners": "ouvintes mensais",

@@ -258,8 +258,6 @@ class PlayerControlButtons extends StatelessWidget {
             ? 6.0
             : isTight
             ? 10.0
-            : screenWidth < 360
-            ? 8.0
             : 16.0;
         final minButtonSize = isUltraTight
             ? 38.0
@@ -503,7 +501,7 @@ class _PlaybackControlsRow extends StatelessWidget {
                     forward: true,
                     isEnabled:
                         audioHandler.hasNext ||
-                        repeatMode == AudioServiceRepeatMode.one,
+                        repeatMode != AudioServiceRepeatMode.none,
                     tooltip: context.l10n!.skipToNext,
                     onPressed: () => repeatMode == AudioServiceRepeatMode.one
                         ? audioHandler.playAgain()
