@@ -24,6 +24,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/screens/user_songs_page.dart';
 import 'package:musify/services/keyboard_shortcuts_manager.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/utilities/language_utils.dart';
 import 'package:musify/utilities/platform_utils.dart';
 
@@ -138,9 +139,14 @@ final showAudioQualityBadge = ValueNotifier<bool>(
   Hive.box('settings').get('showAudioQualityBadge', defaultValue: false),
 );
 
+/// Off until turned on, except where local files already exist: they were
+/// always shown before the switch, and an update must not hide them.
+bool _readShowLocalFiles(Box settings) =>
+    settings.get('showLocalFiles', defaultValue: localFiles.value.isNotEmpty);
+
 /// Shows the audio files kept on this device in the library.
 final showLocalFiles = ValueNotifier<bool>(
-  Hive.box('settings').get('showLocalFiles', defaultValue: false),
+  _readShowLocalFiles(Hive.box('settings')),
 );
 
 const double minInterfaceScale = 0.8;
@@ -278,7 +284,7 @@ void reloadSettingsFromStorage() {
     'showAudioQualityBadge',
     defaultValue: false,
   );
-  showLocalFiles.value = settings.get('showLocalFiles', defaultValue: false);
+  showLocalFiles.value = _readShowLocalFiles(settings);
   interfaceScale.value = _readInterfaceScale();
   startMaximized.value = settings.get('startMaximized', defaultValue: false);
   customTitleBar.value = settings.get('customTitleBar', defaultValue: true);

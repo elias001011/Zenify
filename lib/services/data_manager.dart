@@ -293,6 +293,7 @@ const _deviceSettings = [
   'customTitleBar',
   'startMaximized',
   'interfaceScale',
+  'showLocalFiles',
   'compactDesktopPlayer',
   'keyboardShortcuts',
   'floatingEffect',
