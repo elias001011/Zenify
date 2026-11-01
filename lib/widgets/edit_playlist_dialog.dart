@@ -42,7 +42,7 @@ class _EditPlaylistDialogState extends State<EditPlaylistDialog> {
 
   Future<void> _pickImage() async {
     final result = await pickImage();
-    if (result != null) {
+    if (result != null && mounted) {
       setState(() {
         _imageBase64 = result;
         _imageUrlController.text = '';
@@ -127,9 +127,12 @@ class _EditPlaylistDialogState extends State<EditPlaylistDialog> {
         ),
         FilledButton.icon(
           onPressed: () {
+            final title = _titleController.text.trim();
+            // A playlist without a name could not be told apart.
+            if (title.isEmpty) return;
             final newPlaylist = {
               'ytid': widget.playlistData['ytid'],
-              'title': _titleController.text,
+              'title': title,
               'source': widget.playlistData['source'] ?? 'user-created',
               if (_imageBase64 != null)
                 'image': _imageBase64

@@ -683,20 +683,13 @@ String _upgradeArtistThumbnailResolution(String thumbnail) {
 String normalizeArtistDisplayTitle(String value) =>
     _cleanArtistSearchTerm(value).replaceAll(RegExp(r'\s+'), ' ').trim();
 
-bool looksUnofficialArtistName(String name) {
-  final lowerName = name.toLowerCase();
-  return lowerName.contains('cover') ||
-      lowerName.contains('lyrics') ||
-      lowerName.contains('lyric') ||
-      lowerName.contains('reaction') ||
-      lowerName.contains('fan') ||
-      lowerName.contains('tribute') ||
-      lowerName.contains('karaoke') ||
-      lowerName.contains('parody') ||
-      lowerName.contains('nightcore') ||
-      lowerName.contains('sped up') ||
-      lowerName.contains('slowed');
-}
+final _unofficialArtistName = RegExp(
+  r'\b(?:covers?|lyrics?|reactions?|fans?|tributes?|karaoke|parody|nightcore|sped up|slowed)\b',
+);
+
+/// Whole words only: "Fancy" and "Recovery" are artists, "Queen Fans" is not.
+bool looksUnofficialArtistName(String name) =>
+    _unofficialArtistName.hasMatch(name.toLowerCase());
 
 List<Map<String, dynamic>> dedupeArtistCatalogSongs(
   List<Map<String, dynamic>> songs,

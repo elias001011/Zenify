@@ -59,7 +59,8 @@ final class ArtistPatterns {
   static final audioVideoLyrics = RegExp(
     r'\b(official|audio|video|lyrics?|visuali[sz]er)\b',
   );
-  static final nonAlphanumeric = RegExp('[^a-z0-9&]+');
+  // Letters and digits of any script: a title in Japanese is not empty.
+  static final nonAlphanumeric = RegExp(r'[^\p{L}\p{N}&]+', unicode: true);
   static final multipleSpaces = RegExp(r'\s+');
 
   // Patterns for splitting featured artists

@@ -208,6 +208,7 @@ void showCreatePlaylistDialog(
                   const SizedBox(height: 20),
                   if (isYouTubeMode)
                     TextField(
+                      key: const ValueKey('youtube-playlist-link'),
                       decoration: InputDecoration(
                         labelText: context.l10n!.youtubePlaylistLinkOrId,
                         prefixIcon: Icon(
@@ -226,6 +227,7 @@ void showCreatePlaylistDialog(
                     )
                   else ...[
                     TextField(
+                      key: const ValueKey('custom-playlist-name'),
                       decoration: InputDecoration(
                         labelText: context.l10n!.customPlaylistName,
                         prefixIcon: Icon(
@@ -297,7 +299,8 @@ void showCreatePlaylistDialog(
                     if (context.mounted) showToast(context, result);
                     if (!context.mounted) return;
                     Navigator.pop(context);
-                  } else if (!isYouTubeMode && customPlaylistName.isNotEmpty) {
+                  } else if (!isYouTubeMode &&
+                      customPlaylistName.trim().isNotEmpty) {
                     final (result, newPlaylistId) = createCustomPlaylist(
                       customPlaylistName.trim(),
                       imageBase64 ?? imageUrl,
