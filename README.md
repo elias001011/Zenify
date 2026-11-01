@@ -149,6 +149,10 @@ New in Zenify:
   switched off. Moods, Zenify playlists and radios are hidden in offline mode,
   including in the library; downloaded songs and playlists stay available.
   Saved Zenify playlists and tuning travel with backups and Local Sync.
+- **Local files** (off by default): turn on *Show local files* in Settings to
+  see the audio kept on your device in the library. They play like any song,
+  but they are never downloaded, liked, added to playlists, synced or counted
+  in your recap, and their lyrics are never looked up.
 - **Artist and playlist radios**: start a radio from an artist or playlist;
   YouTube Music supplies the queue, with the automatic picker as a fallback.
   The automatic picker and the suggestions at the end of a playlist also ask
