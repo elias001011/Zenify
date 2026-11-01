@@ -38,13 +38,6 @@ import 'package:musify/widgets/floating_surface.dart';
 /// phones.
 enum PlayerPanel { queue, lyrics }
 
-/// Whether [song] gets a lyrics button: a local file or a radio station has
-/// no lyrics to look up, and none is looked up offline.
-bool songHasLyrics(MediaItem song) =>
-    !offlineMode.value &&
-    !(song.extras?['isLive'] ?? false) &&
-    !isLocalSongId(song.extras?['ytid']);
-
 /// The player's actions besides playback: lyrics, queue, volume, sleep
 /// timer, download, add to playlist and like.
 class PlayerActions extends StatefulWidget {
@@ -160,7 +153,10 @@ class _PlayerActionsState extends State<PlayerActions> {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (songHasLyrics(widget.metadata))
+            // A local file has no lyrics to look up, so it gets no button,
+            // unless the panel is open: then the button is how to close it.
+            if ((online && !isRadioStation && !local) ||
+                widget.panel == PlayerPanel.lyrics)
               PlayerActionButton(
                 icon: FluentIcons.text_quote_24_regular,
                 tooltip: l10n.lyrics,

@@ -173,50 +173,55 @@ void main() {
   }
 
   for (final size in [const Size(420, 860), const Size(1280, 800)]) {
-    testWidgets('lyrics close when the next song has none ($size)', (
-      tester,
-    ) async {
-      tester.view.physicalSize = size;
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      audioHandler = _Handler();
-      audioHandler.mediaItem.add(
-        const MediaItem(id: 'a', title: 'Online', extras: {'ytid': 'a'}),
-      );
-      await tester.pumpWidget(
-        const MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            ...GlobalMaterialLocalizations.delegates,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: NowPlayingPage(),
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 600));
+    testWidgets(
+      'open lyrics stay, with their button, on a song without ($size)',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        audioHandler = _Handler();
+        audioHandler.mediaItem.add(
+          const MediaItem(id: 'a', title: 'Online', extras: {'ytid': 'a'}),
+        );
+        await tester.pumpWidget(
+          const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              ...GlobalMaterialLocalizations.delegates,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: NowPlayingPage(),
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 600));
+        await tester.tap(find.byTooltip('Lyrics'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 600));
 
-      await tester.tap(find.byTooltip('Lyrics'));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 600));
-      expect(find.byType(LyricsPanel), findsOneWidget);
+        audioHandler.mediaItem.add(
+          const MediaItem(
+            id: 'local:b',
+            title: 'Local',
+            extras: {'ytid': 'local:b'},
+          ),
+        );
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 600));
 
-      audioHandler.mediaItem.add(
-        const MediaItem(
-          id: 'local:b',
-          title: 'Local',
-          extras: {'ytid': 'local:b'},
-        ),
-      );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 600));
-
-      expect(find.byType(LyricsPanel), findsNothing);
-      expect(find.byTooltip('Lyrics'), findsNothing);
-      expect(tester.takeException(), isNull);
-      await tester.pumpWidget(const SizedBox());
-      await tester.pump(const Duration(seconds: 30));
-    });
+        expect(find.byType(LyricsPanel), findsOneWidget);
+        expect(find.text('Lyrics not available'), findsOneWidget);
+        // The way to close it is still there, and it works.
+        await tester.tap(find.byTooltip('Lyrics'));
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 600));
+        expect(find.byType(LyricsPanel), findsNothing);
+        expect(find.byTooltip('Lyrics'), findsNothing);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 30));
+      },
+    );
   }
 
   testWidgets(
