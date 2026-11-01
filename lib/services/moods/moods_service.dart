@@ -23,6 +23,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import 'package:musify/localization/app_localizations.dart';
@@ -829,7 +830,7 @@ class MoodsService {
       case 'moment':
         final slot = now.hour ~/ 4;
         final start = DateTime(now.year, now.month, now.day, slot * 4);
-        final mood = _momentMood(slot, now.weekday);
+        final mood = momentMood(slot, now.weekday);
         return made(
           momentTitle(l10n, now),
           l10n.zenifyChangesEvery4Hours,
@@ -907,15 +908,16 @@ class MoodsService {
 
   /// Late night winds down, mornings wake up, Friday and Saturday nights
   /// party.
-  static Mood _momentMood(int slot, int weekday) {
-    final weekend = weekday >= DateTime.friday;
+  @visibleForTesting
+  static Mood momentMood(int slot, int weekday) {
+    final nightOut = weekday == DateTime.friday || weekday == DateTime.saturday;
     return switch (slot) {
       0 => Mood.sleep,
       1 => Mood.chill,
       2 => Mood.energize,
       3 => weekday <= DateTime.friday ? Mood.focus : Mood.feelGood,
-      4 => weekend ? Mood.feelGood : Mood.commute,
-      _ => weekend ? Mood.party : Mood.chill,
+      4 => nightOut ? Mood.feelGood : Mood.commute,
+      _ => nightOut ? Mood.party : Mood.chill,
     };
   }
 

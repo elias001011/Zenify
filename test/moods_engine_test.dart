@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:musify/services/moods/mix_engine.dart';
 import 'package:musify/services/moods/moods_preferences.dart';
+import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/moods/taste.dart';
 
 Map<String, dynamic> song(
@@ -18,6 +19,21 @@ Map<String, dynamic> song(
 };
 
 void main() {
+  test('only Friday and Saturday evenings party', () {
+    for (final (weekday, party) in [
+      (DateTime.thursday, false),
+      (DateTime.friday, true),
+      (DateTime.saturday, true),
+      (DateTime.sunday, false),
+    ]) {
+      expect(
+        MoodsService.momentMood(5, weekday) == Mood.party,
+        party,
+        reason: 'weekday $weekday',
+      );
+    }
+  });
+
   test('songs are never judged by their title', () {
     final taste = Taste.of(
       liked: [song('jorge', title: 'Chove Chuva', artist: 'Jorge Ben Jor')],

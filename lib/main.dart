@@ -547,9 +547,7 @@ Future<String?> initialisation() async {
     }
   } catch (e, stackTrace) {
     logger.log('Initialization Error', error: e, stackTrace: stackTrace);
-    if (isDesktopPlatform) {
-      startupError ??= '$appName could not complete initialization.\n\n$e';
-    }
+    startupError ??= '$appName could not complete initialization.\n\n$e';
   }
 
   try {
