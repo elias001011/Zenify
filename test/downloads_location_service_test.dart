@@ -133,6 +133,18 @@ void main() {
     expect(File('$defaultRoot/tracks/my song.m4a').existsSync(), isTrue);
   });
 
+  test('the same folder under another spelling keeps the only copy', () async {
+    final alias = '${tempDir.path}/alias';
+    Link(alias).createSync(defaultRoot);
+
+    final status = await DownloadsLocation.change(alias);
+
+    expect(status, DownloadsMoveStatus.moved);
+    expect(File(FilePaths.getAudioPath(songId)).readAsStringSync(), 'audio');
+    expect(File('$defaultRoot/artworks/$songId.jpg').existsSync(), isTrue);
+    Link(alias).deleteSync();
+  });
+
   test('copies files kept outside our folders and leaves them', () async {
     const legacyId = 'bbbbbbbbbbb';
     final legacy = Directory('${tempDir.path}/Documents/tracks')

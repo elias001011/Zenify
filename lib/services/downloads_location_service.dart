@@ -194,6 +194,11 @@ class DownloadsLocation {
   static Future<bool> _moveFile(File file, String destination) async {
     try {
       final existing = File(destination);
+      // The same file under another spelling (symlink, case): nothing to move.
+      if (await existing.exists() &&
+          await FileSystemEntity.identical(existing.path, file.path)) {
+        return true;
+      }
       if (await existing.exists() &&
           await existing.length() == await file.length()) {
         // Same song id, already there: keep one copy, not two.
