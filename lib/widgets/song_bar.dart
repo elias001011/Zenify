@@ -361,7 +361,7 @@ class _SongBarState extends State<SongBar> {
     false: FluentIcons.heart_24_regular,
   };
 
-  late final ValueNotifier<bool> _songLikeStatus;
+  late ValueNotifier<bool> _songLikeStatus;
   late ValueNotifier<bool> _songOfflineStatus;
   late ValueNotifier<bool> _songDownloadStatus;
   late String _songTitle;
@@ -421,10 +421,11 @@ class _SongBarState extends State<SongBar> {
     final previous = _ytid;
     _readSong();
     if (_ytid != previous) {
-      // An offline or download change still running for the last song writes
-      // to the notifiers it started with. This song gets new ones, so that
-      // write cannot land on the song now shown. The old ones are not
+      // A like, offline or download change still running for the last song
+      // writes to the notifiers it started with. This song gets new ones, so
+      // that write cannot land on the song now shown. The old ones are not
       // disposed: that write would fail.
+      _songLikeStatus = ValueNotifier(isSongAlreadyLiked(_ytid));
       _songDownloadStatus = ValueNotifier(false);
       _songOfflineStatus = ValueNotifier(isSongAlreadyOffline(_ytid));
     }

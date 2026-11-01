@@ -133,25 +133,27 @@ class AudioLevels {
     // EventChannel cancellation is asynchronous. Finish releasing the old
     // reader before attaching another, including after a surface remount.
     void update() {
-      transition = transition.then((_) async {
-        if (!listening || !visible) {
-          await source?.cancel();
-          source = null;
-        } else if (source == null) {
-          var normalizer = _Normalizer();
-          String? track;
-          source = (isDesktopPlatform ? _mpvFrames() : _androidFrames()).listen(
-            (frame) {
-              final current = audioHandler.mediaItem.valueOrNull?.id;
-              if (current != track) {
-                track = current;
-                normalizer = _Normalizer();
-              }
-              _levels?.add(normalizer(frame));
-            },
-          );
-        }
-      });
+      // A failed release must not break the chain: later changes still run.
+      transition = transition
+          .then((_) async {
+            if (!listening || !visible) {
+              await source?.cancel();
+              source = null;
+            } else if (source == null) {
+              var normalizer = _Normalizer();
+              String? track;
+              source = (isDesktopPlatform ? _mpvFrames() : _androidFrames())
+                  .listen((frame) {
+                    final current = audioHandler.mediaItem.valueOrNull?.id;
+                    if (current != track) {
+                      track = current;
+                      normalizer = _Normalizer();
+                    }
+                    _levels?.add(normalizer(frame));
+                  });
+            }
+          })
+          .catchError((Object _) {});
     }
 
     return (_levels ??= StreamController.broadcast(

@@ -441,6 +441,8 @@ class DownloadManager {
   void flush() {
     _persistTimer?.cancel();
     _persistTimer = null;
+    // Closed while a backup is restored or the app shuts down.
+    if (!Hive.isBoxOpen('userNoBackup')) return;
     final history = [
       for (final entry in entries.value)
         if (!_isActive(entry)) entry.toMap(),
