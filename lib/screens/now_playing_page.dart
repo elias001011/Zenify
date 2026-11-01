@@ -19,12 +19,14 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:async';
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/artwork_glow.dart';
@@ -69,6 +71,27 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
   final _backdropKey = BackdropKey();
   Animation<double>? _routeAnimation;
   bool _backgroundVisible = false;
+  StreamSubscription<MediaItem?>? _songSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _songSubscription = audioHandler.mediaItem.listen(
+      (_) => _closeLyricsIfUnavailable(),
+    );
+    offlineMode.addListener(_closeLyricsIfUnavailable);
+  }
+
+  /// The button that closes the lyrics goes with the song that has none.
+  void _closeLyricsIfUnavailable() {
+    final song = audioHandler.mediaItem.value;
+    if (mounted &&
+        _panel == PlayerPanel.lyrics &&
+        song != null &&
+        !songHasLyrics(song)) {
+      setState(() => _panel = null);
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -91,6 +114,8 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
 
   @override
   void dispose() {
+    unawaited(_songSubscription?.cancel());
+    offlineMode.removeListener(_closeLyricsIfUnavailable);
     _routeAnimation?.removeStatusListener(_onRouteStatus);
     super.dispose();
   }
