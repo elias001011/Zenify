@@ -92,6 +92,10 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
         borderRadius: _radius,
       ),
     );
+    // Phones and tablets slide the cover with each skip; desktop keeps it still.
+    final front = isDesktopPlatform
+        ? artwork
+        : _SkipSlide(trackId: widget.metadata.id, child: artwork);
 
     final content = ValueListenableBuilder<bool>(
       valueListenable: showPlayerVisualizer,
@@ -99,7 +103,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
         onTap: () => setPlayerVisualizer(!visualizer),
         child: FlipCard(
           flipped: visualizer,
-          frontWidget: artwork,
+          frontWidget: front,
           backWidget: SizedBox.square(
             dimension: size,
             // The card builds only the side in view, so the waves listen
@@ -162,6 +166,59 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
           child: child,
         ),
       ),
+    );
+  }
+}
+
+/// Which way the next song change goes: 1 forward, -1 back. The skip buttons
+/// set it just before they skip, and the cover takes it on the change.
+int skipDirection = 1;
+
+/// Slides the cover the way the song goes, as Spotify does: the new cover
+/// comes in from the side of the skip and the old one leaves to the other.
+class _SkipSlide extends StatefulWidget {
+  const _SkipSlide({required this.trackId, required this.child});
+
+  final String trackId;
+  final Widget child;
+
+  @override
+  State<_SkipSlide> createState() => _SkipSlideState();
+}
+
+class _SkipSlideState extends State<_SkipSlide> {
+  /// 1 forward, -1 back. Read while the cover moves.
+  int _direction = 1;
+
+  @override
+  void didUpdateWidget(_SkipSlide oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.trackId != oldWidget.trackId) {
+      _direction = skipDirection;
+      skipDirection = 1;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 350),
+      transitionBuilder: (child, animation) {
+        final incoming = child.key == ValueKey(widget.trackId);
+        return AnimatedBuilder(
+          animation: animation,
+          child: child,
+          builder: (context, child) {
+            final t = Curves.easeOutCubic.transform(animation.value);
+            final shift = incoming ? 1 - t : t - 1;
+            return FractionalTranslation(
+              translation: Offset(shift * _direction, 0),
+              child: child,
+            );
+          },
+        );
+      },
+      child: KeyedSubtree(key: ValueKey(widget.trackId), child: widget.child),
     );
   }
 }

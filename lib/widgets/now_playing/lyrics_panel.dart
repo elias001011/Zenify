@@ -25,6 +25,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/lyrics/lyrics_models.dart';
 import 'package:musify/services/screen_awake.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -71,6 +72,11 @@ class _LyricsPanelState extends State<LyricsPanel> {
     final key = '${widget.metadata.artist} - ${widget.metadata.title}';
     if (key == _resolvedKey) return;
     _resolvedKey = key;
+    // A local file's title is its file name: it is never sent online.
+    if (isLocalSongId(widget.metadata.extras?['ytid'])) {
+      _lyricsFuture = Future.value();
+      return;
+    }
     _lyricsFuture = getSongLyricsResult(
       widget.metadata.artist,
       widget.metadata.title,

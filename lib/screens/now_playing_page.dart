@@ -305,7 +305,7 @@ class _UprightStageState extends State<_UprightStage>
     with SingleTickerProviderStateMixin {
   static const _headerSize = 56.0;
   static const _titleHeight = 72.0;
-  static const _gap = 16.0;
+  static const _gap = 24.0;
 
   late final _controller = AnimationController(
     vsync: this,

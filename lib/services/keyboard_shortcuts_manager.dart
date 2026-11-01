@@ -30,6 +30,7 @@ import 'package:musify/main.dart';
 import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/screens/search_page.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -324,6 +325,8 @@ class KeyboardShortcutsManager {
         final song = audioHandler.currentSong;
         final ytid = song == null ? null : song['ytid']?.toString();
         if (song == null || ytid == null || ytid.isEmpty) break;
+        // Local files are never downloaded.
+        if (isLocalSongId(ytid)) break;
         unawaited(_toggleCurrentSongOffline(song, ytid));
       case ShortcutAction.focusSearch:
         NavigationManager.router.go(NavigationManager.searchPath);

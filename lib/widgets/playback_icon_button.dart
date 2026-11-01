@@ -90,7 +90,24 @@ Widget buildPlaybackIconButton(
           height: iconSize * 2,
         ),
         materialTapTargetSize: MaterialTapTargetSize.padded,
-        child: Semantics(label: semanticLabel, button: true, child: iconWidget),
+        child: Semantics(
+          label: semanticLabel,
+          button: true,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            transitionBuilder: (child, animation) => FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.7, end: 1).animate(animation),
+                child: child,
+              ),
+            ),
+            child: KeyedSubtree(
+              key: ValueKey((processingState, isPlaying)),
+              child: iconWidget,
+            ),
+          ),
+        ),
       );
     },
   );

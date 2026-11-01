@@ -2150,6 +2150,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         return null;
       }
 
+      // A local file that moved has no online copy to fall back to.
+      if (isLocalSongId(songData['ytid'])) return null;
+
       logger.log(
         'Offline file missing for ${songData['ytid']}, switching to online',
       );
