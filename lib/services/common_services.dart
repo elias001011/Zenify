@@ -896,6 +896,8 @@ Future<bool> makeSongOffline(dynamic song, {bool Function()? cancelled}) async {
     logger.log('makeSongOffline: song["ytid"] is null or empty');
     return false;
   }
+  // Local files are never downloaded.
+  if (isLocalSongId(ytid)) return false;
 
   if (isSongAlreadyOffline(ytid)) {
     final existingPath = _storedOfflinePath(

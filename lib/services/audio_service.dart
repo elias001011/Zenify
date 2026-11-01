@@ -2125,6 +2125,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       );
       return null;
     }
+    // A local file that is missing has no online copy to play from, and its
+    // id is never sent to a stream lookup.
+    if (!isOffline && isLocalSongId(songData['ytid'])) return null;
 
     final songUrl = await _getPlaybackUrl(songData, isOffline);
 
@@ -2149,9 +2152,6 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         logger.log('Could not check offline mode, failing playback');
         return null;
       }
-
-      // A local file that moved has no online copy to fall back to.
-      if (isLocalSongId(songData['ytid'])) return null;
 
       logger.log(
         'Offline file missing for ${songData['ytid']}, switching to online',

@@ -23,6 +23,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/flip_card.dart';
@@ -237,6 +238,8 @@ String _normalizeCodec(String codec) => switch (codec) {
 
 /// Resolves a song's stored or playback audio quality, or null if unavailable.
 Future<_AudioQualityInfo?> _resolveAudioQuality(String ytid) async {
+  // A local file has no stream to ask about, and its id is never sent out.
+  if (isLocalSongId(ytid)) return null;
   final offlineSong = getOfflineSongByYtid(ytid);
   final offlineBitrate = offlineSong['audioBitrateKbps'] as int?;
   final offlineCodec = offlineSong['audioCodec'] as String?;
