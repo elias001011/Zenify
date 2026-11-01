@@ -31,6 +31,19 @@ void main() {
     await directory.delete(recursive: true);
   });
 
+  test('a queue that could not be written is written again', () async {
+    final songs = [for (var i = 0; i < 4; i++) song(i)];
+    await Hive.box('userNoBackup').close();
+    memory.saveQueue(songs, songs, 1);
+    await memory.flush();
+
+    await Hive.openBox('userNoBackup');
+    memory.saveQueue(songs, songs, 1);
+    await memory.flush();
+
+    expect(memory.read()?.songs, hasLength(4));
+  });
+
   test(
     'restores duplicate tracks, shuffle order and position by entry',
     () async {

@@ -210,7 +210,10 @@ class QueuePersistenceService {
     _timer = null;
     final pending = _pending;
     _pending = null;
-    if (!Hive.isBoxOpen('userNoBackup')) return;
+    if (!Hive.isBoxOpen('userNoBackup')) {
+      if (pending != null) _savedShape = null;
+      return;
+    }
     try {
       final box = Hive.box('userNoBackup');
       if (pending != null) {
@@ -225,6 +228,8 @@ class QueuePersistenceService {
       }
       await box.flush();
     } catch (error, stack) {
+      // Forgotten, so the next change writes the queue again.
+      if (pending != null) _savedShape = null;
       logger.log(
         'Could not remember playback queue',
         error: error,
