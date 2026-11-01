@@ -362,8 +362,8 @@ class _SongBarState extends State<SongBar> {
   };
 
   late final ValueNotifier<bool> _songLikeStatus;
-  late final ValueNotifier<bool> _songOfflineStatus;
-  late final ValueNotifier<bool> _songDownloadStatus;
+  late ValueNotifier<bool> _songOfflineStatus;
+  late ValueNotifier<bool> _songDownloadStatus;
   late String _songTitle;
   late String _songArtist;
   late String? _artworkPath;
@@ -420,7 +420,14 @@ class _SongBarState extends State<SongBar> {
     super.didUpdateWidget(oldWidget);
     final previous = _ytid;
     _readSong();
-    if (_ytid != previous) _songDownloadStatus.value = false;
+    if (_ytid != previous) {
+      // An offline or download change still running for the last song writes
+      // to the notifiers it started with. This song gets new ones, so that
+      // write cannot land on the song now shown. The old ones are not
+      // disposed: that write would fail.
+      _songDownloadStatus = ValueNotifier(false);
+      _songOfflineStatus = ValueNotifier(isSongAlreadyOffline(_ytid));
+    }
     _songLikeStatus.value = isSongAlreadyLiked(_ytid);
     _songOfflineStatus.value = isSongAlreadyOffline(_ytid);
   }
