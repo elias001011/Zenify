@@ -198,6 +198,13 @@
   "hours": "Hours",
   "imagePicked": "Image selected",
   "importPlaylist": "Import playlist",
+  "exportPlaylistsCsv": "Export playlists as CSV",
+  "exportPlaylists": "Export",
+  "exportPlaylistsInstructions": "Choose the playlists to save as CSV files. Each file has Song and Artist columns, so it can be imported again with Import playlist from Spotify.",
+  "exportPlaylistsEmpty": "There are no playlists to export",
+  "exportPlaylistsNone": "None of the playlists could be loaded",
+  "exportPlaylistsDone": "{count, plural, =1{1 playlist exported} other{{count} playlists exported}}",
+  "exportPlaylistsPartial": "{done} exported, {failed} could not be loaded",
   "importSpotifyPlaylist": "Import playlist from Spotify",
   "importSpotifyPlaylistInstructions": "Export your Spotify playlist as CSV at chosic.com/spotify-playlist-exporter/, then choose the file or paste its contents below. Zenify will search YouTube for each song.",
   "importSpotifyPlaylistTitle": "Import Spotify playlist",
@@ -547,6 +554,23 @@
   "@songsSelected": {
     "placeholders": {
       "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@exportPlaylistsDone": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@exportPlaylistsPartial": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "failed": {
         "type": "int"
       }
     }

@@ -9,6 +9,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/database/radio_stations.db.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
+import 'package:musify/screens/export_playlists_page.dart';
 import 'package:musify/screens/library_page.dart';
 import 'package:musify/screens/moods_tuning_page.dart';
 import 'package:musify/screens/playlist_page.dart';
@@ -243,6 +244,7 @@ void main() {
         ('/library/moods-tuning', '/library'),
         ('/library/radioStations', '/library'),
         ('/home/playlist/zenify%3Adaily', '/home'),
+        ('/settings/export-playlists', '/settings'),
       ]) {
         router.go(path);
         await tester.pump();
@@ -251,6 +253,7 @@ void main() {
         expect(find.byType(MoodsTuningPage), findsNothing);
         expect(find.byType(RadioStationsPage), findsNothing);
         expect(find.byType(PlaylistPage), findsNothing);
+        expect(find.byType(ExportPlaylistsPage), findsNothing);
       }
       await finish(tester);
     },

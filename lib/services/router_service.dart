@@ -30,6 +30,7 @@ import 'package:musify/screens/artist_page.dart';
 import 'package:musify/screens/bottom_navigation_page.dart';
 import 'package:musify/screens/downloads_page.dart';
 import 'package:musify/screens/equalizer_page.dart';
+import 'package:musify/screens/export_playlists_page.dart';
 import 'package:musify/screens/home_page.dart';
 import 'package:musify/screens/import_spotify_playlist_page.dart';
 import 'package:musify/screens/keyboard_shortcuts_page.dart';
@@ -116,6 +117,7 @@ class NavigationManager {
   String? _offlineFallback(GoRouterState state) {
     if (!offlineMode.value) return null;
     final location = state.matchedLocation;
+    if (location.endsWith('/export-playlists')) return settingsPath;
     if (location.endsWith('/moods-tuning') ||
         location.endsWith('/radioStations')) {
       return libraryPath;
@@ -350,6 +352,11 @@ class NavigationManager {
                   child: const ImportSpotifyPlaylistPage(),
                   state: state,
                 ),
+              ),
+              GoRoute(
+                path: 'export-playlists',
+                pageBuilder: (context, state) =>
+                    _pushPage(child: const ExportPlaylistsPage(), state: state),
               ),
               GoRoute(
                 path: 'keyboard-shortcuts',

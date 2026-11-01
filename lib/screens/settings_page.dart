@@ -469,6 +469,16 @@ class SettingsPage extends StatelessWidget {
           FluentIcons.arrow_upload_24_regular,
           onTap: () => context.push('/settings/import-spotify-playlist'),
         ),
+        ValueListenableBuilder<bool>(
+          valueListenable: offlineMode,
+          builder: (context, offline, _) => offline
+              ? const SizedBox.shrink()
+              : CustomBar(
+                  context.l10n!.exportPlaylistsCsv,
+                  FluentIcons.arrow_download_24_regular,
+                  onTap: () => context.push('/settings/export-playlists'),
+                ),
+        ),
         CustomBar(
           context.l10n!.backupUserData,
           FluentIcons.cloud_sync_24_regular,
