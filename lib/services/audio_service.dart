@@ -210,12 +210,16 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   Stream<double> get volumeStream => audioPlayer.volumeStream;
   double get volume => audioPlayer.volume;
 
+  /// Where the song is: the saved spot while a restored queue has no source
+  /// loaded yet, the player's position otherwise.
+  Duration get _position => audioPlayer.audioSource == null
+      ? (_resumePosition ?? audioPlayer.position)
+      : audioPlayer.position;
+
   /// Current snapshot, for listeners that subscribe while paused and would
   /// otherwise see nothing until the next position event.
   PositionData get currentPositionData => PositionData(
-    audioPlayer.audioSource == null
-        ? (_resumePosition ?? audioPlayer.position)
-        : audioPlayer.position,
+    _position,
     audioPlayer.bufferedPosition,
     audioPlayer.duration ?? mediaItem.valueOrNull?.duration ?? Duration.zero,
   );
@@ -805,9 +809,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
     try {
       final now = DateTime.now();
-      final currentPosition = audioPlayer.audioSource == null
-          ? (_resumePosition ?? audioPlayer.position)
-          : audioPlayer.position;
+      final currentPosition = _position;
       final playerProcessingState = audioPlayer.processingState;
       final isPlaying =
           audioPlayer.playing &&
@@ -1974,7 +1976,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> fastForward() {
-    final target = audioPlayer.position + const Duration(seconds: 15);
+    final target = _position + const Duration(seconds: 15);
     final trackDuration = audioPlayer.duration;
     final clamped = (trackDuration != null && target > trackDuration)
         ? trackDuration
@@ -1984,7 +1986,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> rewind() {
-    final target = audioPlayer.position - const Duration(seconds: 15);
+    final target = _position - const Duration(seconds: 15);
     final clamped = target < Duration.zero ? Duration.zero : target;
     return seek(clamped);
   }
