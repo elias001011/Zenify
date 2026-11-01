@@ -103,7 +103,7 @@ moving your library between devices.
 | Library | Sections | Filters (custom, YouTube, albums, artists, offline) and its own search, songs included; global search lists what you own first |
 | Listening recap | Minutes and top songs | Cards with minutes, top artists and top songs, shareable per month |
 | Downloads | In the background | Download manager with progress, failures and retry |
-| Devices | Backup and restore | Local Sync between Android, Linux and Windows over Wi-Fi, plus backup |
+| Devices | Backup and restore | Local Sync between Android, Linux and Windows over Wi-Fi, plus backup; the sync identity and downloads stay out of Android's automatic backup |
 | Desktop | Basic | Interface scale, title bar, remappable shortcuts, downloads folder, volume |
 | Updates | Musify's releases | Zenify's releases, with the right file for each platform |
 
@@ -149,10 +149,19 @@ New in Zenify:
   switched off. Moods, Zenify playlists and radios are hidden in offline mode,
   including in the library; downloaded songs and playlists stay available.
   Saved Zenify playlists and tuning travel with backups and Local Sync.
-- **Local files** (off by default): turn on *Show local files* in Settings to
-  see the audio kept on your device in the library. They play like any song,
-  but they are never downloaded, liked, added to playlists, synced or counted
-  in your recap, and their lyrics are never looked up.
+- **Local files** (off by default, on if you already had some): turn on *Show
+  local files* in Settings to see the audio kept on your device in the library.
+  Each file is copied into the app's own storage, so it keeps playing when the
+  picker's cache is cleared. They play like any song, but they are never
+  downloaded, liked, added to playlists, synced, backed up or counted in your
+  recap, and their lyrics are never looked up.
+- **Export playlists as CSV** (online only): Settings, below the Spotify
+  import. Pick playlists, albums, saved Zenify playlists or your liked songs;
+  each becomes a CSV file with Song and Artist columns that *Import playlist
+  from Spotify* reads back. On desktop you choose a folder; on Android the
+  files go through the share sheet.
+- **Add to playlist from Recents, Liked and Offline songs**: the same button
+  the playlist pages have, for every song on the page, hidden in offline mode.
 - **Artist and playlist radios**: start a radio from an artist or playlist;
   YouTube Music supplies the queue, with the automatic picker as a fallback.
   The automatic picker and the suggestions at the end of a playlist also ask
