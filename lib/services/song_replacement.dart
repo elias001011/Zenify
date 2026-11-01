@@ -78,6 +78,8 @@ bool isSameRecording(Map song, Map candidate) {
   if (length is num && candidateLength is num && length > 0) {
     if ((length - candidateLength).abs() > max(10, length * 0.1)) return false;
   }
+  // A title alone, with no artist and no length to check, proves nothing.
+  if (artist.isEmpty && !(length is num && length > 0)) return false;
   return true;
 }
 

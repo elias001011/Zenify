@@ -534,6 +534,8 @@ class SyncDocument {
     final map = Map<String, dynamic>.from(encodeSyncValue(raw) as Map);
     for (final key in [
       'audioPath',
+      'artworkPath',
+      'artWorkPath',
       'filePath',
       'downloadPath',
       'localPath',

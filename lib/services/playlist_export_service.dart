@@ -74,50 +74,76 @@ Future<List<Map>?> exportSongs(ExportEntry entry) async {
   }
 }
 
+/// Makes spreadsheets read the accents right.
+final _byteOrderMark = String.fromCharCode(0xFEFF);
+
 /// The CSV for [songs]. It has Song and Artist columns, like the files the
-/// Spotify import reads, so what is exported here can be imported again. The
-/// byte order mark makes spreadsheets read the accents right.
+/// Spotify import reads, so what is exported here can be imported again.
 String playlistCsv(Iterable<Map> songs) {
   final rows = [
     _csvHeader,
     for (final song in songs)
       if ((song['title']?.toString() ?? '').trim().isNotEmpty)
         [
-          song['title'].toString(),
-          song['artist']?.toString() ?? '',
+          _csvField(song['title'].toString(), text: true),
+          _csvField(song['artist']?.toString() ?? '', text: true),
           readMediaDuration(song['duration'])?.inMilliseconds.toString() ?? '',
-          song['ytid']?.toString() ?? '',
+          _csvField(song['ytid']?.toString() ?? ''),
           if (song['ytid'] case final String id when id.isNotEmpty)
             'https://music.youtube.com/watch?v=$id'
           else
             '',
         ],
   ];
-  return '﻿${rows.map((row) => row.map(_csvField).join(',')).join('\r\n')}\r\n';
+  return '$_byteOrderMark${rows.map((row) => row.join(',')).join('\r\n')}\r\n';
 }
 
-String _csvField(String value) => value.contains(RegExp(r'[",\r\n]'))
-    ? '"${value.replaceAll('"', '""')}"'
-    : value;
+/// Quotes what needs it. A [text] that starts like a formula (a title comes
+/// from whoever uploaded the video) gets a leading quote, so a spreadsheet
+/// shows it instead of running it.
+String _csvField(String value, {bool text = false}) {
+  final safe = text && RegExp(r'^[=+\-@\t\r]').hasMatch(value)
+      ? "'$value"
+      : value;
+  return safe.contains(RegExp(r'[",\r\n]'))
+      ? '"${safe.replaceAll('"', '""')}"'
+      : safe;
+}
 
-/// A file name for [title] that is safe on every system, not in [taken].
-String csvFileName(String title, Set<String> taken) {
+final _windowsDeviceName = RegExp(
+  r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])$',
+  caseSensitive: false,
+);
+
+/// A file name for [title] that is safe on every system, not in [taken] and
+/// not already in the folder ([exists]).
+String csvFileName(
+  String title,
+  Set<String> taken, {
+  bool Function(String name)? exists,
+}) {
   final clean = title
       .replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1f]'), '_')
       .trim()
       .replaceFirst(RegExp(r'[. ]+$'), '');
-  final base = String.fromCharCodes(
+  var base = String.fromCharCodes(
     (clean.isEmpty ? 'playlist' : clean).runes.take(80),
   );
+  if (_windowsDeviceName.hasMatch(base)) base = '_$base';
   var name = '$base.csv';
-  for (var copy = 2; !taken.add(name.toLowerCase()); copy++) {
+  for (
+    var copy = 2;
+    !taken.add(name.toLowerCase()) || (exists?.call(name) ?? false);
+    copy++
+  ) {
     name = '$base ($copy).csv';
   }
   return name;
 }
 
-/// Writes one CSV per entry into [directory], and returns the paths written
-/// with how many entries could not be loaded.
+/// Writes one CSV per entry into [directory], never over a file that is
+/// already there, and returns the paths written with how many entries could
+/// not be loaded or written.
 Future<({List<String> files, int failed})> writePlaylistCsvs(
   Iterable<ExportEntry> entries,
   Directory directory,
@@ -127,14 +153,23 @@ Future<({List<String> files, int failed})> writePlaylistCsvs(
   final files = <String>[];
   var failed = 0;
   for (final entry in entries) {
-    final songs = await exportSongs(entry);
-    if (songs == null || songs.isEmpty) {
+    try {
+      final songs = await exportSongs(entry);
+      if (songs == null || songs.isEmpty) {
+        failed++;
+        continue;
+      }
+      final name = csvFileName(
+        entry.title,
+        taken,
+        exists: (name) => File('${directory.path}/$name').existsSync(),
+      );
+      final file = File('${directory.path}/$name');
+      await file.writeAsString(playlistCsv(songs));
+      files.add(file.path);
+    } catch (_) {
       failed++;
-      continue;
     }
-    final file = File('${directory.path}/${csvFileName(entry.title, taken)}');
-    await file.writeAsString(playlistCsv(songs));
-    files.add(file.path);
   }
   return (files: files, failed: failed);
 }

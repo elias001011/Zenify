@@ -224,6 +224,18 @@ void main() {
     expect(kept.existsSync(), isTrue);
   });
 
+  test('a list that cannot be saved adds nothing', () async {
+    final path = makeFile('unsaved.mp3', 'unsaved song');
+    await Hive.box('userNoBackup').close();
+
+    final result = await addLocalFiles([path]);
+    await Hive.openBox('userNoBackup');
+
+    expect(result.added, 0);
+    expect(result.failed, 1);
+    expect(localFiles.value, isEmpty);
+  });
+
   test('a local file never becomes recently played', () async {
     await addLocalFiles([makeFile('recent.mp3', 'recent')]);
     final file = localFiles.value.single;

@@ -544,6 +544,22 @@ void main() {
       'duration': seconds,
     };
 
+    test('a title alone is not enough when nothing else can be checked', () {
+      final bare = {'title': 'Yesterday', 'artist': ''};
+
+      expect(
+        isSameRecording(bare, candidate('Yesterday', artist: 'Cover Band')),
+        isFalse,
+      );
+      expect(
+        isSameRecording({
+          ...bare,
+          'duration': 125,
+        }, candidate('Yesterday', seconds: 125)),
+        isTrue,
+      );
+    });
+
     test('a very short artist name is still the credit to look for', () {
       final short = {'title': 'Thunderstruck', 'artist': 'AC/DC'};
       expect(

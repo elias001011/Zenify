@@ -44,6 +44,13 @@ void main() {
     expect(item.artUri, Uri.parse('https://example.com/cover.jpg'));
   });
 
+  test('the stream resolver refuses a local id itself', () {
+    expect(
+      resolveBestAudioStream('local:0123abcd'),
+      throwsA(isA<ArgumentError>()),
+    );
+  });
+
   test('a local id never reaches the stream lookup', () async {
     expect(await fetchSongStreamUrl('local:0123abcd', false), isNull);
   });

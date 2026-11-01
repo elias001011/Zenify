@@ -104,6 +104,9 @@ class _Store {
       final target = _file(fileName);
       final temporary = File('${target.path}.tmp');
       await temporary.writeAsString(text, flush: true);
+      if (!Platform.isWindows) {
+        await Process.run('chmod', ['600', temporary.path]);
+      }
       await temporary.rename(target.path);
     });
     // A failed write must not stop the next ones, but its caller sees it.

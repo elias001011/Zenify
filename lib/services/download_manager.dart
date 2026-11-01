@@ -190,15 +190,17 @@ class DownloadManager {
     _watchOffline();
     if (offlineMode.value) return Future.value(false);
     final asker = cancelled ?? _never;
-    if (_inFlight[ytid] case final request?) {
+    // One that was stopped meanwhile (offline mode) is still winding down: a
+    // new ask must not join it, it would end as stopped too.
+    if (_inFlight[ytid] case final request? when request.epoch == _stopEpoch) {
       request.askers.add(asker);
       return request.result;
     }
-    final request = _Request()..askers.add(asker);
+    final request = _Request(_stopEpoch)..askers.add(asker);
     // A block body: `remove` returns this very request, whose future
     // whenComplete would then wait for for ever.
     request.result = _run(song, save, request).whenComplete(() {
-      _inFlight.remove(ytid);
+      if (identical(_inFlight[ytid], request)) _inFlight.remove(ytid);
     });
     return (_inFlight[ytid] = request).result;
   }
@@ -233,7 +235,10 @@ class DownloadManager {
       finished(entry);
       return true;
     } on DownloadStopped {
-      entries.value = entries.value.where((e) => e != entry).toList();
+      entries.value = [
+        if (epoch == _historyEpoch) ?earlier,
+        ...entries.value.where((e) => e != entry),
+      ];
       _dropFromBatch(entry.ytid);
       _checkIdle();
       return false;
@@ -487,6 +492,10 @@ typedef BatchProgress = ({int done, int total, int failed});
 /// A download that may be asked for by several callers, each with its own
 /// way to say it no longer wants it.
 class _Request {
+  _Request(this.epoch);
+
+  /// The stop count it was made under.
+  final int epoch;
   late final Future<bool> result;
   final askers = <bool Function()>[];
 }

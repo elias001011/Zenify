@@ -49,6 +49,24 @@ void main() {
     expect(csvFileName('x' * 200, taken).length, 84);
   });
 
+  test('a title that looks like a formula is shown, not run', () {
+    final csv = playlistCsv([
+      {'ytid': '-abcdefghij', 'title': '=HYPERLINK("x")', 'artist': '+1'},
+    ]);
+
+    expect(csv, contains('"\'=HYPERLINK(""x"")",\'+1,,-abcdefghij,'));
+  });
+
+  test('names avoid Windows devices and files already in the folder', () {
+    final taken = <String>{};
+
+    expect(csvFileName('CON', taken), '_CON.csv');
+    expect(
+      csvFileName('Mine', taken, exists: (name) => name == 'Mine.csv'),
+      'Mine (2).csv',
+    );
+  });
+
   test(
     'liked songs and custom playlists are written, the rest counted',
     () async {
@@ -93,6 +111,12 @@ void main() {
         File('${out.path}/Mine.csv').readAsStringSync(),
         contains('Custom song,You'),
       );
+      // A second export leaves the first files alone.
+      final again = await writePlaylistCsvs(entries.take(2), out);
+      expect(again.files.map((path) => path.split('/').last).toList()..sort(), [
+        'Liked (2).csv',
+        'Mine (2).csv',
+      ]);
     },
   );
 }

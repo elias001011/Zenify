@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -12,7 +13,8 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
-import 'package:musify/widgets/mini_player.dart';
+import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 /// Saves the playlists the user picks as CSV files, the format the Spotify
@@ -28,17 +30,24 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
   List<ExportEntry>? _entries;
   final _selected = <String>{};
   bool _exporting = false;
+  bool _loading = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _entries ?? _load();
+    if (_entries == null && !_loading) unawaited(_load());
   }
 
   Future<void> _load() async {
-    final entries = await exportableLibrary(
-      likedSongsTitle: context.l10n!.likedSongs,
-    );
+    _loading = true;
+    var entries = const <ExportEntry>[];
+    try {
+      entries = await exportableLibrary(
+        likedSongsTitle: context.l10n!.likedSongs,
+      );
+    } catch (e, stackTrace) {
+      logger.log('Error listing playlists', error: e, stackTrace: stackTrace);
+    }
     if (mounted) setState(() => _entries = entries);
   }
 
@@ -67,7 +76,6 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
     ];
     if (chosen.isEmpty || _exporting) return;
     setState(() => _exporting = true);
-    Directory? temporary;
     try {
       // A phone has no folder to write to: the files go through the share
       // sheet, where they can be saved or sent.
@@ -78,8 +86,10 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
         );
         target = picked == null ? null : Directory(picked);
       } else {
-        temporary = await Directory.systemTemp.createTemp('zenify_export');
-        target = temporary;
+        // Emptied by the next export, not now: the app that receives the files
+        // may read them after the share sheet is gone.
+        target = Directory('${(await getTemporaryDirectory()).path}/exports');
+        if (await target.exists()) await target.delete(recursive: true);
       }
       if (target == null) return;
 
@@ -113,9 +123,6 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
       logger.log('Error exporting playlists', error: e, stackTrace: stackTrace);
       if (mounted) showToast(context, context.l10n!.error);
     } finally {
-      if (temporary != null && await temporary.exists()) {
-        await temporary.delete(recursive: true);
-      }
       if (mounted) setState(() => _exporting = false);
     }
   }
@@ -181,7 +188,7 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
                   label: Text(context.l10n!.exportPlaylists),
                 ),
               ],
-              const SizedBox(height: MiniPlayer.playerHeight + 24),
+              const MiniPlayerBottomSpace(),
             ],
           ),
         ),

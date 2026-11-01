@@ -146,8 +146,13 @@ Future<({int added, int failed})> addLocalFiles(Iterable<String> paths) =>
       }
       if (added.isNotEmpty) {
         final updated = [...localFiles.value, ...added];
-        localFiles.value = updated;
-        await Hive.box('userNoBackup').put(_storageKey, updated);
+        try {
+          await Hive.box('userNoBackup').put(_storageKey, updated);
+          localFiles.value = updated;
+        } catch (_) {
+          // Not listed, so not added: their copies are swept at the next start.
+          return (added: 0, failed: failed + added.length);
+        }
       }
       return (added: added.length, failed: failed);
     });

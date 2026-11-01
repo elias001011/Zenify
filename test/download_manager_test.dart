@@ -220,6 +220,36 @@ void main() {
       expect(running, 0);
     });
 
+    test(
+      'a song asked for after a stop does not join the stopped one',
+      () async {
+        final stopping = manager.download(song('r'), save);
+        await Future<void>.delayed(Duration.zero);
+        final stopped = manager.stopAll();
+        final again = manager.download(song('r'), save);
+        expect(identical(stopping, again), isFalse);
+
+        open('r');
+        await stopped;
+        expect(await stopping, isFalse);
+        expect(await again, isTrue);
+        expect(saved, ['r']);
+      },
+    );
+
+    test('a download stopped while saving keeps the earlier failure', () async {
+      manager.failed(manager.started(song('e')), StateError('x'));
+      final retry = manager.download(song('e'), save);
+      await Future<void>.delayed(Duration.zero);
+      final stopped = manager.stopAll();
+      open('e');
+      await stopped;
+
+      expect(await retry, isFalse);
+      final entry = manager.entries.value.singleWhere((e) => e.ytid == 'e');
+      expect(entry.status, DownloadStatus.failed);
+    });
+
     test('a download is not started in offline mode', () async {
       offlineMode.value = true;
       addTearDown(() => offlineMode.value = false);
