@@ -175,9 +175,9 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
 /// set it just before they skip, and the cover takes it on the change.
 int skipDirection = 1;
 
-/// Runs [skip] so the cover moves [direction] when the song changes. The
-/// direction is dropped once that change is drawn, or straight away if the
-/// skip fails, so it cannot reach a later change.
+/// Runs [skip] so the cover moves [direction] when the song changes. A
+/// successful skip drops the direction once that change is drawn; a failed one
+/// drops it at once, so it cannot reach a later change.
 Future<void> skipWithDirection(
   int direction,
   Future<void> Function() skip,
@@ -185,9 +185,11 @@ Future<void> skipWithDirection(
   skipDirection = direction;
   try {
     await skip();
-  } finally {
-    WidgetsBinding.instance.addPostFrameCallback((_) => skipDirection = 1);
+  } catch (_) {
+    skipDirection = 1;
+    rethrow;
   }
+  WidgetsBinding.instance.addPostFrameCallback((_) => skipDirection = 1);
 }
 
 /// Slides the cover the way the song goes, as Spotify does: the new cover

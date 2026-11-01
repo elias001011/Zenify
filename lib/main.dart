@@ -48,6 +48,7 @@ import 'package:musify/services/io_service.dart';
 import 'package:musify/services/keyboard_shortcuts_manager.dart';
 import 'package:musify/services/linux_media_controls.dart';
 import 'package:musify/services/listening_stats_service.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/local_sync_service.dart';
 import 'package:musify/services/logger_service.dart';
 import 'package:musify/services/playlist_sharing.dart';
@@ -400,6 +401,8 @@ Future<String?> initialisation() async {
       Hive.openBox('cache'),
     ]);
     if (importedLibrary) await forgetImportedSyncIdentity();
+    // Copies older builds left pointing at the picker's cache.
+    unawaited(keepLocalFileCopies());
 
     try {
       await LocalSyncService.instance.initialise();

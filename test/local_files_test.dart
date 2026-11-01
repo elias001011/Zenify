@@ -3,12 +3,16 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/io_service.dart';
 import 'package:musify/services/local_files_service.dart';
 
 void main() {
   late Directory directory;
+  late Directory music;
   setUpAll(() async {
     directory = await Directory.systemTemp.createTemp('zenify_local_files');
+    music = Directory('${directory.path}/music')..createSync();
+    applicationDirPath = directory.path;
     Hive.init(directory.path);
     for (final name in ['settings', 'user', 'userNoBackup', 'cache']) {
       await Hive.openBox(name);
@@ -24,13 +28,17 @@ void main() {
     userRecentlyPlayed.value = [];
   });
 
+  String makeFile(String name, String content) {
+    final file = File('${music.path}/$name')..writeAsStringSync(content);
+    return file.path;
+  }
+
   test('only audio files are added, once each, under a local id', () async {
-    final added = await addLocalFiles([
-      '/music/a.mp3',
-      '/music/notes.txt',
-      '/music/a.mp3',
-      '/music/B.FLAC',
-    ]);
+    final a = makeFile('a.mp3', 'first song');
+    final notes = makeFile('notes.txt', 'not audio');
+    final b = makeFile('B.FLAC', 'second song');
+
+    final added = await addLocalFiles([a, notes, a, b]);
 
     expect(added, 2);
     expect(localFiles.value.map((f) => f['title']), ['a', 'B']);
@@ -38,22 +46,60 @@ void main() {
       expect(isLocalSong(file), isTrue);
       expect(file['ytid'].toString(), startsWith(localSongPrefix));
     }
-    expect(await addLocalFiles(['/music/a.mp3']), 0);
+    expect(await addLocalFiles([a]), 0);
     // Kept on the device only: not in the library's backed-up box.
     expect((Hive.box('userNoBackup').get('localFiles') as List).length, 2);
   });
 
-  test('removing takes the file out of the list, not off the device', () async {
-    await addLocalFiles(['/music/a.mp3', '/music/b.mp3']);
-    final id = localFiles.value.first['ytid'].toString();
+  test('the picked file is kept, and its copy is never the original', () async {
+    final original = makeFile('keep.mp3', 'kept audio');
+    await addLocalFiles([original]);
+    final file = localFiles.value.single;
+    final copy = file['audioPath'].toString();
 
-    await removeLocalFile(id);
+    expect(copy, isNot(original));
+    expect(copy, startsWith('${directory.path}/$localFilesDirName/'));
+    expect(File(copy).readAsStringSync(), 'kept audio');
+  });
 
-    expect(localFiles.value.map((f) => f['title']), ['b']);
+  test(
+    'removing takes the file out of the list and deletes only its copy',
+    () async {
+      final a = makeFile('gone.mp3', 'to remove');
+      await addLocalFiles([a, makeFile('stays.mp3', 'stays')]);
+      final removed = localFiles.value.first;
+      final copy = removed['audioPath'].toString();
+
+      await removeLocalFile(removed['ytid'].toString());
+
+      expect(localFiles.value.map((f) => f['title']), ['stays']);
+      expect(File(copy).existsSync(), isFalse);
+      expect(File(a).existsSync(), isTrue);
+    },
+  );
+
+  test('entries from an older build move their copy off the cache', () async {
+    final original = makeFile('old.mp3', 'old audio');
+    localFiles.value = [
+      {
+        'ytid': 'local:oldpathid',
+        'title': 'old',
+        'artist': '',
+        'audioPath': original,
+      },
+    ];
+
+    await keepLocalFileCopies();
+
+    final file = localFiles.value.single;
+    expect(file['audioPath'].toString(), startsWith(directory.path));
+    expect(file['audioPath'].toString(), isNot(original));
+    expect(isLocalSong(file), isTrue);
+    expect(File(file['audioPath'].toString()).readAsStringSync(), 'old audio');
   });
 
   test('a local file never becomes recently played', () async {
-    await addLocalFiles(['/music/a.mp3']);
+    await addLocalFiles([makeFile('recent.mp3', 'recent')]);
     final file = localFiles.value.single;
 
     await updateRecentlyPlayed(file['ytid'], songFallback: file);

@@ -51,4 +51,10 @@ void main() {
   test('a local id never reaches the song details lookup', () async {
     expect(await getSongDetails(0, 'local:0123abcd'), isEmpty);
   });
+
+  test('a local file is never stored as liked', () async {
+    await updateSongLikeStatus('local:0123abcd', true, songData: localSong);
+
+    expect(isSongAlreadyLiked('local:0123abcd'), isFalse);
+  });
 }

@@ -393,6 +393,8 @@ Future<void> updateSongLikeStatus(
   try {
     final normalizedSongId = songId?.toString().trim() ?? '';
     if (normalizedSongId.isEmpty) return;
+    // A local file cannot be liked; the UI hides the action, this is the guard.
+    if (isLocalSongId(normalizedSongId)) return;
 
     final updateToken = ++_songLikeUpdateToken;
     _latestSongLikeUpdateTokens[normalizedSongId] = updateToken;
@@ -748,6 +750,7 @@ Future<void> invalidateSongStreamCache(String songId) async {
 
 /// The best audio stream of a song. Throws what YouTube answered: a
 /// [VideoUnplayableException] means the song itself is unavailable.
+/// Throws what YouTube answered, or an [ArgumentError] for a local file.
 Future<AudioOnlyStreamInfo> resolveBestAudioStream(String songId) async {
   if (isLocalSongId(songId)) {
     throw ArgumentError.value(songId, 'songId', 'a local file has no stream');
@@ -1007,7 +1010,11 @@ Future<void> saveSongFiles(
   // Stopped while the artwork was saved: drop the audio so it is not left
   // behind without a song entry.
   if (stopped()) {
-    if (await audioFile.exists()) await audioFile.delete();
+    await Future.wait([
+      _deleteFileIfExists(audioFile, 'audio file'),
+      if (offlineSong['artworkPath'] case final String path)
+        _deleteFileIfExists(File(path), 'artwork file'),
+    ]);
     throw const DownloadStopped();
   }
 
