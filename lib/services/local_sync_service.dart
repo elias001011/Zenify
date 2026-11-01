@@ -988,6 +988,8 @@ class LocalSyncService {
     if (state.value.status != LocalSyncStatus.idle &&
         state.value.status != LocalSyncStatus.success &&
         state.value.status != LocalSyncStatus.error) {
+      // A manual sync is running: try again once it is over.
+      _scheduleLocalSync();
       return;
     }
 
