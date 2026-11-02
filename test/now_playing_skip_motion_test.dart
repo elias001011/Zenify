@@ -119,6 +119,36 @@ void main() {
     await disposePlayer(tester);
   });
 
+  for (final panel in ['Lyrics', 'Queue']) {
+    testWidgets('a phone keeps the small cover still on a skip ($panel open)', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      tester.view.physicalSize = const Size(420, 860);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      await pumpPlayer(tester);
+      await tester.tap(find.byTooltip(panel));
+      await tester.pump(const Duration(milliseconds: 700));
+
+      await tester.tap(find.byIcon(FluentIcons.next_24_regular));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(audioHandler.mediaItem.value?.extras?['ytid'], 'ytid_b');
+      expect(coverShifts(tester), isEmpty);
+
+      // Closed again, the cover slides as before.
+      await tester.tap(find.byTooltip(panel));
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.tap(find.byIcon(FluentIcons.previous_24_regular));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(coverShifts(tester), isNotEmpty);
+
+      await disposePlayer(tester);
+    });
+  }
+
   testWidgets('desktop keeps the cover still on a skip', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     await pumpPlayer(tester);

@@ -39,10 +39,16 @@ class NowPlayingArtwork extends StatefulWidget {
     required this.metadata,
     required this.size,
     this.qualityBadgeOpacity,
+    this.slideOnSkip = true,
   });
 
   final MediaItem metadata;
   final double size;
+
+  /// Whether the cover slides when the song changes. Off while it is the small
+  /// cover in the header over the lyrics or the queue, where a slide across
+  /// the screen would look like it came from nowhere.
+  final bool slideOnSkip;
 
   /// Follows the mobile panel transition, without a second delayed fade.
   final Animation<double>? qualityBadgeOpacity;
@@ -96,7 +102,11 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
     // Phones and tablets slide the cover with each skip; desktop keeps it still.
     final front = isDesktopPlatform
         ? artwork
-        : _SkipSlide(trackId: widget.metadata.id, child: artwork);
+        : _SkipSlide(
+            trackId: widget.metadata.id,
+            enabled: widget.slideOnSkip,
+            child: artwork,
+          );
 
     final content = ValueListenableBuilder<bool>(
       valueListenable: showPlayerVisualizer,
@@ -195,9 +205,14 @@ Future<void> skipWithDirection(
 /// Slides the cover the way the song goes, as Spotify does: the new cover
 /// comes in from the side of the skip and the old one leaves to the other.
 class _SkipSlide extends StatefulWidget {
-  const _SkipSlide({required this.trackId, required this.child});
+  const _SkipSlide({
+    required this.trackId,
+    required this.enabled,
+    required this.child,
+  });
 
   final String trackId;
+  final bool enabled;
   final Widget child;
 
   @override
@@ -220,8 +235,12 @@ class _SkipSlideState extends State<_SkipSlide> {
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
+      // No time to move: the new cover simply takes the place.
+      duration: widget.enabled
+          ? const Duration(milliseconds: 300)
+          : Duration.zero,
       transitionBuilder: (child, animation) {
+        if (!widget.enabled) return child;
         final incoming = child.key == ValueKey(widget.trackId);
         return AnimatedBuilder(
           animation: animation,

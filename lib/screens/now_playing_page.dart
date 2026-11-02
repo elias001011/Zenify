@@ -383,6 +383,7 @@ class _UprightStageState extends State<_UprightStage>
                 size: artSize,
                 // Share the move: fully visible as soon as it finishes.
                 qualityBadgeOpacity: _badgeOpacity,
+                slideOnSkip: widget.panel == null,
               );
               // Built once: the frames of the move only reposition and fade
               // them.
