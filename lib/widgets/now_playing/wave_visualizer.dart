@@ -28,6 +28,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/audio_levels.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/utilities/platform_utils.dart';
 
 /// Sound waves: they follow the music's frequencies with the precise
 /// [waveReading] and keep a motion of their own otherwise. Pausing or
@@ -119,7 +120,12 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _setVisibility(AppLifecycleState? state) {
-    _visible = state == null || state == AppLifecycleState.resumed;
+    // A desktop window that lost focus (the music on one screen, the user on
+    // the other) is `inactive` but still in view.
+    _visible =
+        state == null ||
+        state == AppLifecycleState.resumed ||
+        (isDesktopPlatform && state == AppLifecycleState.inactive);
     _updateMotion();
   }
 

@@ -55,4 +55,37 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     });
   }
+
+  testWidgets('desktop waves keep moving while the window is not in focus', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    final handler = WaveTestHandler()..ready();
+    audioHandler = handler;
+    await tester.pumpWidget(const MaterialApp(home: WaveVisualizer(size: 100)));
+    await tester.pump(const Duration(milliseconds: 200));
+
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    final unfocused = heights(tester);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(heights(tester), isNot(unfocused));
+
+    // Minimised: out of view, so the waves rest.
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    await tester.pump();
+    final hidden = heights(tester);
+    await tester.pump(const Duration(seconds: 1));
+    expect(heights(tester), hidden);
+
+    binding
+      ..handleAppLifecycleStateChanged(AppLifecycleState.inactive)
+      ..handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpWidget(const SizedBox());
+    await handler.playbackState.close();
+    await handler.mediaItem.close();
+    debugDefaultTargetPlatformOverride = null;
+  });
 }
