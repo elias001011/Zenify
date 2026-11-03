@@ -125,10 +125,12 @@ class LibraryMergeService {
   static void _refuseMissingLibrary() {
     final baseline = _baseline();
     if (baseline == null || Hive.box('user').isNotEmpty) return;
-    final remembersItems = baseline.values.any(
-      (value) =>
-          (value is List && value.isNotEmpty) ||
-          (value is Map && value.isNotEmpty),
+    // The search history does not count: it can be emptied on purpose.
+    final remembersItems = baseline.entries.any(
+      (entry) =>
+          entry.key != 'searchHistory' &&
+          ((entry.value is List && (entry.value as List).isNotEmpty) ||
+              (entry.value is Map && (entry.value as Map).isNotEmpty)),
     );
     if (remembersItems) {
       throw StateError('The library is missing; sync is stopped.');

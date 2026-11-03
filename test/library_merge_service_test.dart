@@ -134,6 +134,19 @@ void main() {
     },
   );
 
+  test(
+    'an emptied search history is not a library that went missing',
+    () async {
+      await Hive.box('user').put('searchHistory', <dynamic>['music']);
+      await LibraryMergeService.exportLibrary();
+
+      await Hive.box('user').clear();
+
+      // Nothing but the search history was ever there, so nothing went missing.
+      await LibraryMergeService.exportLibrary();
+    },
+  );
+
   test('a library that was always empty still syncs', () async {
     await LibraryMergeService.exportLibrary();
     await LibraryMergeService.exportLibrary();
