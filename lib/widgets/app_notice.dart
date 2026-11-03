@@ -35,21 +35,41 @@ class AppNotice {
   final VoidCallback? onAction;
 }
 
+/// Where the shell's dock is while it is in front: its height above the
+/// window's bottom and how far it stands from each side.
+typedef _Dock = ({double extent, double left, double right});
+
+const _noDock = (
+  extent: 0.0,
+  left: FloatingSurface.edgeMargin,
+  right: FloatingSurface.edgeMargin,
+);
+
 /// The notice on screen. [NoticeHost] floats it above everything, over the
 /// dock when the shell's dock is in front (see [NoticeDockInset]) and near the
 /// bottom edge otherwise. One surface, so text and chrome move as one.
 abstract final class AppNotices {
   static final current = ValueNotifier<AppNotice?>(null);
 
-  /// Distance from the window's bottom to the top of the shell's dock while
-  /// it is in front; 0 when nothing is in the way.
-  static final _dockExtent = ValueNotifier<double>(0);
+  static final _dock = ValueNotifier<_Dock>(_noDock);
   static Timer? _timer;
 
   static void show(AppNotice notice, {required Duration duration}) {
     _timer?.cancel();
     current.value = notice;
-    _timer = Timer(duration, dismiss);
+    _timer = Timer(_readable(notice, duration), dismiss);
+  }
+
+  /// Long enough to read, whatever the caller asked for: several pass a second
+  /// or two, which suited a snack bar that also had to animate out.
+  static Duration _readable(AppNotice notice, Duration asked) {
+    final reading = Duration(
+      milliseconds:
+          3000 +
+          notice.text.length * 45 +
+          (notice.actionLabel == null ? 0 : 2000),
+    );
+    return asked > reading ? asked : reading;
   }
 
   /// Dismisses the current notice, or, given [notice], only if it is still
@@ -61,34 +81,43 @@ abstract final class AppNotices {
   }
 }
 
-/// Tells [NoticeHost] how tall the shell's dock is, so the notice floats above
-/// it. Reports only while its page is in front: under a full-screen player or
-/// a sheet the dock is out of the way.
+/// Tells [NoticeHost] where the shell's dock is, so the notice floats right
+/// above it. Reports only while its page is in front: under a full-screen
+/// player or a sheet the dock is out of the way.
 class NoticeDockInset extends StatefulWidget {
-  const NoticeDockInset({required this.extent, super.key});
+  const NoticeDockInset({
+    required this.extent,
+    this.left = FloatingSurface.edgeMargin,
+    this.right = FloatingSurface.edgeMargin,
+    super.key,
+  });
 
   /// From the window's bottom to the top of the dock.
   final double extent;
+
+  /// From the window's edges to the dock's.
+  final double left;
+  final double right;
 
   @override
   State<NoticeDockInset> createState() => _NoticeDockInsetState();
 }
 
 class _NoticeDockInsetState extends State<NoticeDockInset> {
-  double _reported = 0;
+  _Dock _reported = _noDock;
 
-  void _report(double extent) {
-    if (extent == _reported) return;
-    _reported = extent;
-    AppNotices._dockExtent.value = extent;
+  void _report(_Dock dock) {
+    if (dock == _reported) return;
+    _reported = dock;
+    AppNotices._dock.value = dock;
   }
 
   @override
   void dispose() {
     // After this frame: the host must not rebuild while the tree is torn down.
-    if (_reported != 0) {
+    if (_reported != _noDock) {
       WidgetsBinding.instance.addPostFrameCallback(
-        (_) => AppNotices._dockExtent.value = 0,
+        (_) => AppNotices._dock.value = _noDock,
       );
     }
     super.dispose();
@@ -97,9 +126,11 @@ class _NoticeDockInsetState extends State<NoticeDockInset> {
   @override
   Widget build(BuildContext context) {
     final inFront = ModalRoute.of(context)?.isCurrent ?? true;
-    final extent = inFront ? widget.extent : 0.0;
+    final dock = inFront
+        ? (extent: widget.extent, left: widget.left, right: widget.right)
+        : _noDock;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _report(extent);
+      if (mounted) _report(dock);
     });
     return const SizedBox.shrink();
   }
@@ -121,14 +152,14 @@ class NoticeHost extends StatelessWidget {
     return Stack(
       children: [
         child,
-        ValueListenableBuilder<double>(
-          valueListenable: AppNotices._dockExtent,
-          builder: (context, extent, _) => AnimatedPositioned(
+        ValueListenableBuilder<_Dock>(
+          valueListenable: AppNotices._dock,
+          builder: (context, dock, _) => AnimatedPositioned(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
-            left: FloatingSurface.edgeMargin,
-            right: FloatingSurface.edgeMargin,
-            bottom: extent > 0 ? extent + _gap : edge,
+            left: dock.extent > 0 ? dock.left : FloatingSurface.edgeMargin,
+            right: dock.extent > 0 ? dock.right : FloatingSurface.edgeMargin,
+            bottom: dock.extent > 0 ? dock.extent + _gap : edge,
             child: ValueListenableBuilder<AppNotice?>(
               valueListenable: AppNotices.current,
               builder: (context, notice, _) => AnimatedSwitcher(

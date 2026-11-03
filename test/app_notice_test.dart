@@ -52,9 +52,51 @@ void main() {
     expect(find.text('Saved'), findsOneWidget);
     expect(noticeBottom(tester), closeTo(FloatingSurface.edgeMargin, 0.5));
 
-    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
     expect(find.text('Saved'), findsNothing);
+  });
+
+  testWidgets('a notice stays long enough to read, whatever was asked', (
+    tester,
+  ) async {
+    await tester.pumpWidget(app());
+    await tester.pump();
+
+    AppNotices.show(
+      const AppNotice('Added to your liked songs'),
+      duration: const Duration(seconds: 1),
+    );
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('Added to your liked songs'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(find.text('Added to your liked songs'), findsNothing);
+  });
+
+  testWidgets('it sits exactly over a dock that does not span the window', (
+    tester,
+  ) async {
+    // The compact desktop dock: 400 pixels wide, from the left margin.
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => NoticeHost(child: child!),
+        home: const Scaffold(body: NoticeDockInset(extent: 100, right: 388)),
+      ),
+    );
+    await tester.pump();
+    AppNotices.show(
+      const AppNotice('Saved'),
+      duration: const Duration(seconds: 30),
+    );
+    await tester.pumpAndSettle();
+
+    final pill = find.byType(FloatingSurface);
+    expect(tester.getTopLeft(pill).dx, closeTo(12, 0.5));
+    expect(tester.getTopRight(pill).dx, closeTo(412, 0.5));
+    AppNotices.dismiss();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('the action runs and closes the notice', (tester) async {

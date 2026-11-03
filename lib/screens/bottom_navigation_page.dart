@@ -165,20 +165,23 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
         _dockPadding * 2 +
         _dockBarHeight +
         (playing ? MiniPlayer.playerHeight : 0);
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    // A narrower dock (desktop's compact player) keeps to the left.
+    final dockWidth = math.min(
+      maxDockWidth ?? double.infinity,
+      screenWidth - _margin * 2,
+    );
 
     return Stack(
       children: [
         _withInsets(context, bottom: _margin * 2 + dockHeight),
-        NoticeDockInset(extent: safeBottom + _margin + dockHeight),
+        NoticeDockInset(
+          extent: safeBottom + _margin + dockHeight,
+          right: screenWidth - _margin - dockWidth,
+        ),
         Positioned(
           left: _margin,
-          right: maxDockWidth == null ? _margin : null,
-          width: maxDockWidth == null
-              ? null
-              : math.min(
-                  maxDockWidth,
-                  MediaQuery.sizeOf(context).width - _margin * 2,
-                ),
+          width: dockWidth,
           bottom: safeBottom + _margin,
           child: RepaintBoundary(
             child: FloatingSurface(
@@ -266,6 +269,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
         ),
         NoticeDockInset(
           extent: playing ? _margin + MiniPlayer.playerHeight : 0,
+          left: _margin * 2 + _railWidth,
         ),
         if (playing)
           const Positioned(

@@ -441,7 +441,7 @@ void main() {
       expect(swaps.single.$1, ['b', 'c']);
       expect(swaps.single.$2, 'p');
       // Lets the message go.
-      await tester.pump(const Duration(seconds: 5));
+      await tester.pump(const Duration(seconds: 10));
     });
 
     testWidgets('a search that cannot be made leaves Replace usable', (
@@ -468,7 +468,7 @@ void main() {
         tester.widget<FilledButton>(find.byType(FilledButton)).onPressed,
         isNotNull,
       );
-      await tester.pump(const Duration(seconds: 5));
+      await tester.pump(const Duration(seconds: 10));
     });
 
     testWidgets('dismissing hides it until another song fails', (tester) async {
