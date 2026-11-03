@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/widgets/app_notice.dart';
+import 'package:musify/widgets/floating_surface.dart';
 
 void main() {
   late Directory dir;
@@ -21,12 +22,14 @@ void main() {
 
   Widget app() => MaterialApp(
     builder: (context, child) => NoticeHost(child: child!),
-    home: const Scaffold(
-      body: Align(alignment: Alignment.bottomCenter, child: NoticeSlot()),
-    ),
+    home: const Scaffold(body: NoticeDockInset(extent: 100)),
   );
 
-  testWidgets('shows in the dock, or floats when the dock is covered', (
+  double noticeBottom(WidgetTester tester) =>
+      tester.view.physicalSize.height / tester.view.devicePixelRatio -
+      tester.getBottomLeft(find.byType(FloatingSurface)).dy;
+
+  testWidgets('floats above the dock, or near the edge when it is covered', (
     tester,
   ) async {
     await tester.pumpWidget(app());
@@ -38,27 +41,16 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('Saved'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(NoticeSlot),
-        matching: find.text('Saved'),
-      ),
-      findsOneWidget,
-    );
+    // Over the dock's 100 pixels, with a small gap.
+    expect(noticeBottom(tester), closeTo(108, 0.5));
 
-    // A full-screen page covers the dock: the host floats the notice.
+    // A full-screen page covers the dock: the notice drops to the edge.
     tester
         .state<NavigatorState>(find.byType(Navigator))
         .push(MaterialPageRoute<void>(builder: (_) => const Scaffold()));
     await tester.pumpAndSettle();
     expect(find.text('Saved'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: find.byType(NoticeSlot),
-        matching: find.text('Saved'),
-      ),
-      findsNothing,
-    );
+    expect(noticeBottom(tester), closeTo(FloatingSurface.edgeMargin, 0.5));
 
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();

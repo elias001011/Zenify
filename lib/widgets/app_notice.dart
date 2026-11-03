@@ -35,14 +35,15 @@ class AppNotice {
   final VoidCallback? onAction;
 }
 
-/// The notice on screen. The dock (or the desktop's floating player) grows
-/// to show it while its page is in front; otherwise [NoticeHost] floats it
-/// where the dock would be.
+/// The notice on screen. [NoticeHost] floats it above everything, over the
+/// dock when the shell's dock is in front (see [NoticeDockInset]) and near the
+/// bottom edge otherwise. One surface, so text and chrome move as one.
 abstract final class AppNotices {
   static final current = ValueNotifier<AppNotice?>(null);
 
-  /// How many [NoticeSlot]s are on screen to show it.
-  static final _slots = ValueNotifier<int>(0);
+  /// Distance from the window's bottom to the top of the shell's dock while
+  /// it is in front; 0 when nothing is in the way.
+  static final _dockExtent = ValueNotifier<double>(0);
   static Timer? _timer;
 
   static void show(AppNotice notice, {required Duration duration}) {
@@ -60,29 +61,34 @@ abstract final class AppNotices {
   }
 }
 
-/// The notice inside a floating surface, growing it upwards.
-class NoticeSlot extends StatefulWidget {
-  const NoticeSlot({super.key});
+/// Tells [NoticeHost] how tall the shell's dock is, so the notice floats above
+/// it. Reports only while its page is in front: under a full-screen player or
+/// a sheet the dock is out of the way.
+class NoticeDockInset extends StatefulWidget {
+  const NoticeDockInset({required this.extent, super.key});
+
+  /// From the window's bottom to the top of the dock.
+  final double extent;
 
   @override
-  State<NoticeSlot> createState() => _NoticeSlotState();
+  State<NoticeDockInset> createState() => _NoticeDockInsetState();
 }
 
-class _NoticeSlotState extends State<NoticeSlot> {
-  bool _registered = false;
+class _NoticeDockInsetState extends State<NoticeDockInset> {
+  double _reported = 0;
 
-  void _register(bool register) {
-    if (register == _registered) return;
-    _registered = register;
-    AppNotices._slots.value += register ? 1 : -1;
+  void _report(double extent) {
+    if (extent == _reported) return;
+    _reported = extent;
+    AppNotices._dockExtent.value = extent;
   }
 
   @override
   void dispose() {
     // After this frame: the host must not rebuild while the tree is torn down.
-    if (_registered) {
+    if (_reported != 0) {
       WidgetsBinding.instance.addPostFrameCallback(
-        (_) => AppNotices._slots.value--,
+        (_) => AppNotices._dockExtent.value = 0,
       );
     }
     super.dispose();
@@ -90,55 +96,60 @@ class _NoticeSlotState extends State<NoticeSlot> {
 
   @override
   Widget build(BuildContext context) {
-    // Not in front (a full-screen player, a sheet): the host shows it.
     final inFront = ModalRoute.of(context)?.isCurrent ?? true;
+    final extent = inFront ? widget.extent : 0.0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _register(inFront);
+      if (mounted) _report(extent);
     });
-
-    return ValueListenableBuilder<AppNotice?>(
-      valueListenable: AppNotices.current,
-      builder: (context, notice, _) => AnimatedSize(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        alignment: Alignment.bottomCenter,
-        child: notice == null || !inFront
-            ? const SizedBox(width: double.infinity)
-            : _NoticeContent(notice, key: ObjectKey(notice)),
-      ),
-    );
+    return const SizedBox.shrink();
   }
 }
 
-/// Floats the notice above everything when no [NoticeSlot] can show it.
+/// Floats the notice above everything: over the dock if one is in front,
+/// near the bottom edge otherwise.
 class NoticeHost extends StatelessWidget {
   const NoticeHost({required this.child, super.key});
 
   final Widget child;
 
+  static const _gap = 8.0;
+
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.paddingOf(context).bottom + 12;
+    final edge =
+        MediaQuery.paddingOf(context).bottom + FloatingSurface.edgeMargin;
     return Stack(
       children: [
         child,
-        Positioned(
-          left: 12,
-          right: 12,
-          bottom: bottom,
-          child: ValueListenableBuilder<int>(
-            valueListenable: AppNotices._slots,
-            builder: (context, slots, _) => ValueListenableBuilder<AppNotice?>(
+        ValueListenableBuilder<double>(
+          valueListenable: AppNotices._dockExtent,
+          builder: (context, extent, _) => AnimatedPositioned(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            left: FloatingSurface.edgeMargin,
+            right: FloatingSurface.edgeMargin,
+            bottom: extent > 0 ? extent + _gap : edge,
+            child: ValueListenableBuilder<AppNotice?>(
               valueListenable: AppNotices.current,
               builder: (context, notice, _) => AnimatedSwitcher(
                 duration: const Duration(milliseconds: 220),
-                child: notice == null || slots > 0
+                transitionBuilder: (child, animation) => FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween(
+                      begin: const Offset(0, 0.4),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                ),
+                child: notice == null
                     ? const SizedBox.shrink()
                     : Center(
                         key: ObjectKey(notice),
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 480),
-                          child: FloatingSurface(child: _NoticeContent(notice)),
+                          child: _NoticePill(notice),
                         ),
                       ),
               ),
@@ -150,8 +161,8 @@ class NoticeHost extends StatelessWidget {
   }
 }
 
-class _NoticeContent extends StatelessWidget {
-  const _NoticeContent(this.notice, {super.key});
+class _NoticePill extends StatelessWidget {
+  const _NoticePill(this.notice);
 
   final AppNotice notice;
 
@@ -161,35 +172,40 @@ class _NoticeContent extends StatelessWidget {
     final actionLabel = notice.actionLabel;
     return _SwipeDownToDismiss(
       notice: notice,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(minHeight: 36),
-          child: Row(
-            children: [
-              Icon(
-                notice.icon ?? FluentIcons.checkmark_circle_20_regular,
-                size: 20,
-                color: colorScheme.primary,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  notice.text,
-                  style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
+      child: FloatingSurface(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 8, 8),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 36),
+            child: Row(
+              children: [
+                Icon(
+                  notice.icon ?? FluentIcons.checkmark_circle_20_regular,
+                  size: 20,
+                  color: colorScheme.primary,
                 ),
-              ),
-              if (actionLabel != null)
-                TextButton(
-                  onPressed: () {
-                    AppNotices.dismiss();
-                    notice.onAction?.call();
-                  },
-                  child: Text(actionLabel),
-                )
-              else
-                const SizedBox(width: 6),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    notice.text,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                if (actionLabel != null)
+                  TextButton(
+                    onPressed: () {
+                      AppNotices.dismiss();
+                      notice.onAction?.call();
+                    },
+                    child: Text(actionLabel),
+                  )
+                else
+                  const SizedBox(width: 6),
+              ],
+            ),
           ),
         ),
       ),
@@ -197,9 +213,8 @@ class _NoticeContent extends StatelessWidget {
   }
 }
 
-/// Follows a downward drag and dismisses the notice once dragged or flung
-/// far enough, as Musify's snack bars did; otherwise it springs back.
-/// Clipped, so it doesn't slide over the mini player below it.
+/// Moves the whole notice with a downward drag and dismisses it once dragged
+/// or flung far enough, as Musify's snack bars did; otherwise it springs back.
 class _SwipeDownToDismiss extends StatefulWidget {
   const _SwipeDownToDismiss({required this.notice, required this.child});
 
@@ -211,6 +226,8 @@ class _SwipeDownToDismiss extends StatefulWidget {
 }
 
 class _SwipeDownToDismissState extends State<_SwipeDownToDismiss> {
+  static const _maxOffset = 80.0;
+
   double _offset = 0;
 
   void _end(DragEndDetails details) {
@@ -224,11 +241,13 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss> {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onVerticalDragUpdate: (details) =>
-          setState(() => _offset = (_offset + details.delta.dy).clamp(0, 80)),
+      onVerticalDragUpdate: (details) => setState(
+        () => _offset = (_offset + details.delta.dy).clamp(0, _maxOffset),
+      ),
       onVerticalDragEnd: _end,
       onVerticalDragCancel: () => setState(() => _offset = 0),
-      child: ClipRect(
+      child: Opacity(
+        opacity: 1 - 0.6 * _offset / _maxOffset,
         child: Transform.translate(
           offset: Offset(0, _offset),
           child: widget.child,

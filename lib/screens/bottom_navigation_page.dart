@@ -169,6 +169,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     return Stack(
       children: [
         _withInsets(context, bottom: _margin * 2 + dockHeight),
+        NoticeDockInset(extent: safeBottom + _margin + dockHeight),
         Positioned(
           left: _margin,
           right: maxDockWidth == null ? _margin : null,
@@ -186,7 +187,6 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const NoticeSlot(),
                   if (playing) const MiniPlayer(),
                   SizedBox(
                     height: _dockBarHeight,
@@ -264,6 +264,9 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
             ),
           ),
         ),
+        NoticeDockInset(
+          extent: playing ? _margin + MiniPlayer.playerHeight : 0,
+        ),
         if (playing)
           const Positioned(
             left: _margin * 2 + _railWidth,
@@ -273,10 +276,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
               child: FloatingSurface(
                 grouped: true,
                 borderRadius: BorderRadius.all(Radius.circular(24)),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [NoticeSlot(), MiniPlayer(wide: true)],
-                ),
+                child: MiniPlayer(wide: true),
               ),
             ),
           ),
@@ -350,6 +350,7 @@ class _NavigationButton extends StatelessWidget {
         selected: selected,
         button: true,
         label: item.label,
+        onTap: onTap,
         excludeSemantics: true,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
