@@ -37,6 +37,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
@@ -96,6 +97,7 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return IslandScaffold(
+      background: const PageGlow(source: null, cacheKey: 'time_machine_page'),
       title: context.l10n!.timeMachine,
       body: Center(
         child: Column(
@@ -128,6 +130,7 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
     );
 
     return IslandScaffold(
+      background: const PageGlow(source: null, cacheKey: 'time_machine_page'),
       title: context.l10n!.timeMachine,
       body: ReadablePadding(
         padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
@@ -468,6 +471,7 @@ class TopArtistsPage extends StatelessWidget {
     ].where((month) => month.$2.isNotEmpty).toList();
 
     return IslandScaffold(
+      background: const PageGlow(source: null, cacheKey: 'time_machine_page'),
       title: context.l10n!.topArtists,
       body: ReadablePadding(
         padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),

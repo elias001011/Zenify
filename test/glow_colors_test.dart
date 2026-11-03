@@ -33,6 +33,24 @@ void main() {
     expect(colors.colorAt(0), blue);
   });
 
+  testWidgets('a revisited cached page is immediately static', (tester) async {
+    final first = GlowColors(const TestVSync(), cacheKey: 'cached-test-page')
+      ..update([null], red);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    expect(first.reveal, 1);
+    first.dispose();
+    final revisited = GlowColors(
+      const TestVSync(),
+      cacheKey: 'cached-test-page',
+    )..update([null], red);
+    expect(revisited.reveal, 1);
+    expect(revisited.colorAt(0), red);
+    await tester.pump();
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    revisited.dispose();
+  });
+
   testWidgets('a glow that goes away fades out', (tester) async {
     final colors = GlowColors(const TestVSync());
     addTearDown(colors.dispose);

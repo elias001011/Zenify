@@ -22,7 +22,6 @@
 import 'dart:async';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
-import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
@@ -31,7 +30,6 @@ import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/music_radio.dart';
 import 'package:musify/services/playlist_download_service.dart';
-import 'package:musify/services/playlist_sharing.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/song_replacement.dart';
@@ -45,6 +43,7 @@ import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/edit_playlist_dialog.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
 import 'package:musify/widgets/playlist_page/download_button.dart';
 import 'package:musify/widgets/playlist_page/empty_playlist_state.dart';
@@ -293,14 +292,18 @@ class _PlaylistPageState extends State<PlaylistPage> {
                               return SliverPadding(
                                 padding: commonListViewBottomPadding,
                                 sliver: reorderable
-                                    ? SliverReorderableList(
-                                        itemCount: sourceList.length,
-                                        itemBuilder: item,
-                                        onReorderItem: _reorderSongs,
+                                    ? MusicSliverSurface(
+                                        sliver: SliverReorderableList(
+                                          itemCount: sourceList.length,
+                                          itemBuilder: item,
+                                          onReorderItem: _reorderSongs,
+                                        ),
                                       )
-                                    : SliverList.builder(
-                                        itemCount: sourceList.length,
-                                        itemBuilder: item,
+                                    : MusicSliverSurface(
+                                        sliver: SliverList.builder(
+                                          itemCount: sourceList.length,
+                                          itemBuilder: item,
+                                        ),
                                       ),
                               );
                             },
@@ -491,11 +494,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   )..shuffle()),
                   name: _playlistTitle,
                 ),
-              if (isUserCreated) ...[
-                _buildShareButton(),
-                _buildEditButton(),
-                _buildReorderButton(),
-              ],
+              if (isUserCreated) ...[_buildEditButton(), _buildReorderButton()],
             ],
           ),
         ],
@@ -516,35 +515,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
         ],
         const SizedBox(height: 16),
       ],
-    );
-  }
-
-  Widget _buildShareButton() {
-    return IconButton.filledTonal(
-      icon: const Icon(FluentIcons.share_24_regular),
-      iconSize: 24,
-      onPressed: () async {
-        try {
-          final encodedPlaylist = PlaylistSharingService.encodePlaylist(
-            _playlist,
-          );
-          final url = 'musify://playlist/custom/$encodedPlaylist';
-          await Clipboard.setData(ClipboardData(text: url));
-          if (mounted) {
-            showToast(context, context.l10n!.linkCopied);
-          }
-        } catch (e, stackTrace) {
-          logger.log(
-            'Error sharing playlist',
-            error: e,
-            stackTrace: stackTrace,
-          );
-          if (mounted) {
-            showToast(context, context.l10n!.error);
-          }
-        }
-      },
-      tooltip: context.l10n!.share,
     );
   }
 

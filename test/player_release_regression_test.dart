@@ -13,13 +13,25 @@ import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
+import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/marquee.dart';
+import 'package:musify/widgets/mini_player.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
+import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
 import 'package:musify/widgets/now_playing/wave_visualizer.dart';
+import 'package:musify/widgets/playlist_page/playlist_header.dart';
+import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/queue_list_view.dart';
 
 class _Handler extends MusifyAudioHandler {
+  _Handler() {
+    queue.add([
+      for (var i = 0; i < 6; i++)
+        MediaItem(id: 'song$i', title: 'Track $i', extras: {'ytid': 'song$i'}),
+    ]);
+  }
+
   @override
   Stream<List<Map>> get queueAsMapStream => Stream.value([
     {'ytid': 'test', 'title': 'Song'},
@@ -56,6 +68,8 @@ void main() {
   });
   setUp(() {
     audioHandler = _Handler();
+    shuffleNotifier.value = false;
+    repeatNotifier.value = AudioServiceRepeatMode.none;
   });
   tearDown(() {
     debugDefaultTargetPlatformOverride = null;
@@ -69,7 +83,7 @@ void main() {
       {'ytid': 'a', 'title': 'Song A'},
     ];
     Widget actions(MediaItem item) =>
-        app(PlayerActions(metadata: item, panel: null, onPanel: (_) {}));
+        app(PlayerActions(metadata: item, onPanel: (_) {}));
     await tester.pumpWidget(actions(songA));
     await tester.pump();
     expect(find.byIcon(FluentIcons.heart_24_filled), findsOneWidget);
@@ -133,7 +147,8 @@ void main() {
       expect(find.byType(QueueWidget), findsOneWidget);
       expect(find.byTooltip('Close'), findsOneWidget);
       await tester.tap(find.byTooltip('Queue'));
-      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
       expect(find.byType(QueueWidget), findsNothing);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
@@ -165,6 +180,276 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     debugDefaultTargetPlatformOverride = null;
   });
+  testWidgets('volume opens upward even with free space below', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    await tester.pumpWidget(app(const Center(child: DesktopVolumeButton())));
+    final anchor = tester.getRect(find.byType(DesktopVolumeButton));
+    await tester.tap(find.byType(DesktopVolumeButton));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      tester.getRect(find.byType(DesktopVolumeControl)).bottom,
+      lessThan(anchor.top),
+    );
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('compact player keeps floating actions and simple buttons', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      tester.view.physicalSize = const Size(420, 860);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      audioHandler.mediaItem.add(songA);
+      await tester.pumpWidget(app(const NowPlayingPage()));
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        find.descendant(
+          of: find.byType(PlayerActionBar),
+          matching: find.byType(FloatingSurface),
+        ),
+        findsOneWidget,
+      );
+      for (final tooltip in ['Play', 'Shuffle']) {
+        final button = tester.widget<IconButton>(
+          find.byWidgetPredicate(
+            (w) => w is IconButton && w.tooltip == tooltip,
+          ),
+        );
+        expect(button.style!.backgroundColor!.resolve({}), Colors.transparent);
+      }
+      await tester.pumpWidget(const SizedBox());
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('desktop mini uses shared transport and actions without panels', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1100, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    audioHandler.mediaItem.add(songA);
+    await tester.pumpWidget(app(const MiniPlayer(wide: true)));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(PlaybackTransportControls), findsOneWidget);
+    expect(find.byType(PlayerActions), findsOneWidget);
+    expect(find.byType(PlaybackModeButton), findsNWidgets(2));
+    final playControl = find.byWidgetPredicate(
+      (widget) => widget is IconButton && widget.tooltip == 'Play',
+    );
+    final playButton = tester.widget<IconButton>(playControl);
+    expect(
+      playButton.style!.backgroundColor!.resolve({}),
+      Theme.of(tester.element(playControl)).colorScheme.primary,
+    );
+    expect(playButton.style!.shape!.resolve({}), isA<CircleBorder>());
+    expect(tester.getSize(playControl).width, 44);
+    expect(find.byTooltip('Queue'), findsNothing);
+    expect(find.byTooltip('Lyrics'), findsNothing);
+    final bar = tester.getRect(find.byType(MiniPlayer));
+    final controls = tester.getRect(find.byType(PlaybackTransportControls));
+    expect(controls.center.dx, closeTo(bar.center.dx, 1));
+    await tester.tap(find.byTooltip('Shuffle'));
+    await tester.pump();
+    expect(shuffleNotifier.value, isTrue);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('artist biography stays readable when expanded on desktop', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1920, 1080);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final description = List.filled(80, 'Artist biography.').join(' ');
+    await tester.pumpWidget(
+      app(
+        PlaylistHeader(
+          title: 'Artist',
+          isArtist: true,
+          description: description,
+        ),
+      ),
+    );
+    expect(
+      tester.getSize(find.text(description)).width,
+      lessThanOrEqualTo(860),
+    );
+    await tester.tap(find.text(description));
+    await tester.pump();
+    expect(
+      tester.getSize(find.text(description)).width,
+      lessThanOrEqualTo(860),
+    );
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('desktop queue is directly on the canvas', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    audioHandler.mediaItem.add(songA);
+    await tester.pumpWidget(app(const NowPlayingPage()));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.byTooltip('Queue'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(
+      find.ancestor(
+        of: find.byType(QueueWidget),
+        matching: find.byType(FloatingSurface),
+      ),
+      findsNothing,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  for (final size in [
+    const Size(900, 560),
+    const Size(1280, 720),
+    const Size(1600, 900),
+    const Size(1920, 1080),
+  ]) {
+    for (final scale in [1.0, 1.8]) {
+      testWidgets(
+        'desktop playback fits with fixed volume ($size, text $scale)',
+        (tester) async {
+          debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1;
+          addTearDown(tester.view.reset);
+          audioHandler.mediaItem.add(songA);
+          await tester.pumpWidget(
+            MaterialApp(
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                ...GlobalMaterialLocalizations.delegates,
+              ],
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: MediaQuery(
+                data: MediaQueryData(
+                  size: size,
+                  textScaler: TextScaler.linear(scale),
+                ),
+                child: const NowPlayingPage(),
+              ),
+            ),
+          );
+          await tester.pump(const Duration(milliseconds: 500));
+          final cover = tester.getRect(find.byType(NowPlayingArtwork));
+          final progress = tester.getRect(find.byType(PositionSlider));
+          final title = tester.getRect(find.byType(NowPlayingTitle));
+          expect(
+            title.top - cover.bottom,
+            closeTo(20, 0.1),
+            reason:
+                'The artwork must stay grouped with its title on tall windows',
+          );
+          expect(cover.center.dx, closeTo(progress.center.dx, 0.1));
+          expect(cover.width, lessThanOrEqualTo(progress.width));
+          expect(
+            find.ancestor(
+              of: find.byType(NowPlayingArtwork),
+              matching: find.byType(SingleChildScrollView),
+            ),
+            findsNothing,
+            reason:
+                'Playback must fit the viewport without scrolling the controls',
+          );
+          final play = tester.getCenter(
+            find.byIcon(FluentIcons.play_24_filled),
+          );
+          for (final icon in [
+            FluentIcons.previous_24_filled,
+            FluentIcons.next_24_filled,
+            FluentIcons.arrow_shuffle_24_regular,
+            FluentIcons.arrow_repeat_all_24_regular,
+          ]) {
+            expect(
+              tester.getCenter(find.byIcon(icon)).dy,
+              closeTo(play.dy, 0.1),
+            );
+          }
+          audioHandler.playbackState.add(
+            PlaybackState(
+              playing: true,
+              processingState: AudioProcessingState.ready,
+            ),
+          );
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 350));
+          expect(
+            tester.getCenter(find.byIcon(FluentIcons.pause_24_filled)).dy,
+            closeTo(play.dy, 0.1),
+          );
+          expect(find.byType(DesktopVolumeControl), findsOneWidget);
+          expect(find.byType(DesktopVolumeButton), findsNothing);
+          expect(
+            tester.getTopLeft(find.byType(DesktopVolumeControl)).dy,
+            greaterThanOrEqualTo(
+              tester.getBottomLeft(find.byType(PlayerActions)).dy,
+            ),
+          );
+          await tester.ensureVisible(find.byType(DesktopVolumeControl));
+          await tester.pump(const Duration(milliseconds: 400));
+          expect(
+            find.byType(DesktopVolumeControl).hitTestable(),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox());
+          debugDefaultTargetPlatformOverride = null;
+        },
+      );
+    }
+  }
+
+  testWidgets('desktop panel closes visibly before it is removed', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    audioHandler.mediaItem.add(songA);
+    await tester.pumpWidget(app(const NowPlayingPage()));
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.tap(find.byTooltip('Queue'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byTooltip('Queue'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(find.byType(QueueWidget), findsOneWidget);
+    final artDuringClose = tester.getCenter(find.byType(NowPlayingArtwork)).dx;
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byType(QueueWidget), findsNothing);
+    expect(
+      tester.getCenter(find.byType(NowPlayingArtwork)).dx,
+      greaterThan(artDuringClose),
+    );
+    await tester.tap(find.byTooltip('Queue'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(find.byType(QueueWidget), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('closing scrolling text cancels the pause and animation work', (
     tester,
   ) async {

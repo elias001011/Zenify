@@ -33,6 +33,8 @@ import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/floating_surface.dart';
+import 'package:musify/widgets/now_playing/now_playing_controls.dart';
+import 'package:musify/widgets/now_playing/player_chrome.dart';
 
 /// Side panels of the player: shown beside it on wide screens, as sheets on
 /// phones.
@@ -44,17 +46,21 @@ class PlayerActions extends StatefulWidget {
   const PlayerActions({
     super.key,
     required this.metadata,
-    required this.panel,
-    required this.onPanel,
+    this.panel,
+    this.onPanel,
+    this.miniPlayer = false,
+    this.showVolume = true,
   });
 
   final MediaItem metadata;
+  final bool miniPlayer;
+  final bool showVolume;
 
   /// The panel open beside the player, highlighted.
   final PlayerPanel? panel;
 
   /// Opens or closes [PlayerPanel] beside the player.
-  final ValueChanged<PlayerPanel> onPanel;
+  final ValueChanged<PlayerPanel>? onPanel;
 
   @override
   State<PlayerActions> createState() => _PlayerActionsState();
@@ -78,7 +84,10 @@ class _PlayerActionsState extends State<PlayerActions> {
     }
     _songOfflineStatus = ValueNotifier<bool>(isSongAlreadyOffline(audioId));
     userOfflineSongs.addListener(_syncOfflineStatus);
+    offlineMode.addListener(_onOfflineChanged);
   }
+
+  void _onOfflineChanged() => setState(() {});
 
   void _syncLikeStatus() {
     final newStatus = isSongAlreadyLiked(audioId);
@@ -132,6 +141,7 @@ class _PlayerActionsState extends State<PlayerActions> {
     } else {
       userLikedSongsList.removeListener(_syncLikeStatus);
     }
+    offlineMode.removeListener(_onOfflineChanged);
     userOfflineSongs.removeListener(_syncOfflineStatus);
     _songLikeStatus.dispose();
     _songOfflineStatus.dispose();
@@ -146,82 +156,94 @@ class _PlayerActionsState extends State<PlayerActions> {
     final local = isLocalSongId(audioId);
     final actionAudioId = audioId;
 
-    return StreamBuilder<List<Map>>(
-      stream: audioHandler.queueAsMapStream,
-      builder: (context, snapshot) {
-        final queue = snapshot.data ?? const [];
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // A local file has no lyrics to look up, so it gets no button,
-            // unless the panel is open: then the button is how to close it.
-            if ((online && !isRadioStation && !local) ||
-                widget.panel == PlayerPanel.lyrics)
-              PlayerActionButton(
-                icon: FluentIcons.text_quote_24_regular,
-                tooltip: l10n.lyrics,
-                active: widget.panel == PlayerPanel.lyrics,
-                onPressed: () => widget.onPanel(PlayerPanel.lyrics),
-              ),
-            if (queue.isNotEmpty && !isRadioStation)
-              PlayerActionButton(
-                icon: FluentIcons.apps_list_24_regular,
-                tooltip: l10n.queue,
-                active: widget.panel == PlayerPanel.queue,
-                onPressed: () => widget.onPanel(PlayerPanel.queue),
-              ),
-            if (supportsDesktopVolumeControl) const DesktopVolumeButton(),
-            ValueListenableBuilder<Duration?>(
-              valueListenable: sleepTimerNotifier,
-              builder: (context, timer, _) => PlayerActionButton(
-                icon: FluentIcons.timer_24_regular,
-                activeIcon: FluentIcons.timer_24_filled,
-                tooltip: l10n.sleepTimer,
-                active: timer != null,
-                onPressed: () => _onSleepTimer(context, timer != null),
-              ),
+    Widget actions(bool hasQueue) => Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (widget.miniPlayer && !isRadioStation) ...[
+          const PlaybackModeButton(repeat: false),
+          const SizedBox(width: 2),
+          const PlaybackModeButton(repeat: true),
+        ],
+        // A local file has no lyrics to look up, so it gets no button,
+        // unless the panel is open: then the button is how to close it.
+        if (!widget.miniPlayer &&
+            widget.onPanel != null &&
+            ((online && !isRadioStation && !local) ||
+                widget.panel == PlayerPanel.lyrics))
+          PlayerActionButton(
+            icon: FluentIcons.text_quote_24_regular,
+            tooltip: l10n.lyrics,
+            active: widget.panel == PlayerPanel.lyrics,
+            onPressed: () => widget.onPanel?.call(PlayerPanel.lyrics),
+          ),
+        if (!widget.miniPlayer &&
+            widget.onPanel != null &&
+            hasQueue &&
+            !isRadioStation)
+          PlayerActionButton(
+            icon: FluentIcons.apps_list_24_regular,
+            tooltip: l10n.queue,
+            active: widget.panel == PlayerPanel.queue,
+            onPressed: () => widget.onPanel?.call(PlayerPanel.queue),
+          ),
+        if (widget.showVolume && supportsDesktopVolumeControl)
+          const DesktopVolumeButton(),
+        ValueListenableBuilder<Duration?>(
+          valueListenable: sleepTimerNotifier,
+          builder: (context, timer, _) => PlayerActionButton(
+            icon: FluentIcons.timer_24_regular,
+            activeIcon: FluentIcons.timer_24_filled,
+            tooltip: l10n.sleepTimer,
+            active: timer != null,
+            onPressed: () => _onSleepTimer(context, timer != null),
+          ),
+        ),
+        if (!isRadioStation && !local)
+          ValueListenableBuilder<bool>(
+            valueListenable: _songOfflineStatus,
+            builder: (context, offline, _) => PlayerActionButton(
+              icon: FluentIcons.cloud_arrow_down_24_regular,
+              activeIcon: FluentIcons.cloud_off_24_filled,
+              tooltip: l10n.makeOffline,
+              active: offline,
+              onPressed: audioId == null
+                  ? null
+                  : () => _toggleOffline(
+                      _songOfflineStatus,
+                      audioId,
+                      widget.metadata,
+                      isCurrent: () => mounted && audioId == actionAudioId,
+                    ),
             ),
-            if (!isRadioStation && !local)
-              ValueListenableBuilder<bool>(
-                valueListenable: _songOfflineStatus,
-                builder: (context, offline, _) => PlayerActionButton(
-                  icon: FluentIcons.cloud_arrow_down_24_regular,
-                  activeIcon: FluentIcons.cloud_off_24_filled,
-                  tooltip: l10n.makeOffline,
-                  active: offline,
-                  onPressed: audioId == null
-                      ? null
-                      : () => _toggleOffline(
-                          _songOfflineStatus,
-                          audioId,
-                          widget.metadata,
-                          isCurrent: () => mounted && audioId == actionAudioId,
-                        ),
-                ),
-              ),
-            if (online && !isRadioStation && !local)
-              PlayerActionButton(
-                icon: FluentIcons.album_add_24_regular,
-                tooltip: l10n.addToPlaylist,
-                onPressed: () => showAddToPlaylistDialog(
-                  context,
-                  song: mediaItemToMap(widget.metadata),
-                ),
-              ),
-            if (online && !local)
-              ValueListenableBuilder<bool>(
-                valueListenable: _songLikeStatus,
-                builder: (context, liked, _) => PlayerActionButton(
-                  icon: FluentIcons.heart_24_regular,
-                  activeIcon: FluentIcons.heart_24_filled,
-                  tooltip: l10n.likedSongs,
-                  active: liked,
-                  onPressed: _toggleLike,
-                ),
-              ),
-          ],
-        );
-      },
+          ),
+        if (online && !isRadioStation && !local)
+          PlayerActionButton(
+            icon: FluentIcons.album_add_24_regular,
+            tooltip: l10n.addToPlaylist,
+            onPressed: () => showAddToPlaylistDialog(
+              context,
+              song: mediaItemToMap(widget.metadata),
+            ),
+          ),
+        if (online && !local)
+          ValueListenableBuilder<bool>(
+            valueListenable: _songLikeStatus,
+            builder: (context, liked, _) => PlayerActionButton(
+              icon: FluentIcons.heart_24_regular,
+              activeIcon: FluentIcons.heart_24_filled,
+              tooltip: l10n.likedSongs,
+              active: liked,
+              onPressed: _toggleLike,
+            ),
+          ),
+      ],
+    );
+    if (widget.miniPlayer) return actions(false);
+    return StreamBuilder<List<MediaItem>>(
+      initialData: audioHandler.queue.value,
+      stream: audioHandler.queue,
+      builder: (context, snapshot) =>
+          actions(snapshot.data?.isNotEmpty ?? false),
     );
   }
 
@@ -267,8 +289,7 @@ class _PlayerActionsState extends State<PlayerActions> {
   }
 }
 
-/// The actions in a wide floating bar, in the island's style, all of them
-/// always in view.
+/// The compact player's floating action bar.
 class PlayerActionBar extends StatelessWidget {
   const PlayerActionBar({super.key, required this.child});
 
@@ -280,8 +301,6 @@ class PlayerActionBar extends StatelessWidget {
       grouped: true,
       child: SizedBox(
         height: 64,
-        // Every button stays in view: as wide as the artwork, a narrow
-        // window shrinks them a little instead of hiding the last ones.
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
           child: FittedBox(fit: BoxFit.scaleDown, child: child),
@@ -323,9 +342,10 @@ class PlayerActionButton extends StatelessWidget {
         tooltip: tooltip,
         style: IconButton.styleFrom(
           minimumSize: const Size.square(48),
-          backgroundColor: active
+          backgroundColor: active && !PlayerChrome.minimalOf(context)
               ? color.withValues(alpha: 0.15)
               : Colors.transparent,
+          side: BorderSide.none,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),

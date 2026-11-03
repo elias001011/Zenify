@@ -46,44 +46,49 @@ class LocalFilesPage extends StatelessWidget {
       ],
       body: ReadablePadding(
         padding: commonSingleChildScrollViewPadding,
-        builder: (context, padding) => SingleChildScrollView(
-          padding: padding,
-          child: ValueListenableBuilder<List<Map>>(
-            valueListenable: localFiles,
-            builder: (context, files, _) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (files.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(32),
-                    child: Text(
-                      l10n.localFilesEmpty,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        builder: (context, padding) => ValueListenableBuilder<List<Map>>(
+          valueListenable: localFiles,
+          builder: (context, files, _) => CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: padding,
+                sliver: files.isEmpty
+                    ? SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Text(
+                            l10n.localFilesEmpty,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      )
+                    : SliverList.builder(
+                        itemCount: files.length,
+                        itemBuilder: (context, i) => CustomBar(
+                          key: ValueKey(files[i]['ytid']),
+                          files[i]['title']?.toString() ?? '',
+                          FluentIcons.music_note_2_24_regular,
+                          borderRadius: getItemBorderRadius(i, files.length),
+                          onTap: () => audioHandler.playPlaylistSong(
+                            playlist: {'list': List<Map>.of(files)},
+                            songIndex: i,
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(FluentIcons.delete_24_regular),
+                            tooltip: l10n.removeLocalFile,
+                            onPressed: () =>
+                                removeLocalFile(files[i]['ytid'].toString()),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                for (var i = 0; i < files.length; i++)
-                  CustomBar(
-                    files[i]['title']?.toString() ?? '',
-                    FluentIcons.music_note_2_24_regular,
-                    borderRadius: getItemBorderRadius(i, files.length),
-                    onTap: () => audioHandler.playPlaylistSong(
-                      playlist: {'list': List<Map>.of(files)},
-                      songIndex: i,
-                    ),
-                    trailing: IconButton(
-                      icon: const Icon(FluentIcons.delete_24_regular),
-                      tooltip: l10n.removeLocalFile,
-                      onPressed: () =>
-                          removeLocalFile(files[i]['ytid'].toString()),
-                    ),
-                  ),
-                const SizedBox(height: 20),
-                const MiniPlayerBottomSpace(),
-              ],
-            ),
+              ),
+              const SliverMiniPlayerBottomSpace(),
+            ],
           ),
         ),
       ),

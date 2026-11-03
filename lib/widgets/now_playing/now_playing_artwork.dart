@@ -25,7 +25,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/flip_card.dart';
 import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/song_artwork.dart';
@@ -99,14 +98,11 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
         borderRadius: _radius,
       ),
     );
-    // Phones and tablets slide the cover with each skip; desktop keeps it still.
-    final front = isDesktopPlatform
-        ? artwork
-        : _SkipSlide(
-            trackId: widget.metadata.id,
-            enabled: widget.slideOnSkip,
-            child: artwork,
-          );
+    final front = _SkipSlide(
+      trackId: widget.metadata.id,
+      enabled: widget.slideOnSkip,
+      child: artwork,
+    );
 
     final content = ValueListenableBuilder<bool>(
       valueListenable: showPlayerVisualizer,
@@ -127,7 +123,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
 
     return Stack(
       children: [
-        if (isDesktopPlatform) _tilted(content) else content,
+        _tilted(content),
         // Kept flat over the tilt, where small text would shimmer; it leaves
         // with a fade when the artwork flips to the waves.
         Positioned(

@@ -292,6 +292,7 @@ const _deviceSettings = [
   'startMaximized',
   'interfaceScale',
   'showLocalFiles',
+  'globalSearchOnEnter',
   'compactDesktopPlayer',
   'keyboardShortcuts',
   'floatingEffect',

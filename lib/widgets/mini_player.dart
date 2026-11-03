@@ -30,6 +30,9 @@ import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/marquee.dart';
+import 'package:musify/widgets/now_playing/now_playing_controls.dart';
+import 'package:musify/widgets/now_playing/player_actions.dart';
+import 'package:musify/widgets/now_playing/player_chrome.dart';
 import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
 import 'package:musify/widgets/skip_icon_button.dart';
@@ -55,23 +58,11 @@ _ControlsState _controlsState(PlaybackState playback, List<MediaItem> queue) =>
 _ControlsState _currentControlsState() =>
     _controlsState(audioHandler.playbackState.value, audioHandler.queue.value);
 
-final Stream<_ControlsState> _controlsStateStream =
-    Rx.combineLatest2(
-          audioHandler.playbackStateStream,
-          audioHandler.queue,
-          _controlsState,
-        )
-        .distinct(
-          (a, b) =>
-              a.hasNext == b.hasNext &&
-              a.playback.playing == b.playback.playing &&
-              a.playback.processingState == b.playback.processingState,
-        )
-        .asBroadcastStream();
-
-class MiniPlayer extends StatelessWidget {
+class MiniPlayer extends StatefulWidget {
   /// Drawn straight on the dock's floating surface.
-  const MiniPlayer({super.key});
+  const MiniPlayer({super.key, this.wide = false});
+
+  final bool wide;
 
   static const double playerHeight = 72;
   static const double _borderRadius = 20;
@@ -79,34 +70,57 @@ class MiniPlayer extends StatelessWidget {
   static const double _artworkRadius = 14;
 
   @override
+  State<MiniPlayer> createState() => _MiniPlayerState();
+}
+
+class _MiniPlayerState extends State<MiniPlayer> {
+  late final _controlsStateStream =
+      Rx.combineLatest2(
+        audioHandler.playbackStateStream,
+        audioHandler.queue,
+        _controlsState,
+      ).distinct(
+        (a, b) =>
+            a.hasNext == b.hasNext &&
+            a.playback.playing == b.playback.playing &&
+            a.playback.processingState == b.playback.processingState,
+      );
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOutCubic,
-      child: StreamBuilder<MediaItem?>(
-        initialData: audioHandler.mediaItem.value,
-        stream: audioHandler.mediaItem,
-        builder: (context, mediaSnapshot) {
-          final metadata = mediaSnapshot.data;
-          if (metadata == null) return const SizedBox.shrink();
+    return PlayerChrome(
+      style: PlayerChromeStyle.dock,
+      child: LayoutBuilder(
+        builder: (context, constraints) => AnimatedSize(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          child: StreamBuilder<MediaItem?>(
+            initialData: audioHandler.mediaItem.value,
+            stream: audioHandler.mediaItem,
+            builder: (context, mediaSnapshot) {
+              final metadata = mediaSnapshot.data;
+              if (metadata == null) return const SizedBox.shrink();
 
-          return StreamBuilder<_ControlsState>(
-            initialData: _currentControlsState(),
-            stream: _controlsStateStream,
-            builder: (context, stateSnapshot) {
-              final state = stateSnapshot.data;
-              if (state == null) return const SizedBox.shrink();
-              return _MiniPlayerBody(
-                colorScheme: colorScheme,
-                metadata: metadata,
-                playbackState: state.playback,
-                hasNext: state.hasNext,
+              return StreamBuilder<_ControlsState>(
+                initialData: _currentControlsState(),
+                stream: _controlsStateStream,
+                builder: (context, stateSnapshot) {
+                  final state = stateSnapshot.data;
+                  if (state == null) return const SizedBox.shrink();
+                  return _MiniPlayerBody(
+                    wide: widget.wide && constraints.maxWidth >= 900,
+                    colorScheme: colorScheme,
+                    metadata: metadata,
+                    playbackState: state.playback,
+                    hasNext: state.hasNext,
+                  );
+                },
               );
             },
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -116,12 +130,14 @@ class _MiniPlayerBody extends StatefulWidget {
   const _MiniPlayerBody({
     required this.colorScheme,
     required this.metadata,
+    required this.wide,
     required this.playbackState,
     required this.hasNext,
   });
 
   final ColorScheme colorScheme;
   final MediaItem metadata;
+  final bool wide;
   final PlaybackState playbackState;
   final bool hasNext;
 
@@ -187,42 +203,20 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                 borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: Row(
-                    children: [
-                      _ArtworkWidget(metadata: metadata),
-                      Expanded(
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          switchInCurve: Curves.easeIn,
-                          switchOutCurve: Curves.easeOut,
-                          layoutBuilder: (currentChild, previousChildren) =>
-                              Stack(
-                                alignment: Alignment.centerLeft,
-                                children: [
-                                  ...previousChildren,
-                                  if (currentChild != null) currentChild,
-                                ],
-                              ),
-                          transitionBuilder: (child, animation) =>
-                              FadeTransition(opacity: animation, child: child),
-                          child: KeyedSubtree(
-                            key: ValueKey(metadata.id),
-                            child: _MetadataWidget(
-                              title: metadata.title,
-                              artist: metadata.artist,
+                  child: widget.wide
+                      ? _wideBody(context)
+                      : Row(
+                          children: [
+                            _ArtworkWidget(metadata: metadata),
+                            Expanded(child: _metadata(context)),
+                            _ControlsWidget(
                               colorScheme: colorScheme,
+                              playbackState: widget.playbackState,
+                              hasNext: widget.hasNext,
+                              duration: metadata.duration,
                             ),
-                          ),
+                          ],
                         ),
-                      ),
-                      _ControlsWidget(
-                        colorScheme: colorScheme,
-                        playbackState: widget.playbackState,
-                        hasNext: widget.hasNext,
-                        duration: metadata.duration,
-                      ),
-                    ],
-                  ),
                 ),
               ),
             ),
@@ -231,6 +225,74 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
       },
     );
   }
+
+  Widget _metadata(BuildContext context) => AnimatedSwitcher(
+    duration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 300),
+    switchInCurve: Curves.easeIn,
+    switchOutCurve: Curves.easeOut,
+    layoutBuilder: (currentChild, previousChildren) => Stack(
+      alignment: AlignmentDirectional.centerStart,
+      children: [...previousChildren, if (currentChild != null) currentChild],
+    ),
+    transitionBuilder: (child, animation) =>
+        FadeTransition(opacity: animation, child: child),
+    child: KeyedSubtree(
+      key: ValueKey(widget.metadata.id),
+      child: _MetadataWidget(
+        title: widget.metadata.title,
+        artist: widget.metadata.artist,
+        colorScheme: widget.colorScheme,
+      ),
+    ),
+  );
+
+  Widget _wideBody(BuildContext context) => LayoutBuilder(
+    builder: (context, c) {
+      final colors = widget.colorScheme;
+      final live = widget.metadata.extras?['isLive'] == true;
+      return Row(
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                _ArtworkWidget(metadata: widget.metadata),
+                Expanded(child: _metadata(context)),
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 164,
+            child: live
+                ? PlaybackIconButton(
+                    iconSize: 22,
+                    iconColor: colors.onPrimary,
+                    backgroundColor: colors.primary,
+                  )
+                : PlaybackTransportControls(
+                    colorScheme: colors,
+                    buttonConstraints: const BoxConstraints(
+                      minWidth: 44,
+                      minHeight: 44,
+                    ),
+                    buttonPadding: const EdgeInsets.all(6),
+                    controlIconSize: 22,
+                    buttonSpacing: 8,
+                    minButtonSize: 44,
+                    playPadding: const EdgeInsets.all(10),
+                  ),
+          ),
+          Expanded(
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: PlayerActions(metadata: widget.metadata, miniPlayer: true),
+            ),
+          ),
+        ],
+      );
+    },
+  );
 }
 
 class _ArtworkWidget extends StatelessWidget {
@@ -407,7 +469,9 @@ class _CircularPlayButton extends StatelessWidget {
           RepaintBoundary(
             child: StreamBuilder<PositionData>(
               initialData: audioHandler.currentPositionData,
-              stream: audioHandler.positionDataStream,
+              stream: TickerMode.valuesOf(context).enabled
+                  ? audioHandler.positionDataStream
+                  : const Stream.empty(),
               builder: (context, snapshot) {
                 final position = snapshot.data;
                 final total =

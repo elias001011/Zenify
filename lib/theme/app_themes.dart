@@ -152,6 +152,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       thumbSize: WidgetStateProperty.all(const Size(6, 30)),
     ),
     bottomSheetTheme: base.bottomSheetTheme.copyWith(
+      constraints: const BoxConstraints(maxWidth: 640),
       backgroundColor: cardBgColor,
     ),
     inputDecorationTheme: base.inputDecorationTheme.copyWith(
@@ -165,6 +166,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       contentPadding: const EdgeInsets.fromLTRB(18, 14, 20, 14),
     ),
     dialogTheme: base.dialogTheme.copyWith(
+      constraints: const BoxConstraints(minWidth: 280, maxWidth: 560),
       backgroundColor: effectiveColorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
     ),

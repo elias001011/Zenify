@@ -37,8 +37,10 @@ import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
 import 'package:musify/widgets/playlist_page/empty_playlist_state.dart';
+import 'package:musify/widgets/playlist_page/playlist_action_buttons.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -71,11 +73,6 @@ class _UserSongsPageState extends State<UserSongsPage> {
   }
 
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   void dispose() {
     _selection.dispose();
     _searchQueryNotifier.dispose();
@@ -102,7 +99,10 @@ class _UserSongsPageState extends State<UserSongsPage> {
       child: IslandScaffold(
         title: title,
         headerTitleKey: _headerTitleKey,
-        background: const PageGlow(source: null),
+        background: PageGlow(
+          source: null,
+          cacheKey: 'user-songs:${widget.page}',
+        ),
         onFilter: (value) => _searchQueryNotifier.value = value,
         onBack: () {
           if (_selection.isActive) {
@@ -244,67 +244,32 @@ class _UserSongsPageState extends State<UserSongsPage> {
           showTitle: false,
         ),
         if (songsLength > 0) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    icon: const Icon(FluentIcons.play_24_filled),
-                    label: Text(context.l10n!.play),
-                    onPressed: () {
-                      final songsList = widget.page == 'liked'
-                          ? userLikedSongsList.value
-                          : widget.page == 'offline'
-                          ? userOfflineSongs.value
-                          : userRecentlyPlayed.value;
-                      var sortedList = songsList;
-                      if (isOfflineSongs) {
-                        sortedList = _sortOfflineSongsLocal(
-                          songsList,
-                          _getCurrentOfflineSortType(),
-                        );
-                      }
-                      final playlist = {
-                        'ytid': '',
-                        'title': title,
-                        'source': 'user-created',
-                        'list': sortedList,
-                      };
-                      audioHandler.playPlaylistSong(
-                        playlist: playlist,
-                        songIndex: 0,
-                        shuffle: false,
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: colorScheme.secondaryContainer,
-                      foregroundColor: colorScheme.onSecondaryContainer,
-                    ),
-                    icon: const Icon(FluentIcons.arrow_shuffle_24_filled),
-                    label: Text(context.l10n!.shuffle),
-                    onPressed: () async {
-                      final songs = widget.page == 'liked'
-                          ? userLikedSongsList.value
-                          : widget.page == 'offline'
-                          ? userOfflineSongs.value
-                          : userRecentlyPlayed.value;
-                      if (songs.isEmpty) return;
-                      await audioHandler.addPlaylistToQueue(
-                        List<Map>.from(songs.whereType<Map>()),
-                        replace: true,
-                        shuffle: true,
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+          PlaylistActionButtons(
+            onPlay: () {
+              final songs = _getDisplayList(_currentSongsList);
+              if (songs.isEmpty) return;
+              audioHandler.playPlaylistSong(
+                playlist: {
+                  'ytid': '',
+                  'title': title,
+                  'source': 'user-created',
+                  'list': songs,
+                },
+                songIndex: 0,
+                shuffle: false,
+              );
+            },
+            onShuffle: () async {
+              final songs = _getDisplayList(_currentSongsList)
+                  .whereType<Map>()
+                  .toList();
+              if (songs.isEmpty) return;
+              await audioHandler.addPlaylistToQueue(
+                songs,
+                replace: true,
+                shuffle: true,
+              );
+            },
           ),
           ValueListenableBuilder<bool>(
             valueListenable: offlineMode,
@@ -421,24 +386,29 @@ class _UserSongsPageState extends State<UserSongsPage> {
           );
         }
 
-        return SliverList(
-          key: isOfflineSongs && !isSearching
-              ? ValueKey(_getCurrentOfflineSortType())
-              : null,
-          delegate: SliverChildBuilderDelegate((context, index) {
-            final song = displayList[index];
-            final borderRadius = getItemBorderRadius(index, displayList.length);
-            return RepaintBoundary(
-              key: listItemKey(listKeyScope, index, song),
-              child: _buildSongBar(
-                song,
+        return MusicSliverSurface(
+          sliver: SliverList(
+            key: isOfflineSongs && !isSearching
+                ? ValueKey(_getCurrentOfflineSortType())
+                : null,
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final song = displayList[index];
+              final borderRadius = getItemBorderRadius(
                 index,
-                borderRadius,
-                playlist,
-                isRecentSong: isRecentlyPlayed,
-              ),
-            );
-          }, childCount: displayList.length),
+                displayList.length,
+              );
+              return RepaintBoundary(
+                key: listItemKey(listKeyScope, index, song),
+                child: _buildSongBar(
+                  song,
+                  index,
+                  borderRadius,
+                  playlist,
+                  isRecentSong: isRecentlyPlayed,
+                ),
+              );
+            }, childCount: displayList.length),
+          ),
         );
       },
     );

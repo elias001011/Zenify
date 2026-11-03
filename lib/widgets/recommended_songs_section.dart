@@ -24,6 +24,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/app_utils.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/song_bar.dart';
 
@@ -72,31 +73,36 @@ class RecommendedSongsSection extends StatelessWidget {
                 )
               : null,
         ),
-        ListView.builder(
-          shrinkWrap: true,
-          physics: const BouncingScrollPhysics(),
-          itemCount: songs.length,
+        Padding(
           padding: commonListViewBottomPadding,
-          itemBuilder: (context, index) {
-            final song = songs[index];
-            final borderRadius = getItemBorderRadius(index, songs.length);
-            return RepaintBoundary(
-              key: listItemKey(listKeyPrefix, index, song),
-              child: SongBar(
-                song,
-                true,
-                barPadding: const EdgeInsetsDirectional.only(
-                  top: 10,
-                  bottom: 10,
-                  start: 12,
-                ),
-                borderRadius: borderRadius,
-                onAdd: onAddSong != null && song is Map
-                    ? () => onAddSong!(song)
-                    : null,
-              ),
-            );
-          },
+          child: MusicListSurface(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: commonCustomBarRadius,
+            child: ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              addRepaintBoundaries: false,
+              itemCount: songs.length,
+              padding: EdgeInsets.zero,
+              itemBuilder: (context, index) {
+                final song = songs[index];
+                return SongBar(
+                  key: listItemKey(listKeyPrefix, index, song),
+                  song,
+                  true,
+                  backgroundColor: Colors.transparent,
+                  barPadding: const EdgeInsetsDirectional.only(
+                    top: 10,
+                    bottom: 10,
+                    start: 12,
+                  ),
+                  onAdd: onAddSong != null && song is Map
+                      ? () => onAddSong!(song)
+                      : null,
+                );
+              },
+            ),
+          ),
         ),
       ],
     );

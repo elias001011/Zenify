@@ -30,8 +30,11 @@ Widget buildPlaybackIconButton(
   Color iconColor,
   Color backgroundColor, {
   EdgeInsets? padding,
+  bool filled = false,
+  double? buttonSize,
 }) {
   return StreamBuilder<PlaybackState>(
+    initialData: audioHandler.playbackState.value,
     stream: audioHandler.playbackState.distinct((previous, current) {
       // Only rebuild if relevant state changes
       return previous.playing == current.playing &&
@@ -69,13 +72,43 @@ Widget buildPlaybackIconButton(
       } else {
         iconWidget = Icon(
           isPlaying
-              ? FluentIcons.pause_24_regular
-              : FluentIcons.play_24_regular,
+              ? (filled
+                    ? FluentIcons.pause_24_filled
+                    : FluentIcons.pause_24_regular)
+              : (filled
+                    ? FluentIcons.play_24_filled
+                    : FluentIcons.play_24_regular),
           color: iconColor,
           size: iconSize,
         );
         onPressed = isPlaying ? audioHandler.pause : audioHandler.play;
         semanticLabel = isPlaying ? context.l10n!.pause : context.l10n!.play;
+      }
+
+      // Desktop's plain transport uses the same centred IconButton layout
+      // as its neighbours, with an explicit box and no oversized inner padding.
+      if (filled && buttonSize != null) {
+        return SizedBox.square(
+          dimension: buttonSize,
+          child: IconButton(
+            tooltip: semanticLabel,
+            onPressed: onPressed,
+            iconSize: iconSize,
+            padding: EdgeInsets.zero,
+            style: IconButton.styleFrom(
+              minimumSize: Size.square(buttonSize),
+              fixedSize: Size.square(buttonSize),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              backgroundColor: backgroundColor,
+              side: BorderSide.none,
+              shape: const CircleBorder(),
+            ),
+            icon: PlaybackIconSwitcher(
+              stateKey: (processingState, isPlaying),
+              child: iconWidget,
+            ),
+          ),
+        );
       }
 
       return RawMaterialButton(
@@ -86,8 +119,8 @@ Widget buildPlaybackIconButton(
         padding: padding ?? EdgeInsets.all(iconSize * 0.35),
         shape: const CircleBorder(),
         constraints: BoxConstraints.tightFor(
-          width: iconSize * 2,
-          height: iconSize * 2,
+          width: buttonSize ?? iconSize * 2,
+          height: buttonSize ?? iconSize * 2,
         ),
         materialTapTargetSize: MaterialTapTargetSize.padded,
         child: Semantics(
@@ -118,17 +151,15 @@ class PlaybackIconSwitcher extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : const Duration(milliseconds: 120),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeOutCubic,
       transitionBuilder: (child, animation) => FadeTransition(
-        opacity: Tween<double>(
-          begin: 0,
-          end: 1,
-        ).chain(CurveTween(curve: Curves.easeInOut)).animate(animation),
+        opacity: animation,
         child: ScaleTransition(
-          scale: Tween<double>(
-            begin: 0.85,
-            end: 1,
-          ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(animation),
+          scale: Tween<double>(begin: 0.94, end: 1).animate(animation),
           child: child,
         ),
       ),
@@ -144,12 +175,16 @@ class PlaybackIconButton extends StatelessWidget {
     required this.iconColor,
     required this.backgroundColor,
     this.padding,
+    this.filled = false,
+    this.buttonSize,
   });
 
   final double iconSize;
   final Color iconColor;
   final Color backgroundColor;
   final EdgeInsets? padding;
+  final bool filled;
+  final double? buttonSize;
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +193,8 @@ class PlaybackIconButton extends StatelessWidget {
       iconColor,
       backgroundColor,
       padding: padding,
+      filled: filled,
+      buttonSize: buttonSize,
     );
   }
 }

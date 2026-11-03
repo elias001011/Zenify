@@ -134,9 +134,9 @@ New in Zenify:
 
 - **A new look**: floating navigation and player, a floating title island with
   quick search, a neutral theme with pure black, and an optional dynamic
-  background that glows with the colours of your albums.
+  background that follows album colours in the player and playlist, and the app accent elsewhere.
 - **A new player**: the artwork with the song and playback under it. Lyrics
-  and queue open beside it on desktop; on phones they share the artwork's
+  and queue open beside it in wide windows; in narrow windows they share the artwork's
   space through the same animated transition. Tapping the artwork switches
   to sound waves. They follow the music when audio levels are available and
   keep a gentle motion with the simple reading or when capture is unavailable.

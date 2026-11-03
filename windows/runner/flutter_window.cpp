@@ -15,6 +15,9 @@ namespace {
 constexpr DWORD kDwmUseImmersiveDarkMode = 20;
 constexpr DWORD kDwmCaptionColor = 35;
 constexpr DWORD kDwmTextColor = 36;
+constexpr DWORD kDwmWindowCornerPreference = 33;
+constexpr DWORD kDwmDefaultCorners = 0;
+constexpr DWORD kDwmRoundCorners = 2;
 // DWMWA_COLOR_DEFAULT: lets DWM pick the caption and text colours again.
 constexpr COLORREF kDwmColorDefault = 0xFFFFFFFF;
 
@@ -143,6 +146,31 @@ void FlutterWindow::HandleWindowCall(
       start_maximized_ = true;
     }
     result->Success();
+    return;
+  }
+
+  if (method == "setClientFrame") {
+    const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
+    if (args == nullptr) {
+      result->Error("bad_args", "Expected enabled");
+      return;
+    }
+    auto enabled = args->find(flutter::EncodableValue("enabled"));
+    if (enabled == args->end() || !std::holds_alternative<bool>(enabled->second)) {
+      result->Error("bad_args", "Expected enabled");
+      return;
+    }
+    // Windows 11 supplies its native corner clipping; older Windows ignores it.
+    const HWND hwnd = GetHandle();
+    if (hwnd == nullptr) {
+      result->Error("no_window", "The window is not available");
+      return;
+    }
+    const DWORD preference = std::get<bool>(enabled->second)
+        ? kDwmRoundCorners : kDwmDefaultCorners;
+    DwmSetWindowAttribute(hwnd, kDwmWindowCornerPreference,
+                          &preference, sizeof(preference));
+    result->Success(flutter::EncodableValue(false));
     return;
   }
 

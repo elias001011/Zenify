@@ -19,6 +19,13 @@ import 'package:musify/widgets/queue_list_view.dart';
 import 'package:rxdart/rxdart.dart';
 
 class _Handler extends MusifyAudioHandler {
+  _Handler() {
+    queue.add([
+      for (var i = 0; i < 6; i++)
+        MediaItem(id: 'song$i', title: 'Track $i', extras: {'ytid': 'song$i'}),
+    ]);
+  }
+
   final songs = BehaviorSubject<List<Map>>.seeded([
     for (var i = 0; i < 6; i++)
       {
@@ -83,6 +90,10 @@ void main() {
   tearDownAll(() async {
     await Hive.close();
     await dir.delete(recursive: true);
+  });
+
+  tearDown(() {
+    debugDefaultTargetPlatformOverride = null;
   });
 
   for (final size in [const Size(420, 860), const Size(1280, 800)]) {
@@ -323,6 +334,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Queue'));
     await tester.pump(const Duration(milliseconds: 500));
+    await tester.pump(const Duration(milliseconds: 600));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byType(QueueWidget), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);

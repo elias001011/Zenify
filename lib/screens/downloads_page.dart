@@ -32,8 +32,10 @@ import 'package:musify/services/song_replacement.dart';
 import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/replace_unavailable_button.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -78,6 +80,7 @@ class DownloadsPage extends StatelessWidget {
         }
 
         return IslandScaffold(
+          background: const PageGlow(source: null, cacheKey: 'downloads_page'),
           title: l10n.downloads,
           globalSearch: false,
           actions: [
@@ -181,27 +184,29 @@ class DownloadsPage extends StatelessWidget {
       SliverToBoxAdapter(
         child: SectionHeader(title: title, icon: icon, actionButton: action),
       ),
-      SliverList.builder(
-        itemCount: entries.length,
-        itemBuilder: (context, index) {
-          final entry = entries[index];
-          return RepaintBoundary(
-            key: ValueKey(entry),
-            child: SongBar(
-              entry.song,
-              true,
-              borderRadius: getItemBorderRadius(index, entries.length),
-              onPlay: () => audioHandler.playPlaylistSong(
-                playlist: {
-                  'title': title,
-                  'list': [for (final entry in entries) entry.song],
-                },
-                songIndex: index,
+      MusicSliverSurface(
+        sliver: SliverList.builder(
+          itemCount: entries.length,
+          itemBuilder: (context, index) {
+            final entry = entries[index];
+            return RepaintBoundary(
+              key: ValueKey(entry),
+              child: SongBar(
+                entry.song,
+                true,
+                borderRadius: getItemBorderRadius(index, entries.length),
+                onPlay: () => audioHandler.playPlaylistSong(
+                  playlist: {
+                    'title': title,
+                    'list': [for (final entry in entries) entry.song],
+                  },
+                  songIndex: index,
+                ),
+                trailing: _DownloadStatus(entry),
               ),
-              trailing: _DownloadStatus(entry),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     ];
   }

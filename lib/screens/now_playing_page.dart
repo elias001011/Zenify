@@ -28,11 +28,12 @@ import 'package:musify/main.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/artwork_glow.dart';
-import 'package:musify/widgets/floating_surface.dart';
+import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/now_playing/lyrics_panel.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
+import 'package:musify/widgets/now_playing/player_chrome.dart';
 import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/queue_list_view.dart';
 
@@ -100,58 +101,63 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: _panel == null,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) setState(() => _panel = null);
-      },
-      child: Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        body: StreamBuilder<MediaItem?>(
-          initialData: audioHandler.mediaItem.value,
-          stream: audioHandler.mediaItem,
-          builder: (context, snapshot) {
-            final metadata = snapshot.data;
-            if (metadata == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
-            final panel = _panel;
-            final actions = PlayerActions(
-              metadata: metadata,
-              panel: panel,
-              onPanel: _onPanel,
-            );
-            // Its own group: during the slide its surfaces sit over the shell's.
-            return BackdropGroup(
-              backdropKey: _backdropKey,
-              child: Stack(
-                children: [
-                  // Expands once the player has slid up.
-                  Positioned.fill(
-                    child: PageGlow(
-                      source: mediaItemArtworkSource(metadata),
-                      waiting: !_backgroundVisible,
+    final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
+    return PlayerChrome(
+      style: PlayerChromeStyle.plain,
+      child: PopScope(
+        canPop: layout == _PlayerLayout.wide || _panel == null,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) setState(() => _panel = null);
+        },
+        child: Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          body: StreamBuilder<MediaItem?>(
+            initialData: audioHandler.mediaItem.value,
+            stream: audioHandler.mediaItem,
+            builder: (context, snapshot) {
+              final metadata = snapshot.data;
+              if (metadata == null) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final panel = _panel;
+              final actions = PlayerActions(
+                metadata: metadata,
+                panel: panel,
+                onPanel: _onPanel,
+                showVolume: layout != _PlayerLayout.wide,
+              );
+              // Its own group: during the slide its surfaces sit over the shell's.
+              return BackdropGroup(
+                backdropKey: _backdropKey,
+                child: Stack(
+                  children: [
+                    // Expands once the player has slid up.
+                    Positioned.fill(
+                      child: PageGlow(
+                        source: mediaItemArtworkSource(metadata),
+                        waiting: !_backgroundVisible,
+                        cacheKey: 'now-playing',
+                      ),
                     ),
-                  ),
-                  SafeArea(
-                    child: layout == _PlayerLayout.wide
-                        ? _WideLayout(
-                            metadata: metadata,
-                            actions: actions,
-                            panel: panel,
-                          )
-                        : _CompactLayout(
-                            metadata: metadata,
-                            actions: actions,
-                            panel: panel,
-                            onClosePanel: () => setState(() => _panel = null),
-                          ),
-                  ),
-                ],
-              ),
-            );
-          },
+                    SafeArea(
+                      child: layout == _PlayerLayout.wide
+                          ? _WideLayout(
+                              metadata: metadata,
+                              actions: actions,
+                              panel: panel,
+                            )
+                          : _CompactLayout(
+                              metadata: metadata,
+                              actions: actions,
+                              panel: panel,
+                              onClosePanel: () => setState(() => _panel = null),
+                            ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -159,7 +165,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
 }
 
 enum _PlayerLayout {
-  /// Desktop and tablets: queue and lyrics open beside the artwork.
+  /// Queue and lyrics open beside the artwork.
   wide,
 
   /// Upright phones: lyrics and queue take the artwork's place.
@@ -506,15 +512,14 @@ class _UprightStageState extends State<_UprightStage>
   }
 }
 
-/// Desktop and tablets, as Tidal: the artwork with the song, playback and
-/// actions under it in one column, centred; queue and lyrics open beside it.
+/// Wide listening stage: cover and transport beside lyrics or queue
+/// directly on the ambient canvas.
 class _WideLayout extends StatefulWidget {
   const _WideLayout({
     required this.metadata,
     required this.actions,
     required this.panel,
   });
-
   final MediaItem metadata;
   final Widget actions;
   final PlayerPanel? panel;
@@ -523,132 +528,190 @@ class _WideLayout extends StatefulWidget {
   State<_WideLayout> createState() => _WideLayoutState();
 }
 
-class _WideLayoutState extends State<_WideLayout> {
-  final _belowKey = GlobalKey();
+class _WideLayoutState extends State<_WideLayout>
+    with SingleTickerProviderStateMixin {
+  late final _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+    reverseDuration: const Duration(milliseconds: 320),
+    value: widget.panel == null ? 0 : 1,
+  );
+  late final _progress = CurvedAnimation(
+    parent: _controller,
+    curve: Curves.easeInOutCubic,
+  );
+  late final _slide = Tween(
+    begin: const Offset(0.035, 0),
+    end: Offset.zero,
+  ).animate(_progress);
+  late PlayerPanel? _builtPanel = widget.panel;
 
-  /// What the song, playback and actions take under the artwork, measured
-  /// after each layout: it changes with the text size and for live radio.
-  /// The last song's measure starts the next player, so only the first
-  /// opening corrects itself; live radio, shorter, is left out of it, so the
-  /// guess stays on the generous side and the first frame doesn't overflow.
-  static double _lastSongBelow = 400;
-  double _below = _lastSongBelow;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context))
+      _controller.value = widget.panel == null ? 0 : 1;
+  }
 
-  void _measure(Duration _) {
-    final height = _belowKey.currentContext?.size?.height;
-    if (mounted && height != null && (height - _below).abs() > 0.5) {
-      setState(() => _below = height);
-      if (!(widget.metadata.extras?['isLive'] ?? false)) {
-        _lastSongBelow = height;
+  @override
+  void didUpdateWidget(_WideLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.panel == widget.panel) return;
+    if (widget.panel case final panel?) {
+      _builtPanel = panel;
+      if (MediaQuery.disableAnimationsOf(context)) {
+        _controller.value = 1;
+      } else {
+        _controller.forward();
       }
+    } else {
+      (MediaQuery.disableAnimationsOf(context)
+              ? _controller.animateTo(0, duration: Duration.zero)
+              : _controller.reverse())
+          .whenCompleteOrCancel(() {
+            if (mounted && widget.panel == null)
+              setState(() => _builtPanel = null);
+          });
     }
+  }
+
+  @override
+  void dispose() {
+    _progress.dispose();
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final metadata = widget.metadata;
-    final isLive = metadata.extras?['isLive'] ?? false;
-    final panel = widget.panel;
-    WidgetsBinding.instance.addPostFrameCallback(_measure);
-
+    final live = metadata.extras?['isLive'] == true;
     return Column(
       children: [
         const _CloseButton(),
         Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (context, c) {
-                    final size = min(
-                      c.maxHeight - _below - 16,
-                      c.maxWidth - 64,
-                    ).clamp(160.0, 560.0);
-                    return Center(
-                      child: SizedBox(
-                        // A small artwork must not shrink the action targets.
-                        width: min(c.maxWidth - 32, max(size, 380)),
-                        child: SingleChildScrollView(
-                          primary: false,
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Center(
-                                child: NowPlayingArtwork(
-                                  metadata: metadata,
-                                  size: size,
-                                ),
-                              ),
-                              Column(
-                                key: _belowKey,
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  const SizedBox(height: 28),
-                                  NowPlayingTitle(
-                                    metadata: metadata,
-                                    titleSize: 24,
-                                    artistSize: 16,
-                                    spacing: 4,
-                                    alignment: CrossAxisAlignment.start,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  if (!isLive) ...[
-                                    const PositionSlider(flush: true),
-                                    PlayerControlButtons(
-                                      metadata: metadata,
-                                      iconSize: 40,
-                                      miniIconSize: 20,
-                                      flush: true,
-                                    ),
-                                  ],
-                                  const SizedBox(height: 16),
-                                  PlayerActionBar(child: widget.actions),
-                                ],
-                              ),
-                            ],
+          child: LayoutBuilder(
+            builder: (context, c) {
+              final width = min<double>(380, c.maxWidth * 0.48 - 32);
+              final playback = Center(
+                child: SizedBox(
+                  width: width,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Flexible(
+                        child: LayoutBuilder(
+                          builder: (context, art) => Center(
+                            heightFactor: 1,
+                            child: NowPlayingArtwork(
+                              metadata: metadata,
+                              size: min(width, art.maxHeight),
+                            ),
                           ),
                         ),
                       ),
-                    );
-                  },
-                ),
-              ),
-              AnimatedSize(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOutCubic,
-                child: panel == null
-                    ? const SizedBox.shrink()
-                    : Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 0, 16, 16),
-                        child: SizedBox(
-                          width: 400,
-                          child: _SidePanel(panel: panel, metadata: metadata),
-                        ),
+                      const SizedBox(height: 20),
+                      NowPlayingTitle(
+                        metadata: metadata,
+                        titleSize: 22,
+                        artistSize: 16,
+                        spacing: 4,
                       ),
-              ),
-            ],
+                      const SizedBox(height: 16),
+                      if (!live) ...[
+                        const PositionSlider(flush: true),
+                        PlayerControlButtons(
+                          metadata: metadata,
+                          iconSize: 38,
+                          miniIconSize: 20,
+                          flush: true,
+                        ),
+                      ],
+                      const SizedBox(height: 8),
+                      Center(child: widget.actions),
+                      const SizedBox(height: 12),
+                      if (supportsDesktopVolumeControl)
+                        const Center(
+                          child: DesktopVolumeControl(sliderWidth: 180),
+                        ),
+                      const SizedBox(height: 16),
+                    ],
+                  ),
+                ),
+              );
+              final panelWidth = c.maxWidth * 0.52;
+              final panel = _builtPanel == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      padding: const EdgeInsetsDirectional.fromSTEB(
+                        40,
+                        0,
+                        64,
+                        20,
+                      ),
+                      child: AnimatedSwitcher(
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 260),
+                        transitionBuilder: (child, animation) => FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween(
+                              begin: const Offset(0, 0.035),
+                              end: Offset.zero,
+                            ).animate(animation),
+                            child: child,
+                          ),
+                        ),
+                        child: _builtPanel == PlayerPanel.queue
+                            ? const QueueWidget(
+                                key: ValueKey('player-queue'),
+                                embedded: true,
+                              )
+                            : LyricsPanel(
+                                key: const ValueKey('player-lyrics'),
+                                metadata: metadata,
+                              ),
+                      ),
+                    );
+              return AnimatedBuilder(
+                animation: _progress,
+                child: playback,
+                builder: (context, playback) {
+                  final shownWidth = panelWidth * _progress.value;
+                  return Row(
+                    children: [
+                      SizedBox(width: c.maxWidth - shownWidth, child: playback),
+                      if (_builtPanel != null)
+                        SizedBox(
+                          width: shownWidth,
+                          child: ClipRect(
+                            child: OverflowBox(
+                              alignment: AlignmentDirectional.centerStart,
+                              minWidth: panelWidth,
+                              maxWidth: panelWidth,
+                              child: FadeTransition(
+                                opacity: _progress,
+                                child: SlideTransition(
+                                  position: _slide,
+                                  child: IgnorePointer(
+                                    ignoring: widget.panel == null,
+                                    child: panel,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  );
+                },
+              );
+            },
           ),
         ),
       ],
-    );
-  }
-}
-
-class _SidePanel extends StatelessWidget {
-  const _SidePanel({required this.panel, required this.metadata});
-
-  final PlayerPanel panel;
-  final MediaItem metadata;
-
-  @override
-  Widget build(BuildContext context) {
-    return FloatingSurface(
-      grouped: true,
-      child: panel == PlayerPanel.queue
-          ? const QueueWidget()
-          : LyricsPanel(metadata: metadata),
     );
   }
 }

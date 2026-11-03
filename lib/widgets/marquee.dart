@@ -47,6 +47,7 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
     with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late ScrollController _scrollController;
   bool _isAnimating = false;
+  bool _enabled = true;
   bool _isDisposed = false;
   Timer? _pauseTimer;
   Completer<void>? _pauseCompleter;
@@ -59,6 +60,26 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
     super.initState();
     _scrollController = ScrollController();
     WidgetsBinding.instance.addPostFrameCallback((_) => _startAnimation());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final enabled =
+        TickerMode.valuesOf(context).enabled &&
+        !MediaQuery.disableAnimationsOf(context);
+    if (_enabled == enabled) return;
+    _enabled = enabled;
+    if (!enabled) {
+      _pauseTimer?.cancel();
+      _pauseCompleter?.complete();
+      _pauseCompleter = null;
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.offset);
+      }
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _startAnimation());
+    }
   }
 
   @override
@@ -104,27 +125,27 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
   }
 
   Future<void> _startAnimation() async {
-    if (_isDisposed || _isAnimating) return;
+    if (_isDisposed || !_enabled || _isAnimating) return;
 
     _isAnimating = true;
 
-    while (_scrollController.hasClients && !_isDisposed) {
+    while (_scrollController.hasClients && !_isDisposed && _enabled) {
       try {
         // Check if content actually needs scrolling
         if (_scrollController.position.maxScrollExtent <= 0) break;
 
         await _wait(widget.pauseDuration);
-        if (_isDisposed || !_scrollController.hasClients) break;
+        if (_isDisposed || !_enabled || !_scrollController.hasClients) break;
 
         await _scrollController.animateTo(
           _scrollController.position.maxScrollExtent,
           duration: widget.animationDuration,
           curve: Curves.linear,
         );
-        if (_isDisposed || !_scrollController.hasClients) break;
+        if (_isDisposed || !_enabled || !_scrollController.hasClients) break;
 
         await _wait(widget.pauseDuration);
-        if (_isDisposed || !_scrollController.hasClients) break;
+        if (_isDisposed || !_enabled || !_scrollController.hasClients) break;
 
         await _scrollController.animateTo(
           0,

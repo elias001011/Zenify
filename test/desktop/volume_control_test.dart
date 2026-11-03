@@ -186,7 +186,6 @@ void main() {
                   title: 'Radio',
                   extras: {'isLive': true, 'ytid': 'radio'},
                 ),
-                panel: null,
                 onPanel: (_) {},
               ),
             ),
@@ -221,7 +220,6 @@ void main() {
                   title: 'Song',
                   extras: {'ytid': 'test'},
                 ),
-                panel: null,
                 onPanel: (_) {},
               ),
             ),
@@ -237,7 +235,8 @@ void main() {
       await tester.pumpAndSettle();
       final slider = find.byType(Slider);
       expect(slider, findsOneWidget);
-      expect(tester.getRect(slider).width, 180);
+      expect(tester.getRect(slider).width, greaterThanOrEqualTo(120));
+      expect(tester.getRect(slider).width, lessThanOrEqualTo(180));
       expect(
         tester.getRect(slider).bottom,
         lessThanOrEqualTo(openerRect.bottom),

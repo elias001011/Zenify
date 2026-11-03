@@ -37,9 +37,9 @@ IconData volumeIcon(double volume) {
 
 /// Mute and a volume slider, scrolled with the mouse wheel too.
 class DesktopVolumeControl extends StatelessWidget {
-  const DesktopVolumeControl({super.key});
+  const DesktopVolumeControl({super.key, this.sliderWidth = 132});
 
-  static const double _sliderWidth = 180;
+  final double sliderWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +56,7 @@ class DesktopVolumeControl extends StatelessWidget {
             IconButton(
               icon: Icon(volumeIcon(volume), color: colors.onSurfaceVariant),
               iconSize: 22,
+              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
               tooltip: context.l10n!.volume,
               style: IconButton.styleFrom(
                 backgroundColor: Colors.transparent,
@@ -69,7 +70,7 @@ class DesktopVolumeControl extends StatelessWidget {
               onPressed: audioHandler.toggleMute,
             ),
             SizedBox(
-              width: _sliderWidth,
+              width: sliderWidth,
               height: 32,
               child: _buildSlider(context, volume),
             ),
@@ -124,8 +125,10 @@ class DesktopVolumeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!supportsDesktopVolumeControl) return const SizedBox.shrink();
     return MenuAnchor(
-      alignmentOffset: const Offset(0, 8),
+      alignmentOffset: const Offset(-102, -60),
       style: const MenuStyle(
+        alignment: Alignment.topCenter,
+        elevation: WidgetStatePropertyAll(4),
         padding: WidgetStatePropertyAll(
           EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         ),
@@ -137,8 +140,8 @@ class DesktopVolumeButton extends StatelessWidget {
       ),
       menuChildren: const [
         SizedBox(
-          width: 236,
-          height: 48,
+          width: 188,
+          height: 44,
           child: Center(child: DesktopVolumeControl()),
         ),
       ],

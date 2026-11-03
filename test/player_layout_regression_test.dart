@@ -12,6 +12,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/app_logo.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/no_artwork_cube.dart';
+import 'package:musify/widgets/now_playing/lyric_line_fill.dart';
 import 'package:musify/widgets/now_playing/synced_lyrics_view.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
 
@@ -39,6 +40,198 @@ void main() {
   tearDownAll(() async {
     await Hive.close();
     await dir.delete(recursive: true);
+  });
+
+  testWidgets('compact lyrics rise and stretch smoothly without overshoot', (
+    tester,
+  ) async {
+    final handler = _LyricsHandler();
+    audioHandler = handler;
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Center(
+          child: SizedBox(
+            width: 350,
+            height: 400,
+            child: SyncedLyricsView(
+              lyrics: Lyrics(
+                source: 'test',
+                synced: [
+                  LyricLine(Duration.zero, 'First verse'),
+                  LyricLine(Duration(seconds: 10), 'Second verse'),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    handler.positions.add(
+      PositionData(
+        const Duration(seconds: 12),
+        Duration.zero,
+        const Duration(seconds: 20),
+      ),
+    );
+    var previousScale = 0.98;
+    var previousOffset = 3.0;
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      final transforms = tester.widgetList<Transform>(
+        find.ancestor(
+          of: find.text('Second verse'),
+          matching: find.byType(Transform),
+        ),
+      );
+      final scale = transforms
+          .map((t) => t.transform.entry(1, 1))
+          .reduce((a, b) => a < b ? a : b);
+      final offset = transforms
+          .map((t) => t.transform.getTranslation().y)
+          .reduce((a, b) => a > b ? a : b);
+      expect(scale, inInclusiveRange(previousScale - 0.00001, 1.00001));
+      expect(offset, inInclusiveRange(-0.00001, previousOffset + 0.00001));
+      previousScale = scale;
+      previousOffset = offset;
+    }
+    expect(previousScale, closeTo(1, 0.00001));
+    expect(previousOffset, closeTo(0, 0.00001));
+    await tester.pumpWidget(const SizedBox());
+    await handler.positions.close();
+  });
+
+  testWidgets(
+    'verse handoff keeps its painter and scrolls through intermediate positions',
+    (tester) async {
+      final handler = _LyricsHandler();
+      audioHandler = handler;
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Center(
+            child: SizedBox(
+              width: 320,
+              height: 240,
+              child: SyncedLyricsView(
+                lyrics: Lyrics(
+                  source: 'test',
+                  synced: [
+                    LyricLine(Duration.zero, 'First verse'),
+                    LyricLine(Duration(seconds: 10), 'Second verse'),
+                    LyricLine(Duration(seconds: 20), 'Third verse'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final second = find.ancestor(
+        of: find.text('Second verse'),
+        matching: find.byType(LyricLineFill),
+      );
+      final state = tester.state(second);
+      final viewport = tester
+          .state<ScrollableState>(find.byType(Scrollable).first)
+          .position;
+      final start = viewport.pixels;
+      handler.positions.add(
+        PositionData(
+          const Duration(seconds: 11),
+          Duration.zero,
+          const Duration(seconds: 30),
+        ),
+      );
+      await tester.pump();
+      expect(tester.state(second), same(state));
+      await tester.pump();
+      final samples = <double>[];
+      for (var i = 0; i < 18; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+        samples.add(viewport.pixels);
+      }
+      final end = samples.last;
+      expect(end, greaterThan(start));
+      expect(samples.where((p) => p > start && p < end).length, greaterThan(3));
+      for (var i = 1; i < samples.length; i++) {
+        expect(samples[i], greaterThanOrEqualTo(samples[i - 1]));
+      }
+      expect(tester.state(second), same(state));
+      await tester.pumpWidget(const SizedBox());
+      await handler.positions.close();
+    },
+  );
+
+  testWidgets('desktop lyric fill follows seek and settles while paused', (
+    tester,
+  ) async {
+    final handler = _LyricsHandler();
+    audioHandler = handler;
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: SyncedLyricsView(
+            lyrics: Lyrics(
+              source: 'test',
+              synced: [
+                LyricLine(Duration.zero, 'First verse'),
+                LyricLine(Duration(seconds: 10), 'Second verse'),
+                LyricLine(Duration(seconds: 20), 'Last verse'),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byWidgetPredicate(
+          (widget) => widget is LyricLineFill && widget.emphasis == 1,
+        ),
+        matching: find.text('First verse'),
+      ),
+      findsOneWidget,
+    );
+    handler.positions.add(
+      PositionData(
+        const Duration(seconds: 14),
+        Duration.zero,
+        const Duration(seconds: 30),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byWidgetPredicate(
+          (widget) => widget is LyricLineFill && widget.emphasis == 1,
+        ),
+        matching: find.text('Second verse'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    handler.positions.add(
+      PositionData(
+        const Duration(seconds: 3),
+        Duration.zero,
+        const Duration(seconds: 30),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byWidgetPredicate(
+          (widget) => widget is LyricLineFill && widget.emphasis == 1,
+        ),
+        matching: find.text('First verse'),
+      ),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await handler.positions.close();
   });
 
   testWidgets(
@@ -69,16 +262,17 @@ void main() {
         );
         await tester.pumpAndSettle();
         final finder = find.text(text);
-        final paragraph = tester.renderObject<RenderParagraph>(finder);
-        final size = paragraph.size;
-        final boxes = paragraph
+        RenderParagraph paragraph() =>
+            tester.renderObject<RenderParagraph>(finder);
+        final size = paragraph().size;
+        final boxes = paragraph()
             .getBoxesForSelection(
               const TextSelection(baseOffset: 0, extentOffset: text.length),
             )
             .map((box) => box.toRect())
             .toList();
-        final inactiveColor = paragraph.text.style!.color;
-        final weight = paragraph.text.style!.fontWeight;
+        final inactiveColor = paragraph().text.style!.color;
+        final weight = paragraph().text.style!.fontWeight;
         handler.positions.add(
           PositionData(
             const Duration(seconds: 2),
@@ -90,10 +284,10 @@ void main() {
         // Check every phase of the highlight, including intermediate frames.
         for (var frame = 0; frame < 8; frame++) {
           await tester.pump(const Duration(milliseconds: 50));
-          expect(paragraph.size, size);
-          expect(paragraph.text.style!.fontWeight, weight);
+          expect(paragraph().size, size);
+          expect(paragraph().text.style!.fontWeight, weight);
           expect(
-            paragraph
+            paragraph()
                 .getBoxesForSelection(
                   const TextSelection(baseOffset: 0, extentOffset: text.length),
                 )
@@ -102,7 +296,7 @@ void main() {
             boxes,
           );
         }
-        expect(paragraph.text.style!.color, isNot(inactiveColor));
+        expect(paragraph().text.style!.color, isNot(inactiveColor));
         await tester.pumpWidget(const SizedBox());
       }
       await handler.positions.close();

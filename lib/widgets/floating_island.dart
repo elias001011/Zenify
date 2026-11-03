@@ -133,6 +133,7 @@ class _IslandScaffoldState extends State<IslandScaffold> {
 
     return Scaffold(
       body: Stack(
+        fit: StackFit.expand,
         children: [
           if (widget.background case final background?)
             Positioned.fill(child: IgnorePointer(child: background)),
@@ -228,13 +229,12 @@ class _IslandState extends State<_Island> {
   }
 
   void _submit(String query) {
-    if (widget.onFilter != null) {
-      _focusNode.unfocus();
-      return;
-    }
+    _focusNode.unfocus();
     final trimmed = query.trim();
     if (trimmed.isEmpty || offlineMode.value) return;
-    _closeSearch();
+    if (widget.onFilter != null && !globalSearchOnEnter.value) return;
+    // Keep a page filter (and its text) intact for Back from global search.
+    if (widget.onFilter == null) _closeSearch();
     openSearch(trimmed);
   }
 

@@ -29,6 +29,7 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/library_search.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/moods/moods_preferences.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
@@ -41,10 +42,12 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/offline_playlist_dialogs.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/utilities/playlist_utils.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/playlist_bar.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -57,7 +60,7 @@ class LibraryPage extends StatefulWidget {
   _LibraryPageState createState() => _LibraryPageState();
 }
 
-enum _LibraryFilter { all, custom, youtube, albums, artists, offline }
+enum _LibraryFilter { all, custom, youtube, albums, artists, offline, local }
 
 class _LibraryPageState extends State<LibraryPage> {
   var _filter = _LibraryFilter.all;
@@ -83,8 +86,18 @@ class _LibraryPageState extends State<LibraryPage> {
   void initState() {
     super.initState();
     offlineMode.addListener(_onOfflineModeChanged);
+    showLocalFiles.addListener(_onLocalFilesChanged);
     userPlaylists.addListener(_invalidateAddedPlaylists);
     userPlaylistFolders.addListener(_invalidateAddedPlaylists);
+  }
+
+  void _onLocalFilesChanged() {
+    if (!showLocalFiles.value && _filter == _LibraryFilter.local) {
+      setState(() {
+        _filter = _LibraryFilter.all;
+        _shownBody = null;
+      });
+    }
   }
 
   void _onOfflineModeChanged() {
@@ -111,6 +124,7 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   void dispose() {
     offlineMode.removeListener(_onOfflineModeChanged);
+    showLocalFiles.removeListener(_onLocalFilesChanged);
     userPlaylists.removeListener(_invalidateAddedPlaylists);
     userPlaylistFolders.removeListener(_invalidateAddedPlaylists);
     _filterDebounce?.cancel();
@@ -145,6 +159,7 @@ class _LibraryPageState extends State<LibraryPage> {
     _LibraryFilter.albums => context.l10n!.albums,
     _LibraryFilter.artists => context.l10n!.artists,
     _LibraryFilter.offline => context.l10n!.filterOffline,
+    _LibraryFilter.local => context.l10n!.localFiles,
   };
 
   @override
@@ -164,9 +179,11 @@ class _LibraryPageState extends State<LibraryPage> {
       if (!hasUserContent &&
           !hasOfflinePlaylists &&
           !hasOfflineArtists &&
-          !hasOfflineSongs) {
+          !hasOfflineSongs &&
+          !(showLocalFiles.value && localFiles.value.isNotEmpty)) {
         final colorScheme = Theme.of(context).colorScheme;
         return IslandScaffold(
+          background: const PageGlow(source: null, cacheKey: 'library_page'),
           title: context.l10n!.library,
           body: Center(
             child: Padding(
@@ -211,6 +228,7 @@ class _LibraryPageState extends State<LibraryPage> {
     }
 
     return IslandScaffold(
+      background: const PageGlow(source: null, cacheKey: 'library_page'),
       title: context.l10n!.library,
       // The library's own search: it stays here and finds songs too.
       onFilter: _onFilter,
@@ -229,6 +247,7 @@ class _LibraryPageState extends State<LibraryPage> {
           moodsEnabled,
           savedZenifyPlaylists,
           showLocalFiles,
+          localFiles,
         ]),
         builder: (context, _) {
           // In another tab (built early, see the router), a like or a
@@ -257,13 +276,20 @@ class _LibraryPageState extends State<LibraryPage> {
                     child: SortChips<_LibraryFilter>(
                       currentSortType: _filter,
                       sortTypes: offlineMode.value
-                          ? const [
+                          ? [
                               _LibraryFilter.all,
                               _LibraryFilter.custom,
                               _LibraryFilter.artists,
                               _LibraryFilter.offline,
+                              if (showLocalFiles.value) _LibraryFilter.local,
                             ]
-                          : _LibraryFilter.values,
+                          : _LibraryFilter.values
+                                .where(
+                                  (f) =>
+                                      f != _LibraryFilter.local ||
+                                      showLocalFiles.value,
+                                )
+                                .toList(),
                       sortTypeToString: _filterLabel,
                       onSelected: (filter) => setState(() => _filter = filter),
                     ),
@@ -598,25 +624,27 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
       ),
       if (saved.isNotEmpty)
-        SliverList.builder(
-          itemCount: saved.length,
-          itemBuilder: (context, index) {
-            final playlist = saved[index];
-            final id = playlist['ytid'].toString();
-            return PlaylistBar(
-              key: ValueKey(id),
-              playlist['title'],
-              playlistId: id,
-              playlistArtwork: playlist['image'],
-              borderRadius: getItemBorderRadius(
-                index,
-                saved.length,
-                hasItemsBefore: true,
-              ),
-              onPressed: () =>
-                  context.push('/home/playlist/${Uri.encodeComponent(id)}'),
-            );
-          },
+        MusicSliverSurface(
+          sliver: SliverList.builder(
+            itemCount: saved.length,
+            itemBuilder: (context, index) {
+              final playlist = saved[index];
+              final id = playlist['ytid'].toString();
+              return PlaylistBar(
+                key: ValueKey(id),
+                playlist['title'],
+                playlistId: id,
+                playlistArtwork: playlist['image'],
+                borderRadius: getItemBorderRadius(
+                  index,
+                  saved.length,
+                  hasItemsBefore: true,
+                ),
+                onPressed: () =>
+                    context.push('/home/playlist/${Uri.encodeComponent(id)}'),
+              );
+            },
+          ),
         ),
     ];
   }
@@ -639,11 +667,23 @@ class _LibraryPageState extends State<LibraryPage> {
   /// Songs of the library that match the search, offline or not as the
   /// filter says.
   List<Widget> _buildSongSlivers() {
-    if (_query.isEmpty || !_shows(_LibraryFilter.offline)) return [];
-    final songs = searchLibrarySongs(
-      _query,
-      offlineOnly: offlineMode.value || _filter == _LibraryFilter.offline,
-    );
+    final localOnly = _filter == _LibraryFilter.local && showLocalFiles.value;
+    if (!localOnly && (_query.isEmpty || !_shows(_LibraryFilter.offline)))
+      return [];
+    final songs = localOnly
+        ? localFiles.value
+              .where(
+                (song) =>
+                    _query.isEmpty ||
+                    '${song['title']} ${song['artist']}'.toLowerCase().contains(
+                      _query,
+                    ),
+              )
+              .toList()
+        : searchLibrarySongs(
+            _query,
+            offlineOnly: offlineMode.value || _filter == _LibraryFilter.offline,
+          );
     if (songs.isEmpty) return [];
     return [
       SliverToBoxAdapter(
@@ -654,14 +694,16 @@ class _LibraryPageState extends State<LibraryPage> {
       ),
       SliverPadding(
         padding: commonListViewBottomPadding,
-        sliver: SliverList.builder(
-          itemCount: songs.length,
-          itemBuilder: (context, index) => SongBar(
-            songs[index],
-            true,
-            key: listItemKey('library_song', index, songs[index]),
-            showMusicDuration: true,
-            borderRadius: getItemBorderRadius(index, songs.length),
+        sliver: MusicSliverSurface(
+          sliver: SliverList.builder(
+            itemCount: songs.length,
+            itemBuilder: (context, index) => SongBar(
+              songs[index],
+              true,
+              key: listItemKey('library_song', index, songs[index]),
+              showMusicDuration: true,
+              borderRadius: getItemBorderRadius(index, songs.length),
+            ),
           ),
         ),
       ),
@@ -693,44 +735,46 @@ class _LibraryPageState extends State<LibraryPage> {
   }) {
     return SliverPadding(
       padding: hasItemsAfter ? EdgeInsets.zero : commonListViewBottomPadding,
-      sliver: SliverList.builder(
-        itemCount: playlists.length,
-        itemBuilder: (BuildContext context, index) {
-          final playlist = playlists[index];
-          final isArtist = playlist['source']?.toString() == 'youtube-artist';
-          final borderRadius = getItemBorderRadius(
-            index,
-            playlists.length,
-            hasItemsBefore: hasItemsBefore,
-            hasItemsAfter: hasItemsAfter,
-          );
-          return PlaylistBar(
-            key: listItemKey('library_playlist', index, playlist),
-            playlist['title'],
-            playlistId: playlist['ytid'],
-            playlistArtwork: playlist['image'],
-            cubeIcon: isArtist
-                ? FluentIcons.person_24_filled
-                : FluentIcons.text_bullet_list_24_filled,
-            isAlbum: isArtist ? false : playlist['isAlbum'],
-            playlistData:
-                isArtist ||
-                    playlist['source'] == 'user-created' ||
-                    playlist['source'] == 'user-youtube' ||
-                    isOfflinePlaylists
-                ? playlist
-                : null,
-            onDelete:
-                playlist['source'] == 'user-created' ||
-                    playlist['source'] == 'user-youtube' ||
-                    isOfflinePlaylists
-                ? () => isOfflinePlaylists
-                      ? _showRemoveOfflinePlaylistDialog(playlist)
-                      : _showRemovePlaylistDialog(playlist)
-                : null,
-            borderRadius: borderRadius,
-          );
-        },
+      sliver: MusicSliverSurface(
+        sliver: SliverList.builder(
+          itemCount: playlists.length,
+          itemBuilder: (BuildContext context, index) {
+            final playlist = playlists[index];
+            final isArtist = playlist['source']?.toString() == 'youtube-artist';
+            final borderRadius = getItemBorderRadius(
+              index,
+              playlists.length,
+              hasItemsBefore: hasItemsBefore,
+              hasItemsAfter: hasItemsAfter,
+            );
+            return PlaylistBar(
+              key: listItemKey('library_playlist', index, playlist),
+              playlist['title'],
+              playlistId: playlist['ytid'],
+              playlistArtwork: playlist['image'],
+              cubeIcon: isArtist
+                  ? FluentIcons.person_24_filled
+                  : FluentIcons.text_bullet_list_24_filled,
+              isAlbum: isArtist ? false : playlist['isAlbum'],
+              playlistData:
+                  isArtist ||
+                      playlist['source'] == 'user-created' ||
+                      playlist['source'] == 'user-youtube' ||
+                      isOfflinePlaylists
+                  ? playlist
+                  : null,
+              onDelete:
+                  playlist['source'] == 'user-created' ||
+                      playlist['source'] == 'user-youtube' ||
+                      isOfflinePlaylists
+                  ? () => isOfflinePlaylists
+                        ? _showRemoveOfflinePlaylistDialog(playlist)
+                        : _showRemovePlaylistDialog(playlist)
+                  : null,
+              borderRadius: borderRadius,
+            );
+          },
+        ),
       ),
     );
   }
@@ -740,23 +784,25 @@ class _LibraryPageState extends State<LibraryPage> {
     required bool hasItemsBefore,
     required bool hasItemsAfter,
   }) {
-    return SliverList.builder(
-      itemCount: folders.length,
-      itemBuilder: (BuildContext context, index) {
-        final folder = folders[index];
-        final borderRadius = getItemBorderRadius(
-          index,
-          folders.length,
-          hasItemsBefore: hasItemsBefore,
-          hasItemsAfter: hasItemsAfter,
-        );
-        return PlaylistBar(
-          folder['name'],
-          playlistData: folder,
-          borderRadius: borderRadius,
-          onDelete: () => _showDeleteFolderDialog(folder),
-        );
-      },
+    return MusicSliverSurface(
+      sliver: SliverList.builder(
+        itemCount: folders.length,
+        itemBuilder: (BuildContext context, index) {
+          final folder = folders[index];
+          final borderRadius = getItemBorderRadius(
+            index,
+            folders.length,
+            hasItemsBefore: hasItemsBefore,
+            hasItemsAfter: hasItemsAfter,
+          );
+          return PlaylistBar(
+            folder['name'],
+            playlistData: folder,
+            borderRadius: borderRadius,
+            onDelete: () => _showDeleteFolderDialog(folder),
+          );
+        },
+      ),
     );
   }
 

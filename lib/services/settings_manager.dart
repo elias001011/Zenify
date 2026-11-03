@@ -115,6 +115,11 @@ final offlineMode = ValueNotifier<bool>(
   Hive.box('settings').get('offlineMode', defaultValue: false),
 );
 
+/// Enter may leave a page filter for global search while online.
+final globalSearchOnEnter = ValueNotifier<bool>(
+  Hive.box('settings').get('globalSearchOnEnter', defaultValue: true),
+);
+
 final wrappedEnabled = ValueNotifier<bool>(
   Hive.box('settings').get('wrappedEnabled', defaultValue: true),
 );
@@ -266,6 +271,10 @@ void reloadSettingsFromStorage() {
   );
   usePureBlackColor.value = _readPureBlack(settings);
   offlineMode.value = settings.get('offlineMode', defaultValue: false);
+  globalSearchOnEnter.value = settings.get(
+    'globalSearchOnEnter',
+    defaultValue: true,
+  );
   wrappedEnabled.value = settings.get('wrappedEnabled', defaultValue: true);
   sponsorBlockSupport.value = settings.get(
     'sponsorBlockSupport',

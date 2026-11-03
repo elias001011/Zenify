@@ -20,8 +20,10 @@
  */
 
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/settings_manager.dart';
 
 /// What of the user's library matches a search.
 typedef LibraryMatches = ({
@@ -81,6 +83,7 @@ List<Map> searchLibrarySongs(String query, {bool offlineOnly = false}) {
 /// its file wherever it shows.
 List<Map> _librarySongs(bool offlineOnly) => _uniqueByYtid([
   ...userOfflineSongs.value.whereType<Map>(),
+  if (showLocalFiles.value) ...localFiles.value,
   if (!offlineOnly) ...[
     ...userLikedSongsList.value.whereType<Map>(),
     for (final playlist in getUserCustomPlaylists())

@@ -57,10 +57,10 @@ void paintArtworkGlow(Canvas canvas, Rect bounds, Color color, double alpha) {
 /// to the next, and each fades in when its artwork's colour arrives.
 ///
 /// The first colours also open [reveal]: the glow expanding into the page,
-/// once per widget, so it plays when a page or the player opens and never
-/// again for a song or playlist change.
+/// once per session for a cached page. Reopening that page starts settled;
+/// changing a song or theme only transitions its colours.
 class GlowColors {
-  GlowColors(TickerProvider vsync)
+  GlowColors(TickerProvider vsync, {this.cacheKey})
     : _transition = AnimationController(
         vsync: vsync,
         duration: const Duration(milliseconds: 1200),
@@ -74,6 +74,12 @@ class GlowColors {
       if (status == AnimationStatus.completed) _from = {};
     });
   }
+
+  static final _revealed = <String>{};
+  final String? cacheKey;
+  late final bool _wasRevealed =
+      cacheKey != null && _revealed.contains(cacheKey);
+  bool reduceMotion = false;
 
   final AnimationController _transition;
   final AnimationController _reveal;
@@ -104,7 +110,7 @@ class GlowColors {
   }
 
   /// Glows for [sources]; one without artwork, or without a colour found in
-  /// it, glows in [appColor]. Cached colours also fade in on a newly opened page.
+  /// it, glows in [appColor]. Revisited pages reuse their settled reveal.
   void update(List<String?> sources, Color appColor) {
     if (appColor == _appColor && listEquals(sources, _sources)) return;
     _sources = List.of(sources);
@@ -157,10 +163,19 @@ class GlowColors {
   }
 
   void _maybeReveal() {
+    if (_wasRevealed || reduceMotion) {
+      _reveal.value = 1;
+      return;
+    }
     if (!_held &&
         _to.isNotEmpty &&
         !_reveal.isCompleted &&
         !_reveal.isAnimating) {
+      if (cacheKey case final key?) {
+        // Bound session memory while retaining common cached pages.
+        if (_revealed.length >= 256) _revealed.remove(_revealed.first);
+        _revealed.add(key);
+      }
       _reveal.forward();
     }
   }
@@ -178,7 +193,12 @@ class GlowColors {
         if (colorAt(i) case final color? when color.a > 0) i: color,
     };
     _to = next;
-    _transition.forward(from: 0);
+    if (reduceMotion || (_from.isEmpty && _wasRevealed)) {
+      _from = {};
+      _transition.value = 1;
+    } else {
+      _transition.forward(from: 0);
+    }
     _maybeReveal();
   }
 
@@ -203,7 +223,9 @@ class GlowColors {
 /// colour, and disposes them with it.
 mixin GlowColorsHost<T extends StatefulWidget> on TickerProviderStateMixin<T> {
   GlowColors? _glowColors;
-  GlowColors get glowColors => _glowColors ??= GlowColors(this);
+  String? get glowCacheKey => null;
+  GlowColors get glowColors =>
+      _glowColors ??= GlowColors(this, cacheKey: glowCacheKey);
 
   /// The artworks to glow for, in order.
   List<String?> get glowSources;
@@ -215,6 +237,7 @@ mixin GlowColorsHost<T extends StatefulWidget> on TickerProviderStateMixin<T> {
       _glowColors?.suspend();
       return;
     }
+    glowColors.reduceMotion = MediaQuery.disableAnimationsOf(context);
     glowColors.update(glowSources, Theme.of(context).colorScheme.primary);
   }
 
@@ -251,7 +274,14 @@ mixin GlowColorsHost<T extends StatefulWidget> on TickerProviderStateMixin<T> {
 /// sized by the page, so they keep their shape on a tall phone as on a wide
 /// window, and they reach under the desktop rail, which floats over them.
 class PageGlow extends StatefulWidget {
-  const PageGlow({super.key, required this.source, this.waiting = false});
+  const PageGlow({
+    super.key,
+    required this.source,
+    this.waiting = false,
+    this.cacheKey,
+  });
+
+  final String? cacheKey;
 
   /// The artwork's network URL or file path.
   final String? source;
@@ -267,6 +297,10 @@ class _PageGlowState extends State<PageGlow>
     with TickerProviderStateMixin, GlowColorsHost {
   @override
   List<String?> get glowSources => [widget.source];
+
+  @override
+  String get glowCacheKey =>
+      widget.cacheKey ?? 'page:${widget.source ?? 'theme'}';
 
   @override
   void didChangeDependencies() {

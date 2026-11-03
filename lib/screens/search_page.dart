@@ -40,6 +40,7 @@ import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/youtube_url.dart';
 import 'package:musify/widgets/artist_bar.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/custom_search_bar.dart';
@@ -51,7 +52,9 @@ import 'package:musify/widgets/section_title.dart';
 import 'package:musify/widgets/song_bar.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key});
+  const SearchPage({super.key, this.initialQuery});
+
+  final String? initialQuery;
 
   @override
   _SearchPageState createState() => _SearchPageState();
@@ -73,12 +76,15 @@ int _handledSearchFocusRequest = 0;
 
 void requestSearchFocus() => searchFocusRequest.value++;
 
-/// A query from the island's search shortcut, run once the page is shown.
-final pendingSearchQuery = ValueNotifier<String?>(null);
-
+/// The destination owns its query, including when another search page is cached.
 void openSearch(String query) {
-  pendingSearchQuery.value = query;
-  NavigationManager.router.go(NavigationManager.searchPath);
+  final trimmed = query.trim();
+  if (trimmed.isEmpty || offlineMode.value) return;
+  final location = Uri(
+    path: NavigationManager.searchPath,
+    queryParameters: {'q': trimmed},
+  );
+  unawaited(NavigationManager.router.push<void>(location.toString()));
 }
 
 const LibraryMatches _noLibraryMatches = (
@@ -88,7 +94,9 @@ const LibraryMatches _noLibraryMatches = (
 );
 
 class _SearchPageState extends State<SearchPage> {
-  final TextEditingController _searchBar = TextEditingController();
+  late final TextEditingController _searchBar = TextEditingController(
+    text: widget.initialQuery ?? '',
+  );
   final FocusNode _inputNode = FocusNode();
   final ValueNotifier<bool> _fetchingSongs = ValueNotifier(false);
   int maxSongsInList = 15;
@@ -107,19 +115,25 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     searchFocusRequest.addListener(_focusOnRequest);
-    pendingSearchQuery.addListener(_runPendingSearch);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _runPendingSearch());
+    _runInitialQuery();
     // A request made from another tab arrives before this page mounts.
     if (searchFocusRequest.value != _handledSearchFocusRequest) {
       _focusOnRequest();
     }
   }
 
-  void _runPendingSearch() {
-    final query = pendingSearchQuery.value;
-    if (query == null || !mounted) return;
-    pendingSearchQuery.value = null;
-    _submitSearch(query);
+  @override
+  void didUpdateWidget(SearchPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialQuery != widget.initialQuery) _runInitialQuery();
+  }
+
+  void _runInitialQuery() {
+    final query = widget.initialQuery;
+    if (query == null || query.trim().isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_submitSearch(query));
+    });
   }
 
   void _focusOnRequest() {
@@ -143,13 +157,14 @@ class _SearchPageState extends State<SearchPage> {
     if (mounted) setState(() {});
 
     await search();
-    _inputNode.unfocus();
+    if (mounted) _inputNode.unfocus();
   }
 
   @override
   void dispose() {
     searchFocusRequest.removeListener(_focusOnRequest);
-    pendingSearchQuery.removeListener(_runPendingSearch);
+    _latestSearchRequest++;
+    _latestSuggestionRequest++;
     _searchBar.dispose();
     _inputNode.dispose();
     _fetchingSongs.dispose();
@@ -293,7 +308,7 @@ class _SearchPageState extends State<SearchPage> {
         stackTrace: stackTrace,
       );
     } finally {
-      if (requestId == _latestSearchRequest) {
+      if (mounted && requestId == _latestSearchRequest) {
         _fetchingSongs.value = false;
         if (mounted) setState(() {});
       }
@@ -356,6 +371,7 @@ class _SearchPageState extends State<SearchPage> {
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     return IslandScaffold(
+      background: const PageGlow(source: null, cacheKey: 'search_page'),
       title: context.l10n!.search,
       globalSearch: false,
       body: SingleChildScrollView(

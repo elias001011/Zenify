@@ -75,8 +75,8 @@
   "customPlaylistImgUrl": "Custom playlist image URL",
   "customPlaylistName": "Custom playlist name",
   "customPlaylists": "Custom playlists",
-  "customTitleBar": "Title bar in app colours",
-  "customTitleBarDescription": "Follow the app's light and dark mode instead of the system's.",
+  "customTitleBar": "Integrated title bar",
+  "customTitleBarDescription": "Extend the page and its dynamic background behind the window controls.",
   "dateAdded": "Date Added",
   "default_": "Default",
   "delete": "Delete",
@@ -801,5 +801,10 @@
   "startRadio": "Start radio",
   "radioOf": "{name} radio",
   "@radioOf": {"placeholders": {"name": {"type": "String"}}},
-  "radioUnavailable": "Couldn't start the radio. Try again in a moment."
+  "radioUnavailable": "Couldn't start the radio. Try again in a moment.",
+  "globalSearchOnEnter": "Enter opens global search",
+  "globalSearchOnEnterDescription": "Allow Enter to open global search from bars that filter the current screen. Available only while online.",
+  "windowMinimize": "Minimize",
+  "windowMaximize": "Maximize",
+  "windowRestore": "Restore window"
 }

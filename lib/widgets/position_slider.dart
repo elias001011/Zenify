@@ -23,12 +23,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/utilities/formatter.dart';
-
-PositionData _positionData = PositionData(
-  Duration.zero,
-  Duration.zero,
-  Duration.zero,
-);
+import 'package:musify/widgets/now_playing/player_chrome.dart';
 
 class PositionSlider extends StatefulWidget {
   const PositionSlider({super.key, this.flush = false});
@@ -41,14 +36,22 @@ class PositionSlider extends StatefulWidget {
 }
 
 class _PositionSliderState extends State<PositionSlider> {
+  PositionData _positionData = PositionData(
+    Duration.zero,
+    Duration.zero,
+    Duration.zero,
+  );
   bool _isDragging = false;
   double _dragValue = 0;
   Object? _currentMediaId;
 
   @override
   Widget build(BuildContext context) {
+    final minimal = PlayerChrome.minimalOf(context);
     return StreamBuilder<PositionData>(
-      stream: audioHandler.positionDataStream,
+      stream: TickerMode.valuesOf(context).enabled
+          ? audioHandler.positionDataStream
+          : const Stream.empty(),
       initialData: audioHandler.currentPositionData,
       builder: (context, snapshot) {
         final mediaId = audioHandler.mediaItem.valueOrNull?.id;
@@ -77,28 +80,49 @@ class _PositionSliderState extends State<PositionSlider> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SliderTheme(
-              data: SliderTheme.of(context)
-                  .copyWith(padding: widget.flush ? EdgeInsets.zero : null),
-              child: Slider(
-                value: currentValue.clamp(0.0, maxDuration),
-                onChanged: (value) {
-                  setState(() {
-                    _isDragging = true;
-                    _dragValue = value;
-                  });
-                },
-                onChangeEnd: (value) {
-                  audioHandler.seek(Duration(seconds: value.toInt()));
-                  setState(() {
-                    _isDragging = false;
-                  });
-                },
-                max: maxDuration,
-                semanticFormatterCallback: (value) =>
-                    formatDuration(value.toInt()),
+              data: SliderTheme.of(context).copyWith(
+                padding: widget.flush ? EdgeInsets.zero : null,
+                trackHeight: minimal ? 4 : null,
+                trackShape: minimal
+                    ? const RoundedRectSliderTrackShape()
+                    : null,
+                thumbShape: minimal
+                    ? const RoundSliderThumbShape(enabledThumbRadius: 0)
+                    : null,
+                overlayShape: minimal
+                    ? const RoundSliderOverlayShape(overlayRadius: 8)
+                    : null,
+                activeTrackColor: minimal
+                    ? Theme.of(context).colorScheme.onSurface
+                    : null,
+                inactiveTrackColor: minimal
+                    ? Theme.of(context).colorScheme.onSurface
+                          .withValues(alpha: 0.2)
+                    : null,
+              ),
+              child: SizedBox(
+                height: minimal ? 28 : null,
+                child: Slider(
+                  value: currentValue.clamp(0.0, maxDuration),
+                  onChanged: (value) {
+                    setState(() {
+                      _isDragging = true;
+                      _dragValue = value;
+                    });
+                  },
+                  onChangeEnd: (value) {
+                    audioHandler.seek(Duration(seconds: value.toInt()));
+                    setState(() {
+                      _isDragging = false;
+                    });
+                  },
+                  max: maxDuration,
+                  semanticFormatterCallback: (value) =>
+                      formatDuration(value.toInt()),
+                ),
               ),
             ),
-            if (widget.flush) const SizedBox(height: 8),
+            if (widget.flush) SizedBox(height: minimal ? 4 : 8),
             _buildPositionRow(context, _positionData),
           ],
         );
@@ -106,9 +130,10 @@ class _PositionSliderState extends State<PositionSlider> {
     );
   }
 
-  static const _textStyle = TextStyle(fontSize: 15);
-
   Widget _buildPositionRow(BuildContext context, PositionData positionData) {
+    final textStyle = TextStyle(
+      fontSize: PlayerChrome.minimalOf(context) ? 12 : 15,
+    );
     final positionText = formatDuration(
       _isDragging ? _dragValue.toInt() : positionData.position.inSeconds,
     );
@@ -119,8 +144,8 @@ class _PositionSliderState extends State<PositionSlider> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(positionText, style: _textStyle),
-          Text(durationText, style: _textStyle),
+          Text(positionText, style: textStyle),
+          Text(durationText, style: textStyle),
         ],
       ),
     );

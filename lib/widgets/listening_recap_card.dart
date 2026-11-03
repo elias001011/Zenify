@@ -26,6 +26,7 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/app_logo.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/song_artwork.dart';
 import 'package:musify/widgets/song_bar.dart';
 
@@ -81,24 +82,33 @@ class ListeningRecapCards extends StatelessWidget {
           ),
         ),
         if (songs.isNotEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Column(
-                children: [
-                  for (var i = 0; i < songs.length; i++)
-                    SongBar(
-                      key: ValueKey(songs[i]['ytid'] ?? i),
-                      songs[i],
-                      false,
-                      showPlayTime: true,
-                      rank: i + 1,
-                      onPlay: () => onSongTap(i),
-                      barPadding: const EdgeInsetsDirectional.symmetric(
-                        vertical: 10,
+          Padding(
+            padding: const EdgeInsets.all(4),
+            child: MusicListSurface(
+              color: Theme.of(context).colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 6,
+                ),
+                child: Column(
+                  children: [
+                    for (var i = 0; i < songs.length; i++)
+                      SongBar(
+                        key: ValueKey(songs[i]['ytid'] ?? i),
+                        songs[i],
+                        false,
+                        backgroundColor: Colors.transparent,
+                        showPlayTime: true,
+                        rank: i + 1,
+                        onPlay: () => onSongTap(i),
+                        barPadding: const EdgeInsetsDirectional.symmetric(
+                          vertical: 10,
+                        ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -138,11 +148,15 @@ class _RecapCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(padding: const EdgeInsets.all(16), child: child),
+    return Padding(
+      padding: const EdgeInsets.all(4),
+      child: MusicListSurface(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(padding: const EdgeInsets.all(16), child: child),
+        ),
       ),
     );
   }

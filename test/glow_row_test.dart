@@ -30,7 +30,7 @@ void main() {
           width: 500,
           height: 120,
           child: GlowRow(
-            sources: List.filled(10, null),
+            itemCount: 10,
             itemExtent: 136,
             itemBuilder: (context, index) =>
                 SizedBox(width: 120, child: Text('item $index')),

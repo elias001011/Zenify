@@ -22,6 +22,7 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/widgets/floating_island.dart';
 
 /// The metadata and actions below a playlist, album or artist hero.
 class PlaylistHeader extends StatelessWidget {
@@ -119,7 +120,12 @@ class PlaylistHeader extends StatelessWidget {
             ],
           ),
           if (description != null && description!.trim().isNotEmpty)
-            _Description(description!.trim()),
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: readableWidth),
+                child: _Description(description!.trim()),
+              ),
+            ),
           const SizedBox(height: 20),
         ],
       ),

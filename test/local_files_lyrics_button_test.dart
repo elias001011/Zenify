@@ -47,8 +47,7 @@ void main() {
           home: Scaffold(
             body: PlayerActions(
               metadata: MediaItem(id: id, title: 'Song', extras: {'ytid': id}),
-              panel: null,
-              onPanel: (_) {},
+                onPanel: (_) {},
             ),
           ),
         ),

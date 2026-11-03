@@ -263,7 +263,9 @@ class NavigationManager {
                   builder: (context, isOffline, _) {
                     return isOffline
                         ? const OfflineSearchPlaceholder()
-                        : const SearchPage();
+                        : SearchPage(
+                            initialQuery: state.uri.queryParameters['q'],
+                          );
                   },
                 ),
                 state: state,

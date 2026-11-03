@@ -26,6 +26,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/services/lyrics/lyrics_models.dart';
+import 'package:musify/widgets/now_playing/lyric_line_fill.dart';
 
 /// Shows time-synced lyrics: the current line is highlighted and kept in view,
 /// tapping a line seeks to it, and the timing can be nudged with +/- buttons
@@ -42,13 +43,15 @@ class SyncedLyricsView extends StatefulWidget {
 class _SyncedLyricsViewState extends State<SyncedLyricsView> {
   static const Duration _offsetStep = Duration(milliseconds: 500);
   static const Duration _manualScrollPause = Duration(seconds: 4);
-  static const Duration _scrollDuration = Duration(milliseconds: 350);
+  static const Duration _scrollDuration = Duration(milliseconds: 650);
 
   StreamSubscription<PositionData>? _positionSubscription;
   List<GlobalKey> _lineKeys = const [];
+  final _progress = ValueNotifier<double>(0);
   Duration _position = Duration.zero;
   Duration _offset = Duration.zero;
   int _activeIndex = -1;
+  Size? _viewportSize;
   DateTime _autoScrollResumesAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   List<LyricLine> get _lines => widget.lyrics.synced ?? const <LyricLine>[];
@@ -59,11 +62,26 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
     _prepareLines();
     _position = audioHandler.currentPositionData.position;
     _activeIndex = _computeActiveIndex();
-    _positionSubscription = audioHandler.positionDataStream.listen((data) {
-      _position = data.position;
-      _refreshActiveLine();
-    });
+    _updateProgress();
     _scheduleScrollToActive(animate: false);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (TickerMode.valuesOf(context).enabled) {
+      _position = audioHandler.currentPositionData.position;
+      _refreshActiveLine();
+      _updateProgress();
+      _positionSubscription ??= audioHandler.positionDataStream.listen((data) {
+        _position = data.position;
+        _refreshActiveLine();
+        _updateProgress();
+      });
+    } else {
+      unawaited(_positionSubscription?.cancel());
+      _positionSubscription = null;
+    }
   }
 
   @override
@@ -73,6 +91,7 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
       _prepareLines();
       _offset = Duration.zero;
       _activeIndex = _computeActiveIndex();
+      _updateProgress();
       _scheduleScrollToActive(animate: false);
     }
   }
@@ -80,7 +99,20 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
   @override
   void dispose() {
     unawaited(_positionSubscription?.cancel());
+    _progress.dispose();
     super.dispose();
+  }
+
+  void _updateProgress() {
+    if (_activeIndex < 0 || _activeIndex >= _lines.length) return;
+    final start = _lines[_activeIndex].start;
+    final end = _activeIndex + 1 < _lines.length
+        ? _lines[_activeIndex + 1].start
+        : audioHandler.currentPositionData.duration;
+    final span = (end - start).inMilliseconds;
+    _progress.value = span <= 0
+        ? 1
+        : ((_position + _offset - start).inMilliseconds / span).clamp(0.0, 1.0);
   }
 
   void _prepareLines() {
@@ -109,8 +141,10 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
         Scrollable.ensureVisible(
           lineContext,
           alignment: 0.4,
-          duration: animate ? _scrollDuration : Duration.zero,
-          curve: Curves.easeOutCubic,
+          duration: !animate || MediaQuery.disableAnimationsOf(context)
+              ? Duration.zero
+              : _scrollDuration,
+          curve: Curves.easeInOutCubic,
         ),
       );
     });
@@ -121,6 +155,7 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
       _offset = delta == Duration.zero ? Duration.zero : _offset + delta;
       _activeIndex = _computeActiveIndex();
     });
+    _updateProgress();
     _autoScrollResumesAt = DateTime.fromMillisecondsSinceEpoch(0);
     _scheduleScrollToActive();
   }
@@ -157,6 +192,13 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
             },
             child: LayoutBuilder(
               builder: (context, constraints) {
+                // Resizing reflows the lines and changes the edge padding.
+                // A pixel offset alone no longer keeps the current verse in
+                // view, even when playback is paused and emits no new ticks.
+                if (_viewportSize != constraints.biggest) {
+                  _viewportSize = constraints.biggest;
+                  _scheduleScrollToActive(animate: false);
+                }
                 // Blank space above and below lets the first and last lines
                 // reach the vertical middle of the card.
                 final edgePadding = constraints.maxHeight * 0.4;
@@ -169,9 +211,15 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
                   ),
                   physics: const BouncingScrollPhysics(),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       for (var i = 0; i < lines.length; i++)
-                        _buildLine(i, lines[i], textColor),
+                        _buildLine(
+                          i,
+                          lines[i],
+                          textColor,
+                          constraints.maxWidth >= 500 ? 32 : 20,
+                        ),
                       Padding(
                         padding: const EdgeInsets.only(top: 24),
                         child: Text(
@@ -194,25 +242,64 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
     );
   }
 
-  Widget _buildLine(int index, LyricLine line, Color baseColor) {
+  Widget _buildLine(
+    int index,
+    LyricLine line,
+    Color baseColor,
+    double fontSize,
+  ) {
     final isActive = index == _activeIndex;
+    final spacious = fontSize >= 28;
+    final align = spacious ? TextAlign.start : TextAlign.center;
+    final style = TextStyle(
+      fontSize: fontSize,
+      height: spacious ? 1.35 : 1.4,
+      fontWeight: spacious ? FontWeight.w700 : FontWeight.w800,
+      color: baseColor,
+    );
     return GestureDetector(
       key: _lineKeys[index],
       behavior: HitTestBehavior.opaque,
       onTap: () => _seekToLine(line),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: AnimatedDefaultTextStyle(
-          duration: const Duration(milliseconds: 200),
-          style: TextStyle(
-            fontSize: 20,
-            height: 1.4,
-            // Keep glyph metrics fixed so highlighting never reflows a line.
-            fontWeight: FontWeight.w800,
-            color: baseColor.withValues(alpha: isActive ? 1 : 0.45),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(
+          end: MediaQuery.disableAnimationsOf(context) || isActive ? 1.0 : 0.0,
+        ),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 500),
+        curve: Curves.easeOutCubic,
+        builder: (context, amount, child) => Transform.translate(
+          offset: Offset(0, 3 * (1 - amount)),
+          child: Transform.scale(
+            scaleX: 1,
+            scaleY: 0.98 + 0.02 * amount,
+            alignment: Alignment.bottomCenter,
+            child: child,
           ),
-          textAlign: TextAlign.center,
-          child: Text(line.text.isEmpty ? '♪' : line.text),
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: spacious ? 18 : 6),
+          child: ValueListenableBuilder<double>(
+            valueListenable: isActive
+                ? _progress
+                : AlwaysStoppedAnimation<double>(index < _activeIndex ? 1 : 0),
+            builder: (context, progress, _) => LyricLineFill(
+              text: line.text.isEmpty ? '♪' : line.text,
+              style: style,
+              textAlign: align,
+              progress: progress,
+              emphasis: isActive ? 1 : 0,
+              baseOpacity: isActive
+                  ? 0.38
+                  : index < _activeIndex
+                  ? 0.28
+                  : 0.45,
+              duration: MediaQuery.disableAnimationsOf(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 300),
+            ),
+          ),
         ),
       ),
     );

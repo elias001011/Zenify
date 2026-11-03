@@ -37,6 +37,7 @@ import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/widgets/dialog_item.dart';
 import 'package:musify/widgets/edit_playlist_dialog.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/overflow_menu_button.dart';
 import 'package:musify/widgets/popup_menu_item.dart';
 import 'package:musify/widgets/shapes/seven_sided_cookie_shape.dart';
@@ -97,10 +98,9 @@ class PlaylistBar extends StatelessWidget {
         ? normalizeArtistDisplayTitle(playlistTitle)
         : playlistTitle;
     Map<dynamic, dynamic>? updatedPlaylist;
-    return Material(
+    return MusicListSurface(
       color: colorScheme.surfaceContainerLow,
       borderRadius: borderRadius,
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onPressed ?? _getDefaultOnPressed(context, updatedPlaylist),
         child: Padding(

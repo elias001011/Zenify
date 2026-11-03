@@ -19,6 +19,8 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:math' as math;
+
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
@@ -137,15 +139,19 @@ void showCreatePlaylistDialog(
                                           : colorScheme.onSurfaceVariant,
                                     ),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      'YouTube',
-                                      style: TextStyle(
-                                        color: isYouTubeMode
-                                            ? colorScheme.onPrimaryContainer
-                                            : colorScheme.onSurfaceVariant,
-                                        fontWeight: isYouTubeMode
-                                            ? FontWeight.w600
-                                            : FontWeight.w500,
+                                    Flexible(
+                                      child: Text(
+                                        'YouTube',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: isYouTubeMode
+                                              ? colorScheme.onPrimaryContainer
+                                              : colorScheme.onSurfaceVariant,
+                                          fontWeight: isYouTubeMode
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -186,15 +192,19 @@ void showCreatePlaylistDialog(
                                           : colorScheme.onSurfaceVariant,
                                     ),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      context.l10n!.custom,
-                                      style: TextStyle(
-                                        color: !isYouTubeMode
-                                            ? colorScheme.onPrimaryContainer
-                                            : colorScheme.onSurfaceVariant,
-                                        fontWeight: !isYouTubeMode
-                                            ? FontWeight.w600
-                                            : FontWeight.w500,
+                                    Flexible(
+                                      child: Text(
+                                        context.l10n!.custom,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: !isYouTubeMode
+                                              ? colorScheme.onPrimaryContainer
+                                              : colorScheme.onSurfaceVariant,
+                                          fontWeight: !isYouTubeMode
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
+                                        ),
                                       ),
                                     ),
                                   ],
@@ -381,7 +391,7 @@ void showAddToPlaylistDialog(
         content: Container(
           width: double.maxFinite,
           constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+            maxHeight: math.min(440, MediaQuery.sizeOf(context).height * 0.6),
           ),
           child: Builder(
             builder: (context) {

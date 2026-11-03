@@ -19,6 +19,7 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:developer' as developer;
@@ -60,6 +61,7 @@ class LyricsManager {
 
   /// Clears the in-memory cache (mainly for tests).
   static void clearCache() => _cache.clear();
+  static final _pending = <String, Future<Lyrics?>>{};
 
   /// Backwards compatible entry point: plain text with a source credit.
   Future<String?> fetchLyrics(
@@ -93,9 +95,17 @@ class LyricsManager {
     final cached = _readCache(cacheKey);
     if (cached != null) return cached.value;
 
-    final result = await _search(variants);
-    _writeCache(cacheKey, result);
-    return result;
+    final existing = _pending[cacheKey];
+    if (existing != null) return existing;
+    final request = _search(variants);
+    _pending[cacheKey] = request;
+    try {
+      final result = await request;
+      _writeCache(cacheKey, result);
+      return result;
+    } finally {
+      unawaited(_pending.remove(cacheKey));
+    }
   }
 
   Future<Lyrics?> _search(List<TrackInfo> variants) async {

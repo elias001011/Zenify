@@ -69,8 +69,8 @@
   "customPlaylistImgUrl": "URL da imagem da playlist personalizada",
   "customPlaylistName": "Nome da playlist personalizada",
   "customPlaylists": "Playlists personalizadas",
-  "customTitleBar": "Barra de título nas cores do app",
-  "customTitleBarDescription": "Seguir o modo claro e escuro do app em vez do sistema.",
+  "customTitleBar": "Barra de título integrada",
+  "customTitleBarDescription": "Estende a tela e o fundo dinâmico por trás dos controles da janela.",
   "dateAdded": "Data de Adição",
   "default_": "Padrão",
   "delete": "Excluir",
@@ -631,5 +631,10 @@
   "moodsTuningReading": "Lendo seus gêneros. Da primeira vez leva cerca de um minuto.",
   "startRadio": "Iniciar rádio",
   "radioOf": "Rádio de {name}",
-  "radioUnavailable": "Não deu para começar o rádio. Tente de novo daqui a pouco."
+  "radioUnavailable": "Não deu para começar o rádio. Tente de novo daqui a pouco.",
+  "globalSearchOnEnter": "Enter abre a busca global",
+  "globalSearchOnEnterDescription": "Permite usar Enter para abrir a busca global mesmo nas barras que filtram a tela atual. Disponível apenas online.",
+  "windowMinimize": "Minimizar",
+  "windowMaximize": "Maximizar",
+  "windowRestore": "Restaurar janela"
 }

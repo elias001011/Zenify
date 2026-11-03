@@ -361,6 +361,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
     audioPlayer.playerStateStream.distinct().listen(
       (state) {
+        // Transport changes are infrequent and must reach every control
+        // immediately; only queue/sequence bookkeeping is debounced.
+        _updatePlaybackState();
         listeningStatsService.handlePlayerStateForListeningStats(
           state,
           currentSong: currentSong,
@@ -370,7 +373,6 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
             _lastError != null) {
           Future.microtask(_handlePlaybackError);
         }
-        _debouncedStateUpdate();
       },
       onError: (error, stackTrace) {
         _logStreamError('Player state stream error', error, stackTrace);
@@ -1900,11 +1902,12 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     if (isDesktopPlatform && _currentLoadingIndex >= 0)
       _queuePlayWhenReady = false;
     try {
+      final wasPlaying = audioPlayer.playing;
+      await audioPlayer.pause();
       listeningStatsService.recordListeningSessionProgress(
-        wasPlaying: audioPlayer.playing,
+        wasPlaying: wasPlaying,
       );
       unawaited(listeningStatsService.flush());
-      await audioPlayer.pause();
       await persistPlaybackState();
     } catch (e, stackTrace) {
       logger.log('Error in pause()', error: e, stackTrace: stackTrace);

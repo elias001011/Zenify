@@ -27,10 +27,11 @@ import 'package:musify/services/moods/mix_engine.dart';
 import 'package:musify/services/moods/moods_preferences.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/moods/taste.dart';
-import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/artwork_provider.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/spinner.dart';
 
@@ -62,6 +63,7 @@ class _MoodsTuningPageState extends State<MoodsTuningPage> {
   Widget build(BuildContext context) {
     final l10n = context.l10n!;
     return IslandScaffold(
+      background: const PageGlow(source: null, cacheKey: 'moods_tuning_page'),
       title: l10n.moodsTuning,
       globalSearch: false,
       actions: [
@@ -238,20 +240,35 @@ class _MoodsTuningPageState extends State<MoodsTuningPage> {
           title: context.l10n!.moodsTuningArtists,
           icon: FluentIcons.person_24_filled,
         ),
-        for (var i = 0; i < keys.length; i++)
-          _ArtistRow(
-            name: _taste.artistNames[keys[i]] ?? keys[i],
-            art: _artistArt[keys[i]],
-            allowed: !tuning.blockedArtists.contains(keys[i]),
-            borderRadius: getItemBorderRadius(i, keys.length),
-            onChanged: (allowed) => setMoodsTuning(
-              tuning.copyWith(
-                blockedArtists: allowed
-                    ? ({...tuning.blockedArtists}..remove(keys[i]))
-                    : {...tuning.blockedArtists, keys[i]},
-              ),
-            ),
-          ),
+        LayoutBuilder(
+          builder: (context, c) {
+            final columns = (c.maxWidth / 240).floor().clamp(1, 3);
+            final width = (c.maxWidth - 12 * (columns - 1)) / columns;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                for (final key in keys)
+                  SizedBox(
+                    width: width,
+                    child: _ArtistRow(
+                      name: _taste.artistNames[key] ?? key,
+                      art: _artistArt[key],
+                      allowed: !tuning.blockedArtists.contains(key),
+                      borderRadius: BorderRadius.circular(22),
+                      onChanged: (allowed) => setMoodsTuning(
+                        tuning.copyWith(
+                          blockedArtists: allowed
+                              ? ({...tuning.blockedArtists}..remove(key))
+                              : {...tuning.blockedArtists, key},
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
       ],
     );
   }
@@ -272,7 +289,6 @@ class _Avatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: scheme.surfaceContainerHighest,
-        border: Border.all(color: scheme.surfaceContainerLow, width: 2),
         image: art == null
             ? null
             : DecorationImage(
@@ -311,10 +327,11 @@ class _GenreCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Material(
-      color: theme.colorScheme.surfaceContainerLow,
+    return MusicListSurface(
+      color: included
+          ? theme.colorScheme.primaryContainer
+          : theme.colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(20),
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => onChanged(!included),
         child: Padding(
@@ -383,17 +400,16 @@ class _ArtistRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.surfaceContainerLow,
+    return MusicListSurface(
+      color: allowed ? scheme.surfaceContainerHigh : scheme.surfaceContainerLow,
       borderRadius: borderRadius,
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => onChanged(!allowed),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
           child: Row(
             children: [
-              _Avatar(art, size: 40),
+              _Avatar(art, size: 52),
               const SizedBox(width: 14),
               Expanded(
                 child: Text(

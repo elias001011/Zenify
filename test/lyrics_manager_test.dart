@@ -19,6 +19,7 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -173,6 +174,32 @@ void main() {
 
   group('LyricsManager', () {
     setUp(LyricsManager.clearCache);
+
+    test('concurrent panels share an unfinished request', () async {
+      final response = Completer<http.Response>();
+      var requests = 0;
+      final client = MockClient((_) {
+        requests++;
+        return response.future;
+      });
+      const track = TrackInfo(title: 'Song', artist: 'Artist');
+      final first = LyricsManager(client: client).fetchLyricsResult(track);
+      final second = LyricsManager(client: client).fetchLyricsResult(track);
+      await Future<void>.delayed(Duration.zero);
+      expect(requests, 1);
+      response.complete(
+        _json([
+          {
+            'trackName': 'Song',
+            'artistName': 'Artist',
+            'plainLyrics': 'Lyrics',
+          },
+        ]),
+      );
+      final results = await Future.wait([first, second]);
+      expect(results[0], same(results[1]));
+      expect(results[0]!.text, 'Lyrics');
+    });
 
     test('returns synced LRCLIB lyrics when available', () async {
       final client = MockClient((request) async {

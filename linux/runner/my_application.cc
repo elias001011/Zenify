@@ -12,6 +12,9 @@ struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
   GtkWindow* window;
+  FlView* view;
+  GtkCssProvider* frame_css;
+  gboolean rgba_supported;
   // Null when the window manager draws the title bar instead of GTK.
   GtkWidget* header_bar;
   GtkCssProvider* title_bar_css;
@@ -91,6 +94,31 @@ static void window_method_call_cb(FlMethodChannel* channel,
   } else if (strcmp(method, "raise") == 0) {
     gtk_window_present(self->window);
     response = FL_METHOD_RESPONSE(fl_method_success_response_new(nullptr));
+  } else if (strcmp(method, "setClientFrame") == 0) {
+    FlValue* value = fl_value_get_type(args) == FL_VALUE_TYPE_MAP
+        ? fl_value_lookup_string(args, "enabled") : nullptr;
+    if (value == nullptr || fl_value_get_type(value) != FL_VALUE_TYPE_BOOL) {
+      response = FL_METHOD_RESPONSE(fl_method_error_response_new(
+          "bad_args", "Expected enabled", nullptr));
+    } else {
+      const gboolean transparent = fl_value_get_bool(value) && self->rgba_supported;
+      gtk_widget_set_app_paintable(GTK_WIDGET(self->window), transparent);
+      if (self->frame_css == nullptr) {
+        self->frame_css = gtk_css_provider_new();
+        gtk_style_context_add_provider(
+            gtk_widget_get_style_context(GTK_WIDGET(self->window)),
+            GTK_STYLE_PROVIDER(self->frame_css),
+            GTK_STYLE_PROVIDER_PRIORITY_APPLICATION);
+      }
+      gtk_css_provider_load_from_data(self->frame_css,
+          transparent ? "window#zenify-window { background-color: transparent; }" : "",
+          -1, nullptr);
+      GdkRGBA background;
+      gdk_rgba_parse(&background, transparent ? "#00000000" : "#000000");
+      fl_view_set_background_color(self->view, &background);
+      response = FL_METHOD_RESPONSE(fl_method_success_response_new(
+          fl_value_new_bool(transparent)));
+    }
   } else if (strcmp(method, "setTitleBarTheme") == 0) {
     FlValue* dark = nullptr;
     FlValue* background = nullptr;
@@ -132,6 +160,14 @@ static void my_application_activate(GApplication* application) {
   GtkWindow* window =
       GTK_WINDOW(gtk_application_window_new(GTK_APPLICATION(application)));
   self->window = window;
+  gtk_widget_set_name(GTK_WIDGET(window), "zenify-window");
+  // Select an alpha-capable visual before GTK realizes the native window.
+  GdkScreen* window_screen = gtk_window_get_screen(window);
+  GdkVisual* rgba_visual = gdk_screen_get_rgba_visual(window_screen);
+  if (rgba_visual != nullptr) {
+    gtk_widget_set_visual(GTK_WIDGET(window), rgba_visual);
+    self->rgba_supported = gdk_screen_is_composited(window_screen);
+  }
 
   g_autoptr(GError) executable_path_error = nullptr;
   g_autofree gchar* executable_path =
@@ -202,6 +238,7 @@ static void my_application_activate(GApplication* application) {
       project, self->dart_entrypoint_arguments);
 
   FlView* view = fl_view_new(project);
+  self->view = view;
   GdkRGBA background_color;
   // Background defaults to black, override it here if necessary, e.g. #00000000
   // for transparent.
@@ -273,6 +310,7 @@ static void my_application_dispose(GObject* object) {
   g_clear_pointer(&self->dart_entrypoint_arguments, g_strfreev);
   g_clear_object(&self->window_channel);
   g_clear_object(&self->title_bar_css);
+  g_clear_object(&self->frame_css);
   G_OBJECT_CLASS(my_application_parent_class)->dispose(object);
 }
 

@@ -22,6 +22,9 @@ MediaItem _song(String id) => MediaItem(
 );
 
 class _Handler extends MusifyAudioHandler {
+  _Handler() {
+    queue.add([_song('a'), _song('b')]);
+  }
   @override
   Stream<List<Map>> get queueAsMapStream => Stream.value([
     {'ytid': 'ytid_a', 'title': 'Song a', 'artist': 'Artist a'},
@@ -96,7 +99,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     await pumpPlayer(tester);
 
-    await tester.tap(find.byIcon(FluentIcons.next_24_regular));
+    await tester.tap(find.byIcon(FluentIcons.next_24_filled));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 150));
     final forward = coverShifts(tester);
@@ -109,7 +112,7 @@ void main() {
       isTrue,
     );
 
-    await tester.tap(find.byIcon(FluentIcons.previous_24_regular));
+    await tester.tap(find.byIcon(FluentIcons.previous_24_filled));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 150));
     final back = coverShifts(tester);
@@ -131,7 +134,7 @@ void main() {
       await tester.tap(find.byTooltip(panel));
       await tester.pump(const Duration(milliseconds: 700));
 
-      await tester.tap(find.byIcon(FluentIcons.next_24_regular));
+      await tester.tap(find.byIcon(FluentIcons.next_24_filled));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 150));
       expect(audioHandler.mediaItem.value?.extras?['ytid'], 'ytid_b');
@@ -140,7 +143,7 @@ void main() {
       // Closed again, the cover slides as before.
       await tester.tap(find.byTooltip(panel));
       await tester.pump(const Duration(milliseconds: 700));
-      await tester.tap(find.byIcon(FluentIcons.previous_24_regular));
+      await tester.tap(find.byIcon(FluentIcons.previous_24_filled));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 150));
       expect(coverShifts(tester), isNotEmpty);
@@ -149,14 +152,14 @@ void main() {
     });
   }
 
-  testWidgets('desktop keeps the cover still on a skip', (tester) async {
+  testWidgets('desktop shares the cover slide on a skip', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     await pumpPlayer(tester);
 
-    await tester.tap(find.byIcon(FluentIcons.next_24_regular));
+    await tester.tap(find.byIcon(FluentIcons.next_24_filled));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 150));
-    expect(coverShifts(tester), isEmpty);
+    expect(coverShifts(tester), isNotEmpty);
 
     await disposePlayer(tester);
   });
@@ -174,16 +177,16 @@ void main() {
           .reduce((a, b) => a.abs() > b.abs() ? a : b);
     }
 
-    await tester.tap(find.byIcon(FluentIcons.next_24_regular));
+    await tester.tap(find.byIcon(FluentIcons.next_24_filled));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-    expect(leanOf(FluentIcons.next_24_regular), greaterThan(0));
+    expect(leanOf(FluentIcons.next_24_filled), greaterThan(0));
 
     await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.byIcon(FluentIcons.previous_24_regular));
+    await tester.tap(find.byIcon(FluentIcons.previous_24_filled));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
-    expect(leanOf(FluentIcons.previous_24_regular), lessThan(0));
+    expect(leanOf(FluentIcons.previous_24_filled), lessThan(0));
 
     await disposePlayer(tester);
   });

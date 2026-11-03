@@ -68,6 +68,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   bool _visible = true;
   bool _tickerEnabled = true;
   bool _connecting = false;
+  int _connectionGeneration = 0;
   Duration _last = Duration.zero;
   final _clock = Stopwatch()..start();
   Duration _lastStep = Duration.zero;
@@ -91,7 +92,6 @@ class _WaveVisualizerState extends State<WaveVisualizer>
               state.playing &&
               state.processingState == AudioProcessingState.ready;
           if (!_ready) _clearLevel();
-          if (_ready) unawaited(_connect());
           _updateMotion();
         });
     _trackSubscription = audioHandler.mediaItem
@@ -105,17 +105,19 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _onReadingChanged() {
+    _connectionGeneration++;
     unawaited(_levels?.cancel());
     _levels = null;
     _clearLevel();
-    if (_ready) unawaited(_connect());
     _updateMotion();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _tickerEnabled = TickerMode.valuesOf(context).enabled;
+    _tickerEnabled =
+        TickerMode.valuesOf(context).enabled &&
+        !MediaQuery.disableAnimationsOf(context);
     _updateMotion();
   }
 
@@ -136,12 +138,20 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   Future<void> _connect() async {
-    if (_levels != null || _connecting) return;
+    if (!_moving ||
+        waveReading.value != WaveReading.precise ||
+        _levels != null ||
+        _connecting)
+      return;
+    final generation = _connectionGeneration;
     _connecting = true;
     try {
-      if (await AudioLevels.available && mounted) {
+      if (await AudioLevels.available &&
+          mounted &&
+          _moving &&
+          generation == _connectionGeneration) {
         _levels = AudioLevels.listen().listen((level) {
-          if (!_ready) return;
+          if (!_moving) return;
           _level = level;
           _stale?.cancel();
           _stale = Timer(const Duration(milliseconds: 600), () {
@@ -154,16 +164,23 @@ class _WaveVisualizerState extends State<WaveVisualizer>
       }
     } finally {
       _connecting = false;
+      if (mounted && _moving && generation != _connectionGeneration)
+        unawaited(_connect());
     }
   }
 
   void _updateMotion() {
     if (!_moving) {
+      _connectionGeneration++;
+      unawaited(_levels?.cancel());
+      _levels = null;
+      _clearLevel();
       _ticker.stop();
       _last = Duration.zero;
       _thumbnailTimer?.cancel();
       _thumbnailTimer = null;
     } else if (widget.compact) {
+      unawaited(_connect());
       if (_level == null) {
         _thumbnailTimer ??= Timer.periodic(
           const Duration(milliseconds: 125),
@@ -173,8 +190,9 @@ class _WaveVisualizerState extends State<WaveVisualizer>
         _thumbnailTimer?.cancel();
         _thumbnailTimer = null;
       }
-    } else if (!_ticker.isActive) {
-      _ticker.start();
+    } else {
+      unawaited(_connect());
+      if (!_ticker.isActive) _ticker.start();
     }
   }
 

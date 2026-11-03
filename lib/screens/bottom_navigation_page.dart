@@ -194,7 +194,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                       children: [
                         for (var i = 0; i < items.length; i++)
                           Expanded(
-                            child: _DockButton(
+                            child: _NavigationButton(
                               item: items[i],
                               selected: i == selected,
                               onTap: () => _onTabTapped(i, items),
@@ -221,7 +221,8 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     final colorScheme = Theme.of(context).colorScheme;
     final settingsIndex = items.indexWhere((item) => item.shellIndex == 3);
 
-    Widget railButton(int index) => _RailButton(
+    Widget railButton(int index) => _NavigationButton(
+      vertical: true,
       item: items[index],
       selected: index == selected,
       onTap: () => _onTabTapped(index, items),
@@ -274,7 +275,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
                 borderRadius: BorderRadius.all(Radius.circular(24)),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
-                  children: [NoticeSlot(), MiniPlayer()],
+                  children: [NoticeSlot(), MiniPlayer(wide: true)],
                 ),
               ),
             ),
@@ -323,13 +324,15 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
 }
 
 /// Icon only; the label shows as a tooltip on long press or hover.
-class _DockButton extends StatelessWidget {
-  const _DockButton({
+class _NavigationButton extends StatelessWidget {
+  const _NavigationButton({
+    this.vertical = false,
     required this.item,
     required this.selected,
     required this.onTap,
   });
 
+  final bool vertical;
   final _NavigationItem item;
   final bool selected;
   final VoidCallback onTap;
@@ -361,10 +364,16 @@ class _DockButton extends StatelessWidget {
                 onTap: onTap,
                 borderRadius: BorderRadius.circular(17),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : const Duration(milliseconds: 200),
                   curve: Curves.easeOut,
-                  width: selected ? 60 : 44,
-                  height: 34,
+                  width: vertical
+                      ? 48
+                      : selected
+                      ? 60
+                      : 44,
+                  height: vertical ? 48 : 34,
                   child: Icon(
                     selected ? item.selectedIcon : item.icon,
                     size: 22,
@@ -373,48 +382,6 @@ class _DockButton extends StatelessWidget {
                         : colorScheme.onSurfaceVariant,
                   ),
                 ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _RailButton extends StatelessWidget {
-  const _RailButton({
-    required this.item,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final _NavigationItem item;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Tooltip(
-        message: item.label,
-        child: Material(
-          color: selected ? colorScheme.secondaryContainer : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(16),
-            child: SizedBox(
-              width: 48,
-              height: 48,
-              child: Icon(
-                selected ? item.selectedIcon : item.icon,
-                color: selected
-                    ? colorScheme.onSecondaryContainer
-                    : colorScheme.onSurfaceVariant,
               ),
             ),
           ),

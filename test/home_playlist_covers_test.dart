@@ -30,7 +30,7 @@ Widget _app(Widget child) => MaterialApp(
 Widget _carousel(bool zenify) => SizedBox(
   height: 190,
   child: GlowCarousel(
-    sources: List.filled(6, null),
+    itemCount: 6,
     onTap: (_) {},
     itemBuilder: (_, index) =>
         PlaylistCube(_playlist(index, zenify: zenify), size: 380),

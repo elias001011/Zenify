@@ -5,8 +5,8 @@ repository: https://github.com/elias001011/Zenify
 issue_tracker: https://github.com/elias001011/Zenify/issues
 
 publish_to: 'none'
-version: 0.2.2+18 # Flutter semantic version and Android versionCode
-release_version: 0.2.2 # Display and package version; run update.sh after changing
+version: 0.2.3+19 # Flutter semantic version and Android versionCode
+release_version: 0.2.3 # Display and package version; run update.sh after changing
 
 environment:
   sdk: '>=3.13.0 <4.0.0'
@@ -48,6 +48,7 @@ dependencies:
   rxdart: ^0.28.0
   share_plus: ^13.3.1
   url_launcher: ^6.3.3
+  window_manager: ^0.5.1
   youtube_explode_dart:
     path: ./packages/youtube_explode_dart
   youtube_music_explode_dart:

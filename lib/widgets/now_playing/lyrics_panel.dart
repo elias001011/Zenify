@@ -54,10 +54,19 @@ class _LyricsPanelState extends State<LyricsPanel> {
       audioHandler.playbackState.map((state) => state.playing),
     );
     _resolveIfNeeded();
+    offlineMode.addListener(_onOfflineChanged);
+  }
+
+  void _onOfflineChanged() {
+    if (!offlineMode.value) {
+      _resolvedKey = null;
+      setState(_resolveIfNeeded);
+    }
   }
 
   @override
   void dispose() {
+    offlineMode.removeListener(_onOfflineChanged);
     _releaseScreen();
     super.dispose();
   }
@@ -69,11 +78,13 @@ class _LyricsPanelState extends State<LyricsPanel> {
   }
 
   void _resolveIfNeeded() {
-    final key = '${widget.metadata.artist} - ${widget.metadata.title}';
+    final key =
+        '${widget.metadata.id}:${widget.metadata.artist}:${widget.metadata.title}';
     if (key == _resolvedKey) return;
     _resolvedKey = key;
     // A local file's title is its file name: it is never sent online.
-    if (isLocalSongId(widget.metadata.extras?['ytid'])) {
+    if (isLocalSongId(widget.metadata.extras?['ytid']) ||
+        widget.metadata.extras?['isLive'] == true) {
       _lyricsFuture = Future.value();
       return;
     }
@@ -128,18 +139,22 @@ class _LyricsPanelState extends State<LyricsPanel> {
               return SyncedLyricsView(lyrics: lyrics);
             }
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              physics: const BouncingScrollPhysics(),
-              child: Text(
-                formatPlainLyrics(lyrics),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w500,
-                  color: colorScheme.onSurface,
-                  height: 1.6,
+            return LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                physics: const BouncingScrollPhysics(),
+                child: Text(
+                  formatPlainLyrics(lyrics),
+                  style: TextStyle(
+                    fontSize: constraints.maxWidth >= 500 ? 32 : 18,
+                    fontWeight: FontWeight.w500,
+                    color: colorScheme.onSurface,
+                    height: 1.6,
+                  ),
+                  textAlign: constraints.maxWidth >= 500
+                      ? TextAlign.start
+                      : TextAlign.center,
                 ),
-                textAlign: TextAlign.center,
               ),
             );
           },

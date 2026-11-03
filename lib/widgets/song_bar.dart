@@ -39,6 +39,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/formatter.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/no_artwork_cube.dart';
 import 'package:musify/widgets/overflow_menu_button.dart';
 import 'package:musify/widgets/popup_menu_item.dart';
@@ -455,12 +456,12 @@ class _SongBarState extends State<SongBar> {
 
     final isSelecting = widget.isSelected != null;
     final isSelected = widget.isSelected ?? false;
-    return Material(
+    return MusicListSurface(
+      emphasized: isSelected || widget.backgroundColor != null,
       color: isSelected
           ? colorScheme.secondaryContainer
           : widget.backgroundColor ?? colorScheme.surfaceContainerLow,
       borderRadius: widget.borderRadius,
-      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: isSelecting ? widget.onSelectionToggle : _handleSongTap,
         onLongPress: widget.onLongPress,

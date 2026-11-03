@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/library_search.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/settings_manager.dart';
 
 void main() {
   late Directory dir;
@@ -78,6 +80,22 @@ void main() {
     );
     expect(searchLibrary('blue', offlineOnly: true).playlists, isEmpty);
   });
+
+  test(
+    'enabled local files are searchable by title and artist, including offline',
+    () {
+      localFiles.value = [song('local:sample', 'My recording', 'Blue artist')];
+      showLocalFiles.value = true;
+      expect(searchLibrarySongs('recording').single['ytid'], 'local:sample');
+      expect(
+        searchLibrarySongs('Blue artist', offlineOnly: true).single['ytid'],
+        'local:sample',
+      );
+      showLocalFiles.value = false;
+      expect(searchLibrarySongs('recording'), isEmpty);
+      localFiles.value = [];
+    },
+  );
 
   test('an empty query matches nothing', () {
     expect(searchLibrary('  ').songs, isEmpty);

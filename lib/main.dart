@@ -66,7 +66,9 @@ import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/sharing_intent.dart';
 import 'package:musify/utilities/startup_support.dart';
+import 'package:musify/widgets/app_motion.dart';
 import 'package:musify/widgets/app_notice.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/spotify_import_intro.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
@@ -327,14 +329,16 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
             locale: languageSetting,
             routerConfig: NavigationManager.router,
             builder: (context, child) {
-              final app = NoticeHost(child: child!);
-              return isDesktopPlatform
-                  ? DesktopTitleBarTheme(
-                      child: DesktopInterfaceScale(
-                        child: GlobalShortcuts(child: app),
-                      ),
-                    )
-                  : app;
+              final app = MusicSurfaceTheme(child: NoticeHost(child: child!));
+              return AppMotion(
+                child: isDesktopPlatform
+                    ? DesktopTitleBarTheme(
+                        child: DesktopInterfaceScale(
+                          child: GlobalShortcuts(child: app),
+                        ),
+                      )
+                    : app,
+              );
             },
           ),
         );
@@ -349,6 +353,10 @@ void main() async {
   if (startupError != null) {
     runApp(StartupErrorApp(message: startupError));
     return;
+  }
+
+  if (isDesktopPlatform) {
+    await DesktopWindow.configureClientTitleBar(customTitleBar.value);
   }
 
   if (isDesktopPlatform && startMaximized.value) {

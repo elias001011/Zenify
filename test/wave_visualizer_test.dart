@@ -59,6 +59,28 @@ void main() {
     await handler.mediaItem.close();
   });
 
+  testWidgets('reduced motion leaves waves still without an audio reader', (
+    tester,
+  ) async {
+    handler.ready();
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: MediaQuery(
+          data: MediaQueryData(disableAnimations: true),
+          child: WaveVisualizer(size: 100),
+        ),
+      ),
+    );
+    await tester.pump();
+    final before = heights(tester);
+    await tester.pump(const Duration(seconds: 2));
+    expect(heights(tester), before);
+    expect(captureCalls, isEmpty);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   for (final compact in [true, false]) {
     testWidgets(
       '${compact ? 'compact' : 'full'} waves animate without audio access and freeze on pause',

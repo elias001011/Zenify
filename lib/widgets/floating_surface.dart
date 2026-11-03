@@ -77,8 +77,8 @@ class _FloatingSurfaceState extends State<FloatingSurface> {
     final base = colorScheme.surfaceContainer;
     final color = switch (effect) {
       FloatingEffect.solid => base,
-      FloatingEffect.translucent => base.withValues(alpha: dark ? 0.78 : 0.82),
-      FloatingEffect.blurred => base.withValues(alpha: dark ? 0.55 : 0.6),
+      FloatingEffect.translucent => base.withValues(alpha: dark ? 0.62 : 0.72),
+      FloatingEffect.blurred => base.withValues(alpha: dark ? 0.38 : 0.48),
     };
     final borderRadius = widget.borderRadius;
 

@@ -34,6 +34,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/now_playing/marquee_text_widget.dart';
+import 'package:musify/widgets/now_playing/player_chrome.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
 import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/skip_icon_button.dart';
@@ -259,11 +260,7 @@ class PlayerControlButtons extends StatelessWidget {
             : isTight
             ? 10.0
             : 16.0;
-        final minButtonSize = isUltraTight
-            ? 38.0
-            : isTight
-            ? 42.0
-            : 46.0;
+        final minButtonSize = isTight ? 44.0 : 46.0;
         final buttonPadding = EdgeInsets.all(
           isUltraTight
               ? 6.0
@@ -304,17 +301,16 @@ class PlayerControlButtons extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
           child: Row(
             children: <Widget>[
-              _buildShuffleButton(
-                context,
-                colorScheme,
-                miniControlSize,
-                buttonConstraints,
-                buttonPadding,
+              PlaybackModeButton(
+                repeat: false,
+                size: miniControlSize,
+                constraints: buttonConstraints,
+                padding: buttonPadding,
               ),
               SizedBox(width: buttonSpacing),
               Expanded(
                 child: Center(
-                  child: _PlaybackControlsRow(
+                  child: PlaybackTransportControls(
                     colorScheme: colorScheme,
                     buttonConstraints: buttonConstraints,
                     buttonPadding: buttonPadding,
@@ -326,12 +322,11 @@ class PlayerControlButtons extends StatelessWidget {
                 ),
               ),
               SizedBox(width: buttonSpacing),
-              _buildRepeatButton(
-                context,
-                colorScheme,
-                miniControlSize,
-                buttonConstraints,
-                buttonPadding,
+              PlaybackModeButton(
+                repeat: true,
+                size: miniControlSize,
+                constraints: buttonConstraints,
+                padding: buttonPadding,
               ),
             ],
           ),
@@ -339,111 +334,89 @@ class PlayerControlButtons extends StatelessWidget {
       },
     );
   }
+}
 
-  Widget _buildShuffleButton(
-    BuildContext context,
-    ColorScheme colorScheme,
-    double size,
-    BoxConstraints buttonConstraints,
-    EdgeInsets buttonPadding,
-  ) {
-    return ValueListenableBuilder<bool>(
-      valueListenable: shuffleNotifier,
-      builder: (_, value, __) {
-        return IconButton(
-          icon: Icon(
-            value
-                ? FluentIcons.arrow_shuffle_24_filled
-                : FluentIcons.arrow_shuffle_off_24_regular,
-            color: value ? colorScheme.onPrimary : colorScheme.onSurfaceVariant,
-          ),
-          tooltip: context.l10n!.shuffle,
+/// Shared by the full player and desktop dock, backed by the same audio state.
+class PlaybackModeButton extends StatelessWidget {
+  const PlaybackModeButton({
+    super.key,
+    required this.repeat,
+    this.size = 20,
+    this.constraints = const BoxConstraints(minWidth: 44, minHeight: 44),
+    this.padding = const EdgeInsets.all(8),
+  });
+  final bool repeat;
+  final double size;
+  final BoxConstraints constraints;
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    Widget button(bool active, IconData icon, VoidCallback pressed) =>
+        IconButton(
+          icon: Icon(icon),
+          tooltip: repeat ? context.l10n!.repeat : context.l10n!.shuffle,
           iconSize: size,
-          constraints: buttonConstraints,
-          padding: buttonPadding,
+          constraints: constraints,
+          padding: padding,
           style: IconButton.styleFrom(
-            backgroundColor: value
-                ? colorScheme.primary
-                : colorScheme.surfaceContainerHighest,
+            foregroundColor: active
+                ? (PlayerChrome.minimalOf(context)
+                      ? colors.primary
+                      : colors.onPrimary)
+                : colors.onSurfaceVariant,
+            backgroundColor: PlayerChrome.minimalOf(context)
+                ? Colors.transparent
+                : active
+                ? colors.primary
+                : colors.surfaceContainerHighest.withValues(alpha: 0.45),
+            side: BorderSide.none,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          onPressed: () {
-            audioHandler.setShuffleMode(
-              value
-                  ? AudioServiceShuffleMode.none
-                  : AudioServiceShuffleMode.all,
-            );
-          },
+          onPressed: pressed,
         );
-      },
-    );
-  }
-
-  Widget _buildRepeatButton(
-    BuildContext context,
-    ColorScheme colorScheme,
-    double size,
-    BoxConstraints buttonConstraints,
-    EdgeInsets buttonPadding,
-  ) {
-    return StreamBuilder<List<MediaItem>>(
-      stream: audioHandler.queue,
-      builder: (context, snapshot) {
-        final queue = snapshot.data ?? [];
-        return ValueListenableBuilder<AudioServiceRepeatMode>(
-          valueListenable: repeatNotifier,
-          builder: (_, repeatMode, __) {
-            final isActive = repeatMode != AudioServiceRepeatMode.none;
-
-            return IconButton(
-              icon: Icon(
-                repeatMode == AudioServiceRepeatMode.one
-                    ? FluentIcons.arrow_repeat_1_24_filled
-                    : isActive
-                    ? FluentIcons.arrow_repeat_all_24_filled
-                    : FluentIcons.arrow_repeat_all_off_24_regular,
-                color: isActive
-                    ? colorScheme.onPrimary
-                    : colorScheme.onSurfaceVariant,
-              ),
-              tooltip: context.l10n!.repeat,
-              iconSize: size,
-              constraints: buttonConstraints,
-              padding: buttonPadding,
-              style: IconButton.styleFrom(
-                backgroundColor: isActive
-                    ? colorScheme.primary
-                    : colorScheme.surfaceContainerHighest,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              onPressed: () {
-                final AudioServiceRepeatMode newMode;
-                if (repeatMode == AudioServiceRepeatMode.none) {
-                  newMode = queue.length <= 1
-                      ? AudioServiceRepeatMode.one
-                      : AudioServiceRepeatMode.all;
-                } else if (repeatMode == AudioServiceRepeatMode.all) {
-                  newMode = AudioServiceRepeatMode.one;
-                } else {
-                  newMode = AudioServiceRepeatMode.none;
-                }
-                repeatNotifier.value = newMode;
-                audioHandler.setRepeatMode(newMode);
-              },
-            );
-          },
-        );
-      },
+    if (!repeat) {
+      return ValueListenableBuilder<bool>(
+        valueListenable: shuffleNotifier,
+        builder: (_, active, _) => button(
+          active,
+          active
+              ? FluentIcons.arrow_shuffle_24_filled
+              : FluentIcons.arrow_shuffle_24_regular,
+          () => audioHandler.setShuffleMode(
+            active ? AudioServiceShuffleMode.none : AudioServiceShuffleMode.all,
+          ),
+        ),
+      );
+    }
+    return ValueListenableBuilder<AudioServiceRepeatMode>(
+      valueListenable: repeatNotifier,
+      builder: (_, mode, _) => button(
+        mode != AudioServiceRepeatMode.none,
+        mode == AudioServiceRepeatMode.one
+            ? FluentIcons.arrow_repeat_1_24_filled
+            : mode == AudioServiceRepeatMode.all
+            ? FluentIcons.arrow_repeat_all_24_filled
+            : FluentIcons.arrow_repeat_all_24_regular,
+        () => audioHandler.setRepeatMode(switch (mode) {
+          AudioServiceRepeatMode.none =>
+            audioHandler.queue.value.length <= 1
+                ? AudioServiceRepeatMode.one
+                : AudioServiceRepeatMode.all,
+          AudioServiceRepeatMode.all => AudioServiceRepeatMode.one,
+          _ => AudioServiceRepeatMode.none,
+        }),
+      ),
     );
   }
 }
 
-class _PlaybackControlsRow extends StatelessWidget {
-  const _PlaybackControlsRow({
+class PlaybackTransportControls extends StatelessWidget {
+  const PlaybackTransportControls({
+    super.key,
     required this.colorScheme,
     required this.buttonConstraints,
     required this.buttonPadding,
@@ -475,7 +448,7 @@ class _PlaybackControlsRow extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   _PlaybackControlButton(
-                    icon: FluentIcons.previous_24_regular,
+                    icon: FluentIcons.previous_24_filled,
                     forward: false,
                     isEnabled:
                         audioHandler.hasPrevious ||
@@ -490,14 +463,27 @@ class _PlaybackControlsRow extends StatelessWidget {
                   ),
                   SizedBox(width: buttonSpacing),
                   PlaybackIconButton(
-                    iconColor: colorScheme.onPrimary,
-                    backgroundColor: colorScheme.primary,
+                    iconColor: switch (PlayerChrome.of(context)) {
+                      PlayerChromeStyle.plain => colorScheme.onSurface,
+                      PlayerChromeStyle.dock => colorScheme.onPrimary,
+                      PlayerChromeStyle.soft => colorScheme.onPrimary,
+                    },
+                    backgroundColor: switch (PlayerChrome.of(context)) {
+                      PlayerChromeStyle.plain => Colors.transparent,
+                      PlayerChromeStyle.dock => colorScheme.primary,
+                      PlayerChromeStyle.soft => colorScheme.primary,
+                    },
+                    filled: true,
+                    buttonSize:
+                        PlayerChrome.of(context) == PlayerChromeStyle.dock
+                        ? 44
+                        : 52,
                     iconSize: controlIconSize,
                     padding: playPadding,
                   ),
                   SizedBox(width: buttonSpacing),
                   _PlaybackControlButton(
-                    icon: FluentIcons.next_24_regular,
+                    icon: FluentIcons.next_24_filled,
                     forward: true,
                     isEnabled:
                         audioHandler.hasNext ||
@@ -560,8 +546,13 @@ class _PlaybackControlButton extends StatelessWidget {
       iconSize: controlIconSize * 0.65,
       onPressed: isEnabled ? onPressed : null,
       style: IconButton.styleFrom(
-        backgroundColor: colorScheme.surfaceContainerHighest,
-        disabledBackgroundColor: colorScheme.surfaceContainerHighest,
+        backgroundColor: PlayerChrome.minimalOf(context)
+            ? Colors.transparent
+            : colorScheme.surfaceContainerHighest,
+        disabledBackgroundColor: PlayerChrome.minimalOf(context)
+            ? Colors.transparent
+            : colorScheme.surfaceContainerHighest,
+        side: BorderSide.none,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         padding: buttonPadding,
         minimumSize: Size(minButtonSize, minButtonSize),

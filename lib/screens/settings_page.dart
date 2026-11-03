@@ -202,6 +202,21 @@ class SettingsPage extends StatelessWidget {
           },
         ),
         ValueListenableBuilder<bool>(
+          valueListenable: globalSearchOnEnter,
+          builder: (context, enabled, _) => CustomBar(
+            context.l10n!.globalSearchOnEnter,
+            FluentIcons.search_24_regular,
+            description: context.l10n!.globalSearchOnEnterDescription,
+            trailing: Switch(
+              value: enabled,
+              onChanged: (value) {
+                globalSearchOnEnter.value = value;
+                addOrUpdateData<bool>('settings', 'globalSearchOnEnter', value);
+              },
+            ),
+          ),
+        ),
+        ValueListenableBuilder<bool>(
           valueListenable: showLocalFiles,
           builder: (_, value, __) {
             return CustomBar(

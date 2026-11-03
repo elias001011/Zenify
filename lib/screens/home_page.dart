@@ -36,6 +36,7 @@ import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
 import 'package:musify/widgets/announcement_box.dart';
+import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/glow_row.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
@@ -117,6 +118,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final playlistHeight = MediaQuery.sizeOf(context).height * 0.25 / 1.1;
     return IslandScaffold(
+      background: const PageGlow(source: null, cacheKey: 'home_page'),
       title: appName,
       body: SingleChildScrollView(
         padding: withIslandInset(context, commonSingleChildScrollViewPadding),
@@ -243,9 +245,7 @@ class _HomePageState extends State<HomePage> {
     double height,
   ) {
     return GlowRow(
-      sources: [
-        for (var i = 0; i < itemCount; i++) playlists[i]['image']?.toString(),
-      ],
+      itemCount: itemCount,
       itemExtent: height + 16,
       itemBuilder: (context, index) {
         final playlist = playlists[index];
@@ -268,9 +268,7 @@ class _HomePageState extends State<HomePage> {
     double height,
   ) {
     return GlowCarousel(
-      sources: [
-        for (var i = 0; i < itemCount; i++) playlists[i]['image']?.toString(),
-      ],
+      itemCount: itemCount,
       onTap: (index) => context.push(
         '/home/playlist/${Uri.encodeComponent('${playlists[index]['ytid']}')}',
       ),
