@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -11,6 +12,7 @@ import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/mini_player.dart';
 import 'package:musify/widgets/now_playing/wave_visualizer.dart';
+import 'package:musify/widgets/playback_icon_button.dart';
 import 'package:musify/widgets/song_artwork.dart';
 
 void main() {
@@ -101,4 +103,32 @@ void main() {
       await tester.pump(const Duration(seconds: 30));
     },
   );
+
+  for (final (platform, ring) in [
+    (TargetPlatform.linux, false),
+    (TargetPlatform.android, true),
+  ]) {
+    testWidgets(
+      'the ${platform.name} mini player ${ring ? 'shows' : 'has no'} progress ring',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = platform;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        audioHandler = MusifyAudioHandler();
+        audioHandler.mediaItem.add(const MediaItem(id: 'a', title: 'Song'));
+        audioHandler.playbackState.add(PlaybackState(playing: true));
+
+        await tester.pumpWidget(app(ValueKey(platform)));
+        await tester.pump(const Duration(milliseconds: 400));
+
+        // Desktop: the plain filled circle; phones: the ring that tracks time.
+        expect(
+          find.byType(PlaybackIconButton),
+          ring ? findsNothing : findsOneWidget,
+        );
+        debugDefaultTargetPlatformOverride = null;
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 30));
+      },
+    );
+  }
 }

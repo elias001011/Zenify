@@ -38,7 +38,7 @@ Future<_AudioQualityInfo?> _resolveAudioQuality(String ytid) async {
 
 String? _ytidOf(MediaItem? item) => item?.extras?['ytid']?.toString();
 
-/// The playing song's audio bitrate and codec as a small tag, for the row of
+/// The playing song's audio bitrate and codec as small text, for the row of
 /// times under the progress bar. It is about the stream, not the artwork, so
 /// it looks the same on every layout. While the setting is off it is not even
 /// built: nothing listens to the song and nothing is looked up.
@@ -91,23 +91,12 @@ class _QualityTagState extends State<_QualityTag> {
       builder: (context, snapshot) {
         final quality = snapshot.data;
         if (quality == null) return const SizedBox.shrink();
-        return DecoratedBox(
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(7),
-          ),
-          // As tall as the times beside it, so the row never grows.
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1.5),
-            child: Text(
-              '${quality.bitrateKbps} kbps • ${quality.codec}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                height: 1,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+        return Text(
+          '${quality.bitrateKbps} kbps • ${quality.codec}',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
           ),
         );
       },
