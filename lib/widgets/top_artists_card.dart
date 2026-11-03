@@ -76,8 +76,6 @@ class TopArtistTile extends StatelessWidget {
   /// Defaults to opening the artist's page.
   final VoidCallback? onTap;
 
-  static const double _artworkSize = 52;
-
   void _openArtist(BuildContext context) {
     final destination = NavigationManager.artistDestination(
       context,
@@ -91,13 +89,61 @@ class TopArtistTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ArtistTile(
+      rank: rank,
+      // Artist pages need YouTube.
+      onTap: onTap ?? (offlineMode.value ? null : () => _openArtist(context)),
+      artwork: SongArtworkWidget(
+        size: ArtistTile.artworkSize,
+        borderRadius: ArtistTile.artworkSize / 2,
+        metadata: mapToMediaItem(artist.topSong),
+      ),
+      name: artist.name,
+      subtitle: context.l10n!.artistListeningSummary(
+        artist.seconds ~/ 60,
+        artist.songCount,
+      ),
+    );
+  }
+}
+
+/// A row for an artist: [artwork], name and an optional line under it, with
+/// the rank before and a [trailing] widget after. Shared by the recap and the
+/// Moods tuning, so artists look the same wherever they are listed.
+class ArtistTile extends StatelessWidget {
+  const ArtistTile({
+    required this.artwork,
+    required this.name,
+    this.subtitle,
+    this.rank,
+    this.trailing,
+    this.onTap,
+    this.struck = false,
+    super.key,
+  });
+
+  final Widget artwork;
+  final String name;
+  final String? subtitle;
+  final int? rank;
+  final Widget? trailing;
+  final VoidCallback? onTap;
+
+  /// Muted and struck through, for an artist that is left out.
+  final bool struck;
+
+  /// The size [artwork] is drawn at.
+  static const double artworkSize = 52;
+
+  @override
+  Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final rank = this.rank;
+    final subtitle = this.subtitle;
 
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      // Artist pages need YouTube.
-      onTap: onTap ?? (offlineMode.value ? null : () => _openArtist(context)),
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10),
         child: Row(
@@ -117,42 +163,41 @@ class TopArtistTile extends StatelessWidget {
               ),
               const SizedBox(width: 10),
             ],
-            SongArtworkWidget(
-              size: _artworkSize,
-              borderRadius: _artworkSize / 2,
-              metadata: mapToMediaItem(artist.topSong),
-            ),
+            artwork,
             const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    artist.name,
+                    name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurface,
+                      color: struck
+                          ? colorScheme.onSurfaceVariant
+                          : colorScheme.onSurface,
+                      decoration: struck ? TextDecoration.lineThrough : null,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    context.l10n!.artistListeningSummary(
-                      artist.seconds ~/ 60,
-                      artist.songCount,
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
+            ?trailing,
           ],
         ),
       ),

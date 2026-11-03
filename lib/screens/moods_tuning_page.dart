@@ -34,6 +34,7 @@ import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/spinner.dart';
+import 'package:musify/widgets/top_artists_card.dart';
 
 /// "Tune the Moods": how much to discover, the genres the user listens to
 /// and the artists that may come up, as Deezer's "Tune your Flow". What is
@@ -227,6 +228,15 @@ class _MoodsTuningPageState extends State<MoodsTuningPage> {
     );
   }
 
+  void _setArtistAllowed(MoodsTuning tuning, String key, bool allowed) =>
+      setMoodsTuning(
+        tuning.copyWith(
+          blockedArtists: allowed
+              ? ({...tuning.blockedArtists}..remove(key))
+              : {...tuning.blockedArtists, key},
+        ),
+      );
+
   Widget _buildArtists(BuildContext context, MoodsTuning tuning) {
     final keys = {
       ..._taste.artists.keys.take(20),
@@ -240,34 +250,35 @@ class _MoodsTuningPageState extends State<MoodsTuningPage> {
           title: context.l10n!.moodsTuningArtists,
           icon: FluentIcons.person_24_filled,
         ),
-        LayoutBuilder(
-          builder: (context, c) {
-            final columns = (c.maxWidth / 240).floor().clamp(1, 3);
-            final width = (c.maxWidth - 12 * (columns - 1)) / columns;
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
+        MusicListSurface(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            child: Column(
               children: [
                 for (final key in keys)
-                  SizedBox(
-                    width: width,
-                    child: _ArtistRow(
-                      name: _taste.artistNames[key] ?? key,
-                      art: _artistArt[key],
-                      allowed: !tuning.blockedArtists.contains(key),
-                      borderRadius: BorderRadius.circular(22),
-                      onChanged: (allowed) => setMoodsTuning(
-                        tuning.copyWith(
-                          blockedArtists: allowed
-                              ? ({...tuning.blockedArtists}..remove(key))
-                              : {...tuning.blockedArtists, key},
-                        ),
-                      ),
+                  ArtistTile(
+                    artwork: _Avatar(
+                      _artistArt[key],
+                      size: ArtistTile.artworkSize,
+                    ),
+                    name: _taste.artistNames[key] ?? key,
+                    struck: tuning.blockedArtists.contains(key),
+                    trailing: Switch(
+                      value: !tuning.blockedArtists.contains(key),
+                      onChanged: (allowed) =>
+                          _setArtistAllowed(tuning, key, allowed),
+                    ),
+                    onTap: () => _setArtistAllowed(
+                      tuning,
+                      key,
+                      tuning.blockedArtists.contains(key),
                     ),
                   ),
               ],
-            );
-          },
+            ),
+          ),
         ),
       ],
     );
@@ -374,55 +385,6 @@ class _GenreCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Switch(value: included, onChanged: onChanged),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ArtistRow extends StatelessWidget {
-  const _ArtistRow({
-    required this.name,
-    required this.art,
-    required this.allowed,
-    required this.borderRadius,
-    required this.onChanged,
-  });
-
-  final String name;
-  final String? art;
-  final bool allowed;
-  final BorderRadius borderRadius;
-  final ValueChanged<bool> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return MusicListSurface(
-      color: allowed ? scheme.surfaceContainerHigh : scheme.surfaceContainerLow,
-      borderRadius: borderRadius,
-      child: InkWell(
-        onTap: () => onChanged(!allowed),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          child: Row(
-            children: [
-              _Avatar(art, size: 52),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: allowed ? scheme.onSurface : scheme.onSurfaceVariant,
-                    decoration: allowed ? null : TextDecoration.lineThrough,
-                  ),
-                ),
-              ),
-              Switch(value: allowed, onChanged: onChanged),
             ],
           ),
         ),

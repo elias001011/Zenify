@@ -358,15 +358,33 @@ class _PeriodSection extends StatefulWidget {
 class _PeriodSectionState extends State<_PeriodSection> {
   final _cardsKey = GlobalKey();
 
+  /// Paints [image] over an opaque [background]: the shared picture has the
+  /// page behind the cards, while the app shows no frame around them.
+  Future<ui.Image> _onBackground(ui.Image image, Color background) async {
+    final recorder = ui.PictureRecorder();
+    ui.Canvas(recorder)
+      ..drawColor(background, BlendMode.src)
+      ..drawImage(image, Offset.zero, ui.Paint());
+    final picture = recorder.endRecording();
+    try {
+      return await picture.toImage(image.width, image.height);
+    } finally {
+      picture.dispose();
+    }
+  }
+
   Future<void> _share() async {
     try {
       final boundary =
           _cardsKey.currentContext?.findRenderObject()
               as RenderRepaintBoundary?;
       if (boundary == null) return;
+      final background = Theme.of(context).scaffoldBackgroundColor;
 
       await WidgetsBinding.instance.endOfFrame;
-      final image = await boundary.toImage(pixelRatio: 3);
+      final captured = await boundary.toImage(pixelRatio: 3);
+      final image = await _onBackground(captured, background);
+      captured.dispose();
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
       final bytes = byteData?.buffer.asUint8List();
@@ -444,14 +462,7 @@ class _PeriodSectionState extends State<_PeriodSection> {
               ),
             ],
           ),
-          RepaintBoundary(
-            key: _cardsKey,
-            // Opaque, so the shared image has the page behind it.
-            child: ColoredBox(
-              color: theme.scaffoldBackgroundColor,
-              child: widget.cards,
-            ),
-          ),
+          RepaintBoundary(key: _cardsKey, child: widget.cards),
           ?footer,
         ],
       ),
