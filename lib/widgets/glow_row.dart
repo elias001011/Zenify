@@ -23,7 +23,6 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/utilities/platform_utils.dart';
-import 'package:musify/widgets/floating_surface.dart';
 
 /// Horizontal artwork browsing with desktop arrows and mouse dragging.
 /// The ambient background belongs to the page, not individual artwork.
@@ -101,6 +100,7 @@ class _GlowRowState extends State<GlowRow> {
       ),
     );
 
+    final rtl = Directionality.of(context) == TextDirection.rtl;
     return Stack(
       children: [
         list,
@@ -112,14 +112,18 @@ class _GlowRowState extends State<GlowRow> {
                 children: [
                   if (canScroll.$1)
                     _ArrowButton(
-                      alignment: Alignment.centerLeft,
-                      icon: FluentIcons.chevron_left_24_regular,
+                      alignment: AlignmentDirectional.centerStart,
+                      icon: rtl
+                          ? FluentIcons.chevron_right_24_regular
+                          : FluentIcons.chevron_left_24_regular,
                       onPressed: () => _page(-1),
                     ),
                   if (canScroll.$2)
                     _ArrowButton(
-                      alignment: Alignment.centerRight,
-                      icon: FluentIcons.chevron_right_24_regular,
+                      alignment: AlignmentDirectional.centerEnd,
+                      icon: rtl
+                          ? FluentIcons.chevron_left_24_regular
+                          : FluentIcons.chevron_right_24_regular,
                       onPressed: () => _page(1),
                     ),
                 ],
@@ -139,19 +143,29 @@ class _ArrowButton extends StatelessWidget {
     required this.onPressed,
   });
 
-  final Alignment alignment;
+  final AlignmentGeometry alignment;
   final IconData icon;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Positioned.fill(
       child: Align(
         alignment: alignment,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: FloatingSurface(
-            borderRadius: const BorderRadius.all(Radius.circular(20)),
+          // Not the floating chrome: a blur per arrow, repainted while the row
+          // scrolls, is far more than a button over artwork needs.
+          child: Material(
+            color: colorScheme.surfaceContainerHigh.withValues(alpha: 0.9),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+                width: 0.8,
+              ),
+            ),
             child: IconButton(icon: Icon(icon), onPressed: onPressed),
           ),
         ),

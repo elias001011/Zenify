@@ -24,6 +24,17 @@ import 'dart:ui' show ImageFilter;
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/settings_manager.dart';
 
+/// How opaque the floating chrome is under each [FloatingEffect]. It sits over
+/// scrolling text, so the simple translucency keeps most of its colour (music
+/// lists, over the page's glow only, can afford far less); the blur is what
+/// lets the blurred one show more of what is behind.
+double floatingOpacity(FloatingEffect effect, {required bool dark}) =>
+    switch (effect) {
+      FloatingEffect.solid => 1,
+      FloatingEffect.translucent => dark ? 0.92 : 0.94,
+      FloatingEffect.blurred => dark ? 0.5 : 0.6,
+    };
+
 /// The rounded surface every floating element (top island, bottom dock,
 /// desktop rail, mini player) sits on, so they share one look.
 ///
@@ -56,11 +67,11 @@ class FloatingSurface extends StatefulWidget {
 }
 
 class _FloatingSurfaceState extends State<FloatingSurface> {
-  static final _blurFilter = ImageFilter.blur(sigmaX: 18, sigmaY: 18);
+  static final _blurFilter = ImageFilter.blur(sigmaX: 12, sigmaY: 12);
 
-  /// Moves the content, with its state (the mini player's audio reader and
-  /// animations), when the blur is added or taken away around it, so solid
-  /// and translucent surfaces need no filter or clip of their own.
+  /// Moves the content, with its state (the mini player's animations), when
+  /// the blur is added or taken away around it, so solid and translucent
+  /// surfaces need no filter or clip of their own.
   final _contentKey = GlobalKey();
 
   @override
@@ -74,12 +85,9 @@ class _FloatingSurfaceState extends State<FloatingSurface> {
   Widget _build(BuildContext context, FloatingEffect effect) {
     final colorScheme = Theme.of(context).colorScheme;
     final dark = colorScheme.brightness == Brightness.dark;
-    final base = colorScheme.surfaceContainer;
-    final color = switch (effect) {
-      FloatingEffect.solid => base,
-      FloatingEffect.translucent => base.withValues(alpha: dark ? 0.62 : 0.72),
-      FloatingEffect.blurred => base.withValues(alpha: dark ? 0.38 : 0.48),
-    };
+    final color = colorScheme.surfaceContainer.withValues(
+      alpha: floatingOpacity(effect, dark: dark),
+    );
     final borderRadius = widget.borderRadius;
 
     final Widget surface = Material(

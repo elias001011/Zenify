@@ -357,6 +357,10 @@ class _PageGlowPainter extends CustomPainter {
     final reach = size.shortestSide + size.longestSide * 0.35;
     final grow = colors.grow;
 
+    // The lights are larger than the page and a painter does not clip: while
+    // the player slides over the shell, they would shine beyond its edges.
+    canvas.clipRect(Offset.zero & size);
+
     // A neighbouring hue, as the second light of a stage.
     final hsl = HSLColor.fromColor(color);
     paintArtworkGlow(

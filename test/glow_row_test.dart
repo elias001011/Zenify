@@ -42,11 +42,14 @@ void main() {
 
   testWidgets('desktop arrows follow the scroll position', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    floatingEffect.value = FloatingEffect.blurred;
     await tester.pumpWidget(row());
     await tester.pump();
 
     expect(tester.takeException(), isNull);
     expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsOneWidget);
+    // Glass is for the navigation, not for a button over artwork.
+    expect(find.byType(BackdropFilter), findsNothing);
     expect(find.byIcon(FluentIcons.chevron_left_24_regular), findsNothing);
 
     await tester.tap(find.byIcon(FluentIcons.chevron_right_24_regular));
