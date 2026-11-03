@@ -22,6 +22,7 @@
 import 'dart:async';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
@@ -48,11 +49,18 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
   StreamSubscription<PositionData>? _positionSubscription;
   List<GlobalKey> _lineKeys = const [];
   final _progress = ValueNotifier<double>(0);
+
+  /// The row that is being sung. Each row listens and rebuilds only when it
+  /// becomes, or stops being, the active one: a line change touches two rows,
+  /// not the whole song.
+  final _active = ValueNotifier<int>(-1);
   Duration _position = Duration.zero;
   Duration _offset = Duration.zero;
-  int _activeIndex = -1;
   Size? _viewportSize;
   DateTime _autoScrollResumesAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  int get _activeIndex => _active.value;
+  set _activeIndex(int index) => _active.value = index;
 
   List<LyricLine> get _lines => widget.lyrics.synced ?? const <LyricLine>[];
 
@@ -100,6 +108,7 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
   void dispose() {
     unawaited(_positionSubscription?.cancel());
     _progress.dispose();
+    _active.dispose();
     super.dispose();
   }
 
@@ -124,7 +133,7 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
   void _refreshActiveLine() {
     final index = _computeActiveIndex();
     if (index == _activeIndex || !mounted) return;
-    setState(() => _activeIndex = index);
+    _activeIndex = index;
     _scheduleScrollToActive();
   }
 
@@ -214,11 +223,15 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       for (var i = 0; i < lines.length; i++)
-                        _buildLine(
-                          i,
-                          lines[i],
-                          textColor,
-                          constraints.maxWidth >= 500 ? 32 : 20,
+                        _LyricRow(
+                          key: _lineKeys[i],
+                          index: i,
+                          line: lines[i],
+                          active: _active,
+                          progress: _progress,
+                          color: textColor,
+                          fontSize: constraints.maxWidth >= 500 ? 32 : 20,
+                          onTap: () => _seekToLine(lines[i]),
                         ),
                       Padding(
                         padding: const EdgeInsets.only(top: 24),
@@ -239,69 +252,6 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
         ),
         _buildOffsetControls(textColor),
       ],
-    );
-  }
-
-  Widget _buildLine(
-    int index,
-    LyricLine line,
-    Color baseColor,
-    double fontSize,
-  ) {
-    final isActive = index == _activeIndex;
-    final spacious = fontSize >= 28;
-    final align = spacious ? TextAlign.start : TextAlign.center;
-    final style = TextStyle(
-      fontSize: fontSize,
-      height: spacious ? 1.35 : 1.4,
-      fontWeight: spacious ? FontWeight.w700 : FontWeight.w800,
-      color: baseColor,
-    );
-    return GestureDetector(
-      key: _lineKeys[index],
-      behavior: HitTestBehavior.opaque,
-      onTap: () => _seekToLine(line),
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(
-          end: MediaQuery.disableAnimationsOf(context) || isActive ? 1.0 : 0.0,
-        ),
-        duration: MediaQuery.disableAnimationsOf(context)
-            ? Duration.zero
-            : const Duration(milliseconds: 500),
-        curve: Curves.easeOutCubic,
-        builder: (context, amount, child) => Transform.translate(
-          offset: Offset(0, 3 * (1 - amount)),
-          child: Transform.scale(
-            scaleX: 1,
-            scaleY: 0.98 + 0.02 * amount,
-            alignment: Alignment.bottomCenter,
-            child: child,
-          ),
-        ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: spacious ? 18 : 6),
-          child: ValueListenableBuilder<double>(
-            valueListenable: isActive
-                ? _progress
-                : AlwaysStoppedAnimation<double>(index < _activeIndex ? 1 : 0),
-            builder: (context, progress, _) => LyricLineFill(
-              text: line.text.isEmpty ? '♪' : line.text,
-              style: style,
-              textAlign: align,
-              progress: progress,
-              emphasis: isActive ? 1 : 0,
-              baseOpacity: isActive
-                  ? 0.38
-                  : index < _activeIndex
-                  ? 0.28
-                  : 0.45,
-              duration: MediaQuery.disableAnimationsOf(context)
-                  ? Duration.zero
-                  : const Duration(milliseconds: 300),
-            ),
-          ),
-        ),
-      ),
     );
   }
 
@@ -334,6 +284,136 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
             onPressed: () => _changeOffset(_offsetStep),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Where a row stands in the song, against the line being sung.
+enum _Place { before, current, after }
+
+/// One lyric line. It watches the active index itself and rebuilds only when
+/// its [_Place] changes.
+class _LyricRow extends StatefulWidget {
+  const _LyricRow({
+    required super.key,
+    required this.index,
+    required this.line,
+    required this.active,
+    required this.progress,
+    required this.color,
+    required this.fontSize,
+    required this.onTap,
+  });
+
+  final int index;
+  final LyricLine line;
+  final ValueListenable<int> active;
+
+  /// How much of the active line has been sung.
+  final ValueListenable<double> progress;
+  final Color color;
+  final double fontSize;
+  final VoidCallback onTap;
+
+  @override
+  State<_LyricRow> createState() => _LyricRowState();
+}
+
+class _LyricRowState extends State<_LyricRow> {
+  late _Place _place = _placeAt(widget.active.value);
+
+  _Place _placeAt(int active) => widget.index == active
+      ? _Place.current
+      : widget.index < active
+      ? _Place.before
+      : _Place.after;
+
+  void _onActive() {
+    final place = _placeAt(widget.active.value);
+    if (place != _place) setState(() => _place = place);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    widget.active.addListener(_onActive);
+  }
+
+  @override
+  void didUpdateWidget(_LyricRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.index != oldWidget.index) _place = _placeAt(widget.active.value);
+  }
+
+  @override
+  void dispose() {
+    widget.active.removeListener(_onActive);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final current = _place == _Place.current;
+    final spacious = widget.fontSize >= 28;
+    final style = TextStyle(
+      fontSize: widget.fontSize,
+      height: spacious ? 1.35 : 1.4,
+      fontWeight: spacious ? FontWeight.w700 : FontWeight.w800,
+      color: widget.color,
+    );
+    // -1 for the lines already sung, 1 for those to come, 0 for the current
+    // one: it rises between its neighbours, so the gap above and below it
+    // grows by the same amount.
+    final lean = reduceMotion || current
+        ? 0.0
+        : _place == _Place.before
+        ? -1.0
+        : 1.0;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: widget.onTap,
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(end: lean),
+        duration: reduceMotion
+            ? Duration.zero
+            : const Duration(milliseconds: 500),
+        curve: Curves.easeOutCubic,
+        builder: (context, lean, child) => Transform.translate(
+          offset: Offset(0, 3 * lean),
+          child: Transform.scale(
+            scaleX: 1,
+            scaleY: 1 - 0.02 * lean.abs(),
+            alignment: Alignment.bottomCenter,
+            child: child,
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(vertical: spacious ? 18 : 6),
+          child: ValueListenableBuilder<double>(
+            valueListenable: current
+                ? widget.progress
+                : AlwaysStoppedAnimation<double>(
+                    _place == _Place.before ? 1 : 0,
+                  ),
+            builder: (context, progress, _) => LyricLineFill(
+              text: widget.line.text.isEmpty ? '♪' : widget.line.text,
+              style: style,
+              textAlign: spacious ? TextAlign.start : TextAlign.center,
+              progress: progress,
+              emphasis: current ? 1 : 0,
+              baseOpacity: current
+                  ? 0.38
+                  : _place == _Place.before
+                  ? 0.28
+                  : 0.45,
+              duration: reduceMotion
+                  ? Duration.zero
+                  : const Duration(milliseconds: 300),
+            ),
+          ),
+        ),
       ),
     );
   }
