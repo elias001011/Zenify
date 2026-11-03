@@ -69,6 +69,9 @@ class SongArtworkWidget extends StatelessWidget {
             width: size,
             height: size,
             imageUrl: source,
+            // Decoded at the size it is drawn, as the local files are.
+            memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
+                .round(),
             imageBuilder: (context, imageProvider) => ClipRRect(
               borderRadius: BorderRadius.circular(borderRadius),
               child: Image(image: imageProvider, fit: BoxFit.cover),

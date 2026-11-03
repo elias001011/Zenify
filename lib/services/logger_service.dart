@@ -19,12 +19,18 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:collection';
+
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 
 class Logger {
-  String _logs = '';
+  /// Only the latest entries are kept: a session that keeps failing would
+  /// otherwise grow the log, and copy it again on every new line, forever.
+  static const _maxEntries = 500;
+
+  final _logs = Queue<String>();
   final ValueNotifier<int> logCount = ValueNotifier<int>(0);
 
   void log(String errorLocation, {Object? error, StackTrace? stackTrace}) {
@@ -40,14 +46,17 @@ class Logger {
         '[$timestamp] $errorLocation:$errorMessage\n$stackTraceMessage';
 
     debugPrint(logMessage);
-    _logs += '$logMessage\n';
+    _logs.add(logMessage);
+    if (_logs.length > _maxEntries) _logs.removeFirst();
     logCount.value++;
   }
 
   Future<String> copyLogs(BuildContext context) async {
     try {
-      if (_logs != '') {
-        await Clipboard.setData(ClipboardData(text: _logs));
+      if (_logs.isNotEmpty) {
+        await Clipboard.setData(
+          ClipboardData(text: _logs.map((entry) => '$entry\n').join()),
+        );
         return '${context.l10n!.copyLogsSuccess}.';
       } else {
         return '${context.l10n!.copyLogsNoLogs}.';
