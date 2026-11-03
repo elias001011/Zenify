@@ -23,6 +23,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/utilities/formatter.dart';
+import 'package:musify/widgets/now_playing/audio_quality_badge.dart';
 import 'package:musify/widgets/now_playing/player_chrome.dart';
 
 class PositionSlider extends StatefulWidget {
@@ -141,11 +142,17 @@ class _PositionSliderState extends State<PositionSlider> {
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: widget.flush ? 0 : 22),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Text(positionText, style: textStyle),
-          Text(durationText, style: textStyle),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(positionText, style: textStyle),
+              Text(durationText, style: textStyle),
+            ],
+          ),
+          const AudioQualityBadge(),
         ],
       ),
     );

@@ -327,12 +327,6 @@ class _UprightStageState extends State<_UprightStage>
     curve: const Interval(0.4, 1, curve: Curves.easeIn),
   );
 
-  late final _badgeFade = CurvedAnimation(
-    parent: _controller,
-    curve: const Interval(0, 0.5, curve: Curves.easeOut),
-  );
-  late final _badgeOpacity = ReverseAnimation(_badgeFade);
-
   /// Keep the closing panel built until it has faded out.
   late PlayerPanel? _builtPanel = widget.panel;
 
@@ -355,7 +349,6 @@ class _UprightStageState extends State<_UprightStage>
 
   @override
   void dispose() {
-    _badgeFade.dispose();
     _panelFade.dispose();
     _progress.dispose();
     _controller.dispose();
@@ -387,8 +380,6 @@ class _UprightStageState extends State<_UprightStage>
               final artwork = NowPlayingArtwork(
                 metadata: metadata,
                 size: artSize,
-                // Share the move: fully visible as soon as it finishes.
-                qualityBadgeOpacity: _badgeOpacity,
                 slideOnSkip: widget.panel == null,
               );
               // Built once: the frames of the move only reposition and fade

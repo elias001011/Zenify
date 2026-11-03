@@ -22,8 +22,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/services/common_services.dart';
-import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/flip_card.dart';
@@ -40,7 +38,6 @@ class NowPlayingArtwork extends StatefulWidget {
     super.key,
     required this.metadata,
     required this.size,
-    this.qualityBadgeOpacity,
     this.slideOnSkip = true,
   });
 
@@ -51,9 +48,6 @@ class NowPlayingArtwork extends StatefulWidget {
   /// it is the small cover in the header over the lyrics or the queue, where a
   /// slide across the screen would look like it came from nowhere.
   final bool slideOnSkip;
-
-  /// Follows the mobile panel transition, without a second delayed fade.
-  final Animation<double>? qualityBadgeOpacity;
 
   @override
   State<NowPlayingArtwork> createState() => _NowPlayingArtworkState();
@@ -124,31 +118,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
       ),
     );
 
-    return Stack(
-      children: [
-        if (isDesktopPlatform) _tilted(content) else content,
-        // Kept flat over the tilt, where small text would shimmer; it leaves
-        // with a fade when the artwork flips to the waves.
-        Positioned(
-          right: 10,
-          bottom: 10,
-          child: ValueListenableBuilder<bool>(
-            valueListenable: showPlayerVisualizer,
-            builder: (context, visualizer, child) => AnimatedOpacity(
-              opacity: visualizer ? 0 : 1,
-              duration: const Duration(milliseconds: 200),
-              child: child,
-            ),
-            child: FadeTransition(
-              opacity: widget.qualityBadgeOpacity ?? kAlwaysCompleteAnimation,
-              child: IgnorePointer(
-                child: _AudioQualityBadge(metadata: widget.metadata),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+    return isDesktopPlatform ? _tilted(content) : content;
   }
 
   Widget _tilted(Widget content) {
@@ -258,117 +228,6 @@ class _SkipSlideState extends State<_SkipSlide> {
         );
       },
       child: KeyedSubtree(key: ValueKey(widget.trackId), child: widget.child),
-    );
-  }
-}
-
-typedef _AudioQualityInfo = ({int bitrateKbps, String codec});
-
-String _normalizeCodec(String codec) => switch (codec) {
-  final c when c.startsWith('opus') => 'Opus',
-  final c when c.startsWith('mp4a') => 'AAC',
-  final c => c,
-};
-
-/// Resolves a song's stored or playback audio quality, or null if unavailable.
-Future<_AudioQualityInfo?> _resolveAudioQuality(String ytid) async {
-  // A local file has no stream to ask about, and its id is never sent out.
-  if (isLocalSongId(ytid)) return null;
-  final offlineSong = getOfflineSongByYtid(ytid);
-  final offlineBitrate = offlineSong['audioBitrateKbps'] as int?;
-  final offlineCodec = offlineSong['audioCodec'] as String?;
-  if (offlineBitrate != null && offlineCodec != null) {
-    return (bitrateKbps: offlineBitrate, codec: _normalizeCodec(offlineCodec));
-  }
-  if (offlineSong.isNotEmpty || offlineMode.value) return null;
-
-  // Free for a song that is playing: the stream it picked is already resolved
-  // and cached, so this reads it back instead of asking YouTube again.
-  final stream = await fetchBestAudioStream(ytid);
-  if (stream == null) return null;
-
-  return (
-    bitrateKbps: stream.bitrate.kiloBitsPerSecond.round(),
-    codec: _normalizeCodec(stream.audioCodec),
-  );
-}
-
-/// Shows the current song's resolved audio bitrate and codec.
-class _AudioQualityBadge extends StatefulWidget {
-  const _AudioQualityBadge({required this.metadata});
-  final MediaItem metadata;
-
-  @override
-  State<_AudioQualityBadge> createState() => _AudioQualityBadgeState();
-}
-
-class _AudioQualityBadgeState extends State<_AudioQualityBadge> {
-  String? _resolvedYtid;
-  Future<_AudioQualityInfo?>? _infoFuture;
-
-  @override
-  void initState() {
-    super.initState();
-    _resolveIfNeeded();
-    showAudioQualityBadge.addListener(_onSettingChanged);
-  }
-
-  void _onSettingChanged() {
-    setState(() {
-      _resolvedYtid = null;
-      _resolveIfNeeded();
-    });
-  }
-
-  @override
-  void dispose() {
-    showAudioQualityBadge.removeListener(_onSettingChanged);
-    super.dispose();
-  }
-
-  @override
-  void didUpdateWidget(_AudioQualityBadge oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    _resolveIfNeeded();
-  }
-
-  void _resolveIfNeeded() {
-    final ytid = widget.metadata.extras?['ytid']?.toString();
-    if (ytid == _resolvedYtid) return;
-    _resolvedYtid = ytid;
-
-    final shouldResolve =
-        showAudioQualityBadge.value && ytid != null && ytid.isNotEmpty;
-    _infoFuture = shouldResolve ? _resolveAudioQuality(ytid) : null;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final infoFuture = _infoFuture;
-    if (infoFuture == null) return const SizedBox.shrink();
-
-    return FutureBuilder<_AudioQualityInfo?>(
-      future: infoFuture,
-      builder: (context, snapshot) {
-        final info = snapshot.data;
-        if (info == null) return const SizedBox.shrink();
-
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.55),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            '${info.bitrateKbps} kbps • ${info.codec}',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        );
-      },
     );
   }
 }

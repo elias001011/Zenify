@@ -98,7 +98,7 @@ void main() {
 
   for (final size in [const Size(420, 860), const Size(1280, 800)]) {
     testWidgets(
-      'quality badge stays on wide layouts and follows the mobile transition ($size)',
+      'quality badge sits under the progress bar and stays through the panels ($size)',
       (tester) async {
         tester.view.physicalSize = size;
         tester.view.devicePixelRatio = 1;
@@ -108,6 +108,7 @@ void main() {
         showPlayerVisualizer.value = false;
         userOfflineSongs.value = [
           {'ytid': 'badge', 'audioBitrateKbps': 192, 'audioCodec': 'opus'},
+          {'ytid': 'other', 'audioBitrateKbps': 128, 'audioCodec': 'mp4a.40.2'},
         ];
         addTearDown(() {
           showAudioQualityBadge.value = false;
@@ -134,48 +135,63 @@ void main() {
         await tester.pump(const Duration(milliseconds: 600));
         const badgeText = '192 kbps • Opus';
         final badge = find.text(badgeText);
-        double opacity() => tester
-            .widgetList<FadeTransition>(
-              find.ancestor(of: badge, matching: find.byType(FadeTransition)),
-            )
-            .fold(1, (value, fade) => value * fade.opacity.value);
-        final compact = size.width < 900;
         expect(badge, findsOneWidget);
-        expect(opacity(), 1);
+        // About the stream, not the artwork: never part of the cover.
+        expect(
+          find.descendant(of: find.byType(NowPlayingArtwork), matching: badge),
+          findsNothing,
+        );
+        void expectUnderTheBar() {
+          expect(
+            tester.getCenter(badge).dy,
+            greaterThan(tester.getRect(find.byType(Slider)).bottom),
+          );
+        }
 
+        // Centred between the times.
+        expectUnderTheBar();
+        expect(
+          tester.getCenter(badge).dx,
+          closeTo(tester.getRect(find.byType(Slider)).center.dx, 2),
+        );
+
+        // Opening and closing a panel moves the cover, never the badge's
+        // presence.
         for (final panel in ['Lyrics', 'Queue']) {
           await tester.tap(find.byTooltip(panel));
           await tester.pump();
-          await tester.pump();
           await tester.pump(const Duration(milliseconds: 100));
-          expect(opacity(), compact ? lessThan(1) : 1);
-          await tester.pump(const Duration(milliseconds: 500));
-          expect(opacity(), compact ? 0 : 1);
+          expect(badge, findsOneWidget);
+          await tester.pump(const Duration(milliseconds: 600));
+          expect(badge, findsOneWidget);
+          expectUnderTheBar();
           await tester.tap(find.byTooltip(panel));
           await tester.pump();
-          await tester.pump(const Duration(milliseconds: 350));
-          expect(opacity(), compact ? greaterThan(0) : 1);
-          await tester.pump(const Duration(milliseconds: 150));
-          expect(opacity(), 1);
+          await tester.pump(const Duration(milliseconds: 600));
+          expect(badge, findsOneWidget);
         }
-        // Switching directly between panels must never bring the badge back.
-        await tester.tap(find.byTooltip('Lyrics'));
+
+        // A new song brings its own quality, even without a position tick.
+        audioHandler.mediaItem.add(
+          const MediaItem(
+            id: 'other',
+            title: 'Other',
+            extras: {'ytid': 'other'},
+          ),
+        );
         await tester.pump();
         await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
-        await tester.tap(find.byTooltip('Queue'));
-        await tester.pump();
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 600));
-        expect(opacity(), compact ? 0 : 1);
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('128 kbps • AAC'), findsOneWidget);
+        expect(badge, findsNothing);
 
         showAudioQualityBadge.value = false;
         await tester.pump();
-        expect(badge, findsNothing);
+        expect(find.text('128 kbps • AAC'), findsNothing);
         showAudioQualityBadge.value = true;
         await tester.pump();
         await tester.pump();
-        expect(badge, findsOneWidget);
+        expect(find.text('128 kbps • AAC'), findsOneWidget);
         expect(tester.takeException(), isNull);
         await tester.pumpWidget(const SizedBox());
         await tester.pump(const Duration(seconds: 30));
