@@ -152,15 +152,32 @@ void main() {
     });
   }
 
-  testWidgets('desktop shares the cover slide on a skip', (tester) async {
+  testWidgets('desktop changes the cover without sliding it', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     await pumpPlayer(tester);
 
     await tester.tap(find.byIcon(FluentIcons.next_24_filled));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 150));
-    expect(coverShifts(tester), isNotEmpty);
+    expect(audioHandler.mediaItem.value?.extras?['ytid'], 'ytid_b');
+    expect(coverShifts(tester), isEmpty);
 
+    await disposePlayer(tester);
+  });
+
+  testWidgets('the cover tilts after the mouse on desktop only', (
+    tester,
+  ) async {
+    Finder tilt() =>
+        find.descendant(of: artwork(), matching: find.byType(MouseRegion));
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    await pumpPlayer(tester);
+    final onDesktop = tilt().evaluate().length;
+    await disposePlayer(tester);
+
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await pumpPlayer(tester);
+    expect(tilt().evaluate().length, lessThan(onDesktop));
     await disposePlayer(tester);
   });
 

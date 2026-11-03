@@ -25,13 +25,16 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/flip_card.dart';
 import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/song_artwork.dart';
 
 /// The player's artwork. Tapping it flips it round, as in the original
-/// Musify, to sound waves on the page itself, and back; on desktop it tilts gently after the mouse, the side
-/// under it sinking in.
+/// Musify, to sound waves on the page itself, and back. Each platform keeps
+/// the motion that suits its pointer: on phones the cover slides the way a
+/// song goes; on desktop it tilts gently after the mouse, the side under it
+/// sinking in.
 class NowPlayingArtwork extends StatefulWidget {
   const NowPlayingArtwork({
     super.key,
@@ -44,9 +47,9 @@ class NowPlayingArtwork extends StatefulWidget {
   final MediaItem metadata;
   final double size;
 
-  /// Whether the cover slides when the song changes. Off while it is the small
-  /// cover in the header over the lyrics or the queue, where a slide across
-  /// the screen would look like it came from nowhere.
+  /// Whether the cover slides when the song changes (phones only). Off while
+  /// it is the small cover in the header over the lyrics or the queue, where a
+  /// slide across the screen would look like it came from nowhere.
   final bool slideOnSkip;
 
   /// Follows the mobile panel transition, without a second delayed fade.
@@ -100,7 +103,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
     );
     final front = _SkipSlide(
       trackId: widget.metadata.id,
-      enabled: widget.slideOnSkip,
+      enabled: widget.slideOnSkip && isMobilePlatform,
       child: artwork,
     );
 
@@ -123,7 +126,7 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
 
     return Stack(
       children: [
-        _tilted(content),
+        if (isDesktopPlatform) _tilted(content) else content,
         // Kept flat over the tilt, where small text would shimmer; it leaves
         // with a fade when the artwork flips to the waves.
         Positioned(
@@ -148,7 +151,6 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
     );
   }
 
-  /// On desktop, the artwork tilts gently after the mouse.
   Widget _tilted(Widget content) {
     return MouseRegion(
       onHover: _onHover,
