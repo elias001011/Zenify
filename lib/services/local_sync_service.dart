@@ -259,7 +259,17 @@ class LocalSyncService {
     if (_initialised || !isSupportedPlatform) return;
     _initialised = true;
 
-    await LibraryMergeService.recoverPendingMerge();
+    try {
+      await LibraryMergeService.recoverPendingMerge();
+    } catch (e, stackTrace) {
+      // Not worth leaving sync off for good: the server, the paired devices and
+      // the timers do not depend on it.
+      logger.log(
+        'Local sync could not recover an interrupted merge',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
     _loadPairedDevices();
 
     if (localSyncEnabled.value) {

@@ -500,4 +500,26 @@ void main() {
     expect(server.state.value.status, LocalSyncStatus.error);
     expect(server.state.value.activeDevice?.deviceId, peerId);
   });
+
+  test(
+    'an interrupted merge that cannot be recovered does not stop sync',
+    () async {
+      await server.savePairedDevice(
+        PairedSyncDevice(deviceId: 'kept', name: 'Kept', secret: secret),
+      );
+      await server.dispose();
+      // A journal the recovery cannot read.
+      await Hive.box('userNoBackup')
+          .put('localSyncPendingMergeV2', {'user': 1});
+
+      server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
+      await server.initialise();
+
+      expect(
+        server.pairedDevices.value.map((device) => device.deviceId),
+        contains('kept'),
+      );
+      await Hive.box('userNoBackup').delete('localSyncPendingMergeV2');
+    },
+  );
 }
