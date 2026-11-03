@@ -829,9 +829,12 @@ class LocalSyncService {
     incomingPairingRequest.value = null;
   }
 
-  /// Broadcasts a discovery request and collects the answers for [duration].
+  /// Broadcasts a discovery request and collects the answers for [duration],
+  /// telling [onFound] about the list as it grows. The scan changes nothing
+  /// else: a silent sync's quick scan must not rewrite what the page shows.
   Future<List<DiscoveredSyncDevice>> discoverDevices({
     Duration duration = const Duration(seconds: 4),
+    void Function(List<DiscoveredSyncDevice> devices)? onFound,
   }) async {
     if (_testDiscovery != null) return _testDiscovery();
     final discovered = <DiscoveredSyncDevice>[];
@@ -876,9 +879,7 @@ class LocalSyncService {
         if (discovered.any((d) => d.deviceId == device.deviceId)) return;
 
         discovered.add(device);
-        state.value = state.value.copyWith(
-          discoveredDevices: List.unmodifiable(discovered),
-        );
+        onFound?.call(List.unmodifiable(discovered));
       });
 
       final payload = utf8.encode(_discoveryRequest);
@@ -922,7 +923,10 @@ class LocalSyncService {
       clearStage: true,
       clearActiveDevice: true,
     );
-    await discoverDevices();
+    await discoverDevices(
+      onFound: (devices) =>
+          state.value = state.value.copyWith(discoveredDevices: devices),
+    );
     if (state.value.status == LocalSyncStatus.scanning) {
       state.value = state.value.copyWith(status: LocalSyncStatus.idle);
     }
