@@ -94,9 +94,20 @@ void main() {
           id: likedSongsExportId,
           title: 'Liked',
           source: ExportSource.likedSongs,
+          artwork: null,
         ),
-        (id: 'customId-1', title: 'Mine', source: ExportSource.custom),
-        (id: 'customId-2', title: 'Empty', source: ExportSource.custom),
+        (
+          id: 'customId-1',
+          title: 'Mine',
+          source: ExportSource.custom,
+          artwork: null,
+        ),
+        (
+          id: 'customId-2',
+          title: 'Empty',
+          source: ExportSource.custom,
+          artwork: null,
+        ),
       ];
       final out = Directory('${directory.path}/out');
 

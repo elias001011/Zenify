@@ -10,7 +10,12 @@ import 'package:musify/utilities/media_duration.dart';
 enum ExportSource { likedSongs, custom, youtube, saved, zenify }
 
 /// One thing in the library that holds songs and can become a CSV file.
-typedef ExportEntry = ({String id, String title, ExportSource source});
+typedef ExportEntry = ({
+  String id,
+  String title,
+  ExportSource source,
+  String? artwork,
+});
 
 const likedSongsExportId = 'liked-songs';
 
@@ -29,26 +34,47 @@ Future<List<ExportEntry>> exportableLibrary({
 }) async {
   final entries = <ExportEntry>[];
   final seen = <String>{};
-  void add(Object? id, Object? title, ExportSource source) {
+  void add(Object? id, Object? title, ExportSource source, [Object? image]) {
     final key = id?.toString() ?? '';
     if (key.isEmpty || !seen.add(key)) return;
-    entries.add((id: key, title: title?.toString() ?? key, source: source));
+    entries.add((
+      id: key,
+      title: title?.toString() ?? key,
+      source: source,
+      artwork: image?.toString(),
+    ));
   }
 
   if (userLikedSongsList.value.isNotEmpty) {
     add(likedSongsExportId, likedSongsTitle, ExportSource.likedSongs);
   }
   for (final playlist in getUserCustomPlaylists()) {
-    add(playlist['ytid'], playlist['title'], ExportSource.custom);
+    add(
+      playlist['ytid'],
+      playlist['title'],
+      ExportSource.custom,
+      playlist['image'],
+    );
   }
   for (final playlist in getLikedPlaylistItems()) {
-    add(playlist['ytid'], playlist['title'], ExportSource.saved);
+    add(
+      playlist['ytid'],
+      playlist['title'],
+      ExportSource.saved,
+      playlist['image'],
+    );
   }
   for (final id in savedZenifyPlaylists.value) {
-    add(id, moodsService.cachedPlaylist(id)['title'], ExportSource.zenify);
+    final saved = moodsService.cachedPlaylist(id);
+    add(id, saved['title'], ExportSource.zenify, saved['image']);
   }
   for (final playlist in await getUserPlaylists()) {
-    add((playlist as Map)['ytid'], playlist['title'], ExportSource.youtube);
+    add(
+      (playlist as Map)['ytid'],
+      playlist['title'],
+      ExportSource.youtube,
+      playlist['image'],
+    );
   }
   return entries;
 }

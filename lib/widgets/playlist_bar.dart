@@ -52,6 +52,7 @@ class PlaylistBar extends StatelessWidget {
     this.playlistData,
     this.onPressed,
     this.onDelete,
+    this.trailing,
     this.cubeIcon = FluentIcons.text_bullet_list_24_filled,
     this.showBuildActions = true,
     this.isAlbum = false,
@@ -64,6 +65,9 @@ class PlaylistBar extends StatelessWidget {
   final String? playlistArtwork;
   final VoidCallback? onPressed;
   final VoidCallback? onDelete;
+
+  /// Shown in place of the actions menu, e.g. a checkbox to pick the playlist.
+  final Widget? trailing;
   final IconData cubeIcon;
   final bool? isAlbum;
   final bool showBuildActions;
@@ -156,7 +160,10 @@ class PlaylistBar extends StatelessWidget {
                   ],
                 ),
               ),
-              if (showBuildActions) ...[
+              if (trailing case final trailing?) ...[
+                const SizedBox(width: 4),
+                trailing,
+              ] else if (showBuildActions) ...[
                 const SizedBox(width: 4),
                 OverflowMenuButton<String>(
                   onSelected: (String value) {
