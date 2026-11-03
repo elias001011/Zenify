@@ -423,6 +423,31 @@ void main() {
       }
     },
   );
+
+  test('one entry without an id does not stop the rest of the library', () {
+    final flat = SyncDocument.flatten({
+      'likedSongs': [
+        song('a'),
+        {'title': 'no id'},
+        song('b'),
+      ],
+      'customPlaylists': [
+        {
+          'ytid': 'PL1',
+          'title': 'Mine',
+          'list': [
+            song('x'),
+            {'title': 'no id either'},
+          ],
+        },
+      ],
+    });
+    final text = flat.keys.join();
+    expect(text, contains('"a"'));
+    expect(text, contains('"b"'));
+    expect(text, contains('"x"'));
+    expect(text, isNot(contains('no id')));
+  });
 }
 
 void expectConverges(List<SyncDocument> documents) {

@@ -493,7 +493,9 @@ class SyncDocument {
             : item is Map
             ? item['ytid']?.toString()
             : null;
-        if (id == null || id.isEmpty) throw FormatException('Missing $kind id');
+        // An entry without an id cannot be tracked: it stays on this device
+        // instead of stopping the whole library from syncing.
+        if (id == null || id.isEmpty) continue;
         if (ids.contains(id)) continue;
         ids.add(id);
         result[_key(kind, parent, id)] = strings
@@ -532,12 +534,10 @@ class SyncDocument {
       result[_key('playlistLocation', '', id)] = folder;
       final ids = <String>[];
       for (final song in item['list']) {
-        if (song is! Map || song['ytid'] == null) {
-          throw const FormatException('Invalid playlist song');
-        }
-        final songId = song['ytid'].toString();
+        final songId = song is Map ? song['ytid']?.toString() : null;
+        if (songId == null || songId.isEmpty) continue;
         if (!ids.contains(songId)) ids.add(songId);
-        result[_key('playlistSong', id, songId)] = _portableMap(song);
+        result[_key('playlistSong', id, songId)] = _portableMap(song as Map);
       }
       result[_key('playlistSongOrder', id, '')] = ids;
     }
