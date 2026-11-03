@@ -27,13 +27,11 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
-import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/marquee.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
 import 'package:musify/widgets/now_playing/player_chrome.dart';
-import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
 import 'package:musify/widgets/skip_icon_button.dart';
 import 'package:musify/widgets/song_artwork.dart';
@@ -316,21 +314,11 @@ class _ArtworkWidget extends StatelessWidget {
               ),
             ],
           ),
-          child: ValueListenableBuilder<bool>(
-            valueListenable: showPlayerVisualizer,
-            builder: (context, visualizer, _) => visualizer
-                ? const SizedBox.square(
-                    dimension: MiniPlayer._artworkSize,
-                    child: Center(
-                      child: WaveVisualizer(size: 40, compact: true),
-                    ),
-                  )
-                : SongArtworkWidget(
-                    metadata: metadata,
-                    size: MiniPlayer._artworkSize,
-                    errorWidgetIconSize: 24,
-                    borderRadius: MiniPlayer._artworkRadius,
-                  ),
+          child: SongArtworkWidget(
+            metadata: metadata,
+            size: MiniPlayer._artworkSize,
+            errorWidgetIconSize: 24,
+            borderRadius: MiniPlayer._artworkRadius,
           ),
         ),
       ),

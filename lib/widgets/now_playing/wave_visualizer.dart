@@ -31,18 +31,13 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
 
 /// Sound waves: they follow the music's frequencies with the precise
-/// [waveReading] and keep a motion of their own otherwise. Pausing or
-/// buffering freezes the bars in place.
+/// [waveReading] and keep a motion of their own otherwise. While nothing plays
+/// (paused, buffering, loading) they stop listening to the audio, settle to a
+/// quiet pose and rest there without drawing a frame.
 class WaveVisualizer extends StatefulWidget {
-  const WaveVisualizer({super.key, required this.size, this.compact = false});
+  const WaveVisualizer({super.key, required this.size});
 
   final double size;
-
-  /// For the mini player's thumbnail, always on screen, which draws only as
-  /// often as it needs: a step per audio reading (at most ~15 a second) with
-  /// the precise reading, otherwise a slower motion of its own (8 a second),
-  /// and no frames in between. The open player uses a ticker.
-  final bool compact;
 
   @override
   State<WaveVisualizer> createState() => _WaveVisualizerState();
@@ -50,18 +45,20 @@ class WaveVisualizer extends StatefulWidget {
 
 class _WaveVisualizerState extends State<WaveVisualizer>
     with SingleTickerProviderStateMixin {
-  late final _bars = widget.compact ? 7 : 9;
-  late final _heights = List<double>.generate(
+  static const _bars = 9;
+
+  /// The pose of silence, a low hill; where the bars start and come to rest.
+  static final _quiet = List<double>.generate(
     _bars,
     (i) => 0.18 + 0.28 * (1 - (i - (_bars - 1) / 2).abs() / (_bars / 2)),
   );
+  late final _heights = List<double>.of(_quiet);
   final _repaint = ValueNotifier<int>(0);
   late final Ticker _ticker = createTicker(_tick);
   late final StreamSubscription<PlaybackState> _playingSubscription;
   late final StreamSubscription<String?> _trackSubscription;
   late final AppLifecycleListener _lifecycle;
   StreamSubscription<AudioLevel>? _levels;
-  Timer? _thumbnailTimer;
   Timer? _stale;
   AudioLevel? _level;
   bool _ready = false;
@@ -70,12 +67,15 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   bool _connecting = false;
   int _connectionGeneration = 0;
   Duration _last = Duration.zero;
-  final _clock = Stopwatch()..start();
-  Duration _lastStep = Duration.zero;
   double _time = 0;
   double _beat = 0;
 
-  bool get _moving => _ready && _visible && _tickerEnabled;
+  /// In view and allowed to animate.
+  bool get _active => _visible && _tickerEnabled;
+  bool get _moving => _ready && _active;
+  bool get _isQuiet =>
+      Iterable<int>.generate(_bars)
+          .every((i) => (_heights[i] - _quiet[i]).abs() < 0.004);
 
   @override
   void initState() {
@@ -158,7 +158,6 @@ class _WaveVisualizerState extends State<WaveVisualizer>
             _level = null;
             _updateMotion();
           });
-          if (widget.compact) _stepThumbnail();
           _updateMotion();
         });
       }
@@ -170,45 +169,39 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _updateMotion() {
-    if (!_moving) {
-      _connectionGeneration++;
-      unawaited(_levels?.cancel());
-      _levels = null;
-      _clearLevel();
-      _ticker.stop();
-      _last = Duration.zero;
-      _thumbnailTimer?.cancel();
-      _thumbnailTimer = null;
-    } else if (widget.compact) {
-      unawaited(_connect());
-      if (_level == null) {
-        _thumbnailTimer ??= Timer.periodic(
-          const Duration(milliseconds: 125),
-          (_) => _advance(0.125),
-        );
-      } else {
-        _thumbnailTimer?.cancel();
-        _thumbnailTimer = null;
-      }
-    } else {
+    if (_moving) {
       unawaited(_connect());
       if (!_ticker.isActive) _ticker.start();
+      return;
+    }
+    // Nothing to follow: stop listening to the audio.
+    _connectionGeneration++;
+    unawaited(_levels?.cancel());
+    _levels = null;
+    _clearLevel();
+    // Paused but in view, the bars settle to the quiet pose rather than stay
+    // frozen mid-beat; out of view they simply stop where they are.
+    if (_active && !_isQuiet) {
+      if (!_ticker.isActive) _ticker.start();
+    } else {
+      _rest();
     }
   }
 
-  void _stepThumbnail() {
-    if (!_moving) return;
-    final now = _clock.elapsed;
-    final since = now - _lastStep;
-    if (since < const Duration(milliseconds: 66)) return;
-    _lastStep = now;
-    _advance(min(since.inMicroseconds / 1e6, 0.2));
+  void _rest() {
+    _ticker.stop();
+    _last = Duration.zero;
   }
 
   void _tick(Duration elapsed) {
     final dt = min((elapsed - _last).inMicroseconds / 1e6, 0.1);
     _last = elapsed;
     _advance(dt);
+    if (!_ready && _isQuiet) {
+      _heights.setAll(0, _quiet);
+      _repaint.value++;
+      _rest();
+    }
   }
 
   void _advance(double dt) {
@@ -218,7 +211,9 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     for (var i = 0; i < _bars; i++) {
       final reach = (i - (_bars - 1) / 2).abs() / ((_bars - 1) / 2);
       final double target;
-      if (level != null) {
+      if (!_ready) {
+        target = _quiet[i];
+      } else if (level != null) {
         final index = (reach * (AudioLevels.bandCount - 1)).round();
         final band = index < level.bands.length
             ? level.bands[index]
@@ -245,7 +240,6 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   void dispose() {
     waveReading.removeListener(_onReadingChanged);
     _lifecycle.dispose();
-    _thumbnailTimer?.cancel();
     _stale?.cancel();
     unawaited(_playingSubscription.cancel());
     unawaited(_trackSubscription.cancel());

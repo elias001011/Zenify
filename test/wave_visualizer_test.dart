@@ -22,9 +22,8 @@ List<double> heights(WidgetTester tester) => List<double>.of(
       as List<double>,
 );
 
-Widget wave({bool compact = true}) => MaterialApp(
-  home: Scaffold(body: WaveVisualizer(size: 100, compact: compact)),
-);
+Widget wave() =>
+    const MaterialApp(home: Scaffold(body: WaveVisualizer(size: 100)));
 
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
@@ -81,64 +80,54 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  for (final compact in [true, false]) {
-    testWidgets(
-      '${compact ? 'compact' : 'full'} waves animate without audio access and freeze on pause',
-      (tester) async {
-        handler.ready();
-        await tester.pumpWidget(wave(compact: compact));
-        await tester.pump(const Duration(milliseconds: 100));
-        final before = heights(tester);
-        await tester.pump(const Duration(milliseconds: 200));
-        expect(heights(tester), isNot(before));
-        expect(captureCalls, isEmpty);
-        expect(find.byType(TextButton), findsNothing);
-
-        handler.playbackState.add(
-          PlaybackState(processingState: AudioProcessingState.ready),
-        );
-        await tester.pump();
-        final paused = heights(tester);
-        await tester.pump(const Duration(seconds: 1));
-        expect(heights(tester), paused);
-        expect(tester.binding.hasScheduledFrame, isFalse);
-        // The paused painter still has all of its wave bars.
-        expect(paused.length, compact ? 7 : 9);
-
-        handler.ready();
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 200));
-        await tester.pump(const Duration(milliseconds: 50));
-        expect(heights(tester), isNot(paused));
-        await tester.pumpWidget(const SizedBox());
-        debugDefaultTargetPlatformOverride = null;
-      },
-    );
+  /// Frames enough for the bars to settle.
+  Future<void> settle(WidgetTester tester) async {
+    for (var i = 0; i < 20; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
   }
 
-  testWidgets('the simple thumbnail redraws 8 times a second, no more', (
+  testWidgets('waves animate without audio access and settle on pause', (
     tester,
   ) async {
     handler.ready();
     await tester.pumpWidget(wave());
-    var previous = heights(tester);
-    var redraws = 0;
-    for (var i = 0; i < 40; i++) {
-      await tester.pump(const Duration(milliseconds: 25));
-      final now = heights(tester);
-      if (!listEquals(now, previous)) redraws++;
-      previous = now;
-    }
-    expect(redraws, 8);
+    final quiet = heights(tester);
+    expect(quiet.length, 9);
+    await tester.pump(const Duration(milliseconds: 100));
+    final before = heights(tester);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(heights(tester), isNot(before));
+    expect(captureCalls, isEmpty);
+    expect(find.byType(TextButton), findsNothing);
+
+    // Paused: the bars come down to the quiet pose and rest, as if silent.
+    handler.playbackState.add(
+      PlaybackState(processingState: AudioProcessingState.ready),
+    );
+    await tester.pump();
+    await settle(tester);
+    expect(heights(tester), quiet);
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    await tester.pump(const Duration(seconds: 1));
+    expect(heights(tester), quiet);
+
+    // Playing again: no jump, they simply start moving from where they rest.
+    handler.ready();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(heights(tester), isNot(quiet));
     await tester.pumpWidget(const SizedBox());
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('buffering, idle and completed freeze waves until ready', (
+  testWidgets('buffering, idle and completed settle the waves until ready', (
     tester,
   ) async {
     handler.ready();
     await tester.pumpWidget(wave());
+    final quiet = heights(tester);
     await tester.pump(const Duration(milliseconds: 200));
     for (final state in [
       AudioProcessingState.buffering,
@@ -150,14 +139,20 @@ void main() {
         PlaybackState(playing: true, processingState: state),
       );
       await tester.pump();
-      final resting = heights(tester);
-      await tester.pump(const Duration(seconds: 1));
-      expect(heights(tester), resting);
+      await settle(tester);
+      expect(heights(tester), quiet);
       expect(tester.binding.hasScheduledFrame, isFalse);
+      // Back in play between the states, so each one is settled afresh.
+      handler.ready();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 200));
     }
     handler.mediaItem.add(const MediaItem(id: 'next', title: 'Next'));
     handler.ready();
     await tester.pump();
+    // The restarted ticker's first frame only sets its clock.
+    await tester.pump(const Duration(milliseconds: 50));
     final before = heights(tester);
     await tester.pump(const Duration(milliseconds: 200));
     expect(heights(tester), isNot(before));

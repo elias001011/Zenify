@@ -8,7 +8,10 @@ import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/audio_service.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/mini_player.dart';
+import 'package:musify/widgets/now_playing/wave_visualizer.dart';
+import 'package:musify/widgets/song_artwork.dart';
 
 void main() {
   late Directory dir;
@@ -75,4 +78,27 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 30));
   });
+
+  testWidgets(
+    'the mini player keeps its artwork while the player shows waves',
+    (tester) async {
+      audioHandler = MusifyAudioHandler();
+      audioHandler.mediaItem.add(
+        const MediaItem(id: 'a', title: 'Song', extras: {'ytid': 'a'}),
+      );
+      audioHandler.playbackState.add(PlaybackState(playing: true));
+      showPlayerVisualizer.value = true;
+      addTearDown(() => showPlayerVisualizer.value = false);
+
+      await tester.pumpWidget(app(const ValueKey('waves')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(find.byType(WaveVisualizer), findsNothing);
+      expect(find.byType(SongArtworkWidget), findsOneWidget);
+      expect(tester.binding.hasScheduledFrame, isFalse);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 30));
+    },
+  );
 }

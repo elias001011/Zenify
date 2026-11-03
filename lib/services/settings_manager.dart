@@ -47,7 +47,7 @@ final dynamicBackground = ValueNotifier<bool>(
   Hive.box('settings').get('dynamicBackground', defaultValue: true),
 );
 
-/// Shared by the full player and dock, and included in settings backups.
+/// Whether the player's cover shows the waves; included in settings backups.
 final showPlayerVisualizer = ValueNotifier<bool>(
   Hive.box('settings').get('showPlayerVisualizer', defaultValue: false),
 );

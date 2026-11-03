@@ -119,9 +119,9 @@ class AudioLevels {
 
   static StreamController<AudioLevel>? _levels;
 
-  /// Levels while listened to; check [available] first. Every listener (the
-  /// player and the mini player) shares one reader, which stops with the
-  /// last one and while the app is out of view.
+  /// Levels while listened to; check [available] first. Every listener shares
+  /// one reader, which stops with the last one and while the app is out of
+  /// view.
   static Stream<AudioLevel> listen() {
     StreamSubscription<_Frame>? source;
     AppLifecycleListener? lifecycle;
