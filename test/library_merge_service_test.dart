@@ -54,6 +54,40 @@ void main() {
     },
   );
 
+  test('local paths on nested downloaded songs stay on this device', () async {
+    await Hive.box('user').put('likedPlaylists', [
+      {
+        'ytid': 'PL1',
+        'list': [
+          {
+            'ytid': 'a',
+            'audioPath': '/private/audio',
+            'artworkPath': '/private/cover',
+          },
+        ],
+      },
+    ]);
+    await LibraryMergeService.exportLibrary();
+    final remote = document({
+      'likedPlaylists': [
+        {'ytid': 'PL2', 'list': <Map>[]},
+      ],
+    });
+    await LibraryMergeService.mergeLibrary(
+      payload(remote, categories: {SyncCategory.playlists}),
+      categories: {SyncCategory.playlists},
+    );
+    final local = (Hive.box('user').get('likedPlaylists') as List).firstWhere(
+      (p) => p['ytid'] == 'PL1',
+    );
+    expect(local['list'].single['audioPath'], '/private/audio');
+    expect(local['list'].single['artworkPath'], '/private/cover');
+    expect(
+      canonicalSync(await LibraryMergeService.exportLibrary()),
+      isNot(contains('/private/')),
+    );
+  });
+
   test('a restore that changed nothing keeps the sync baseline', () async {
     await Hive.box('user').put('likedSongs', [song('a')]);
     await LibraryMergeService.exportLibrary();
@@ -81,6 +115,24 @@ void main() {
       throwsA(isA<StateError>()),
     );
   });
+
+  test(
+    'clearing the last search or history keeps an explicit empty list for sync',
+    () async {
+      for (final entry in {
+        'searchHistory': <dynamic>['music'],
+        'recentlyPlayedSongs': <dynamic>[song('a')],
+      }.entries) {
+        await Hive.box('user').clear();
+        await Hive.box('userNoBackup').clear();
+        await Hive.box('user').put(entry.key, entry.value);
+        await LibraryMergeService.exportLibrary();
+        await Hive.box('user').put(entry.key, <dynamic>[]);
+        final exported = await LibraryMergeService.exportLibrary();
+        expect(exported['document'], isNotNull);
+      }
+    },
+  );
 
   test('a library that was always empty still syncs', () async {
     await LibraryMergeService.exportLibrary();

@@ -164,13 +164,15 @@ typedef _Reply = (int, Map<String, dynamic>);
 
 /// Serverless library sync: each device runs a small HTTP server and answers UDP discovery.
 class LocalSyncService {
-  LocalSyncService._() : _testDiscovery = null;
+  LocalSyncService._() : _testDiscovery = null, _pairingNow = DateTime.now;
 
   /// A throwaway instance for tests that talk to each other over loopback.
   @visibleForTesting
   LocalSyncService.forTesting({
     Future<List<DiscoveredSyncDevice>> Function()? discovery,
-  }) : _testDiscovery = discovery;
+    DateTime Function()? pairingNow,
+  }) : _testDiscovery = discovery,
+       _pairingNow = pairingNow ?? DateTime.now;
 
   static final LocalSyncService instance = LocalSyncService._();
 
@@ -204,12 +206,18 @@ class LocalSyncService {
   final ValueNotifier<bool> serverRunning = ValueNotifier(false);
 
   final Future<List<DiscoveredSyncDevice>> Function()? _testDiscovery;
+  final DateTime Function() _pairingNow;
   final http.Client _client = http.Client();
+  Future<void> _pairedWrites = Future.value();
+  Future<void> _serverOperations = Future.value();
+  int _activeTransfers = 0;
+  Completer<void>? _transfersIdle;
   final FlutterMulticastLock _multicastLock = FlutterMulticastLock();
 
   HttpServer? _httpServer;
   RawDatagramSocket? _udpSocket;
   StreamSubscription<BoxEvent>? _userBoxSubscription;
+  String? _observedRecapReset;
   Timer? _periodicTimer;
   Timer? _startupTimer;
   Timer? _localChangeTimer;
@@ -276,7 +284,12 @@ class LocalSyncService {
   /// Re-subscribes to the `user` box, which a backup restore silently unsubscribes.
   Future<void> rebindStorageListeners() async {
     await _userBoxSubscription?.cancel();
-    _userBoxSubscription = Hive.box('user').watch().listen(_onLocalChange);
+    final box = Hive.box('user');
+    final recap = box.get('wrappedListeningStats');
+    _observedRecapReset = recap is Map && recap['syncResetId'] is String
+        ? recap['syncResetId'] as String
+        : null;
+    _userBoxSubscription = box.watch().listen(_onLocalChange);
   }
 
   Future<void> pauseForStorageRestore() async {
@@ -346,9 +359,24 @@ class LocalSyncService {
   }
 
   Future<void> setCategories(Set<SyncCategory> categories) async {
+    // A change takes effect only after exchanges already in progress finish.
+    while (_activeTransfers > 0) {
+      _transfersIdle ??= Completer<void>();
+      await _transfersIdle!.future;
+    }
     await Hive.box('settings')
         .put('localSyncCategories', categories.map((e) => e.name).toList());
     if (categories.isNotEmpty) _scheduleLocalSync();
+  }
+
+  void _beginTransfer() => _activeTransfers++;
+
+  void _endTransfer() {
+    if (--_activeTransfers == 0) {
+      final idle = _transfersIdle;
+      _transfersIdle = null;
+      idle?.complete();
+    }
   }
 
   PairedSyncDevice? _paired(String deviceId) => pairedDevices.value
@@ -357,24 +385,36 @@ class LocalSyncService {
 
   bool isDevicePaired(String deviceId) => _paired(deviceId) != null;
 
-  Future<void> savePairedDevice(PairedSyncDevice device) async {
+  Future<void> _serializePaired(Future<void> Function() action) {
+    final result = _pairedWrites.then((_) => action());
+    _pairedWrites = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return result;
+  }
+
+  Future<void> _savePairedDeviceUnlocked(PairedSyncDevice device) async {
     final updated = List<PairedSyncDevice>.from(pairedDevices.value)
       ..removeWhere((item) => item.deviceId == device.deviceId)
       ..add(device);
     await _storePairedDevices(updated);
   }
 
-  Future<void> forgetDevice(String deviceId) async {
+  Future<void> savePairedDevice(PairedSyncDevice device) =>
+      _serializePaired(() => _savePairedDeviceUnlocked(device));
+
+  Future<void> forgetDevice(String deviceId) => _serializePaired(() async {
     final updated = List<PairedSyncDevice>.from(pairedDevices.value)
       ..removeWhere((item) => item.deviceId == deviceId);
     await _storePairedDevices(updated);
     await _dropCounters((key) => key.contains(':$deviceId:'));
-  }
+  });
 
-  Future<void> forgetAllDevices() async {
+  Future<void> forgetAllDevices() => _serializePaired(() async {
     await _storePairedDevices(const []);
     await _dropCounters((_) => true);
-  }
+  });
 
   Future<void> _dropCounters(bool Function(String key) matches) async {
     final store = Hive.box('userNoBackup');
@@ -405,7 +445,18 @@ class LocalSyncService {
     pairedDevices.value = List.unmodifiable(devices);
   }
 
-  Future<void> startServer() async {
+  Future<void> _serializeServer(Future<void> Function() action) {
+    final result = _serverOperations.then((_) => action());
+    _serverOperations = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace __) {},
+    );
+    return result;
+  }
+
+  Future<void> startServer() => _serializeServer(_startServer);
+
+  Future<void> _startServer() async {
     if (_httpServer != null) return;
 
     try {
@@ -434,12 +485,14 @@ class LocalSyncService {
         error: e,
         stackTrace: stackTrace,
       );
-      await stopServer();
+      await _stopServer();
       rethrow;
     }
   }
 
-  Future<void> stopServer() async {
+  Future<void> stopServer() => _serializeServer(_stopServer);
+
+  Future<void> _stopServer() async {
     _cancelPendingPairing();
     cancelPinInput();
     _udpSocket?.close();
@@ -512,7 +565,12 @@ class LocalSyncService {
       if (id is! String || id.isEmpty || id.length > 128) {
         return (400, {'error': 'invalid_pairing'});
       }
-      final now = DateTime.now();
+      final now = _pairingNow();
+      final blockedUntil = Hive.box('userNoBackup')
+          .get('localSyncPairBlockedUntil');
+      if (blockedUntil is int && now.millisecondsSinceEpoch < blockedUntil) {
+        return (429, {'error': 'pairing_busy'});
+      }
       if (_pendingSession != null ||
           (_lastPairingRequest != null &&
               now.difference(_lastPairingRequest!) <
@@ -570,6 +628,8 @@ class LocalSyncService {
         return (403, {'error': 'pairing_cancelled'});
       }
       await _trust(_pendingClientId!, _pendingClientName!, agreement.secret);
+      await Hive.box('userNoBackup')
+          .deleteAll(['localSyncPairFailures', 'localSyncPairBlockedUntil']);
       final confirmation = await SyncSecurity.seal(agreement.secret, {
         'status': 'paired',
         'deviceId': LibraryMergeService.deviceId,
@@ -581,19 +641,34 @@ class LocalSyncService {
       return (200, {'proof': agreement.proof, 'confirmation': confirmation});
     } catch (_) {
       _cancelPendingPairing();
+      final store = Hive.box('userNoBackup');
+      final previous = store.get('localSyncPairFailures', defaultValue: 0);
+      final failures = (previous is int ? previous : 0) + 1;
+      final delayMinutes = failures < 5
+          ? 0
+          : min(60, 5 * (1 << min(failures - 5, 4)));
+      await store.putAll({
+        'localSyncPairFailures': failures,
+        if (delayMinutes > 0)
+          'localSyncPairBlockedUntil': _pairingNow()
+              .add(Duration(minutes: delayMinutes))
+              .millisecondsSinceEpoch,
+      });
       return (403, {'error': 'incorrect_pin'});
     }
   }
 
   /// Stores a new pairing secret; old replay counters belong to the old secret.
-  Future<void> _trust(String deviceId, String name, String secret) async {
-    await savePairedDevice(
-      PairedSyncDevice(deviceId: deviceId, name: name, secret: secret),
-    );
-    await _dropCounters(
-      (key) => key.contains(':$deviceId:') && !key.endsWith(syncDigest(secret)),
-    );
-  }
+  Future<void> _trust(String deviceId, String name, String secret) =>
+      _serializePaired(() async {
+        await _savePairedDeviceUnlocked(
+          PairedSyncDevice(deviceId: deviceId, name: name, secret: secret),
+        );
+        await _dropCounters(
+          (key) =>
+              key.contains(':$deviceId:') && !key.endsWith(syncDigest(secret)),
+        );
+      });
 
   Future<({Map<String, dynamic> body, PairedSyncDevice peer})> _authenticated(
     HttpRequest request, {
@@ -683,8 +758,11 @@ class LocalSyncService {
   }
 
   Future<_Reply> _handleMerge(HttpRequest request) async {
+    var transferStarted = false;
     try {
       final auth = await _authenticated(request);
+      _beginTransfer();
+      transferStarted = true;
       final categories = parseSyncCategories(auth.body['categories']);
       if (categories.isEmpty || !selectedCategories.containsAll(categories)) {
         return (409, {'error': 'categories_changed'});
@@ -714,6 +792,8 @@ class LocalSyncService {
     } catch (e, stack) {
       logger.log('Local sync request rejected', error: e, stackTrace: stack);
       return (400, {'error': 'invalid_sync'});
+    } finally {
+      if (transferStarted) _endTransfer();
     }
   }
 
@@ -954,6 +1034,15 @@ class LocalSyncService {
       if (state.value.status != LocalSyncStatus.success) return;
       changed.addAll(state.value.changed ?? const {});
     }
+    // Forward data learned from later devices to the earlier ones, even when
+    // automatic sync is disabled. Keep the same error handling as the first pass.
+    for (final device in targets.take(
+      targets.length > 1 ? targets.length - 1 : 0,
+    )) {
+      await syncWith(device);
+      if (state.value.status != LocalSyncStatus.success) return;
+      changed.addAll(state.value.changed ?? const {});
+    }
     if (targets.length > 1) {
       state.value = state.value.copyWith(
         changed: changed,
@@ -1146,7 +1235,14 @@ class LocalSyncService {
     final done = Completer<void>();
     _outbound[target.deviceId] = done.future;
     return previous
-        .then((_) => _performSyncUnlocked(target, onStage: onStage))
+        .then((_) async {
+          _beginTransfer();
+          try {
+            return await _performSyncUnlocked(target, onStage: onStage);
+          } finally {
+            _endTransfer();
+          }
+        })
         .whenComplete(() {
           done.complete();
           if (identical(_outbound[target.deviceId], done.future)) {
@@ -1208,12 +1304,14 @@ class LocalSyncService {
     final now = DateTime.now().toUtc();
     await Hive.box('settings').put(_lastSyncedAtKey, now.toIso8601String());
     localSyncLastSyncedAt.value = now;
-    final peer = _paired(deviceId);
-    if (peer != null && peer.name != name) {
-      await savePairedDevice(
-        PairedSyncDevice(deviceId: deviceId, name: name, secret: peer.secret),
-      );
-    }
+    await _serializePaired(() async {
+      final peer = _paired(deviceId);
+      if (peer != null && peer.name != name) {
+        await _savePairedDeviceUnlocked(
+          PairedSyncDevice(deviceId: deviceId, name: name, secret: peer.secret),
+        );
+      }
+    });
   }
 
   Future<Map<String, dynamic>> _post(
@@ -1276,9 +1374,18 @@ class LocalSyncService {
 
   void _onLocalChange(BoxEvent event) {
     final key = event.key.toString();
-    // Checked first so every merge write is consumed; those changes are already shared.
-    if (LibraryMergeService.isMergeWrite(key, event.value) ||
-        key == 'wrappedListeningStats' ||
+    // Consume merge writes even when the changed category is disabled.
+    final isMerge = LibraryMergeService.isMergeWrite(key, event.value);
+    if (key == 'wrappedListeningStats') {
+      final recap = event.value;
+      final reset = recap is Map && recap['syncResetId'] is String
+          ? recap['syncResetId'] as String
+          : null;
+      final resetChanged = reset != null && reset != _observedRecapReset;
+      _observedRecapReset = reset;
+      if (isMerge || !resetChanged) return;
+    }
+    if (isMerge ||
         pairedDevices.value.isEmpty ||
         !selectedCategories.any((c) => syncCategoryKeys[c]!.contains(key))) {
       return;

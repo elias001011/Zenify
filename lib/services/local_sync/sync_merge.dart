@@ -86,6 +86,7 @@ class SyncDocument {
         records[entry.key] = migrated;
       }
       if (cell['deleted'] != true) _validateValue(key, cell['value']);
+      records[entry.key] = _portableCell(key[0], records[entry.key] as Map);
     }
     return SyncDocument(records: records, clock: raw['clock']);
   }
@@ -95,8 +96,28 @@ class SyncDocument {
   Map<String, dynamic> toMap() => {
     'version': syncSchemaVersion,
     'clock': clock,
-    'records': records,
+    'records': {
+      for (final entry in records.entries)
+        entry.key: _portableCell(_parts(entry.key)[0], entry.value as Map),
+    },
   };
+
+  static Map<String, dynamic> _portableCell(String kind, Map cell) {
+    const kinds = {
+      'likedSongs',
+      'likedPlaylists',
+      'customPlaylists',
+      'playlistSong',
+      'playlistFolders',
+      'recentlyPlayedSongs',
+      'recapMonth',
+    };
+    return {
+      ...Map<String, dynamic>.from(cell),
+      if (kinds.contains(kind) && cell['value'] is Map)
+        'value': _portableMap(cell['value'] as Map),
+    };
+  }
 
   SyncDocument select(Set<SyncCategory> categories) {
     final keys = categories.expand((c) => syncCategoryKeys[c]!).toSet();
@@ -125,9 +146,59 @@ class SyncDocument {
     final now = flatten(current);
     final before = baseline == null ? <String, dynamic>{} : flatten(baseline);
     final resetKey = _key('recapReset', '', '');
+    // A clear applies to all live history records, including those hidden by
+    // the materialized 100-item limit.
+    if (baseline != null &&
+        current['recentlyPlayedSongs'] is List &&
+        (current['recentlyPlayedSongs'] as List).isEmpty &&
+        baseline['recentlyPlayedSongs'] is List &&
+        (baseline['recentlyPlayedSongs'] as List).isNotEmpty) {
+      for (final entry in records.entries) {
+        final cell = entry.value as Map;
+        if (_parts(entry.key)[0] == 'recentlyPlayedSongs' &&
+            cell['deleted'] != true) {
+          before.putIfAbsent(entry.key, () => cell['value']);
+        }
+      }
+    }
+    // A YouTube playlist recovered from a deleted folder is shown in the
+    // root collection. Deleting it there must also remove its old folder record.
+    if (baseline?['playlists'] is List && current['playlists'] is List) {
+      final removed = (baseline!['playlists'] as List).toSet()
+        ..removeAll(current['playlists'] as List);
+      for (final id in removed) {
+        final key = _key('customPlaylists', '', id.toString());
+        final cell = records[key] as Map?;
+        if (cell == null ||
+            cell['deleted'] == true ||
+            cell['value'] is! Map ||
+            cell['value']['source'] != 'user-youtube' ||
+            now.containsKey(key))
+          continue;
+        before[key] = cell['value'];
+        for (final entry in records.entries) {
+          final parts = _parts(entry.key);
+          final related =
+              (parts[0] == 'playlistLocation' && parts[2] == id) ||
+              ((parts[0] == 'playlistSong' ||
+                      parts[0] == 'playlistSongOrder') &&
+                  parts[1] == id);
+          final relatedCell = entry.value as Map;
+          if (related &&
+              relatedCell['deleted'] != true &&
+              !now.containsKey(entry.key)) {
+            before[entry.key] = relatedCell['value'];
+          }
+        }
+      }
+    }
     if (baseline == null && records.isEmpty) {
       final reset = now.containsKey(resetKey) ? [++clock, device] : null;
       for (final e in now.entries) {
+        if (_parts(e.key)[0].endsWith('Order') &&
+            e.value is List &&
+            (e.value as List).isEmpty)
+          continue;
         records[e.key] = {
           'clock': e.key == resetKey && reset != null ? clock : 0,
           'device': e.key == resetKey && reset != null ? device : '',
@@ -138,6 +209,16 @@ class SyncDocument {
         };
       }
       return true;
+    }
+    // A missing baseline after restore does not make an unchanged reset ID
+    // a new reset. Preserve the existing epoch in that case.
+    final previousReset = records[resetKey] as Map?;
+    if (baseline == null &&
+        previousReset != null &&
+        previousReset['deleted'] != true &&
+        now.containsKey(resetKey) &&
+        now[resetKey] == previousReset['value']) {
+      before[resetKey] = previousReset['value'];
     }
     final resetChanged = now[resetKey] != before[resetKey];
     final edits =
@@ -213,6 +294,22 @@ class SyncDocument {
   }
 
   static Map _mergeCell(String kind, Map a, Map b) {
+    // Older peers seeded an empty order at the initial zero stamp. It must
+    // not erase an existing order, while a later explicit clear still wins.
+    if (kind.endsWith('Order') &&
+        a['clock'] == 0 &&
+        b['clock'] == 0 &&
+        a['device'] == '' &&
+        b['device'] == '' &&
+        a['deleted'] == false &&
+        b['deleted'] == false &&
+        a['value'] is List &&
+        b['value'] is List) {
+      if ((a['value'] as List).isEmpty && (b['value'] as List).isNotEmpty)
+        return b;
+      if ((b['value'] as List).isEmpty && (a['value'] as List).isNotEmpty)
+        return a;
+    }
     final newest = _compare(a, b) >= 0 ? a : b;
     if (!_aggregated(kind)) return newest;
     if (kind == 'recapMonth') {
@@ -289,6 +386,7 @@ class SyncDocument {
     final playlists = entries('customPlaylists');
     final nested = <String, List<Map>>{for (final id in folders.keys) id: []};
     final top = <String, Map>{};
+    final restoredYoutubeIds = <String>[];
     for (final e in playlists.entries) {
       final songs = entries('playlistSong', e.key);
       final order = (live[_key('playlistSongOrder', e.key, '')] as List? ?? [])
@@ -305,6 +403,8 @@ class SyncDocument {
       final location = live[_key('playlistLocation', '', e.key)];
       if (location is String && nested.containsKey(location)) {
         nested[location]!.add(playlist);
+      } else if (playlist['source'] == 'user-youtube') {
+        restoredYoutubeIds.add(e.key);
       } else {
         top[e.key] = playlist;
       }
@@ -326,15 +426,10 @@ class SyncDocument {
         'playlists': ids.map((id) => members[id]).toList(),
       });
     }
-    final allPlaylistIds = {
-      ...playlists.keys,
-      ...entries('playlists').keys,
-      ...entries('likedPlaylists').keys,
-    };
     final pins = list(
       'pinnedPlaylistIds',
       strings: true,
-    ).cast<String>().where(allPlaylistIds.contains).take(5).toList();
+    ).cast<String>().take(5).toList();
     final recent = entries('recentlyPlayedSongs').values.toList()
       ..sort((a, b) {
         final date = _date(b['lastPlayed']).compareTo(_date(a['lastPlayed']));
@@ -361,7 +456,10 @@ class SyncDocument {
       },
       'likedSongs': list('likedSongs'),
       'likedRadioStations': list('likedRadioStations', strings: true),
-      'playlists': list('playlists', strings: true),
+      'playlists': {
+        ...list('playlists', strings: true).cast<String>(),
+        ...restoredYoutubeIds,
+      }.toList(),
       'likedPlaylists': list('likedPlaylists'),
       'customPlaylists': ordered(
         'customPlaylists',
@@ -531,8 +629,7 @@ class SyncDocument {
   }
 
   static Map<String, dynamic> _portableMap(Map raw) {
-    final map = Map<String, dynamic>.from(encodeSyncValue(raw) as Map);
-    for (final key in [
+    const localKeys = {
       'audioPath',
       'artworkPath',
       'artWorkPath',
@@ -540,10 +637,20 @@ class SyncDocument {
       'downloadPath',
       'localPath',
       'path',
-    ]) {
-      map.remove(key);
+    };
+    Object? portable(Object? value) {
+      if (value is Map) {
+        return <String, dynamic>{
+          for (final entry in value.entries)
+            if (!localKeys.contains(entry.key))
+              entry.key.toString(): portable(entry.value),
+        };
+      }
+      if (value is List) return value.map(portable).toList();
+      return value;
     }
-    return map;
+
+    return portable(encodeSyncValue(raw)) as Map<String, dynamic>;
   }
 
   static void _validateValue(List<String> parts, Object? value) {

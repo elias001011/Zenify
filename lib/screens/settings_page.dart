@@ -421,7 +421,7 @@ class SettingsPage extends StatelessWidget {
             confirmationMessage: context.l10n!.clearSearchHistoryQuestion,
             onSubmit: () {
               searchHistoryNotifier.value = [];
-              deleteData('user', 'searchHistory');
+              addOrUpdateData('user', 'searchHistory', <dynamic>[]);
               showToast(context, '${context.l10n!.searchHistoryMsg}!');
             },
           ),
@@ -434,7 +434,7 @@ class SettingsPage extends StatelessWidget {
             confirmationMessage: context.l10n!.clearRecentlyPlayedQuestion,
             onSubmit: () {
               userRecentlyPlayed.value = [];
-              deleteData('user', 'recentlyPlayedSongs');
+              addOrUpdateData('user', 'recentlyPlayedSongs', <dynamic>[]);
               showToast(context, '${context.l10n!.recentlyPlayedMsg}!');
             },
           ),
@@ -503,14 +503,16 @@ class SettingsPage extends StatelessWidget {
           context.l10n!.restoreUserData,
           FluentIcons.cloud_add_24_regular,
           onTap: () async {
-            var storageChanged = true;
+            var storageChanged = false;
             try {
               // Readers must not access Hive while restore closes its boxes.
               await moodsService.clearCache();
               await LocalSyncService.instance.pauseForStorageRestore();
               if (!context.mounted) return;
-              final result = await restoreData(context);
-              storageChanged = result.success;
+              final result = await restoreData(
+                context,
+                onStorageChanged: (changed) => storageChanged = changed,
+              );
               if (result.success) {
                 // Generated playlists belonged to the previous library.
                 await moodsService.clearCache();

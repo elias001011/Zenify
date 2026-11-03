@@ -46,6 +46,9 @@ class ListeningStatsService {
   // instead of on a periodic timer. This keeps device I/O off the hot path
   // during continuous playback.
   bool _dirty = false;
+
+  /// Whether listening progress is still waiting to be written.
+  bool get hasPendingChanges => _dirty;
   Duration _listeningTimeRemainder = Duration.zero;
 
   // Playback-session bookkeeping stays here so the audio handler can focus on

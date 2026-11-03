@@ -3,15 +3,15 @@
      transfer. -->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="root" path="app_flutter/userNoBackup.hive" />
-        <exclude domain="root" path="app_flutter/userNoBackup.lock" />
+        <exclude domain="root" path="app_flutter/usernobackup.hive" />
+        <exclude domain="root" path="app_flutter/usernobackup.lock" />
         <exclude domain="root" path="app_flutter/tracks" />
         <exclude domain="root" path="app_flutter/artworks" />
         <exclude domain="root" path="app_flutter/local_files" />
     </cloud-backup>
     <device-transfer>
-        <exclude domain="root" path="app_flutter/userNoBackup.hive" />
-        <exclude domain="root" path="app_flutter/userNoBackup.lock" />
+        <exclude domain="root" path="app_flutter/usernobackup.hive" />
+        <exclude domain="root" path="app_flutter/usernobackup.lock" />
         <exclude domain="root" path="app_flutter/tracks" />
         <exclude domain="root" path="app_flutter/artworks" />
         <exclude domain="root" path="app_flutter/local_files" />

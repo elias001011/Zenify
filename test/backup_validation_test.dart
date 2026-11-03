@@ -56,4 +56,12 @@ void main() {
     ]);
     expect(matchBackupFiles(['favourites.hive']), isEmpty);
   });
+  test('rejects a nonempty Hive log with no remaining user entries', () async {
+    final box = Hive.box('user');
+    await box.delete('likedSongs');
+    await box.flush();
+    final bytes = await File(box.path!).readAsBytes();
+    expect(bytes, isNotEmpty);
+    await expectLater(validateHiveBackup('user', bytes), throwsFormatException);
+  });
 }

@@ -317,9 +317,13 @@ Map<String, String> matchBackupFiles(Iterable<String> names) => {
       boxName: name,
 };
 
+@visibleForTesting
+Future<void> Function(String stage)? restoreFault;
+
 Future<({String message, bool success})> restoreData(
-  BuildContext context,
-) async {
+  BuildContext context, {
+  void Function(bool changed)? onStorageChanged,
+}) async {
   final result = await FilePicker.pickFiles(
     type: FileType.custom,
     allowedExtensions: ['hive'],
@@ -367,6 +371,7 @@ Future<({String message, bool success})> restoreData(
   }
 
   final restoredBoxes = <String>[];
+  var replacementStarted = false;
   final settings = Hive.box('settings');
   final deviceSettings = {
     for (final key in _deviceSettings)
@@ -393,8 +398,11 @@ Future<({String message, bool success})> restoreData(
     }
 
     for (final boxName in boxNames) {
+      replacementStarted = true;
+      onStorageChanged?.call(true);
       await _replaceHiveFile(boxPaths[boxName]!, backupBytes[boxName]!);
       restoredBoxes.add(boxName);
+      await restoreFault?.call('restored:$boxName');
       logger.log('Restored $boxName');
     }
 
@@ -403,6 +411,7 @@ Future<({String message, bool success})> restoreData(
     logger.log('Restore error', error: e, stackTrace: stackTrace);
     for (final boxName in restoredBoxes.reversed) {
       try {
+        await restoreFault?.call('rollback:$boxName');
         await _replaceHiveFile(boxPaths[boxName]!, originalBytes[boxName]!);
       } catch (rollbackError, rollbackStackTrace) {
         logger.log(
@@ -411,6 +420,30 @@ Future<({String message, bool success})> restoreData(
           stackTrace: rollbackStackTrace,
         );
       }
+    }
+    if (replacementStarted) {
+      var unchanged = true;
+      for (final boxName in boxNames) {
+        try {
+          final actual = await File(boxPaths[boxName]!).readAsBytes();
+          final original = originalBytes[boxName]!;
+          if (actual.length != original.length) {
+            unchanged = false;
+            break;
+          }
+          for (var i = 0; i < actual.length; i++) {
+            if (actual[i] != original[i]) {
+              unchanged = false;
+              break;
+            }
+          }
+          if (!unchanged) break;
+        } catch (_) {
+          unchanged = false;
+          break;
+        }
+      }
+      onStorageChanged?.call(!unchanged);
     }
     return (message: '${context.l10n!.restoreError}: $e', success: false);
   } finally {
@@ -439,15 +472,24 @@ Future<Uint8List> _readPickedFile(PlatformFile file) async {
   return file.readAsBytes();
 }
 
-Future<void> validateHiveBackup(String boxName, Uint8List bytes) =>
-    Isolate.run(() {
-      final reader = BinaryReaderImpl(bytes, HiveImpl());
-      while (reader.availableBytes > 0) {
-        if (reader.readFrame() == null) {
-          throw FormatException('Corrupt Hive backup: $boxName');
-        }
+Future<void> validateHiveBackup(String boxName, Uint8List bytes) => Isolate.run(
+  () {
+    final reader = BinaryReaderImpl(bytes, HiveImpl());
+    final liveKeys = <dynamic>{};
+    while (reader.availableBytes > 0) {
+      final frame = reader.readFrame();
+      if (frame == null) throw FormatException('Corrupt Hive backup: $boxName');
+      if (frame.deleted) {
+        liveKeys.remove(frame.key);
+      } else {
+        liveKeys.add(frame.key);
       }
-    });
+    }
+    if (boxName == 'user' && liveKeys.isEmpty) {
+      throw const FormatException('Empty backup: user');
+    }
+  },
+);
 
 Future<void> _replaceHiveFile(String targetPath, Uint8List bytes) async {
   final targetFile = File(targetPath);

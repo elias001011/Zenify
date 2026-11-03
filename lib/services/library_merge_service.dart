@@ -66,17 +66,24 @@ class LibraryMergeService {
     final before = Map<String, dynamic>.from(journal['user']);
     final absent = (journal['absent'] as List).cast<String>();
     final after = journal['after'] as Map?;
+    const recapKey = 'wrappedListeningStats';
+    final touchesRecap =
+        before.containsKey(recapKey) || absent.contains(recapKey);
+    if (touchesRecap) await listeningStatsService.prepareForSync();
     bool unchanged(String key) =>
-        after == null ||
-        canonicalSync(encodeSyncValue(Hive.box('user').get(key))) ==
-            canonicalSync(after[key]);
-    await Hive.box('user').putAll(
-      decodeSyncValue({
-        for (final e in before.entries)
-          if (unchanged(e.key)) e.key: e.value,
-      }) as Map,
-    );
-    await Hive.box('user').deleteAll(absent.where(unchanged));
+        !(key == recapKey && listeningStatsService.hasPendingChanges) &&
+        (after == null ||
+            canonicalSync(encodeSyncValue(Hive.box('user').get(key))) ==
+                canonicalSync(after[key]));
+    final restore = {
+      for (final e in before.entries)
+        if (unchanged(e.key)) e.key: e.value,
+    };
+    final remove = absent.where(unchanged).toList();
+    final restoredRecap =
+        restore.containsKey(recapKey) || remove.contains(recapKey);
+    await Hive.box('user').putAll(decodeSyncValue(restore) as Map);
+    await Hive.box('user').deleteAll(remove);
     await Hive.box('user').flush();
     for (final key in [_documentKey, _baselineKey]) {
       if (journal[key] == null) {
@@ -87,7 +94,9 @@ class LibraryMergeService {
     }
     await store.delete(_journalKey);
     await store.flush();
-    _refresh();
+    _refresh(
+      reloadRecap: restoredRecap && !listeningStatsService.hasPendingChanges,
+    );
   }
 
   /// This installation's sync identity, created on first use.
@@ -124,6 +133,41 @@ class LibraryMergeService {
     if (remembersItems) {
       throw StateError('The library is missing; sync is stopped.');
     }
+  }
+
+  // Local file paths are never exchanged, but remain useful on this device.
+  static Object? _keepLocalPaths(Object? merged, Object? local) {
+    const keys = {
+      'audioPath',
+      'artworkPath',
+      'artWorkPath',
+      'filePath',
+      'downloadPath',
+      'localPath',
+      'path',
+    };
+    if (merged is Map && local is Map) {
+      return <String, dynamic>{
+        for (final e in merged.entries)
+          e.key.toString(): _keepLocalPaths(e.value, local[e.key]),
+        for (final key in keys)
+          if (local.containsKey(key)) key: local[key],
+      };
+    }
+    if (merged is List && local is List) {
+      Object? identity(Object? item) =>
+          item is Map ? item['ytid'] ?? item['id'] : null;
+      final originals = <Object, Object?>{};
+      for (final item in local) {
+        final id = identity(item);
+        if (id != null) originals[id] = item;
+      }
+      return [
+        for (final item in merged)
+          _keepLocalPaths(item, originals[identity(item)]),
+      ];
+    }
+    return merged;
   }
 
   static Map<String, dynamic> _snapshot() {
@@ -218,8 +262,9 @@ class LibraryMergeService {
               .toSet();
           final updates = <String, dynamic>{};
           for (final key in keys) {
-            if (canonicalSync(current[key]) != canonicalSync(merged[key])) {
-              updates[key] = merged[key];
+            final value = _keepLocalPaths(merged[key], current[key]);
+            if (canonicalSync(current[key]) != canonicalSync(value)) {
+              updates[key] = value;
             }
           }
           final changed = {
@@ -250,7 +295,13 @@ class LibraryMergeService {
           }
           try {
             await fault?.call('prepared');
-            if (canonicalSync(current) != canonicalSync(_snapshot())) {
+            final updatesRecap = updates.containsKey('wrappedListeningStats');
+            if (updatesRecap) {
+              await listeningStatsService.prepareForSync();
+              await fault?.call('recapFlushed');
+            }
+            if ((updatesRecap && listeningStatsService.hasPendingChanges) ||
+                canonicalSync(current) != canonicalSync(_snapshot())) {
               await store.delete(_journalKey);
               continue;
             }
@@ -259,7 +310,7 @@ class LibraryMergeService {
             }
             final write = Hive.box('user')
                 .putAll(decodeSyncValue(updates) as Map);
-            _refresh();
+            _refresh(reloadRecap: updates.containsKey('wrappedListeningStats'));
             await write;
             await Hive.box('user').flush();
             await fault?.call('written');
@@ -276,12 +327,12 @@ class LibraryMergeService {
         throw StateError('Library is changing; try syncing again.');
       });
 
-  static void _refresh() {
+  static void _refresh({bool reloadRecap = true}) {
     reloadSettingsFromStorage();
     reloadSongLibraryStateFromStorage();
     reloadPlaylistLibraryStateFromStorage();
     reloadMoodsFromStorage();
     reloadSearchHistoryFromStorage();
-    listeningStatsService.reload();
+    if (reloadRecap) listeningStatsService.reload();
   }
 }

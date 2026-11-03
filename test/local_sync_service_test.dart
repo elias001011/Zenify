@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -28,12 +29,14 @@ void main() {
       await Hive.openBox(name);
     }
   });
+  late DateTime pairingClock;
   setUp(() async {
+    pairingClock = DateTime(2026, 11, 3);
     listeningStatsService.reload();
     for (final name in ['user', 'userNoBackup', 'settings', 'cache']) {
       await Hive.box(name).clear();
     }
-    server = LocalSyncService.forTesting();
+    server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
     await server.startServer();
     ownId = LibraryMergeService.deviceId;
     secret = SyncSecurity.randomToken();
@@ -230,6 +233,45 @@ void main() {
   );
 
   test(
+    'repeated incorrect PINs are rate limited even after a restart',
+    () async {
+      for (var i = 0; i < 5; i++) {
+        pairingClock = pairingClock.add(const Duration(seconds: 4));
+        final attempt = await pair(wrongPin: true);
+        expect(
+          (await post('pair-verify', {
+            'session': attempt.session,
+            'proof': attempt.proof,
+          })).statusCode,
+          403,
+        );
+      }
+      pairingClock = pairingClock.add(const Duration(seconds: 4));
+      final request = {
+        'apiVersion': 3,
+        'clientId': peerId,
+        'clientName': 'Fixture',
+      };
+      expect(
+        (await post('pair-request', request, device: null)).statusCode,
+        429,
+      );
+      await server.dispose();
+      server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
+      await server.startServer();
+      expect(
+        (await post('pair-request', request, device: null)).statusCode,
+        429,
+      );
+      pairingClock = pairingClock.add(const Duration(minutes: 6));
+      expect(
+        (await post('pair-request', request, device: null)).statusCode,
+        200,
+      );
+    },
+  );
+
+  test(
     'rejecting a request preserves existing trust and completes the dialog',
     () async {
       final attempt = await pair();
@@ -246,6 +288,33 @@ void main() {
       expect(server.pairedDevices.value.single.secret, secret);
     },
   );
+
+  test('changing categories waits for an incoming merge to finish', () async {
+    await server.setCategories({SyncCategory.favourites});
+    Future<void>? change;
+    LibraryMergeService.fault = (stage) async {
+      if (stage == 'prepared') {
+        change = server.setCategories({});
+        await Future<void>.delayed(Duration.zero);
+        expect(server.selectedCategories, contains(SyncCategory.favourites));
+      }
+    };
+    addTearDown(() => LibraryMergeService.fault = null);
+    final incoming = payload(
+      document({
+        'likedSongs': [song('remote')],
+      }),
+      categories: {SyncCategory.favourites},
+    );
+    final response = await secure('merge', {
+      'categories': ['favourites'],
+      'library': incoming,
+    });
+    expect(response.status, 200);
+    expect(change, isNotNull);
+    await change;
+    expect(server.selectedCategories, isEmpty);
+  });
 
   test('forgetting a device also drops its replay counters', () async {
     expect((await secure('capabilities', {})).status, 200);
@@ -363,6 +432,39 @@ void main() {
       expect(Hive.box('user').get('likedSongs')[0]['ytid'], 'private');
     },
   );
+  test(
+    'changing categories waits for an outgoing exchange to finish',
+    () async {
+      await server.setCategories({SyncCategory.favourites});
+      final peer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => peer.close(force: true));
+      final arrived = Completer<void>();
+      final release = Completer<void>();
+      peer.listen((request) async {
+        arrived.complete();
+        await release.future;
+        request.response.statusCode = 503;
+        await request.response.close();
+      });
+      final sync = server.syncWith(
+        DiscoveredSyncDevice(
+          deviceId: peerId,
+          name: 'Fixture',
+          ip: '127.0.0.1',
+          port: peer.port,
+        ),
+      );
+      await arrived.future;
+      final change = server.setCategories({});
+      await Future<void>.delayed(Duration.zero);
+      expect(server.selectedCategories, contains(SyncCategory.favourites));
+      release.complete();
+      await sync;
+      await change;
+      expect(server.selectedCategories, isEmpty);
+    },
+  );
+
   test('sync now stops at the first paired device that fails', () async {
     final closed = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     final port = closed.port;
