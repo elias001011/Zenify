@@ -51,112 +51,6 @@ Stream<PlaybackState> settledPlaybackState() => audioHandler.playbackState
           : Stream<void>.value(null),
     );
 
-Widget buildPlaybackIconButton(
-  double iconSize,
-  Color iconColor,
-  Color backgroundColor, {
-  EdgeInsets? padding,
-  bool filled = false,
-  double? buttonSize,
-}) {
-  return StreamBuilder<PlaybackState>(
-    initialData: audioHandler.playbackState.value,
-    stream: settledPlaybackState(),
-    builder: (context, snapshot) {
-      final playbackState = snapshot.data;
-      final processingState = playbackState?.processingState;
-      final isPlaying = playbackState?.playing ?? false;
-
-      Widget iconWidget;
-      VoidCallback? onPressed;
-      String? semanticLabel;
-
-      if (playbackState != null && isPlaybackLoading(playbackState)) {
-        iconWidget = SizedBox(
-          width: iconSize,
-          height: iconSize,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            valueColor: AlwaysStoppedAnimation<Color>(iconColor),
-          ),
-        );
-        onPressed = null;
-        semanticLabel = context.l10n!.loading;
-      } else if (processingState == AudioProcessingState.completed) {
-        iconWidget = Icon(
-          FluentIcons.arrow_counterclockwise_24_regular,
-          color: iconColor,
-          size: iconSize,
-        );
-        onPressed = () => audioHandler.playAgain();
-        semanticLabel = context.l10n!.replay;
-      } else {
-        iconWidget = Icon(
-          isPlaying
-              ? (filled
-                    ? FluentIcons.pause_24_filled
-                    : FluentIcons.pause_24_regular)
-              : (filled
-                    ? FluentIcons.play_24_filled
-                    : FluentIcons.play_24_regular),
-          color: iconColor,
-          size: iconSize,
-        );
-        onPressed = isPlaying ? audioHandler.pause : audioHandler.play;
-        semanticLabel = isPlaying ? context.l10n!.pause : context.l10n!.play;
-      }
-
-      // Desktop's plain transport uses the same centred IconButton layout
-      // as its neighbours, with an explicit box and no oversized inner padding.
-      if (filled && buttonSize != null) {
-        return SizedBox.square(
-          dimension: buttonSize,
-          child: IconButton(
-            tooltip: semanticLabel,
-            onPressed: onPressed,
-            iconSize: iconSize,
-            padding: EdgeInsets.zero,
-            style: IconButton.styleFrom(
-              minimumSize: Size.square(buttonSize),
-              fixedSize: Size.square(buttonSize),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              backgroundColor: backgroundColor,
-              side: BorderSide.none,
-              shape: const CircleBorder(),
-            ),
-            icon: PlaybackIconSwitcher(
-              stateKey: (processingState, isPlaying),
-              child: iconWidget,
-            ),
-          ),
-        );
-      }
-
-      return RawMaterialButton(
-        elevation: 0,
-        onPressed: onPressed,
-        fillColor: backgroundColor,
-        splashColor: Colors.transparent,
-        padding: padding ?? EdgeInsets.all(iconSize * 0.35),
-        shape: const CircleBorder(),
-        constraints: BoxConstraints.tightFor(
-          width: buttonSize ?? iconSize * 2,
-          height: buttonSize ?? iconSize * 2,
-        ),
-        materialTapTargetSize: MaterialTapTargetSize.padded,
-        child: Semantics(
-          label: semanticLabel,
-          button: true,
-          child: PlaybackIconSwitcher(
-            stateKey: (processingState, isPlaying),
-            child: iconWidget,
-          ),
-        ),
-      );
-    },
-  );
-}
-
 /// Cross-fades a play, pause or replay icon as the state it shows changes.
 /// `stateKey` names that state; the icon swaps when it changes.
 class PlaybackIconSwitcher extends StatelessWidget {
@@ -189,7 +83,7 @@ class PlaybackIconSwitcher extends StatelessWidget {
   }
 }
 
-class PlaybackIconButton extends StatelessWidget {
+class PlaybackIconButton extends StatefulWidget {
   const PlaybackIconButton({
     super.key,
     required this.iconSize,
@@ -208,14 +102,117 @@ class PlaybackIconButton extends StatelessWidget {
   final double? buttonSize;
 
   @override
+  State<PlaybackIconButton> createState() => _PlaybackIconButtonState();
+}
+
+class _PlaybackIconButtonState extends State<PlaybackIconButton> {
+  /// Subscribed once for the button's life: a rebuild of the parent (the queue
+  /// or repeat mode changing) must not restart the delay of the spinner.
+  late final _state = settledPlaybackState();
+
+  @override
   Widget build(BuildContext context) {
-    return buildPlaybackIconButton(
-      iconSize,
-      iconColor,
-      backgroundColor,
-      padding: padding,
-      filled: filled,
-      buttonSize: buttonSize,
+    final iconSize = widget.iconSize;
+    final iconColor = widget.iconColor;
+    final backgroundColor = widget.backgroundColor;
+    final padding = widget.padding;
+    final filled = widget.filled;
+    final buttonSize = widget.buttonSize;
+    return StreamBuilder<PlaybackState>(
+      initialData: audioHandler.playbackState.value,
+      stream: _state,
+      builder: (context, snapshot) {
+        final playbackState = snapshot.data;
+        final processingState = playbackState?.processingState;
+        final isPlaying = playbackState?.playing ?? false;
+
+        Widget iconWidget;
+        VoidCallback? onPressed;
+        String? semanticLabel;
+
+        if (playbackState != null && isPlaybackLoading(playbackState)) {
+          iconWidget = SizedBox(
+            width: iconSize,
+            height: iconSize,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              valueColor: AlwaysStoppedAnimation<Color>(iconColor),
+            ),
+          );
+          onPressed = null;
+          semanticLabel = context.l10n!.loading;
+        } else if (processingState == AudioProcessingState.completed) {
+          iconWidget = Icon(
+            FluentIcons.arrow_counterclockwise_24_regular,
+            color: iconColor,
+            size: iconSize,
+          );
+          onPressed = () => audioHandler.playAgain();
+          semanticLabel = context.l10n!.replay;
+        } else {
+          iconWidget = Icon(
+            isPlaying
+                ? (filled
+                      ? FluentIcons.pause_24_filled
+                      : FluentIcons.pause_24_regular)
+                : (filled
+                      ? FluentIcons.play_24_filled
+                      : FluentIcons.play_24_regular),
+            color: iconColor,
+            size: iconSize,
+          );
+          onPressed = isPlaying ? audioHandler.pause : audioHandler.play;
+          semanticLabel = isPlaying ? context.l10n!.pause : context.l10n!.play;
+        }
+
+        // Desktop's plain transport uses the same centred IconButton layout
+        // as its neighbours, with an explicit box and no oversized inner padding.
+        if (filled && buttonSize != null) {
+          return SizedBox.square(
+            dimension: buttonSize,
+            child: IconButton(
+              tooltip: semanticLabel,
+              onPressed: onPressed,
+              iconSize: iconSize,
+              padding: EdgeInsets.zero,
+              style: IconButton.styleFrom(
+                minimumSize: Size.square(buttonSize),
+                fixedSize: Size.square(buttonSize),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                backgroundColor: backgroundColor,
+                side: BorderSide.none,
+                shape: const CircleBorder(),
+              ),
+              icon: PlaybackIconSwitcher(
+                stateKey: (processingState, isPlaying),
+                child: iconWidget,
+              ),
+            ),
+          );
+        }
+
+        return RawMaterialButton(
+          elevation: 0,
+          onPressed: onPressed,
+          fillColor: backgroundColor,
+          splashColor: Colors.transparent,
+          padding: padding ?? EdgeInsets.all(iconSize * 0.35),
+          shape: const CircleBorder(),
+          constraints: BoxConstraints.tightFor(
+            width: buttonSize ?? iconSize * 2,
+            height: buttonSize ?? iconSize * 2,
+          ),
+          materialTapTargetSize: MaterialTapTargetSize.padded,
+          child: Semantics(
+            label: semanticLabel,
+            button: true,
+            child: PlaybackIconSwitcher(
+              stateKey: (processingState, isPlaying),
+              child: iconWidget,
+            ),
+          ),
+        );
+      },
     );
   }
 }
