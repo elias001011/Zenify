@@ -194,37 +194,37 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('compact player keeps floating actions and simple buttons', (
-    tester,
-  ) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    try {
-      tester.view.physicalSize = const Size(420, 860);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.reset);
-      audioHandler.mediaItem.add(songA);
-      await tester.pumpWidget(app(const NowPlayingPage()));
-      await tester.pump(const Duration(milliseconds: 400));
-      expect(
-        find.descendant(
-          of: find.byType(PlayerActionBar),
-          matching: find.byType(FloatingSurface),
-        ),
-        findsOneWidget,
-      );
-      for (final tooltip in ['Play', 'Shuffle']) {
-        final button = tester.widget<IconButton>(
-          find.byWidgetPredicate(
-            (w) => w is IconButton && w.tooltip == tooltip,
-          ),
-        );
-        expect(button.style!.backgroundColor!.resolve({}), Colors.transparent);
+  testWidgets(
+    'compact player has the wide player\'s plain actions and buttons',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        tester.view.physicalSize = const Size(420, 860);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        audioHandler.mediaItem.add(songA);
+        await tester.pumpWidget(app(const NowPlayingPage()));
+        await tester.pump(const Duration(milliseconds: 400));
+        // No card around the actions: they sit on the page like the wide ones.
+        expect(find.byType(FloatingSurface), findsNothing);
+        expect(find.byTooltip('Queue'), findsOneWidget);
+        for (final tooltip in ['Play', 'Shuffle']) {
+          final button = tester.widget<IconButton>(
+            find.byWidgetPredicate(
+              (w) => w is IconButton && w.tooltip == tooltip,
+            ),
+          );
+          expect(
+            button.style!.backgroundColor!.resolve({}),
+            Colors.transparent,
+          );
+        }
+        await tester.pumpWidget(const SizedBox());
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
       }
-      await tester.pumpWidget(const SizedBox());
-    } finally {
-      debugDefaultTargetPlatformOverride = null;
-    }
-  });
+    },
+  );
 
   testWidgets('desktop mini uses shared transport and actions without panels', (
     tester,

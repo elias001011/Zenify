@@ -32,7 +32,6 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
-import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_chrome.dart';
 
@@ -285,27 +284,6 @@ class _PlayerActionsState extends State<PlayerActions> {
       context,
       context.l10n!.sleepTimerCancelled,
       duration: const Duration(seconds: 1, milliseconds: 500),
-    );
-  }
-}
-
-/// The compact player's floating action bar.
-class PlayerActionBar extends StatelessWidget {
-  const PlayerActionBar({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    return FloatingSurface(
-      grouped: true,
-      child: SizedBox(
-        height: 64,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: FittedBox(fit: BoxFit.scaleDown, child: child),
-        ),
-      ),
     );
   }
 }

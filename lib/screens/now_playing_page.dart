@@ -275,9 +275,10 @@ class _CompactLayout extends StatelessWidget {
             child: stage,
           ),
         ),
+        // The same plain row as the wide player, shrunk to fit a small phone.
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-          child: PlayerActionBar(child: actions),
+          child: FittedBox(fit: BoxFit.scaleDown, child: actions),
         ),
       ],
     );
