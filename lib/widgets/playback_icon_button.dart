@@ -24,6 +24,32 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
+import 'package:rxdart/rxdart.dart';
+
+/// Whether [state] is loading a song or buffering it.
+bool isPlaybackLoading(PlaybackState state) =>
+    state.processingState == AudioProcessingState.loading ||
+    state.processingState == AudioProcessingState.buffering;
+
+/// How long playback must stay loading before the controls show it.
+const _loadingShownAfter = Duration(milliseconds: 250);
+
+/// The playback state as the controls show it. Every skip goes through
+/// loading for a moment, even to an offline or already prepared song, and the
+/// optimistic state is not playing yet: shown as it comes, that is a spinner
+/// and a play icon flickering for nothing. Loading is passed on only once it
+/// lasts; until then the controls keep what they were showing.
+Stream<PlaybackState> settledPlaybackState() => audioHandler.playbackState
+    .distinct(
+      (previous, current) =>
+          previous.playing == current.playing &&
+          previous.processingState == current.processingState,
+    )
+    .debounce(
+      (state) => isPlaybackLoading(state)
+          ? Rx.timer<void>(null, _loadingShownAfter)
+          : Stream<void>.value(null),
+    );
 
 Widget buildPlaybackIconButton(
   double iconSize,
@@ -35,11 +61,7 @@ Widget buildPlaybackIconButton(
 }) {
   return StreamBuilder<PlaybackState>(
     initialData: audioHandler.playbackState.value,
-    stream: audioHandler.playbackState.distinct((previous, current) {
-      // Only rebuild if relevant state changes
-      return previous.playing == current.playing &&
-          previous.processingState == current.processingState;
-    }),
+    stream: settledPlaybackState(),
     builder: (context, snapshot) {
       final playbackState = snapshot.data;
       final processingState = playbackState?.processingState;
@@ -49,8 +71,7 @@ Widget buildPlaybackIconButton(
       VoidCallback? onPressed;
       String? semanticLabel;
 
-      if (processingState == AudioProcessingState.loading ||
-          processingState == AudioProcessingState.buffering) {
+      if (playbackState != null && isPlaybackLoading(playbackState)) {
         iconWidget = SizedBox(
           width: iconSize,
           height: iconSize,

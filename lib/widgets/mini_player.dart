@@ -75,7 +75,7 @@ class MiniPlayer extends StatefulWidget {
 class _MiniPlayerState extends State<MiniPlayer> {
   late final _controlsStateStream =
       Rx.combineLatest2(
-        audioHandler.playbackStateStream,
+        settledPlaybackState(),
         audioHandler.queue,
         _controlsState,
       ).distinct(
@@ -455,9 +455,7 @@ class _CircularPlayButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final processingState = playbackState.processingState;
     final isPlaying = playbackState.playing;
-    final isLoading =
-        processingState == AudioProcessingState.loading ||
-        processingState == AudioProcessingState.buffering;
+    final isLoading = isPlaybackLoading(playbackState);
     final isCompleted = processingState == AudioProcessingState.completed;
 
     return SizedBox(
