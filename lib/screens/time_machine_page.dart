@@ -373,7 +373,6 @@ class _PeriodSectionState extends State<_PeriodSection> {
       if (Platform.isLinux) {
         final saved = await FilePicker.saveFile(
           fileName: widget.fileName,
-          type: FileType.image,
           bytes: bytes,
         );
         if (saved != null && mounted) {

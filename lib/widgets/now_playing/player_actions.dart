@@ -63,8 +63,8 @@ class PlayerActions extends StatefulWidget {
 class _PlayerActionsState extends State<PlayerActions> {
   late final ValueNotifier<bool> _songLikeStatus;
   late final ValueNotifier<bool> _songOfflineStatus;
-  String? get audioId => widget.metadata.extras?['ytid'];
-  bool get isRadioStation => widget.metadata.extras?['isLive'] ?? false;
+  String? get audioId => widget.metadata.extras?['ytid']?.toString();
+  bool get isRadioStation => widget.metadata.extras?['isLive'] == true;
 
   @override
   void initState() {
@@ -104,7 +104,7 @@ class _PlayerActionsState extends State<PlayerActions> {
   @override
   void didUpdateWidget(PlayerActions oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final oldAudioId = oldWidget.metadata.extras?['ytid'];
+    final oldAudioId = oldWidget.metadata.extras?['ytid']?.toString();
     final oldRadio = oldWidget.metadata.extras?['isLive'] == true;
     if (oldRadio != isRadioStation) {
       if (oldRadio) {

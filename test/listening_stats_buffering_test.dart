@@ -74,4 +74,20 @@ void main() {
       expect(seconds(), 12);
     },
   );
+
+  test('a track already ready and playing when its session starts counts', () {
+    final ready = PlayerState(true, ProcessingState.ready);
+    state(ready.playing, ready.processingState);
+    stats
+      ..finishListeningSession(countCurrentTick: true)
+      ..startListeningSession(
+        song,
+        isPlaying:
+            ready.playing && ready.processingState == ProcessingState.ready,
+      );
+    advance(45);
+    stats.recordListeningSessionProgress(wasPlaying: true);
+    expect(seconds(), 45);
+    expect(stats.monthStats('2026-10')!['songs']['track']['playCount'], 1);
+  });
 }

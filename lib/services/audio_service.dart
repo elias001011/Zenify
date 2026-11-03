@@ -2302,7 +2302,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         ..startListeningSession(
           song,
           duration: audioPlayer.duration,
-          isPlaying: false,
+          isPlaying:
+              audioPlayer.playing &&
+              audioPlayer.processingState == ProcessingState.ready,
         );
       final startPlayback = transitionId == null || !isDesktopPlatform
           ? playWhenReady
