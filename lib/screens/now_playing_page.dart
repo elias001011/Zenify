@@ -79,8 +79,17 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
     _routeAnimation?.removeStatusListener(_onRouteStatus);
     _routeAnimation = animation;
     animation?.addStatusListener(_onRouteStatus);
-    _backgroundVisible =
-        animation == null || animation.status == AnimationStatus.completed;
+    // While the route is being built its animation still reads "completed"
+    // (a proxy without its controller), which would let the glow expand as
+    // the player rises. Trust it only after the first frame.
+    _backgroundVisible = animation == null;
+    if (animation != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && animation.status == AnimationStatus.completed) {
+          _onRouteStatus(AnimationStatus.completed);
+        }
+      });
+    }
   }
 
   void _onRouteStatus(AnimationStatus status) {
