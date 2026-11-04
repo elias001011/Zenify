@@ -165,7 +165,7 @@ class MainActivity : AudioServiceActivity() {
             events.success(levels)
           }
         },
-        Visualizer.getMaxCaptureRate(),
+        minOf(Visualizer.getMaxCaptureRate(), CAPTURE_RATE_MILLIHERTZ),
         false,
         true,
       )
@@ -182,6 +182,8 @@ class MainActivity : AudioServiceActivity() {
   }
 
   private companion object {
+    /// 30 readings a second are plenty for the waves.
+    const val CAPTURE_RATE_MILLIHERTZ = 30000
     const val AUDIO_PERMISSION_REQUEST = 4108
 
     /// Sub-bass, bass, low mids, mids and treble, as on desktop.

@@ -54,6 +54,10 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   final _heights = List<double>.filled(_bars, 0);
   final _repaint = ValueNotifier<int>(0);
   late final Ticker _ticker = createTicker(_tick);
+
+  /// The bars move at 30 frames a second: the music is read that often, and
+  /// more would only cost.
+  static const _frame = Duration(milliseconds: 28);
   late final StreamSubscription<PlaybackState> _playingSubscription;
   late final StreamSubscription<String?> _trackSubscription;
   late final AppLifecycleListener _lifecycle;
@@ -68,6 +72,15 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   Duration _last = Duration.zero;
   double _time = 0;
   double _beat = 0;
+
+  /// 0 in silence, 1 playing: the bars rise and fall with it over a moment,
+  /// so a pause, a resume or a new song never jumps them.
+  double _energy = 0;
+
+  /// 0 for the bars' own motion, 1 for the music: they cross over, so the
+  /// reading arriving does not shake the bars.
+  double _blend = 0;
+  final _music = List<double>.filled(_bars, 0);
 
   /// In view and allowed to animate.
   bool get _active => _visible && _tickerEnabled;
@@ -187,6 +200,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _tick(Duration elapsed) {
+    if (elapsed - _last < _frame) return;
     final dt = min((elapsed - _last).inMicroseconds / 1e6, 0.1);
     _last = elapsed;
     _advance(dt);
@@ -201,28 +215,28 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     _time += dt;
     final level = _level;
     _beat = max(level?.onset ?? 0, _beat * pow(0.02, dt).toDouble());
+    _energy +=
+        ((_ready ? 1 : 0) - _energy) * (1 - exp(-(_ready ? 9 : 12) * dt));
+    _blend += ((level == null ? 0 : 1) - _blend) * (1 - exp(-8 * dt));
     for (var i = 0; i < _bars; i++) {
       final reach = (i - (_bars - 1) / 2).abs() / ((_bars - 1) / 2);
-      final double target;
-      if (!_ready) {
-        target = 0;
-      } else if (level != null) {
+      if (level != null) {
         final index = (reach * (AudioLevels.bandCount - 1)).round();
         final band = index < level.bands.length
             ? level.bands[index]
             : level.loud;
-        target =
+        _music[i] =
             0.08 +
             band * 0.62 * (1 - 0.2 * reach) +
             _beat * 0.3 * pow(1 - reach, 2) +
             level.loud * 0.03 * sin(_time * 6 + i * 1.7);
-      } else {
-        target =
-            (0.3 +
-                0.14 * sin(_time * 2.1 + i * 0.8) +
-                0.08 * sin(_time * 3.3 - i * 1.2)) *
-            (1 - 0.3 * reach);
       }
+      final own =
+          (0.3 +
+              0.14 * sin(_time * 2.1 + i * 0.8) +
+              0.08 * sin(_time * 3.3 - i * 1.2)) *
+          (1 - 0.3 * reach);
+      final target = _energy * (own + (_music[i] - own) * _blend);
       final rate = target > _heights[i] ? 30.0 : 7.0;
       _heights[i] += (target - _heights[i]) * (1 - exp(-rate * dt));
     }

@@ -299,7 +299,7 @@ class AudioLevels {
 
     controller = StreamController(
       onListen: () {
-        timer = Timer.periodic(const Duration(milliseconds: 25), (_) {
+        timer = Timer.periodic(const Duration(milliseconds: 33), (_) {
           unawaited(poll());
         });
       },

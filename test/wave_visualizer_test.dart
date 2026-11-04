@@ -122,6 +122,39 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('waves rise from nothing without a dip, and fall the same', (
+    tester,
+  ) async {
+    handler.ready();
+    await tester.pumpWidget(wave());
+    double level() => heights(tester).reduce((a, b) => a + b) / 9;
+
+    // The first moments: only up, never a jump or a dip.
+    var last = level();
+    expect(last, 0);
+    for (var i = 0; i < 14; i++) {
+      await tester.pump(const Duration(milliseconds: 34));
+      final now = level();
+      expect(now, greaterThanOrEqualTo(last - 0.005), reason: 'frame $i');
+      last = now;
+    }
+
+    // Paused: down, with no rebound on the way.
+    handler.playbackState.add(
+      PlaybackState(processingState: AudioProcessingState.ready),
+    );
+    await tester.pump();
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 34));
+      final now = level();
+      expect(now, lessThanOrEqualTo(last + 0.005), reason: 'frame $i');
+      last = now;
+    }
+    expect(level(), lessThan(0.01));
+    await tester.pumpWidget(const SizedBox());
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('buffering, idle and completed settle the waves until ready', (
     tester,
   ) async {
