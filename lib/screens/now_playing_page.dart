@@ -27,6 +27,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
+import 'package:musify/widgets/app_notice.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/now_playing/lyrics_panel.dart';
@@ -508,9 +509,12 @@ class _UprightStageState extends State<_UprightStage>
           // As wide as the artwork above it.
           FractionallySizedBox(
             widthFactor: _artworkShare,
-            child: PlayerTransport(
-              iconSize: widget.iconSize,
-              miniIconSize: widget.miniIconSize,
+            // Notices float above the progress bar, not over the buttons.
+            child: NoticeAbove(
+              child: PlayerTransport(
+                iconSize: widget.iconSize,
+                miniIconSize: widget.miniIconSize,
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -597,6 +601,8 @@ class _WideLayoutState extends State<_WideLayout>
     return Column(
       children: [
         const _CloseButton(),
+        // The middle belongs to playback: notices go to the corner.
+        const NoticeCorner(),
         Expanded(
           child: LayoutBuilder(
             builder: (context, c) {

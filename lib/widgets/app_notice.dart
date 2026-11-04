@@ -35,14 +35,21 @@ class AppNotice {
   final VoidCallback? onAction;
 }
 
-/// Where the shell's dock is while it is in front: its height above the
-/// window's bottom and how far it stands from each side.
-typedef _Dock = ({double extent, double left, double right});
+/// Where the notice goes while a page is in front: the height above the
+/// window's bottom of what it floats over, how far that stands from each
+/// side, and where the notice sits across that width.
+typedef _Dock = ({
+  double extent,
+  double left,
+  double right,
+  AlignmentGeometry align,
+});
 
 const _noDock = (
   extent: 0.0,
   left: FloatingSurface.edgeMargin,
   right: FloatingSurface.edgeMargin,
+  align: Alignment.center,
 );
 
 /// The notice on screen. [NoticeHost] floats it above everything, over the
@@ -52,24 +59,16 @@ abstract final class AppNotices {
   static final current = ValueNotifier<AppNotice?>(null);
 
   static final _dock = ValueNotifier<_Dock>(_noDock);
+
+  /// Who reported [_dock], so that a page leaving the front does not undo
+  /// what the page that came to the front has reported.
+  static Object? _owner;
   static Timer? _timer;
 
   static void show(AppNotice notice, {required Duration duration}) {
     _timer?.cancel();
     current.value = notice;
-    _timer = Timer(_readable(notice, duration), dismiss);
-  }
-
-  /// Long enough to read, whatever the caller asked for: several pass a second
-  /// or two, which suited a snack bar that also had to animate out.
-  static Duration _readable(AppNotice notice, Duration asked) {
-    final reading = Duration(
-      milliseconds:
-          3000 +
-          notice.text.length * 45 +
-          (notice.actionLabel == null ? 0 : 2000),
-    );
-    return asked > reading ? asked : reading;
+    _timer = Timer(duration, dismiss);
   }
 
   /// Dismisses the current notice, or, given [notice], only if it is still
@@ -78,6 +77,38 @@ abstract final class AppNotices {
     if (notice != null && current.value != notice) return;
     _timer?.cancel();
     current.value = null;
+  }
+}
+
+/// Reports where the notice goes while the page of the widget is in front,
+/// and takes it back when the page leaves it or goes: only if it is still the
+/// one that reported.
+mixin _DockReporter<T extends StatefulWidget> on State<T> {
+  _Dock? _reported;
+
+  void _report({required bool inFront, required _Dock dock}) {
+    if (!inFront) return _release();
+    if (_reported == dock && AppNotices._owner == this) return;
+    _reported = dock;
+    AppNotices._owner = this;
+    AppNotices._dock.value = dock;
+  }
+
+  void _release() {
+    if (_reported == null) return;
+    _reported = null;
+    if (AppNotices._owner != this) return;
+    AppNotices._owner = null;
+    AppNotices._dock.value = _noDock;
+  }
+
+  @override
+  void dispose() {
+    // After this frame: the host must not rebuild while the tree is torn down.
+    if (_reported != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _release());
+    }
+    super.dispose();
   }
 }
 
@@ -103,34 +134,86 @@ class NoticeDockInset extends StatefulWidget {
   State<NoticeDockInset> createState() => _NoticeDockInsetState();
 }
 
-class _NoticeDockInsetState extends State<NoticeDockInset> {
-  _Dock _reported = _noDock;
-
-  void _report(_Dock dock) {
-    if (dock == _reported) return;
-    _reported = dock;
-    AppNotices._dock.value = dock;
-  }
-
-  @override
-  void dispose() {
-    // After this frame: the host must not rebuild while the tree is torn down.
-    if (_reported != _noDock) {
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => AppNotices._dock.value = _noDock,
-      );
-    }
-    super.dispose();
-  }
-
+class _NoticeDockInsetState extends State<NoticeDockInset> with _DockReporter {
   @override
   Widget build(BuildContext context) {
     final inFront = ModalRoute.of(context)?.isCurrent ?? true;
-    final dock = inFront
-        ? (extent: widget.extent, left: widget.left, right: widget.right)
-        : _noDock;
+    final dock = (
+      extent: widget.extent,
+      left: widget.left,
+      right: widget.right,
+      align: Alignment.center,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _report(dock);
+      if (mounted) _report(inFront: inFront, dock: dock);
+    });
+    return const SizedBox.shrink();
+  }
+}
+
+/// Makes the notice float right above [child], over its width, while the page
+/// of the widget is in front: the player puts it above the progress bar, where
+/// it covers no button.
+class NoticeAbove extends StatefulWidget {
+  const NoticeAbove({required this.child, super.key});
+
+  final Widget child;
+
+  @override
+  State<NoticeAbove> createState() => _NoticeAboveState();
+}
+
+class _NoticeAboveState extends State<NoticeAbove> with _DockReporter {
+  @override
+  Widget build(BuildContext context) {
+    final inFront = ModalRoute.of(context)?.isCurrent ?? true;
+    final window = MediaQuery.sizeOf(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = context.findRenderObject();
+      if (box is! RenderBox || !box.attached || !box.hasSize) return;
+      final rect = box.localToGlobal(Offset.zero) & box.size;
+      _report(
+        inFront: inFront,
+        dock: (
+          extent: window.height - rect.top,
+          left: rect.left,
+          right: window.width - rect.right,
+          align: Alignment.center,
+        ),
+      );
+    });
+    return widget.child;
+  }
+}
+
+/// Makes the notice sit in the bottom left corner of the window while the
+/// page of the widget is in front, for a page whose middle is taken and whose
+/// corner is free.
+class NoticeCorner extends StatefulWidget {
+  const NoticeCorner({super.key});
+
+  @override
+  State<NoticeCorner> createState() => _NoticeCornerState();
+}
+
+class _NoticeCornerState extends State<NoticeCorner> with _DockReporter {
+  @override
+  Widget build(BuildContext context) {
+    final inFront = ModalRoute.of(context)?.isCurrent ?? true;
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _report(
+        inFront: inFront,
+        dock: (
+          // The host adds its gap to what it floats over.
+          extent: bottom + FloatingSurface.edgeMargin - NoticeHost._gap,
+          left: FloatingSurface.edgeMargin,
+          right: FloatingSurface.edgeMargin,
+          align: Alignment.centerLeft,
+        ),
+      );
     });
     return const SizedBox.shrink();
   }
@@ -176,8 +259,9 @@ class NoticeHost extends StatelessWidget {
                 ),
                 child: notice == null
                     ? const SizedBox.shrink()
-                    : Center(
+                    : Align(
                         key: ObjectKey(notice),
+                        alignment: dock.align,
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: 480),
                           child: _NoticePill(notice),

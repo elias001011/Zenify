@@ -57,7 +57,7 @@ void main() {
     expect(find.text('Saved'), findsNothing);
   });
 
-  testWidgets('a notice stays long enough to read, whatever was asked', (
+  testWidgets('a notice stays as long as it was asked, as a snack bar did', (
     tester,
   ) async {
     await tester.pumpWidget(app());
@@ -65,14 +65,82 @@ void main() {
 
     AppNotices.show(
       const AppNotice('Added to your liked songs'),
-      duration: const Duration(seconds: 1),
+      duration: const Duration(seconds: 3),
     );
-    await tester.pump(const Duration(seconds: 2));
+    await tester.pump(const Duration(milliseconds: 2900));
     expect(find.text('Added to your liked songs'), findsOneWidget);
 
-    await tester.pump(const Duration(seconds: 3));
+    await tester.pump(const Duration(milliseconds: 200));
     await tester.pumpAndSettle();
     expect(find.text('Added to your liked songs'), findsNothing);
+  });
+
+  testWidgets('over the player it floats above the bar it is given', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => NoticeHost(child: child!),
+        home: const Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(40, 0, 60, 200),
+              child: NoticeAbove(child: SizedBox(height: 50, width: 300)),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+    AppNotices.show(
+      const AppNotice('Saved'),
+      duration: const Duration(seconds: 30),
+    );
+    await tester.pumpAndSettle();
+
+    final pill = find.byType(FloatingSurface);
+    final height =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio;
+    // The bar's top is 250 pixels above the bottom; the notice, a gap above.
+    expect(height - tester.getBottomLeft(pill).dy, closeTo(258, 0.5));
+    AppNotices.dismiss();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('in the corner it leaves the middle free, and a page that '
+      'leaves does not undo the one in front', (tester) async {
+    await tester.pumpWidget(app());
+    await tester.pump();
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: NoticeCorner()),
+          ),
+        );
+    await tester.pumpAndSettle();
+    AppNotices.show(
+      const AppNotice('Saved'),
+      duration: const Duration(seconds: 30),
+    );
+    await tester.pumpAndSettle();
+
+    final pill = find.byType(FloatingSurface);
+    expect(
+      tester.getTopLeft(pill).dx,
+      closeTo(FloatingSurface.edgeMargin, 0.5),
+    );
+    expect(tester.getTopRight(pill).dx, lessThan(500));
+    expect(noticeBottom(tester), closeTo(FloatingSurface.edgeMargin, 0.5));
+
+    // Back to the page with the dock: it is the one that is reported now.
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    expect(noticeBottom(tester), closeTo(108, 0.5));
+    AppNotices.dismiss();
+    await tester.pumpAndSettle();
   });
 
   testWidgets('it sits exactly over a dock that does not span the window', (
