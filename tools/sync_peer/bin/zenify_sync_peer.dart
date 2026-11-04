@@ -33,6 +33,7 @@ const _pairingTimeout = Duration(seconds: 60);
 // the first attempt: the PIN is six digits and nobody watches this process.
 const _pairingWindow = Duration(minutes: 5);
 const _readTimeout = Duration(seconds: 45);
+const _replyTimeout = Duration(seconds: 12);
 
 typedef _Reply = (int, Map<String, dynamic>);
 
@@ -143,6 +144,9 @@ class _Peer {
   Timer? _pendingTimer;
   DateTime? _lastPairingRequest;
 
+  // What a handler wants done once its reply went out, or failed to.
+  final _afterReply = Expando<Future<void> Function(bool delivered)>();
+
   Future<void> start(int port) async {
     _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
     _server.listen((request) => unawaited(_handle(request)));
@@ -191,14 +195,27 @@ class _Peer {
     final (status, body) = handler == null
         ? (404, <String, dynamic>{'error': 'not_found'})
         : await handler(request);
+    final afterReply = _afterReply[request];
+    var delivered = true;
     try {
       request.response
         ..statusCode = status
         ..headers.contentType = ContentType.json
         ..write(jsonEncode(body));
-      await request.response.close();
+      final closing = request.response.close();
+      // A connection the other side reset never finishes writing: that only
+      // matters when something depends on the reply having gone out.
+      await (afterReply == null ? closing : closing.timeout(_replyTimeout));
     } catch (_) {
       // The other device gave up waiting.
+      delivered = false;
+    }
+    if (afterReply != null) {
+      try {
+        await afterReply(delivered);
+      } catch (e) {
+        _log('Could not finish a request: $e');
+      }
     }
   }
 
@@ -334,33 +351,74 @@ class _Peer {
         data['proof'] is! Map) {
       return (403, {'error': 'pairing_expired'});
     }
+    final ({String secret, String proof}) agreement;
     try {
-      final agreement = await pairing.verify(data['proof']);
-      if (_pendingSession != session) {
-        return (403, {'error': 'pairing_cancelled'});
+      agreement = await pairing.verify(data['proof']);
+    } catch (_) {
+      // Only a proof that fails is a wrong PIN.
+      _closePairingWindow();
+      _clearPairing();
+      _log('Pairing failed: wrong PIN; pairing is closed');
+      return (403, {'error': 'incorrect_pin'});
+    }
+    if (_pendingSession != session) {
+      return (403, {'error': 'pairing_cancelled'});
+    }
+    final id = _pendingClientId!;
+    final clientName = _pendingClientName!;
+    final previous = store.paired[id];
+    final counters = {
+      for (final e in store.counters.entries)
+        if (e.key.contains(':$id:')) e.key: e.value,
+    };
+    // Puts the trust of [id] back as it was.
+    Future<void> undo() async {
+      if (previous == null) {
+        store.paired.remove(id);
+      } else {
+        store.paired[id] = previous;
       }
-      final id = _pendingClientId!;
-      store.paired[id] = (name: _pendingClientName!, secret: agreement.secret);
+      store.counters
+        ..removeWhere((key, _) => key.contains(':$id:'))
+        ..addAll(counters);
+      await store.saveState();
+    }
+
+    try {
+      final confirmation = await SyncSecurity.seal(agreement.secret, {
+        'status': 'paired',
+        'deviceId': store.deviceId,
+        'deviceName': store.name,
+      }, 'pair:$session:reply');
+      store.paired[id] = (name: clientName, secret: agreement.secret);
       // Replay counters belong to the secret they were made with.
       final digest = syncDigest(agreement.secret);
       store.counters.removeWhere(
         (key, _) => key.contains(':$id:') && !key.endsWith(digest),
       );
       await store.saveState();
-      final confirmation = await SyncSecurity.seal(agreement.secret, {
-        'status': 'paired',
-        'deviceId': store.deviceId,
-        'deviceName': store.name,
-      }, 'pair:$session:reply');
-      _log('Paired with "$_pendingClientName" ($id)');
+      _log('Paired with "$clientName" ($id)');
       _closePairingWindow();
       _clearPairing();
+      // The peer trusts the other device now: if the reply never reaches it,
+      // the other one does not trust the peer, so that is undone.
+      _afterReply[request] = (delivered) async {
+        if (delivered) return;
+        _log('The confirmation of "$clientName" did not arrive; undone');
+        await undo();
+      };
       return (200, {'proof': agreement.proof, 'confirmation': confirmation});
-    } catch (_) {
-      _closePairingWindow();
+    } catch (e) {
+      // The PIN was right; the peer failed. Not a wrong PIN, and not paired:
+      // the pairing stays open for another try.
+      _log('Pairing could not be completed: $e');
       _clearPairing();
-      _log('Pairing failed: wrong PIN; pairing is closed');
-      return (403, {'error': 'incorrect_pin'});
+      try {
+        await undo();
+      } catch (e) {
+        _log('Could not undo an unfinished pairing: $e');
+      }
+      return (500, {'error': 'pairing_failed'});
     }
   }
 

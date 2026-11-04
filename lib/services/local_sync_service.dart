@@ -164,15 +164,20 @@ typedef _Reply = (int, Map<String, dynamic>);
 
 /// Serverless library sync: each device runs a small HTTP server and answers UDP discovery.
 class LocalSyncService {
-  LocalSyncService._() : _testDiscovery = null, _pairingNow = DateTime.now;
+  LocalSyncService._()
+    : _testDiscovery = null,
+      _pairingNow = DateTime.now,
+      _replyTimeout = _shortTimeout;
 
   /// A throwaway instance for tests that talk to each other over loopback.
   @visibleForTesting
   LocalSyncService.forTesting({
     Future<List<DiscoveredSyncDevice>> Function()? discovery,
     DateTime Function()? pairingNow,
+    Duration? replyTimeout,
   }) : _testDiscovery = discovery,
-       _pairingNow = pairingNow ?? DateTime.now;
+       _pairingNow = pairingNow ?? DateTime.now,
+       _replyTimeout = replyTimeout ?? _shortTimeout;
 
   static final LocalSyncService instance = LocalSyncService._();
 
@@ -207,6 +212,13 @@ class LocalSyncService {
 
   final Future<List<DiscoveredSyncDevice>> Function()? _testDiscovery;
   final DateTime Function() _pairingNow;
+
+  /// How long a reply that must be known to arrive may take to be written.
+  final Duration _replyTimeout;
+
+  /// Runs once a pairing is trusted and before the reply is sent (tests).
+  @visibleForTesting
+  Future<void> Function()? beforePairingReply;
   final http.Client _client = http.Client();
   Future<void> _pairedWrites = Future.value();
   Future<void> _serverOperations = Future.value();
@@ -242,6 +254,9 @@ class LocalSyncService {
   Map<String, dynamic>? _outgoingChallenge;
   String? _outgoingTarget;
   DateTime? _outgoingExpires;
+
+  // What a handler wants done once its reply went out, or failed to.
+  final Expando<Future<void> Function(bool delivered)> _afterReply = Expando();
 
   final Map<String, DateTime> _retryAfter = {};
   final Map<String, int> _retryCount = {};
@@ -426,17 +441,16 @@ class LocalSyncService {
     await _dropCounters((_) => true);
   });
 
-  Future<void> _dropCounters(bool Function(String key) matches) async {
-    final store = Hive.box('userNoBackup');
-    await store.deleteAll(
-      store.keys.whereType<String>().where(
+  Iterable<String> _counterKeys(bool Function(String key) matches) =>
+      Hive.box('userNoBackup').keys.whereType<String>().where(
         (key) =>
             (key.startsWith('localSyncSent:') ||
                 key.startsWith('localSyncReceived:')) &&
             matches(key),
-      ),
-    );
-  }
+      );
+
+  Future<void> _dropCounters(bool Function(String key) matches) =>
+      Hive.box('userNoBackup').deleteAll(_counterKeys(matches).toList());
 
   void _loadPairedDevices() {
     final raw = Hive.box('userNoBackup').get(_pairedDevicesKey);
@@ -549,14 +563,31 @@ class LocalSyncService {
     final (status, body) = handler == null
         ? (404, <String, dynamic>{'error': 'not_found'})
         : await handler(request);
+    final afterReply = _afterReply[request];
+    var delivered = true;
     try {
       request.response
         ..statusCode = status
         ..headers.contentType = ContentType.json
         ..write(json.encode(body));
-      await request.response.close();
+      final closing = request.response.close();
+      // A connection the other side reset never finishes writing: that only
+      // matters when something depends on the reply having gone out.
+      await (afterReply == null ? closing : closing.timeout(_replyTimeout));
     } catch (_) {
       // The other device gave up waiting.
+      delivered = false;
+    }
+    if (afterReply != null) {
+      try {
+        await afterReply(delivered);
+      } catch (e, stackTrace) {
+        logger.log(
+          'Local sync could not finish a request',
+          error: e,
+          stackTrace: stackTrace,
+        );
+      }
     }
   }
 
@@ -632,25 +663,74 @@ class LocalSyncService {
         data['proof'] is! Map) {
       return (403, {'error': 'pairing_expired'});
     }
+    final ({String secret, String proof}) agreement;
     try {
-      final agreement = await pairing.verify(data['proof']);
-      if (_pendingSession != session) {
-        return (403, {'error': 'pairing_cancelled'});
-      }
-      await _trust(_pendingClientId!, _pendingClientName!, agreement.secret);
-      await Hive.box('userNoBackup')
-          .deleteAll(['localSyncPairFailures', 'localSyncPairBlockedUntil']);
+      agreement = await pairing.verify(data['proof']);
+    } catch (_) {
+      // Only a proof that fails is a wrong PIN.
+      return _countWrongPin();
+    }
+    if (_pendingSession != session) {
+      return (403, {'error': 'pairing_cancelled'});
+    }
+    final id = _pendingClientId!;
+    final name = _pendingClientName!;
+    final completer = _pendingCompleter;
+    PairedSyncDevice? previous;
+    var counters = <String, Object?>{};
+    try {
+      previous = _paired(id);
+      final store = Hive.box('userNoBackup');
+      counters = {
+        for (final key in _counterKeys((key) => key.contains(':$id:')))
+          key: store.get(key),
+      };
       final confirmation = await SyncSecurity.seal(agreement.secret, {
         'status': 'paired',
         'deviceId': LibraryMergeService.deviceId,
         'deviceName': deviceName,
       }, 'pair:$session:reply');
-      final completer = _pendingCompleter;
+      await _trust(id, name, agreement.secret);
+      await store.deleteAll(_pairFailureKeys);
       _clearPendingPairing();
-      if (completer != null && !completer.isCompleted) completer.complete(true);
+      await beforePairingReply?.call();
+      // This device trusts the other one now: if the reply never reaches it,
+      // the other one does not trust this one, so that is undone.
+      _afterReply[request] = (delivered) async {
+        if (delivered) {
+          if (completer != null && !completer.isCompleted) {
+            completer.complete(true);
+          }
+        } else {
+          await _undoTrust(id, previous, counters);
+          if (completer != null && !completer.isCompleted) {
+            completer.complete(false);
+          }
+        }
+      };
       return (200, {'proof': agreement.proof, 'confirmation': confirmation});
-    } catch (_) {
+    } catch (e, stackTrace) {
+      // The PIN was right; this device failed. Not a wrong PIN, and not paired.
+      logger.log(
+        'Local sync pairing could not be completed',
+        error: e,
+        stackTrace: stackTrace,
+      );
       _cancelPendingPairing();
+      await _undoTrust(id, previous, counters);
+      return (500, {'error': 'pairing_failed'});
+    }
+  }
+
+  static const List<String> _pairFailureKeys = [
+    'localSyncPairFailures',
+    'localSyncPairBlockedUntil',
+  ];
+
+  /// A wrong PIN closes the attempt and, from the fifth in a row, blocks new ones.
+  Future<_Reply> _countWrongPin() async {
+    _cancelPendingPairing();
+    try {
       final store = Hive.box('userNoBackup');
       final previous = store.get('localSyncPairFailures', defaultValue: 0);
       final failures = (previous is int ? previous : 0) + 1;
@@ -664,7 +744,38 @@ class LocalSyncService {
               .add(Duration(minutes: delayMinutes))
               .millisecondsSinceEpoch,
       });
-      return (403, {'error': 'incorrect_pin'});
+    } catch (e, stackTrace) {
+      logger.log(
+        'Local sync could not record a wrong PIN',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+    return (403, {'error': 'incorrect_pin'});
+  }
+
+  /// Puts the trust of [id] back as it was before a pairing that did not finish.
+  Future<void> _undoTrust(
+    String id,
+    PairedSyncDevice? previous,
+    Map<String, Object?> counters,
+  ) async {
+    try {
+      await _serializePaired(() async {
+        final updated = List<PairedSyncDevice>.from(pairedDevices.value)
+          ..removeWhere((item) => item.deviceId == id);
+        if (previous != null) updated.add(previous);
+        await _storePairedDevices(updated);
+        final store = Hive.box('userNoBackup');
+        await _dropCounters((key) => key.contains(':$id:'));
+        if (counters.isNotEmpty) await store.putAll(counters);
+      });
+    } catch (e, stackTrace) {
+      logger.log(
+        'Local sync could not undo an unfinished pairing',
+        error: e,
+        stackTrace: stackTrace,
+      );
     }
   }
 
