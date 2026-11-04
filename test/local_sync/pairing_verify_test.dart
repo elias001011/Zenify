@@ -176,4 +176,116 @@ void main() {
     expect(await completed, true);
     expect(h.server.isDevicePaired('newcomer'), true);
   });
+
+  group('wrong PIN policy', () {
+    int now() => h.pairingClock.millisecondsSinceEpoch;
+    Object? stored(String key) => Hive.box('userNoBackup').get(key);
+    int wait() => (stored('localSyncPairBlockedUntil') as int) - now();
+
+    /// One wrong PIN, `gap` after the last request.
+    Future<void> wrongPin({Duration gap = const Duration(seconds: 4)}) async {
+      h.pairingClock = h.pairingClock.add(gap);
+      final attempt = await h.pair(wrongPin: true);
+      expect((await verify(attempt)).statusCode, 403);
+    }
+
+    Future<int> request() async {
+      h.pairingClock = h.pairingClock.add(const Duration(seconds: 4));
+      final response = await h.post('pair-request', {
+        'apiVersion': 3,
+        'clientId': SyncHarness.peerId,
+        'clientName': 'Fixture',
+      }, device: null);
+      return response.statusCode;
+    }
+
+    test('four wrong PINs are free, the fifth waits five minutes', () async {
+      for (var i = 0; i < 4; i++) {
+        await wrongPin();
+        expect(stored('localSyncPairBlockedUntil'), isNull, reason: 'try $i');
+      }
+      await wrongPin();
+      expect(wait(), const Duration(minutes: 5).inMilliseconds);
+    });
+
+    test('the wait doubles and stops at fifteen minutes', () async {
+      final waits = <int>[];
+      for (var i = 0; i < 9; i++) {
+        await wrongPin(
+          gap: i < 5
+              ? const Duration(seconds: 4)
+              : Duration(minutes: waits.last + 1),
+        );
+        if (i >= 4) waits.add(wait() ~/ 60000);
+      }
+      expect(waits, [5, 10, 15, 15, 15]);
+    });
+
+    test('the wait is kept to the minute while it lasts', () async {
+      for (var i = 0; i < 4; i++) {
+        await wrongPin();
+      }
+      await wrongPin();
+      await wrongPin(gap: const Duration(minutes: 6));
+      await wrongPin(gap: const Duration(minutes: 11));
+      expect(wait(), const Duration(minutes: 15).inMilliseconds);
+      h.pairingClock = h.pairingClock.add(const Duration(minutes: 14));
+      expect(await request(), 429);
+      h.pairingClock = h.pairingClock.add(
+        const Duration(minutes: 1, seconds: 1),
+      );
+      expect(await request(), 200);
+    });
+
+    test('a day without a mistake clears the count', () async {
+      for (var i = 0; i < 4; i++) {
+        await wrongPin();
+      }
+      await wrongPin(gap: const Duration(hours: 25));
+      expect(stored('localSyncPairFailures'), 1);
+      expect(stored('localSyncPairBlockedUntil'), isNull);
+      expect(await request(), 200);
+    });
+
+    test('less than a day later the count goes on', () async {
+      for (var i = 0; i < 4; i++) {
+        await wrongPin();
+      }
+      await wrongPin(gap: const Duration(hours: 23));
+      expect(stored('localSyncPairFailures'), 5);
+      expect(wait(), const Duration(minutes: 5).inMilliseconds);
+    });
+
+    test('the count and the wait survive a restart', () async {
+      for (var i = 0; i < 4; i++) {
+        await wrongPin();
+      }
+      await wrongPin();
+      await h.restart();
+      expect(await request(), 429);
+      await wrongPin(gap: const Duration(minutes: 6));
+      expect(stored('localSyncPairFailures'), 6);
+      expect(wait(), const Duration(minutes: 10).inMilliseconds);
+    });
+
+    test('the state an older version left is still understood', () async {
+      // Seven mistakes and no record of when: kept, not cleared.
+      await Hive.box('userNoBackup').put('localSyncPairFailures', 7);
+      await wrongPin(gap: const Duration(days: 3));
+      expect(stored('localSyncPairFailures'), 8);
+      expect(wait(), const Duration(minutes: 15).inMilliseconds);
+    });
+
+    test('a right PIN clears everything', () async {
+      for (var i = 0; i < 5; i++) {
+        await wrongPin();
+      }
+      h.pairingClock = h.pairingClock.add(const Duration(minutes: 6));
+      final attempt = await h.pair();
+      expect((await verify(attempt)).statusCode, 200);
+      expect(stored('localSyncPairFailures'), isNull);
+      expect(stored('localSyncPairLastFailure'), isNull);
+      expect(stored('localSyncPairBlockedUntil'), isNull);
+    });
+  });
 }

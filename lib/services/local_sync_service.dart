@@ -788,23 +788,38 @@ class LocalSyncService {
 
   static const List<String> _pairFailureKeys = [
     'localSyncPairFailures',
+    'localSyncPairLastFailure',
     'localSyncPairBlockedUntil',
   ];
+
+  // Wrong PINs: four free tries, then waits of 5, 10 and 15 minutes (never
+  // more), and a day without a mistake clears the count. The wait is for the
+  // whole device, not for whoever got the PIN wrong, because the PIN is the
+  // only thing that tells them apart: while it lasts nobody can start a new
+  // pairing, and devices that are already paired are not affected.
+  static const Duration _pairBlockCap = Duration(minutes: 15);
+  static const Duration _pairFailureMemory = Duration(hours: 24);
 
   /// A wrong PIN closes the attempt and, from the fifth in a row, blocks new ones.
   Future<_Reply> _countWrongPin() async {
     _cancelPendingPairing();
     try {
       final store = Hive.box('userNoBackup');
+      final now = _pairingNow();
       final previous = store.get('localSyncPairFailures', defaultValue: 0);
-      final failures = (previous is int ? previous : 0) + 1;
+      final last = store.get('localSyncPairLastFailure');
+      final forgotten =
+          last is int &&
+          now.millisecondsSinceEpoch - last > _pairFailureMemory.inMilliseconds;
+      final failures = (forgotten || previous is! int ? 0 : previous) + 1;
       final delayMinutes = failures < 5
           ? 0
-          : min(60, 5 * (1 << min(failures - 5, 4)));
+          : min(_pairBlockCap.inMinutes, 5 * (1 << min(failures - 5, 4)));
       await store.putAll({
         'localSyncPairFailures': failures,
+        'localSyncPairLastFailure': now.millisecondsSinceEpoch,
         if (delayMinutes > 0)
-          'localSyncPairBlockedUntil': _pairingNow()
+          'localSyncPairBlockedUntil': now
               .add(Duration(minutes: delayMinutes))
               .millisecondsSinceEpoch,
       });
