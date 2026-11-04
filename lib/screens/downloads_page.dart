@@ -43,8 +43,22 @@ import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/song_bar.dart';
 
 /// The download manager: what is downloading, what failed and what finished.
-class DownloadsPage extends StatelessWidget {
+class DownloadsPage extends StatefulWidget {
   const DownloadsPage({super.key});
+
+  @override
+  State<DownloadsPage> createState() => _DownloadsPageState();
+}
+
+class _DownloadsPageState extends State<DownloadsPage> {
+  /// What the island's search shortcut filters the history by, lowercase.
+  String _query = '';
+
+  bool _matches(DownloadEntry entry) =>
+      _query.isEmpty ||
+      '${entry.song['title']} ${entry.song['artist']}'.toLowerCase().contains(
+        _query,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -62,6 +76,7 @@ class DownloadsPage extends StatelessWidget {
         final unavailable = <DownloadEntry>[];
         final done = <DownloadEntry>[];
         for (final entry in entries) {
+          if (!_matches(entry)) continue;
           switch (entry.status) {
             case DownloadStatus.downloading:
               downloading.add(entry);
@@ -84,7 +99,8 @@ class DownloadsPage extends StatelessWidget {
         return IslandScaffold(
           background: const PageGlow(source: null, cacheKey: 'downloads_page'),
           title: l10n.downloads,
-          globalSearch: false,
+          onFilter: (value) =>
+              setState(() => _query = value.trim().toLowerCase()),
           actions: [
             if (failed.isNotEmpty || unavailable.isNotEmpty || done.isNotEmpty)
               IconButton(
