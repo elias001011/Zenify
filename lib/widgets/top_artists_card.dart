@@ -19,6 +19,7 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
@@ -93,15 +94,52 @@ class TopArtistTile extends StatelessWidget {
       rank: rank,
       // Artist pages need YouTube.
       onTap: onTap ?? (offlineMode.value ? null : () => _openArtist(context)),
-      artwork: SongArtworkWidget(
-        size: ArtistTile.artworkSize,
-        borderRadius: ArtistTile.artworkSize / 2,
-        metadata: mapToMediaItem(artist.topSong),
-      ),
+      artwork: ArtistAvatar(artist.topSong),
       name: artist.name,
       subtitle: context.l10n!.artistListeningSummary(
         artist.seconds ~/ 60,
         artist.songCount,
+      ),
+    );
+  }
+}
+
+/// An artist's round picture: the cover of [song], one of theirs, drawn as the
+/// app draws any song's, so it is the same wherever artists are listed. A
+/// circle with a person without a song.
+class ArtistAvatar extends StatelessWidget {
+  const ArtistAvatar(
+    this.song, {
+    this.size = ArtistTile.artworkSize,
+    super.key,
+  });
+
+  final Map? song;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final song = this.song;
+    if (song != null) {
+      return SongArtworkWidget(
+        size: size,
+        borderRadius: size / 2,
+        metadata: mapToMediaItem(song),
+        errorWidgetIconSize: size * 0.5,
+      );
+    }
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: colors.surfaceContainerHighest,
+      ),
+      child: Icon(
+        FluentIcons.person_24_regular,
+        size: size * 0.5,
+        color: colors.onSurfaceVariant,
       ),
     );
   }

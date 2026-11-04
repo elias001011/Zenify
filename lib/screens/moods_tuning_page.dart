@@ -27,7 +27,6 @@ import 'package:musify/services/moods/mix_engine.dart';
 import 'package:musify/services/moods/moods_preferences.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/moods/taste.dart';
-import 'package:musify/utilities/artwork_provider.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
@@ -52,12 +51,10 @@ class _MoodsTuningPageState extends State<MoodsTuningPage> {
   late final Future<List<DetectedGenre>> _genres = moodsService
       .detectedGenres();
 
-  /// An artwork of one of the user's songs by each artist, for its avatar.
-  late final Map<String, String> _artistArt = {
+  /// One of the user's songs by each artist, for its avatar: the best ranked.
+  late final Map<String, Map> _artistSong = {
     for (final seed in _taste.seeds.reversed)
-      if (seed.song['lowResImage'] ?? seed.song['image'] case final String art
-          when art.isNotEmpty)
-        artistKey(seed.song['artist']): art,
+      artistKey(seed.song['artist']): seed.song,
   };
 
   @override
@@ -201,9 +198,9 @@ class _MoodsTuningPageState extends State<MoodsTuningPage> {
                             for (final key in genre.artists.take(3))
                               _taste.artistNames[key] ?? key,
                           ],
-                          art: [
+                          songs: [
                             for (final key in genre.artists)
-                              if (_artistArt[key] case final art?) art,
+                              if (_artistSong[key] case final song?) song,
                           ].take(3).toList(),
                           included: !tuning.excludedGenres.contains(
                             genre.title,
@@ -259,10 +256,7 @@ class _MoodsTuningPageState extends State<MoodsTuningPage> {
               children: [
                 for (final key in keys)
                   ArtistTile(
-                    artwork: _Avatar(
-                      _artistArt[key],
-                      size: ArtistTile.artworkSize,
-                    ),
+                    artwork: ArtistAvatar(_artistSong[key]),
                     name: _taste.artistNames[key] ?? key,
                     struck: tuning.blockedArtists.contains(key),
                     trailing: Switch(
@@ -285,51 +279,18 @@ class _MoodsTuningPageState extends State<MoodsTuningPage> {
   }
 }
 
-class _Avatar extends StatelessWidget {
-  const _Avatar(this.art, {required this.size});
-
-  final String? art;
-  final double size;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: scheme.surfaceContainerHighest,
-        image: art == null
-            ? null
-            : DecorationImage(
-                image: ArtworkProvider.thumbnail(art!, size, context),
-                fit: BoxFit.cover,
-              ),
-      ),
-      child: art == null
-          ? Icon(
-              FluentIcons.person_24_regular,
-              size: size * 0.5,
-              color: scheme.onSurfaceVariant,
-            )
-          : null,
-    );
-  }
-}
-
 class _GenreCard extends StatelessWidget {
   const _GenreCard({
     required this.genre,
     required this.names,
-    required this.art,
+    required this.songs,
     required this.included,
     required this.onChanged,
   });
 
   final DetectedGenre genre;
   final List<String> names;
-  final List<String> art;
+  final List<Map> songs;
   final bool included;
   final ValueChanged<bool> onChanged;
 
@@ -354,13 +315,10 @@ class _GenreCard extends StatelessWidget {
                 height: _avatar,
                 child: Stack(
                   children: [
-                    for (var i = 0; i < (art.isEmpty ? 1 : art.length); i++)
+                    for (var i = 0; i < (songs.isEmpty ? 1 : songs.length); i++)
                       Positioned(
                         left: i * _avatar * 0.62,
-                        child: _Avatar(
-                          art.isEmpty ? null : art[i],
-                          size: _avatar,
-                        ),
+                        child: ArtistAvatar(songs.isEmpty ? null : songs[i]),
                       ),
                   ],
                 ),
