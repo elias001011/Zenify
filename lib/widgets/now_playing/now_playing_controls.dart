@@ -20,6 +20,7 @@
  */
 
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
@@ -100,13 +101,11 @@ class NowPlayingControls extends StatelessWidget {
               constraints: BoxConstraints(
                 maxWidth: isDesktop ? 400 : constraints.maxWidth,
               ),
-              child: const PositionSlider(),
-            ),
-            SizedBox(height: spacing),
-            PlayerControlButtons(
-              metadata: metadata,
-              iconSize: adjustedIconSize * iconScale,
-              miniIconSize: adjustedMiniIconSize * iconScale,
+              child: PlayerTransport(
+                iconSize: adjustedIconSize * iconScale,
+                miniIconSize: adjustedMiniIconSize * iconScale,
+                gap: spacing,
+              ),
             ),
             if (!isCompact) const Spacer(),
           ],
@@ -219,20 +218,21 @@ Future<void> _copyNowPlayingSong(
   if (context.mounted) showToast(context, context.l10n!.songInfoCopied);
 }
 
-class PlayerControlButtons extends StatelessWidget {
-  const PlayerControlButtons({
+/// The progress bar, the times and the playback buttons. One column, so the
+/// progress bar, the times and the icons of shuffle and repeat all begin and
+/// end at the same edges, the artwork's, whatever the layout around it.
+class PlayerTransport extends StatelessWidget {
+  const PlayerTransport({
     super.key,
-    required this.metadata,
     required this.iconSize,
     required this.miniIconSize,
-    this.flush = false,
+    this.gap = 6,
   });
-  final MediaItem metadata;
   final double iconSize;
   final double miniIconSize;
 
-  /// The outer buttons reach the edges, to line up with an artwork above.
-  final bool flush;
+  /// Between the times and the buttons.
+  final double gap;
 
   @override
   Widget build(BuildContext context) {
@@ -248,13 +248,6 @@ class PlayerControlButtons extends StatelessWidget {
         final isTight = maxWidth < 360;
         final isUltraTight = maxWidth < 320;
 
-        final horizontalPadding = flush
-            ? 0.0
-            : isUltraTight
-            ? 10.0
-            : isTight
-            ? 14.0
-            : 20.0;
         final buttonSpacing = isUltraTight
             ? 6.0
             : isTight
@@ -296,40 +289,60 @@ class PlayerControlButtons extends StatelessWidget {
                   ? 0.36
                   : 0.45),
         );
+        // The room around the icon of shuffle and repeat inside their buttons:
+        // the buttons are moved out by it, so the icons, not their touch
+        // areas, are what lines up with the progress bar and the times.
+        final iconInset =
+            (math.max(
+                  minButtonSize,
+                  miniControlSize + buttonPadding.horizontal,
+                ) -
+                miniControlSize) /
+            2;
 
-        return Padding(
-          padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-          child: Row(
-            children: <Widget>[
-              PlaybackModeButton(
-                repeat: false,
-                size: miniControlSize,
-                constraints: buttonConstraints,
-                padding: buttonPadding,
-              ),
-              SizedBox(width: buttonSpacing),
-              Expanded(
-                child: Center(
-                  child: PlaybackTransportControls(
-                    colorScheme: colorScheme,
-                    buttonConstraints: buttonConstraints,
-                    buttonPadding: buttonPadding,
-                    controlIconSize: controlIconSize,
-                    buttonSpacing: buttonSpacing,
-                    minButtonSize: minButtonSize,
-                    playPadding: playPadding,
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const PositionSlider(),
+            SizedBox(height: gap),
+            Row(
+              children: <Widget>[
+                Transform.translate(
+                  offset: Offset(-iconInset, 0),
+                  child: PlaybackModeButton(
+                    repeat: false,
+                    size: miniControlSize,
+                    constraints: buttonConstraints,
+                    padding: buttonPadding,
                   ),
                 ),
-              ),
-              SizedBox(width: buttonSpacing),
-              PlaybackModeButton(
-                repeat: true,
-                size: miniControlSize,
-                constraints: buttonConstraints,
-                padding: buttonPadding,
-              ),
-            ],
-          ),
+                SizedBox(width: buttonSpacing),
+                Expanded(
+                  child: Center(
+                    child: PlaybackTransportControls(
+                      colorScheme: colorScheme,
+                      buttonConstraints: buttonConstraints,
+                      buttonPadding: buttonPadding,
+                      controlIconSize: controlIconSize,
+                      buttonSpacing: buttonSpacing,
+                      minButtonSize: minButtonSize,
+                      playPadding: playPadding,
+                    ),
+                  ),
+                ),
+                SizedBox(width: buttonSpacing),
+                Transform.translate(
+                  offset: Offset(iconInset, 0),
+                  child: PlaybackModeButton(
+                    repeat: true,
+                    size: miniControlSize,
+                    constraints: buttonConstraints,
+                    padding: buttonPadding,
+                  ),
+                ),
+              ],
+            ),
+          ],
         );
       },
     );

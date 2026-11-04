@@ -34,7 +34,6 @@ import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
 import 'package:musify/widgets/now_playing/player_chrome.dart';
-import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/queue_list_view.dart';
 
 class NowPlayingPage extends StatefulWidget {
@@ -323,6 +322,9 @@ class _UprightStageState extends State<_UprightStage>
   static const _titleHeight = 72.0;
   static const _gap = 24.0;
 
+  /// How much of the width the artwork takes, and the playback under it.
+  static const _artworkShare = 0.92;
+
   late final _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 500),
@@ -378,7 +380,10 @@ class _UprightStageState extends State<_UprightStage>
             builder: (context, c) {
               final artSize = max(
                 _headerSize,
-                min(c.maxWidth * 0.92, c.maxHeight - _titleHeight - _gap * 2),
+                min(
+                  c.maxWidth * _artworkShare,
+                  c.maxHeight - _titleHeight - _gap * 2,
+                ),
               );
               // The artwork and the song under it, centred together.
               final artOrigin = Offset(
@@ -500,11 +505,13 @@ class _UprightStageState extends State<_UprightStage>
         ),
         if (!isLive) ...[
           const SizedBox(height: 8),
-          const PositionSlider(),
-          PlayerControlButtons(
-            metadata: metadata,
-            iconSize: widget.iconSize,
-            miniIconSize: widget.miniIconSize,
+          // As wide as the artwork above it.
+          FractionallySizedBox(
+            widthFactor: _artworkShare,
+            child: PlayerTransport(
+              iconSize: widget.iconSize,
+              miniIconSize: widget.miniIconSize,
+            ),
           ),
           const SizedBox(height: 8),
         ],
@@ -621,13 +628,7 @@ class _WideLayoutState extends State<_WideLayout>
                       ),
                       const SizedBox(height: 16),
                       if (!live) ...[
-                        const PositionSlider(flush: true),
-                        PlayerControlButtons(
-                          metadata: metadata,
-                          iconSize: 38,
-                          miniIconSize: 20,
-                          flush: true,
-                        ),
+                        const PlayerTransport(iconSize: 38, miniIconSize: 20),
                       ],
                       const SizedBox(height: 8),
                       Center(child: widget.actions),

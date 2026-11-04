@@ -27,10 +27,9 @@ import 'package:musify/widgets/now_playing/audio_quality_badge.dart';
 import 'package:musify/widgets/now_playing/player_chrome.dart';
 
 class PositionSlider extends StatefulWidget {
-  const PositionSlider({super.key, this.flush = false});
-
-  /// Track and times reach the edges, to line up with an artwork above.
-  final bool flush;
+  /// The track and the times reach the edges of the space they are given, so
+  /// the player's buttons and the artwork can line up with them.
+  const PositionSlider({super.key});
 
   @override
   State<PositionSlider> createState() => _PositionSliderState();
@@ -82,7 +81,7 @@ class _PositionSliderState extends State<PositionSlider> {
           children: [
             SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                padding: widget.flush ? EdgeInsets.zero : null,
+                padding: EdgeInsets.zero,
                 trackHeight: minimal ? 4 : null,
                 trackShape: minimal
                     ? const RoundedRectSliderTrackShape()
@@ -123,7 +122,7 @@ class _PositionSliderState extends State<PositionSlider> {
                 ),
               ),
             ),
-            if (widget.flush) SizedBox(height: minimal ? 4 : 8),
+            SizedBox(height: minimal ? 4 : 8),
             _buildPositionRow(context, _positionData),
           ],
         );
@@ -140,21 +139,18 @@ class _PositionSliderState extends State<PositionSlider> {
     );
     final durationText = formatDuration(positionData.duration.inSeconds);
 
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: widget.flush ? 0 : 22),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(positionText, style: textStyle),
-              Text(durationText, style: textStyle),
-            ],
-          ),
-          const AudioQualityBadge(),
-        ],
-      ),
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(positionText, style: textStyle),
+            Text(durationText, style: textStyle),
+          ],
+        ),
+        AudioQualityBadge(style: textStyle),
+      ],
     );
   }
 }

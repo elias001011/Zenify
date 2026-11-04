@@ -38,12 +38,15 @@ Future<_AudioQualityInfo?> _resolveAudioQuality(String ytid) async {
 
 String? _ytidOf(MediaItem? item) => item?.extras?['ytid']?.toString();
 
-/// The playing song's audio bitrate and codec as small text, for the row of
-/// times under the progress bar. It is about the stream, not the artwork, so
-/// it looks the same on every layout. While the setting is off it is not even
-/// built: nothing listens to the song and nothing is looked up.
+/// The playing song's audio bitrate and codec as text, for the row of times
+/// under the progress bar: [style] is the times' own, so it sits in that row
+/// as one more of them. It is about the stream, not the artwork, so it looks
+/// the same on every layout. While the setting is off it is not even built:
+/// nothing listens to the song and nothing is looked up.
 class AudioQualityBadge extends StatelessWidget {
-  const AudioQualityBadge({super.key});
+  const AudioQualityBadge({super.key, required this.style});
+
+  final TextStyle style;
 
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<bool>(
@@ -53,15 +56,17 @@ class AudioQualityBadge extends StatelessWidget {
         : StreamBuilder<String?>(
             initialData: _ytidOf(audioHandler.mediaItem.valueOrNull),
             stream: audioHandler.mediaItem.map(_ytidOf).distinct(),
-            builder: (context, snapshot) => _QualityTag(ytid: snapshot.data),
+            builder: (context, snapshot) =>
+                _QualityTag(ytid: snapshot.data, style: style),
           ),
   );
 }
 
 class _QualityTag extends StatefulWidget {
-  const _QualityTag({required this.ytid});
+  const _QualityTag({required this.ytid, required this.style});
 
   final String? ytid;
+  final TextStyle style;
 
   @override
   State<_QualityTag> createState() => _QualityTagState();
@@ -93,10 +98,8 @@ class _QualityTagState extends State<_QualityTag> {
         if (quality == null) return const SizedBox.shrink();
         return Text(
           '${quality.bitrateKbps} kbps • ${quality.codec}',
-          style: TextStyle(
+          style: widget.style.copyWith(
             color: Theme.of(context).colorScheme.onSurfaceVariant,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
           ),
         );
       },

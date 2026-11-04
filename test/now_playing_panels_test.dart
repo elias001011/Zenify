@@ -354,7 +354,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byType(QueueWidget), findsOneWidget);
     expect(find.byType(BottomSheet), findsNothing);
-    expect(find.byType(PlayerControlButtons), findsOneWidget);
+    expect(find.byType(PlayerTransport), findsOneWidget);
     expect(
       tester.getTopLeft(find.byType(QueueWidget)).dy,
       greaterThan(tester.getTopLeft(find.byType(NowPlayingArtwork)).dy),
