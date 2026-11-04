@@ -419,4 +419,118 @@ void main() {
       60,
     );
   });
+
+  group('entries that cannot be exchanged', () {
+    SyncDocument remoteWith(Map<String, dynamic> library) =>
+        SyncDocument()..capture(library, null, 'other');
+
+    test('stay in a list when a merge changes it', () async {
+      final box = Hive.box('user');
+      await box.put('likedSongs', [
+        song('a'),
+        {'title': 'no id'},
+        song('b'),
+        {...song('../escape'), 'title': 'unsafe'},
+      ]);
+      final merged = await LibraryMergeService.mergeLibrary(
+        payload(
+          remoteWith({
+            'likedSongs': [song('c')],
+          }),
+        ),
+      );
+      expect(merged.changed, contains('likedSongs'));
+      final titles = (box.get('likedSongs') as List).map((s) => s['title']);
+      expect(titles, containsAll(['a', 'b', 'c', 'no id', 'unsafe']));
+      expect(titles, hasLength(5));
+    });
+
+    test('are not erased by a merge that changes nothing', () async {
+      final box = Hive.box('user');
+      final before = [
+        song('a'),
+        {'title': 'no id'},
+        song('b'),
+      ];
+      await box.put('likedSongs', before);
+      final merged = await LibraryMergeService.mergeLibrary(
+        payload(
+          remoteWith({
+            'likedSongs': [song('a'), song('b')],
+          }),
+        ),
+      );
+      expect(merged.changed, isNot(contains('likedSongs')));
+      expect(canonicalSync(box.get('likedSongs')), canonicalSync(before));
+    });
+
+    test('keep their place and do not pile up over repeated merges', () async {
+      final box = Hive.box('user');
+      await box.put('likedSongs', [
+        {'title': 'first, no id'},
+        song('a'),
+      ]);
+      final remote = payload(
+        remoteWith({
+          'likedSongs': [song('b')],
+        }),
+      );
+      await LibraryMergeService.mergeLibrary(remote);
+      final once = canonicalSync(box.get('likedSongs'));
+      await LibraryMergeService.mergeLibrary(remote);
+      await LibraryMergeService.mergeLibrary(remote);
+      expect(canonicalSync(box.get('likedSongs')), once);
+      expect((box.get('likedSongs') as List).first['title'], 'first, no id');
+    });
+
+    test('stay in the playlists and folders that hold them', () async {
+      final box = Hive.box('user');
+      Map<String, dynamic> withNoId(String id, List<String> songs) => {
+        ...playlist(id, songs),
+        'list': [
+          ...playlist(id, songs)['list'] as List,
+          {'title': 'song without id'},
+        ],
+      };
+      await box.put('customPlaylists', [
+        withNoId('top', ['a']),
+      ]);
+      await box.put('playlistFolders', [
+        {
+          'id': 'folder',
+          'name': 'Folder',
+          'playlists': [
+            withNoId('inside', ['b']),
+          ],
+        },
+      ]);
+      await LibraryMergeService.mergeLibrary(
+        payload(
+          remoteWith({
+            'customPlaylists': [
+              playlist('other', ['x']),
+            ],
+          }),
+        ),
+      );
+      final top = (box.get('customPlaylists') as List).firstWhere(
+        (p) => p['ytid'] == 'top',
+      );
+      expect((top['list'] as List).map((s) => s['title']), [
+        'a',
+        'song without id',
+      ]);
+      final inside =
+          ((box.get('playlistFolders') as List).single['playlists'] as List)
+              .single;
+      expect((inside['list'] as List).map((s) => s['title']), [
+        'b',
+        'song without id',
+      ]);
+      expect(
+        (box.get('customPlaylists') as List).map((p) => p['ytid']),
+        contains('other'),
+      );
+    });
+  });
 }

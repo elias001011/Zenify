@@ -137,6 +137,80 @@ class LibraryMergeService {
     }
   }
 
+  /// Entries that cannot be exchanged (no id, or one that is not safe) are
+  /// not in the merged library; a merge puts them back where they were on
+  /// this device instead of erasing them.
+  static Object? _keepEntriesWithoutId(
+    String key,
+    Object? merged,
+    Map<String, dynamic> current,
+  ) {
+    bool unexchanged(Object? item) =>
+        item is Map && !SyncDocument.isSyncableId(item['ytid']?.toString());
+
+    List<dynamic> putBack(Object? mergedList, Object? localList) {
+      final result = mergedList is List
+          ? List<dynamic>.of(mergedList)
+          : <dynamic>[];
+      if (localList is List) {
+        for (var i = 0; i < localList.length; i++) {
+          if (unexchanged(localList[i])) {
+            result.insert(min(i, result.length), localList[i]);
+          }
+        }
+      }
+      return result;
+    }
+
+    // The playlists of this device wherever they are (on top or in a folder).
+    Map<String, Map> localPlaylists() => {
+      for (final list in [
+        current['customPlaylists'],
+        for (final folder in current['playlistFolders'] as List? ?? const [])
+          if (folder is Map) folder['playlists'],
+      ])
+        for (final playlist in list as List? ?? const [])
+          if (playlist is Map && playlist['ytid'] != null)
+            playlist['ytid'].toString(): playlist,
+    };
+
+    List<dynamic> songsPutBack(Object? playlists, Map<String, Map> local) => [
+      for (final playlist in playlists as List? ?? const [])
+        if (playlist is Map && local[playlist['ytid']?.toString()] != null)
+          {
+            ...playlist,
+            'list': putBack(
+              playlist['list'],
+              local[playlist['ytid'].toString()]!['list'],
+            ),
+          }
+        else
+          playlist,
+    ];
+
+    switch (key) {
+      case 'likedSongs' || 'likedPlaylists' || 'recentlyPlayedSongs':
+        return merged is List ? putBack(merged, current[key]) : merged;
+      case 'customPlaylists':
+        return merged is List ? songsPutBack(merged, localPlaylists()) : merged;
+      case 'playlistFolders':
+        final local = localPlaylists();
+        return merged is List
+            ? [
+                for (final folder in merged)
+                  if (folder is Map)
+                    {
+                      ...folder,
+                      'playlists': songsPutBack(folder['playlists'], local),
+                    }
+                  else
+                    folder,
+              ]
+            : merged;
+    }
+    return merged;
+  }
+
   // Local file paths are never exchanged, but remain useful on this device.
   static Object? _keepLocalPaths(Object? merged, Object? local) {
     const keys = {
@@ -264,7 +338,11 @@ class LibraryMergeService {
               .toSet();
           final updates = <String, dynamic>{};
           for (final key in keys) {
-            final value = _keepLocalPaths(merged[key], current[key]);
+            final value = _keepEntriesWithoutId(
+              key,
+              _keepLocalPaths(merged[key], current[key]),
+              current,
+            );
             if (canonicalSync(current[key]) != canonicalSync(value)) {
               updates[key] = value;
             }
