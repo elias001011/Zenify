@@ -29,11 +29,13 @@ import 'package:musify/main.dart';
 import 'package:musify/services/audio_levels.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
+import 'package:musify/widgets/playback_icon_button.dart';
 
 /// Sound waves: they follow the music's frequencies with the precise
 /// [waveReading] and keep a motion of their own otherwise. While nothing plays
-/// (paused, buffering, loading) they stop listening to the audio, settle to a
-/// quiet pose and rest there without drawing a frame.
+/// (paused, buffering, loading) they stop listening to the audio, go down to a
+/// row of dots, the picture of silence, and rest there without drawing a
+/// frame.
 class WaveVisualizer extends StatefulWidget {
   const WaveVisualizer({super.key, required this.size});
 
@@ -47,12 +49,9 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     with SingleTickerProviderStateMixin {
   static const _bars = 9;
 
-  /// The pose of silence, a low hill; where the bars start and come to rest.
-  static final _quiet = List<double>.generate(
-    _bars,
-    (i) => 0.18 + 0.28 * (1 - (i - (_bars - 1) / 2).abs() / (_bars / 2)),
-  );
-  late final _heights = List<double>.of(_quiet);
+  /// Where the bars start and come to rest: no height at all, only the dots
+  /// the painter keeps them from shrinking below.
+  final _heights = List<double>.filled(_bars, 0);
   final _repaint = ValueNotifier<int>(0);
   late final Ticker _ticker = createTicker(_tick);
   late final StreamSubscription<PlaybackState> _playingSubscription;
@@ -73,27 +72,21 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   /// In view and allowed to animate.
   bool get _active => _visible && _tickerEnabled;
   bool get _moving => _ready && _active;
-  bool get _isQuiet =>
-      Iterable<int>.generate(_bars)
-          .every((i) => (_heights[i] - _quiet[i]).abs() < 0.004);
+  bool get _isQuiet => _heights.every((height) => height < 0.004);
 
   @override
   void initState() {
     super.initState();
     _setVisibility(WidgetsBinding.instance.lifecycleState);
     _lifecycle = AppLifecycleListener(onStateChange: _setVisibility);
-    _playingSubscription = audioHandler.playbackState
-        .distinct(
-          (a, b) =>
-              a.playing == b.playing && a.processingState == b.processingState,
-        )
-        .listen((state) {
-          _ready =
-              state.playing &&
-              state.processingState == AudioProcessingState.ready;
-          if (!_ready) _clearLevel();
-          _updateMotion();
-        });
+    // The same state as the play button shows: a skip's moment of loading
+    // does not send the bars down and up again.
+    _playingSubscription = settledPlaybackState().listen((state) {
+      _ready =
+          state.playing && state.processingState == AudioProcessingState.ready;
+      if (!_ready) _clearLevel();
+      _updateMotion();
+    });
     _trackSubscription = audioHandler.mediaItem
         .map((item) => item?.id)
         .distinct()
@@ -179,8 +172,8 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     unawaited(_levels?.cancel());
     _levels = null;
     _clearLevel();
-    // Paused but in view, the bars settle to the quiet pose rather than stay
-    // frozen mid-beat; out of view they simply stop where they are.
+    // Paused but in view, the bars go down rather than stay frozen mid-beat;
+    // out of view they simply stop where they are.
     if (_active && !_isQuiet) {
       if (!_ticker.isActive) _ticker.start();
     } else {
@@ -198,7 +191,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     _last = elapsed;
     _advance(dt);
     if (!_ready && _isQuiet) {
-      _heights.setAll(0, _quiet);
+      _heights.fillRange(0, _bars, 0);
       _repaint.value++;
       _rest();
     }
@@ -212,7 +205,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
       final reach = (i - (_bars - 1) / 2).abs() / ((_bars - 1) / 2);
       final double target;
       if (!_ready) {
-        target = _quiet[i];
+        target = 0;
       } else if (level != null) {
         final index = (reach * (AudioLevels.bandCount - 1)).round();
         final band = index < level.bands.length
