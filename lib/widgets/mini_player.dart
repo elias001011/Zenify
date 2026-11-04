@@ -19,15 +19,11 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
-import 'dart:math' as math;
-
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
-import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
-import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/marquee.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
@@ -38,24 +34,17 @@ import 'package:musify/widgets/skip_icon_button.dart';
 import 'package:musify/widgets/song_artwork.dart';
 import 'package:rxdart/rxdart.dart';
 
-/// What the mini player's body shows besides the song: the playback state
-/// and whether there is a next song. Position is left out, so the body
-/// rebuilds when these change, not on every tick; only the ring follows it.
-typedef _ControlsState = ({PlaybackState playback, bool hasNext});
-
-_ControlsState _controlsState(PlaybackState playback, List<MediaItem> queue) =>
-    (
-      playback: playback,
-      hasNext:
-          queue.length > 1 &&
-          ((playback.queueIndex ?? 0) < queue.length - 1 ||
-              playback.repeatMode == AudioServiceRepeatMode.all),
-    );
+/// Whether a song follows the current one. The mini player's body rebuilds
+/// only when this changes: the play button follows playback on its own.
+bool _hasNext(PlaybackState playback, List<MediaItem> queue) =>
+    queue.length > 1 &&
+    ((playback.queueIndex ?? 0) < queue.length - 1 ||
+        playback.repeatMode == AudioServiceRepeatMode.all);
 
 /// The stream doesn't replay, so a mini player built later (the layout
 /// switching between dock and rail) starts from this.
-_ControlsState _currentControlsState() =>
-    _controlsState(audioHandler.playbackState.value, audioHandler.queue.value);
+bool _currentHasNext() =>
+    _hasNext(audioHandler.playbackState.value, audioHandler.queue.value);
 
 class MiniPlayer extends StatefulWidget {
   /// Drawn straight on the dock's floating surface.
@@ -73,17 +62,11 @@ class MiniPlayer extends StatefulWidget {
 }
 
 class _MiniPlayerState extends State<MiniPlayer> {
-  late final _controlsStateStream =
-      Rx.combineLatest2(
-        settledPlaybackState(),
-        audioHandler.queue,
-        _controlsState,
-      ).distinct(
-        (a, b) =>
-            a.hasNext == b.hasNext &&
-            a.playback.playing == b.playback.playing &&
-            a.playback.processingState == b.playback.processingState,
-      );
+  late final _hasNextStream = Rx.combineLatest2(
+    audioHandler.playbackState,
+    audioHandler.queue,
+    _hasNext,
+  ).distinct();
 
   @override
   Widget build(BuildContext context) {
@@ -102,20 +85,15 @@ class _MiniPlayerState extends State<MiniPlayer> {
               final metadata = mediaSnapshot.data;
               if (metadata == null) return const SizedBox.shrink();
 
-              return StreamBuilder<_ControlsState>(
-                initialData: _currentControlsState(),
-                stream: _controlsStateStream,
-                builder: (context, stateSnapshot) {
-                  final state = stateSnapshot.data;
-                  if (state == null) return const SizedBox.shrink();
-                  return _MiniPlayerBody(
-                    wide: widget.wide && constraints.maxWidth >= 900,
-                    colorScheme: colorScheme,
-                    metadata: metadata,
-                    playbackState: state.playback,
-                    hasNext: state.hasNext,
-                  );
-                },
+              return StreamBuilder<bool>(
+                initialData: _currentHasNext(),
+                stream: _hasNextStream,
+                builder: (context, nextSnapshot) => _MiniPlayerBody(
+                  wide: widget.wide && constraints.maxWidth >= 900,
+                  colorScheme: colorScheme,
+                  metadata: metadata,
+                  hasNext: nextSnapshot.data ?? false,
+                ),
               );
             },
           ),
@@ -130,14 +108,12 @@ class _MiniPlayerBody extends StatefulWidget {
     required this.colorScheme,
     required this.metadata,
     required this.wide,
-    required this.playbackState,
     required this.hasNext,
   });
 
   final ColorScheme colorScheme;
   final MediaItem metadata;
   final bool wide;
-  final PlaybackState playbackState;
   final bool hasNext;
 
   @override
@@ -210,9 +186,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                             Expanded(child: _metadata(context)),
                             _ControlsWidget(
                               colorScheme: colorScheme,
-                              playbackState: widget.playbackState,
                               hasNext: widget.hasNext,
-                              duration: metadata.duration,
                             ),
                           ],
                         ),
@@ -383,17 +357,10 @@ class _MetadataWidget extends StatelessWidget {
 }
 
 class _ControlsWidget extends StatelessWidget {
-  const _ControlsWidget({
-    required this.colorScheme,
-    required this.playbackState,
-    required this.hasNext,
-    required this.duration,
-  });
+  const _ControlsWidget({required this.colorScheme, required this.hasNext});
 
   final ColorScheme colorScheme;
-  final PlaybackState playbackState;
   final bool hasNext;
-  final Duration? duration;
 
   @override
   Widget build(BuildContext context) {
@@ -404,22 +371,14 @@ class _ControlsWidget extends StatelessWidget {
           const DesktopVolumeButton(),
           const SizedBox(width: 4),
         ],
-        // The same filled circle as the wide mini player; the progress ring
-        // is the phones' way of showing where the song is.
-        if (isDesktopPlatform)
-          PlaybackIconButton(
-            iconSize: 22,
-            iconColor: colorScheme.onPrimary,
-            backgroundColor: colorScheme.primary,
-            filled: true,
-            buttonSize: 44,
-          )
-        else
-          _CircularPlayButton(
-            colorScheme: colorScheme,
-            playbackState: playbackState,
-            duration: duration,
-          ),
+        // The same filled circle as the wide mini player, on every platform.
+        PlaybackIconButton(
+          iconSize: 22,
+          iconColor: colorScheme.onPrimary,
+          backgroundColor: colorScheme.primary,
+          filled: true,
+          buttonSize: 44,
+        ),
         if (hasNext) ...[
           const SizedBox(width: 4),
           SkipIconButton(
@@ -436,168 +395,4 @@ class _ControlsWidget extends StatelessWidget {
       ],
     );
   }
-}
-
-class _CircularPlayButton extends StatelessWidget {
-  const _CircularPlayButton({
-    required this.colorScheme,
-    required this.playbackState,
-    required this.duration,
-  });
-
-  final ColorScheme colorScheme;
-  final PlaybackState playbackState;
-
-  /// The song's known length, until the player reports its own.
-  final Duration? duration;
-
-  @override
-  Widget build(BuildContext context) {
-    final processingState = playbackState.processingState;
-    final isPlaying = playbackState.playing;
-    final isLoading = isPlaybackLoading(playbackState);
-    final isCompleted = processingState == AudioProcessingState.completed;
-
-    return SizedBox(
-      width: 48,
-      height: 48,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          RepaintBoundary(
-            child: StreamBuilder<PositionData>(
-              initialData: audioHandler.currentPositionData,
-              stream: TickerMode.valuesOf(context).enabled
-                  ? audioHandler.positionDataStream
-                  : const Stream.empty(),
-              builder: (context, snapshot) {
-                final position = snapshot.data;
-                final total =
-                    position != null && position.duration > Duration.zero
-                    ? position.duration
-                    : (duration ?? Duration.zero);
-                return CustomPaint(
-                  size: const Size(48, 48),
-                  painter: _CircularProgressPainter(
-                    progress: position == null || total == Duration.zero
-                        ? 0
-                        : (position.position.inMilliseconds /
-                                  total.inMilliseconds)
-                              .clamp(0.0, 1.0),
-                    backgroundColor: colorScheme.surfaceContainerHighest,
-                    progressColor: colorScheme.primary,
-                    strokeWidth: 3,
-                  ),
-                );
-              },
-            ),
-          ),
-          if (isLoading)
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-              ),
-            )
-          else
-            IconButton(
-              onPressed: isCompleted
-                  ? () => audioHandler.playAgain()
-                  : (isPlaying ? audioHandler.pause : audioHandler.play),
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              icon: PlaybackIconSwitcher(
-                stateKey: (isCompleted, isPlaying),
-                child: Icon(
-                  isCompleted
-                      ? FluentIcons.arrow_counterclockwise_24_filled
-                      : (isPlaying
-                            ? FluentIcons.pause_16_filled
-                            : FluentIcons.play_16_filled),
-                  color: colorScheme.primary,
-                  size: 22,
-                ),
-              ),
-              visualDensity: VisualDensity.compact,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CircularProgressPainter extends CustomPainter {
-  _CircularProgressPainter({
-    required this.progress,
-    required this.backgroundColor,
-    required this.progressColor,
-    required this.strokeWidth,
-  });
-
-  final double progress;
-  final Color backgroundColor;
-  final Color progressColor;
-  final double strokeWidth;
-
-  final waveAmplitude = 1.5;
-  final waveFrequency = 12.0;
-  final animationValue = 0.0;
-
-  Path _buildWavyArcPath(Size size, double startAngle, double sweepAngle) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final baseRadius = (size.width - strokeWidth) / 2;
-    final steps = (sweepAngle.abs() * 180 / math.pi).round().clamp(4, 720);
-    final path = Path();
-
-    for (var i = 0; i <= steps; i++) {
-      final t = i / steps;
-      final angle = startAngle + sweepAngle * t;
-      final wave =
-          waveAmplitude * math.sin(waveFrequency * angle + animationValue);
-      final r = baseRadius + wave;
-      final x = cx + r * math.cos(angle);
-      final y = cy + r * math.sin(angle);
-      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
-    }
-    return path;
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final trackPaint = Paint()
-      ..color = backgroundColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    canvas.drawPath(
-      _buildWavyArcPath(size, -math.pi / 2, 2 * math.pi),
-      trackPaint,
-    );
-
-    if (progress > 0) {
-      final progressPaint = Paint()
-        ..color = progressColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-
-      canvas.drawPath(
-        _buildWavyArcPath(size, -math.pi / 2, 2 * math.pi * progress),
-        progressPaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_CircularProgressPainter old) =>
-      old.progress != progress ||
-      old.backgroundColor != backgroundColor ||
-      old.progressColor != progressColor ||
-      old.animationValue != animationValue;
 }
