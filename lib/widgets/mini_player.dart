@@ -27,7 +27,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
-import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/marquee.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
@@ -404,22 +403,14 @@ class _ControlsWidget extends StatelessWidget {
           const DesktopVolumeButton(),
           const SizedBox(width: 4),
         ],
-        // The same filled circle as the wide mini player; the progress ring
-        // is the phones' way of showing where the song is.
-        if (isDesktopPlatform)
-          PlaybackIconButton(
-            iconSize: 22,
-            iconColor: colorScheme.onPrimary,
-            backgroundColor: colorScheme.primary,
-            filled: true,
-            buttonSize: 44,
-          )
-        else
-          _CircularPlayButton(
-            colorScheme: colorScheme,
-            playbackState: playbackState,
-            duration: duration,
-          ),
+        // The ring that follows the song, as on phones, wherever the mini
+        // player is compact. The wide one has room for the transport row, and
+        // a ring around its play button would be too big.
+        _CircularPlayButton(
+          colorScheme: colorScheme,
+          playbackState: playbackState,
+          duration: duration,
+        ),
         if (hasNext) ...[
           const SizedBox(width: 4),
           SkipIconButton(
