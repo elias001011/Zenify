@@ -25,6 +25,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -32,6 +33,7 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
+import 'package:musify/widgets/download_progress_icon.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_chrome.dart';
 
@@ -198,22 +200,32 @@ class _PlayerActionsState extends State<PlayerActions> {
           ),
         ),
         if (!isRadioStation && !local)
-          ValueListenableBuilder<bool>(
-            valueListenable: _songOfflineStatus,
-            builder: (context, offline, _) => PlayerActionButton(
-              icon: FluentIcons.cloud_arrow_down_24_regular,
-              activeIcon: FluentIcons.cloud_off_24_filled,
-              tooltip: l10n.makeOffline,
-              active: offline,
-              onPressed: audioId == null
-                  ? null
-                  : () => _toggleOffline(
-                      _songOfflineStatus,
-                      audioId,
-                      widget.metadata,
-                      isCurrent: () => mounted && audioId == actionAudioId,
-                    ),
-            ),
+          // From the download manager, for whichever song this is: it shows
+          // the download of this song, and only of this one, wherever it was
+          // started and whatever the player did meanwhile.
+          ListenableBuilder(
+            listenable: Listenable.merge([
+              _songOfflineStatus,
+              DownloadManager.instance.entries,
+            ]),
+            builder: (context, _) {
+              final download = DownloadManager.instance.activeFor(audioId);
+              return PlayerActionButton(
+                icon: FluentIcons.cloud_arrow_down_24_regular,
+                activeIcon: FluentIcons.cloud_off_24_filled,
+                tooltip: l10n.makeOffline,
+                active: _songOfflineStatus.value,
+                busy: download == null ? null : DownloadProgressIcon(download),
+                onPressed: audioId == null || download != null
+                    ? null
+                    : () => _toggleOffline(
+                        _songOfflineStatus,
+                        audioId,
+                        widget.metadata,
+                        isCurrent: () => mounted && audioId == actionAudioId,
+                      ),
+              );
+            },
           ),
         if (online && !isRadioStation && !local)
           PlayerActionButton(
@@ -297,6 +309,7 @@ class PlayerActionButton extends StatelessWidget {
     required this.onPressed,
     this.activeIcon,
     this.active = false,
+    this.busy,
   });
 
   final IconData icon;
@@ -305,6 +318,9 @@ class PlayerActionButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool active;
 
+  /// Takes the icon's place while something is under way.
+  final Widget? busy;
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -312,10 +328,12 @@ class PlayerActionButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2),
       child: IconButton(
-        icon: Icon(
-          active ? activeIcon ?? icon : icon,
-          color: active ? color : colorScheme.onSurfaceVariant,
-        ),
+        icon:
+            busy ??
+            Icon(
+              active ? activeIcon ?? icon : icon,
+              color: active ? color : colorScheme.onSurfaceVariant,
+            ),
         iconSize: 24,
         tooltip: tooltip,
         style: IconButton.styleFrom(
@@ -340,26 +358,21 @@ Future<void> _toggleOffline(
   MediaItem metadata, {
   required bool Function() isCurrent,
 }) async {
-  final originalValue = status.value;
-  status.value = !originalValue;
-
+  // A download is not flipped ahead: the button follows the download manager,
+  // which has it queued, running, saved or failed.
+  if (!status.value) {
+    await makeSongOffline(mediaItemToMap(metadata));
+    return;
+  }
+  status.value = false;
   try {
-    final bool success;
-    if (originalValue) {
-      success =
-          !(audioId == null) &&
-          await OfflinePlaylistService().removeSongFromOfflineAndResync(
-            audioId,
-          );
-    } else {
-      success = await makeSongOffline(mediaItemToMap(metadata));
-    }
-    if (!success && isCurrent()) {
-      status.value = originalValue;
-    }
+    final removed =
+        audioId != null &&
+        await OfflinePlaylistService().removeSongFromOfflineAndResync(audioId);
+    if (!removed && isCurrent()) status.value = true;
   } catch (e) {
-    if (isCurrent()) status.value = originalValue;
-    logger.log('Error toggling offline status', error: e);
+    if (isCurrent()) status.value = true;
+    logger.log('Error removing the offline song', error: e);
   }
 }
 

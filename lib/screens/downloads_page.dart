@@ -34,6 +34,7 @@ import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/artwork_glow.dart';
+import 'package:musify/widgets/download_progress_icon.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/music_list_surface.dart';
@@ -280,22 +281,9 @@ class _DownloadStatus extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return switch (entry.status) {
-      DownloadStatus.queued => Padding(
+      DownloadStatus.queued || DownloadStatus.downloading => Padding(
         padding: const EdgeInsets.all(10),
-        child: Icon(
-          FluentIcons.clock_24_regular,
-          color: colorScheme.onSurfaceVariant,
-        ),
-      ),
-      DownloadStatus.downloading => Padding(
-        padding: const EdgeInsets.all(10),
-        child: ValueListenableBuilder<double?>(
-          valueListenable: entry.progress,
-          builder: (context, progress, _) => SizedBox.square(
-            dimension: 24,
-            child: CircularProgressIndicator(value: progress, strokeWidth: 3),
-          ),
-        ),
+        child: DownloadProgressIcon(entry),
       ),
       DownloadStatus.failed => IconButton(
         icon: Icon(

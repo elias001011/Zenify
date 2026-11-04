@@ -176,6 +176,14 @@ class DownloadManager {
 
   List<DownloadEntry> get active => entries.value.where(_isActive).toList();
 
+  /// The download of [ytid] that is queued or running, if any.
+  DownloadEntry? activeFor(Object? ytid) {
+    for (final entry in entries.value) {
+      if (_isActive(entry) && entry.ytid == ytid) return entry;
+    }
+    return null;
+  }
+
   /// Downloads [song] with [save]. Asking again for a song that is queued or
   /// downloading shares that download. Returns whether the song was saved.
   ///
