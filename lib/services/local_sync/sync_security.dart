@@ -96,6 +96,31 @@ class SyncSecurity {
     String context,
   ) => Isolate.run(() => open(secret, box, context));
 
+  /// Reads the JSON envelope of a request and [open]s it, all on another
+  /// isolate: decoding up to 64 MB of JSON before knowing who sent it would
+  /// freeze the interface of the receiving device. The bytes move to the other
+  /// isolate without being copied.
+  static Future<Map<String, dynamic>> openRequestInBackground(
+    String secret,
+    Uint8List request,
+    String context, {
+    required int apiVersion,
+  }) {
+    final transferable = TransferableTypedData.fromList([request]);
+    return Isolate.run(() async {
+      final decoded = jsonDecode(
+        utf8.decode(transferable.materialize().asUint8List()),
+      );
+      if (decoded is! Map) throw const SyncEnvelopeException();
+      if (decoded['apiVersion'] != apiVersion) {
+        throw const SyncEnvelopeException(upgradeRequired: true);
+      }
+      final box = decoded['encrypted'];
+      if (box is! Map) throw const SyncEnvelopeException();
+      return open(secret, box, context);
+    });
+  }
+
   static List<int> _inflate(List<int> compressed) {
     final output = _CappedSink();
     gzip.decoder.startChunkedConversion(output)
@@ -117,4 +142,12 @@ class _CappedSink implements Sink<List<int>> {
 
   @override
   void close() {}
+}
+
+/// A request whose envelope is not what the protocol sends.
+class SyncEnvelopeException implements Exception {
+  const SyncEnvelopeException({this.upgradeRequired = false});
+
+  /// The sender speaks another version of the protocol.
+  final bool upgradeRequired;
 }

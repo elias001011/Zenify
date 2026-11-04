@@ -37,6 +37,7 @@ class SyncHarness {
 
   Future<void> start({
     Duration? replyTimeout,
+    Duration? bodyTimeout,
     Future<void> Function()? beforePairingReply,
   }) async {
     pairingClock = DateTime(2026, 11, 3);
@@ -47,6 +48,7 @@ class SyncHarness {
     server = LocalSyncService.forTesting(
       pairingNow: () => pairingClock,
       replyTimeout: replyTimeout,
+      bodyTimeout: bodyTimeout,
     )..beforePairingReply = beforePairingReply;
     await server.startServer();
     ownId = LibraryMergeService.deviceId;

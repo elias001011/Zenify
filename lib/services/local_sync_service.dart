@@ -167,7 +167,8 @@ class LocalSyncService {
   LocalSyncService._()
     : _testDiscovery = null,
       _pairingNow = DateTime.now,
-      _replyTimeout = _shortTimeout;
+      _replyTimeout = _shortTimeout,
+      _bodyTimeout = _mergeTimeout;
 
   /// A throwaway instance for tests that talk to each other over loopback.
   @visibleForTesting
@@ -175,9 +176,11 @@ class LocalSyncService {
     Future<List<DiscoveredSyncDevice>> Function()? discovery,
     DateTime Function()? pairingNow,
     Duration? replyTimeout,
+    Duration? bodyTimeout,
   }) : _testDiscovery = discovery,
        _pairingNow = pairingNow ?? DateTime.now,
-       _replyTimeout = replyTimeout ?? _shortTimeout;
+       _replyTimeout = replyTimeout ?? _shortTimeout,
+       _bodyTimeout = bodyTimeout ?? _mergeTimeout;
 
   static final LocalSyncService instance = LocalSyncService._();
 
@@ -215,6 +218,13 @@ class LocalSyncService {
 
   /// How long a reply that must be known to arrive may take to be written.
   final Duration _replyTimeout;
+
+  /// How long a request may take to send its body.
+  final Duration _bodyTimeout;
+
+  /// A large body is read by one request at a time: the others would pile
+  /// up to 64 MB each, and none of them has proven who sent it yet.
+  bool _largeBodyActive = false;
 
   /// Runs once a pairing is trusted and before the reply is sent (tests).
   @visibleForTesting
@@ -257,6 +267,9 @@ class LocalSyncService {
 
   // What a handler wants done once its reply went out, or failed to.
   final Expando<Future<void> Function(bool delivered)> _afterReply = Expando();
+
+  // Requests whose body was read to its end.
+  final Expando<bool> _bodyRead = Expando();
 
   final Map<String, DateTime> _retryAfter = {};
   final Map<String, int> _retryCount = {};
@@ -560,9 +573,22 @@ class LocalSyncService {
             '/api/sync/merge' => _handleMerge,
             _ => null,
           };
+    // The clients always say so. A web page cannot send JSON to another
+    // origin without a preflight request, which this server never answers.
     final (status, body) = handler == null
         ? (404, <String, dynamic>{'error': 'not_found'})
+        : !_isJson(request)
+        ? (415, <String, dynamic>{'error': 'unsupported_media_type'})
         : await handler(request);
+    // A reply to a request whose body is large or of unknown size and was
+    // not read would wait for all of it to arrive, and the sender decides
+    // when that is: answer now and hang up instead.
+    final length = request.contentLength;
+    if (_bodyRead[request] != true &&
+        (length < 0 || length > _smallMessageBytes)) {
+      await _replyAndHangUp(request, status, body);
+      return;
+    }
     final afterReply = _afterReply[request];
     var delivered = true;
     try {
@@ -588,6 +614,44 @@ class LocalSyncService {
           stackTrace: stackTrace,
         );
       }
+    }
+  }
+
+  Future<void> _replyAndHangUp(
+    HttpRequest request,
+    int status,
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      final response = request.response..statusCode = status;
+      final payload = utf8.encode(json.encode(body));
+      final socket = await response.detachSocket(writeHeaders: false);
+      socket
+        ..add(
+          utf8.encode(
+            'HTTP/1.1 $status ${response.reasonPhrase}\r\n'
+            'Content-Type: application/json; charset=utf-8\r\n'
+            'Content-Length: ${payload.length}\r\n'
+            'Connection: close\r\n\r\n',
+          ),
+        )
+        ..add(payload);
+      try {
+        await socket.flush().timeout(_shortTimeout);
+      } catch (_) {
+        // The other device gave up waiting.
+      }
+      socket.destroy();
+    } catch (_) {
+      // The other device gave up waiting.
+    }
+  }
+
+  bool _isJson(HttpRequest request) {
+    try {
+      return request.headers.contentType?.mimeType == 'application/json';
+    } catch (_) {
+      return false;
     }
   }
 
@@ -803,24 +867,39 @@ class LocalSyncService {
     if (request.contentLength > maxBytes) {
       throw const _HttpFailure(413, 'too_large');
     }
-    final data = await _readJson(request, maxBytes: maxBytes);
-    if (data['apiVersion'] != apiVersion) {
-      throw const _HttpFailure(426, 'upgrade_required');
+    final large = maxBytes > _smallMessageBytes;
+    if (large) {
+      // The device id is public (discovery answers with it), so a large body
+      // is not trusted yet: its size must be known, and only one is read.
+      if (request.contentLength < 0) {
+        throw const _HttpFailure(411, 'length_required');
+      }
+      if (_largeBodyActive) throw const _HttpFailure(429, 'busy');
+      _largeBodyActive = true;
     }
-    if (data['encrypted'] is! Map) throw const _HttpFailure(400, 'invalid');
     final Map<String, dynamic> body;
     try {
-      body = await SyncSecurity.openInBackground(
+      final bytes = await _readBody(request, maxBytes: maxBytes);
+      body = await SyncSecurity.openRequestInBackground(
         peer.secret,
-        data['encrypted'],
+        bytes,
         '${request.uri.path.substring(1)}|$id|${LibraryMergeService.deviceId}',
+        apiVersion: apiVersion,
       );
+    } on SyncEnvelopeException catch (e) {
+      throw e.upgradeRequired
+          ? const _HttpFailure(426, 'upgrade_required')
+          : const _HttpFailure(400, 'invalid');
     } on SecretBoxAuthenticationError {
       throw const _HttpFailure(403, 'not_paired');
     } on SyncTooLargeException {
       throw const _HttpFailure(413, 'too_large');
+    } on _HttpFailure {
+      rethrow;
     } catch (_) {
       throw const _HttpFailure(400, 'invalid');
+    } finally {
+      if (large) _largeBodyActive = false;
     }
     final nonce = body['requestId'];
     if (nonce is! String || nonce.length < 20 || nonce.length > 128) {
@@ -1577,14 +1656,52 @@ class LocalSyncService {
     return bytes.takeBytes();
   }
 
+  /// Reads a request body, giving up after [_bodyTimeout]. Unlike a timeout
+  /// on the future, this stops listening, so a client that stalls or trickles
+  /// cannot keep the read and its buffer alive; the reply that follows ends
+  /// the connection, as the body was not read to its end.
+  Future<Uint8List> _readBody(HttpRequest request, {required int maxBytes}) {
+    final result = Completer<Uint8List>();
+    final bytes = BytesBuilder(copy: false);
+    late final StreamSubscription<List<int>> subscription;
+    void finish(void Function() complete) {
+      if (result.isCompleted) return;
+      complete();
+      unawaited(subscription.cancel());
+    }
+
+    final timer = Timer(
+      _bodyTimeout,
+      () => finish(
+        () => result.completeError(const _HttpFailure(408, 'request_timeout')),
+      ),
+    );
+    subscription = request.listen(
+      (chunk) {
+        if (bytes.length + chunk.length > maxBytes) {
+          finish(
+            () => result.completeError(const _HttpFailure(413, 'too_large')),
+          );
+        } else {
+          bytes.add(chunk);
+        }
+      },
+      onDone: () => finish(() {
+        _bodyRead[request] = true;
+        result.complete(bytes.takeBytes());
+      }),
+      onError: (Object error, StackTrace stackTrace) =>
+          finish(() => result.completeError(error, stackTrace)),
+      cancelOnError: true,
+    );
+    return result.future.whenComplete(timer.cancel);
+  }
+
   Future<Map<String, dynamic>> _readJson(
     HttpRequest request, {
     required int maxBytes,
   }) async {
-    final bytes = await _readMessage(
-      request,
-      maxBytes: maxBytes,
-    ).timeout(_mergeTimeout);
+    final bytes = await _readBody(request, maxBytes: maxBytes);
     final decoded = json.decode(utf8.decode(bytes));
     if (decoded is! Map) throw const _HttpFailure(400, 'invalid');
     return Map<String, dynamic>.from(decoded);

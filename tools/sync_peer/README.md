@@ -16,6 +16,7 @@ keeps its constants equal to the app's.
 
 ```
 dart run bin/zenify_sync_peer.dart [--data DIR] [--name NAME] [--port PORT]
+                                   [--read-timeout SECONDS]
 ```
 
 It keeps only the sync document (what was liked, the playlists, the history
@@ -64,6 +65,15 @@ SSH_OPTS="-i KEY" tools/sync_peer/verify.sh ssh://USER@HOST:PORT/zenify-sync/dat
 
 Against a real server it leaves two test pairings and a test liked song in
 the peer: stop it and delete its `data` folder afterwards.
+
+## What it refuses
+
+Before it knows who sent a request it reads little: a request needs
+`Content-Type: application/json`; a merge needs a `Content-Length` (the apps
+always send one) of at most 64 MB, and only one such body is read at a time (a
+second one gets 429); a body that takes longer than `--read-timeout` (45
+seconds) to arrive is dropped. The JSON of a merge is decoded on another
+isolate.
 
 ## Limits
 

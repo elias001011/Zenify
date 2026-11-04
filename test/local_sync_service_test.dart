@@ -332,6 +332,7 @@ void main() {
     for (final path in ['pair-request', 'pair-verify']) {
       final response = await http.post(
         Uri.parse('http://127.0.0.1:${server.serverPort}/api/sync/$path'),
+        headers: {'Content-Type': 'application/json'},
         body: 'not json',
       );
       expect(response.statusCode, 400);

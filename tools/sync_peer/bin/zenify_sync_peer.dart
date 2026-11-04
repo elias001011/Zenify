@@ -32,7 +32,7 @@ const _pairingTimeout = Duration(seconds: 60);
 // Pairing is only accepted after `run.sh pair` opens it, and it closes with
 // the first attempt: the PIN is six digits and nobody watches this process.
 const _pairingWindow = Duration(minutes: 5);
-const _readTimeout = Duration(seconds: 45);
+const _defaultReadTimeout = Duration(seconds: 45);
 const _replyTimeout = Duration(seconds: 12);
 
 typedef _Reply = (int, Map<String, dynamic>);
@@ -129,9 +129,16 @@ class _Store {
 }
 
 class _Peer {
-  _Peer(this.store);
+  _Peer(this.store, {this.readTimeout = _defaultReadTimeout});
 
   final _Store store;
+
+  /// How long a request may take to send its body.
+  final Duration readTimeout;
+
+  // A large body is read by one request at a time: the others would pile up
+  // to 64 MB each, and none of them has proven who sent it yet.
+  var _largeBodyActive = false;
   late HttpServer _server;
   RawDatagramSocket? _udp;
   var _merging = Future<void>.value();
@@ -146,6 +153,9 @@ class _Peer {
 
   // What a handler wants done once its reply went out, or failed to.
   final _afterReply = Expando<Future<void> Function(bool delivered)>();
+
+  // Requests whose body was read to its end.
+  final _bodyRead = Expando<bool>();
 
   Future<void> start(int port) async {
     _server = await HttpServer.bind(InternetAddress.anyIPv4, port);
@@ -192,9 +202,22 @@ class _Peer {
             '/api/sync/merge' => _merge,
             _ => null,
           };
+    // The clients always say so. A web page cannot send JSON to another
+    // origin without a preflight request, which this server never answers.
     final (status, body) = handler == null
         ? (404, <String, dynamic>{'error': 'not_found'})
+        : !_isJson(request)
+        ? (415, <String, dynamic>{'error': 'unsupported_media_type'})
         : await handler(request);
+    // A reply to a request whose body is large or of unknown size and was
+    // not read would wait for all of it to arrive, and the sender decides
+    // when that is: answer now and hang up instead.
+    final length = request.contentLength;
+    if (_bodyRead[request] != true &&
+        (length < 0 || length > _smallMessageBytes)) {
+      await _replyAndHangUp(request, status, body);
+      return;
+    }
     final afterReply = _afterReply[request];
     var delivered = true;
     try {
@@ -219,28 +242,87 @@ class _Peer {
     }
   }
 
-  Future<Uint8List> _readMessage(
-    Stream<List<int>> stream, {
-    required int maxBytes,
-  }) async {
-    final bytes = BytesBuilder(copy: false);
-    await for (final chunk in stream) {
-      if (bytes.length + chunk.length > maxBytes) {
-        throw const _Failure(413, 'too_large');
+  Future<void> _replyAndHangUp(
+    HttpRequest request,
+    int status,
+    Map<String, dynamic> body,
+  ) async {
+    try {
+      final response = request.response..statusCode = status;
+      final payload = utf8.encode(jsonEncode(body));
+      final socket = await response.detachSocket(writeHeaders: false);
+      socket
+        ..add(
+          utf8.encode(
+            'HTTP/1.1 $status ${response.reasonPhrase}\r\n'
+            'Content-Type: application/json; charset=utf-8\r\n'
+            'Content-Length: ${payload.length}\r\n'
+            'Connection: close\r\n\r\n',
+          ),
+        )
+        ..add(payload);
+      try {
+        await socket.flush().timeout(_replyTimeout);
+      } catch (_) {
+        // The other device gave up waiting.
       }
-      bytes.add(chunk);
+      socket.destroy();
+    } catch (_) {
+      // The other device gave up waiting.
     }
-    return bytes.takeBytes();
+  }
+
+  bool _isJson(HttpRequest request) {
+    try {
+      return request.headers.contentType?.mimeType == 'application/json';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Reads a request body, giving up after [readTimeout]. Unlike a timeout on
+  /// the future, this stops listening, so a client that stalls or trickles
+  /// cannot keep the read and its buffer alive.
+  Future<Uint8List> _readBody(HttpRequest request, {required int maxBytes}) {
+    final result = Completer<Uint8List>();
+    final bytes = BytesBuilder(copy: false);
+    late final StreamSubscription<List<int>> subscription;
+    void finish(void Function() complete) {
+      if (result.isCompleted) return;
+      complete();
+      unawaited(subscription.cancel());
+    }
+
+    final timer = Timer(
+      readTimeout,
+      () => finish(
+        () => result.completeError(const _Failure(408, 'request_timeout')),
+      ),
+    );
+    subscription = request.listen(
+      (chunk) {
+        if (bytes.length + chunk.length > maxBytes) {
+          finish(() => result.completeError(const _Failure(413, 'too_large')));
+        } else {
+          bytes.add(chunk);
+        }
+      },
+      onDone: () => finish(() {
+        _bodyRead[request] = true;
+        result.complete(bytes.takeBytes());
+      }),
+      onError: (Object error, StackTrace stackTrace) =>
+          finish(() => result.completeError(error, stackTrace)),
+      cancelOnError: true,
+    );
+    return result.future.whenComplete(timer.cancel);
   }
 
   Future<Map<String, dynamic>> _readJson(
     HttpRequest request, {
     required int maxBytes,
   }) async {
-    final bytes = await _readMessage(
-      request,
-      maxBytes: maxBytes,
-    ).timeout(_readTimeout);
+    final bytes = await _readBody(request, maxBytes: maxBytes);
     final decoded = jsonDecode(utf8.decode(bytes));
     if (decoded is! Map) throw const _Failure(400, 'invalid');
     return Map<String, dynamic>.from(decoded);
@@ -255,8 +337,12 @@ class _Peer {
   }
 
   void _closePairingWindow() {
-    final file = _windowFile;
-    if (file.existsSync()) file.deleteSync();
+    try {
+      final file = _windowFile;
+      if (file.existsSync()) file.deleteSync();
+    } on FileSystemException catch (e) {
+      _log('Could not close the pairing window: $e');
+    }
   }
 
   DateTime? _lastRefusalLogged;
@@ -268,8 +354,12 @@ class _Peer {
     _pendingClientName = null;
     _pendingPairing = null;
     _pendingTimer = null;
-    final pin = File('${store.directory.path}/pairing-pin.txt');
-    if (pin.existsSync()) pin.deleteSync();
+    try {
+      final pin = File('${store.directory.path}/pairing-pin.txt');
+      if (pin.existsSync()) pin.deleteSync();
+    } on FileSystemException catch (e) {
+      _log('Could not remove the PIN file: $e');
+    }
   }
 
   Future<_Reply> _pairRequest(HttpRequest request) async {
@@ -433,25 +523,39 @@ class _Peer {
     if (request.contentLength > maxBytes) {
       throw const _Failure(413, 'too_large');
     }
-    final data = await _readJson(request, maxBytes: maxBytes);
-    if (data['apiVersion'] != _apiVersion) {
-      throw const _Failure(426, 'upgrade_required');
+    final large = maxBytes > _smallMessageBytes;
+    if (large) {
+      // The device id is public (discovery answers with it), so a large body
+      // is not trusted yet: its size must be known, and only one is read.
+      if (request.contentLength < 0)
+        throw const _Failure(411, 'length_required');
+      if (_largeBodyActive) throw const _Failure(429, 'busy');
+      _largeBodyActive = true;
     }
-    if (data['encrypted'] is! Map) throw const _Failure(400, 'invalid');
     final Map<String, dynamic> body;
     try {
-      body = await SyncSecurity.open(
+      final bytes = await _readBody(request, maxBytes: maxBytes);
+      body = await SyncSecurity.openRequestInBackground(
         peer.secret,
-        data['encrypted'],
+        bytes,
         '${request.uri.path.substring(1)}|$id|${store.deviceId}',
+        apiVersion: _apiVersion,
       );
+    } on SyncEnvelopeException catch (e) {
+      throw e.upgradeRequired
+          ? const _Failure(426, 'upgrade_required')
+          : const _Failure(400, 'invalid');
     } on SyncTooLargeException {
       throw const _Failure(413, 'too_large');
     } on FormatException {
       throw const _Failure(400, 'invalid');
+    } on _Failure {
+      rethrow;
     } catch (_) {
       // A wrong secret fails the authentication of the message.
       throw const _Failure(403, 'not_paired');
+    } finally {
+      if (large) _largeBodyActive = false;
     }
     final nonce = body['requestId'];
     if (nonce is! String || nonce.length < 20 || nonce.length > 128) {
@@ -566,6 +670,7 @@ Future<void> main(List<String> arguments) async {
   var data = '${Platform.environment['HOME'] ?? '.'}/zenify-sync/data';
   var name = 'Zenify Sync Server';
   var port = 0;
+  var readTimeout = _defaultReadTimeout;
   var list = false;
   String? unpair;
   for (var i = 0; i < arguments.length; i++) {
@@ -576,6 +681,8 @@ Future<void> main(List<String> arguments) async {
         name = arguments[++i];
       case '--port':
         port = int.parse(arguments[++i]);
+      case '--read-timeout':
+        readTimeout = Duration(seconds: int.parse(arguments[++i]));
       case '--list':
         list = true;
       case '--unpair':
@@ -583,6 +690,7 @@ Future<void> main(List<String> arguments) async {
       default:
         stderr.writeln(
           'Usage: zenify_sync_peer [--data DIR] [--name NAME] [--port PORT]\n'
+          '                        [--read-timeout SECONDS]\n'
           '       zenify_sync_peer [--data DIR] --list | --unpair ID',
         );
         exit(64);
@@ -606,5 +714,5 @@ Future<void> main(List<String> arguments) async {
     }
     return;
   }
-  await _Peer(store).start(port);
+  await _Peer(store, readTimeout: readTimeout).start(port);
 }
