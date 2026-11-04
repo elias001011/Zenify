@@ -369,6 +369,9 @@ class ListeningStatsService {
     cleared['syncResetId'] = SyncSecurity.randomToken(16);
     _stats = cleared;
     await deleteData('user', storageKey);
+    if (Hive.isBoxOpen('userNoBackup')) {
+      await deleteData('userNoBackup', _extraKey);
+    }
     // Persist the cleared map last so an in-flight checkpoint flush can't
     // resurrect the deleted stats (skipped if a new recording replaced _stats).
     if (identical(_stats, cleared)) {
@@ -405,11 +408,39 @@ class ListeningStatsService {
     }
 
     final raw = Hive.box('user').get(storageKey);
-    _stats = normalizeListeningStats(raw, currentDate);
+    _stats = _withStoredExtra(normalizeListeningStats(raw, currentDate));
     if (_shouldPersistNormalizedStats(raw, _stats!)) {
       _markDirty();
     }
     return _stats!;
+  }
+
+  /// The songs of this month beyond what is backed up and synced: kept on
+  /// this device alone, so a month longer than that counts every song.
+  static const _extraKey = 'wrappedMonthExtra';
+
+  Map<String, dynamic> _withStoredExtra(Map<String, dynamic> stats) {
+    if (!Hive.isBoxOpen('userNoBackup')) return stats;
+    final stored = Hive.box('userNoBackup').get(_extraKey);
+    final songs = stored is Map ? _asMap(stored['songs']) : null;
+    if (songs == null || stored['month'] != stats['currentMonthKey']) {
+      return stats;
+    }
+    return withExtraSongs(stats, songs);
+  }
+
+  Future<void> _saveExtra(String monthKey, Map<String, dynamic> extra) async {
+    final stored = Hive.isBoxOpen('userNoBackup')
+        ? Hive.box('userNoBackup').get(_extraKey)
+        : null;
+    if (extra.isEmpty) {
+      if (stored != null) await deleteData('userNoBackup', _extraKey);
+      return;
+    }
+    await addOrUpdateData('userNoBackup', _extraKey, {
+      'month': monthKey,
+      'songs': extra,
+    });
   }
 
   void _markDirty() {
@@ -420,7 +451,9 @@ class ListeningStatsService {
     final stats = _stats;
     if (stats == null || !_dirty) return;
     try {
-      await addOrUpdateData('user', storageKey, stats);
+      final (stats: stored, :extra) = splitCurrentMonthSongs(stats);
+      await addOrUpdateData('user', storageKey, stored);
+      await _saveExtra(stats['currentMonthKey'].toString(), extra);
       // Clear the dirty flag only if no newer recording replaced _stats while
       // this write was in flight, otherwise those changes would be lost.
       if (identical(_stats, stats)) {

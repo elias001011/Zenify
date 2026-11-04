@@ -22,7 +22,16 @@
 import 'dart:math';
 
 const wrappedListeningStatsSchemaVersion = 2;
+
+/// How many songs of the current month go with the stats that are backed up
+/// and synced.
 const wrappedCurrentMonthSongsLimit = 250;
+
+/// How many songs of the current month this device keeps counting: the best
+/// [wrappedCurrentMonthSongsLimit] are the stats that are backed up and
+/// synced (see [splitCurrentMonthSongs]), the rest stay on the device, so a
+/// month with more songs than that does not stop counting the new ones.
+const wrappedWorkingSongsLimit = 4000;
 const wrappedMonthlyHistorySongsLimit = 15;
 const wrappedAnnualSongsLimit = 30;
 const wrappedExpandedSongsLimit = wrappedAnnualSongsLimit;
@@ -105,7 +114,7 @@ Map<String, dynamic> normalizeListeningStats(dynamic raw, DateTime now) {
       currentMonthFromHistory = _mergeMonthStats(
         currentMonthFromHistory,
         month,
-        songLimit: wrappedCurrentMonthSongsLimit,
+        songLimit: wrappedWorkingSongsLimit,
       );
       return;
     }
@@ -125,7 +134,7 @@ Map<String, dynamic> normalizeListeningStats(dynamic raw, DateTime now) {
   currentMonth = _mergeMonthStats(
     currentMonth,
     currentMonthFromHistory,
-    songLimit: wrappedCurrentMonthSongsLimit,
+    songLimit: wrappedWorkingSongsLimit,
   );
 
   final normalized = {
@@ -135,7 +144,7 @@ Map<String, dynamic> normalizeListeningStats(dynamic raw, DateTime now) {
     'currentMonthKey': currentMonthKeyFromStats,
     'currentMonth': _trimmedMonth(
       currentMonth,
-      songLimit: wrappedCurrentMonthSongsLimit,
+      songLimit: wrappedWorkingSongsLimit,
     ),
     'history': _retainedHistory(history, now),
   };
@@ -217,7 +226,7 @@ Map<String, dynamic> _storeDeltaMonth(
   final listenedMonthKey = listeningStatsMonthKey(listenedAt);
   final writesToCurrentMonth = currentMonthKey == listenedMonthKey;
   final songLimit = writesToCurrentMonth
-      ? wrappedCurrentMonthSongsLimit
+      ? wrappedWorkingSongsLimit
       : wrappedMonthlyHistorySongsLimit;
   final trimmedMonth = _trimmedMonth(
     monthStats,
@@ -562,6 +571,62 @@ Map<String, dynamic> _trimmedMonth(
   _trimSongs(songs, songLimit, keep: keep);
   normalized['songs'] = songs;
   return normalized;
+}
+
+/// The stats for storing: the current month with only the best [limit] songs
+/// (what is backed up and synced), and the others as `extra`, to be kept on
+/// the device alone and given back with [withExtraSongs].
+({Map<String, dynamic> stats, Map<String, dynamic> extra})
+splitCurrentMonthSongs(
+  Map<String, dynamic> stats, {
+  int limit = wrappedCurrentMonthSongsLimit,
+}) {
+  final month = _normalizeMonth(stats['currentMonth']);
+  final songs = _normalizeMap(month['songs']);
+  if (songs.length <= limit) return (stats: stats, extra: const {});
+
+  final ranked = songs.entries.toList()
+    ..sort(
+      (a, b) =>
+          _compareSongStats(_normalizeMap(a.value), _normalizeMap(b.value)),
+    );
+  return (
+    stats: {
+      ...stats,
+      'currentMonth': {
+        ...month,
+        'songs': {
+          for (final entry in ranked.take(limit)) entry.key: entry.value,
+        },
+      },
+    },
+    extra: {for (final entry in ranked.skip(limit)) entry.key: entry.value},
+  );
+}
+
+/// [stats] with the [extra] songs of its current month given back: those it
+/// does not have already, as it may have newer figures for the others.
+Map<String, dynamic> withExtraSongs(
+  Map<String, dynamic> stats,
+  Map<String, dynamic> extra,
+) {
+  final month = _normalizeMonth(stats['currentMonth']);
+  final songs = _normalizeMap(month['songs']);
+  final missing = {
+    for (final entry in extra.entries)
+      if (!songs.containsKey(entry.key)) entry.key: entry.value,
+  };
+  if (missing.isEmpty) return stats;
+  return {
+    ...stats,
+    'currentMonth': {
+      ...month,
+      'songs': _trimmedMonth({
+        ...month,
+        'songs': {...songs, ...missing},
+      }, songLimit: wrappedWorkingSongsLimit)['songs'],
+    },
+  };
 }
 
 void _trimSongs(Map<String, dynamic> songs, int limit, {String? keep}) {

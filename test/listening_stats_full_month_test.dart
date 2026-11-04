@@ -10,23 +10,16 @@ void main() {
   late Directory dir;
   late DateTime now;
   late ListeningStatsService stats;
+
   setUp(() async {
     dir = await Directory.systemTemp.createTemp('zenify_stats_full_month');
     Hive.init(dir.path);
     await Hive.openBox('settings');
     await Hive.openBox('user');
+    await Hive.openBox('userNoBackup');
     wrappedEnabled.value = true;
     now = DateTime(2026, 11, 3, 12);
     stats = ListeningStatsService(now: () => now);
-    // A month whose songs were all heard to the end once: the least of them
-    // has far more seconds than a song that has just qualified.
-    for (var i = 0; i < wrappedCurrentMonthSongsLimit; i++) {
-      stats.recordListening(
-        {'ytid': 'old$i', 'title': 'Old $i'},
-        Duration(seconds: 200 + i),
-        incrementPlayCount: true,
-      );
-    }
   });
   tearDown(() async {
     await stats.flush();
@@ -34,8 +27,36 @@ void main() {
     await dir.delete(recursive: true);
   });
 
+  /// A month the device has stored with [count] songs, each heard to the end
+  /// once: the least of them has far more seconds than a song that has just
+  /// qualified.
+  Future<void> seed(int count) async {
+    final stored = createEmptyListeningStats(2026, currentMonthKey: '2026-11');
+    stored['currentMonth'] = {
+      'totalSeconds': count * 300,
+      'songs': {
+        for (var i = 0; i < count; i++)
+          'old$i': {
+            'ytid': 'old$i',
+            'title': 'Old $i',
+            'seconds': 200 + i,
+            'playCount': 1,
+            'listeningCount': 1,
+            'lastPlayed': now.toIso8601String(),
+          },
+      },
+    };
+    await Hive.box('user').put(ListeningStatsService.storageKey, stored);
+    stats.reload();
+  }
+
   Map<String, dynamic> songs() =>
       stats.monthStats('2026-11')!['songs'] as Map<String, dynamic>;
+
+  Map storedSongs() =>
+      (Hive.box('user').get(ListeningStatsService.storageKey)['currentMonth']
+              as Map)['songs']
+          as Map;
 
   void listen(Map<String, dynamic> song, int seconds) {
     stats.startListeningSession(song);
@@ -43,26 +64,91 @@ void main() {
     stats.finishListeningSession(countCurrentTick: true, wasPlaying: true);
   }
 
-  test('a song new to a full month counts, with everything heard of it', () {
-    expect(songs(), hasLength(wrappedCurrentMonthSongsLimit));
+  test('a song new to a month of many songs counts, with all of it', () async {
+    await seed(wrappedCurrentMonthSongsLimit + 50);
 
-    listen({'ytid': 'new', 'title': 'New'}, 100);
-
-    expect(songs(), hasLength(wrappedCurrentMonthSongsLimit));
-    expect(songs()['new'], containsPair('playCount', 1));
-    expect(songs()['new'], containsPair('seconds', 100));
-  });
-
-  test('the least heard song makes room, never the one just played', () {
     listen({'ytid': 'new', 'title': 'New'}, 100);
     listen({'ytid': 'other', 'title': 'Other'}, 90);
 
-    expect(songs(), hasLength(wrappedCurrentMonthSongsLimit));
-    // The first newcomer took the place of the least heard of the month, the
-    // second one took the first's: it had the fewest seconds by then.
-    expect(songs(), contains('other'));
-    expect(songs(), isNot(contains('new')));
-    expect(songs(), isNot(contains('old0')));
-    expect(songs(), contains('old1'));
+    // Nothing was cut to make room: both are there, with what was heard.
+    expect(songs(), hasLength(wrappedCurrentMonthSongsLimit + 52));
+    expect(songs()['new'], containsPair('playCount', 1));
+    expect(songs()['new'], containsPair('seconds', 100));
+    expect(songs()['other'], containsPair('seconds', 90));
   });
+
+  test(
+    'only the best songs are backed up, the others stay on the device',
+    () async {
+      await seed(wrappedCurrentMonthSongsLimit + 50);
+      listen({'ytid': 'new', 'title': 'New'}, 100);
+      await stats.flush();
+
+      // What a backup or a sync takes is the size it always was.
+      expect(storedSongs(), hasLength(wrappedCurrentMonthSongsLimit));
+      expect(storedSongs(), contains('old299'));
+      expect(storedSongs(), isNot(contains('new')));
+
+      // And the device gives the rest back after a restart.
+      stats.reload();
+      expect(songs(), hasLength(wrappedCurrentMonthSongsLimit + 51));
+      expect(songs()['new'], containsPair('seconds', 100));
+    },
+  );
+
+  test('a song that rose into the best ones is not kept twice', () async {
+    await seed(wrappedCurrentMonthSongsLimit + 5);
+    songs();
+    await stats.flush();
+
+    // Heard for a long time, a song of the device alone becomes one of the best.
+    listen({'ytid': 'old0', 'title': 'Old 0'}, 4000);
+    await stats.flush();
+    expect(storedSongs(), contains('old0'));
+
+    stats.reload();
+    expect(songs()['old0'], containsPair('seconds', 4200));
+    expect(songs(), hasLength(wrappedCurrentMonthSongsLimit + 5));
+  });
+
+  test('a new month starts without the extra songs of the last', () async {
+    await seed(wrappedCurrentMonthSongsLimit + 50);
+    songs();
+    await stats.flush();
+    expect(Hive.box('userNoBackup').get('wrappedMonthExtra'), isNotNull);
+
+    now = DateTime(2026, 12, 1, 9);
+    stats.reload();
+    expect(stats.monthStats('2026-12')?['songs'] ?? const {}, isEmpty);
+    listen({'ytid': 'new', 'title': 'New'}, 100);
+    await stats.flush();
+
+    expect(Hive.box('userNoBackup').get('wrappedMonthExtra'), isNull);
+  });
+
+  test('clearing the recap clears what the device kept too', () async {
+    await seed(wrappedCurrentMonthSongsLimit + 50);
+    songs();
+    await stats.flush();
+    expect(Hive.box('userNoBackup').get('wrappedMonthExtra'), isNotNull);
+
+    await stats.clearStats();
+
+    expect(Hive.box('userNoBackup').get('wrappedMonthExtra'), isNull);
+    stats.reload();
+    expect(stats.monthStats('2026-11')?['songs'] ?? const {}, isEmpty);
+  });
+
+  test(
+    'past the limit of the device the song being played still stays',
+    () async {
+      await seed(wrappedWorkingSongsLimit);
+
+      listen({'ytid': 'new', 'title': 'New'}, 100);
+
+      expect(songs(), hasLength(wrappedWorkingSongsLimit));
+      expect(songs()['new'], containsPair('seconds', 100));
+      expect(songs(), isNot(contains('old0')));
+    },
+  );
 }
