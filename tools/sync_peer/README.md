@@ -73,7 +73,8 @@ Before it knows who sent a request it reads little: a request needs
 always send one) of at most 64 MB, and only one such body is read at a time (a
 second one gets 429); a body that takes longer than `--read-timeout` (45
 seconds) to arrive is dropped. The JSON of a merge is decoded on another
-isolate.
+isolate. A record that names a path outside the library (a song id with `/` or
+`..`) is refused.
 
 ## Limits
 

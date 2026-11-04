@@ -252,6 +252,34 @@ void main() {
     );
   }, skip: skip);
 
+  test('a record that names a path outside the library is refused', () async {
+    for (final id in ['../../x', 'a/b', r'a\b', 'tab\there', 'x' * 129]) {
+      final library = payload(
+        document({
+          'likedSongs': [song('fine')],
+        }),
+      );
+      final records = Map<String, dynamic>.from(
+        library['document']['records'] as Map,
+      );
+      final key = records.keys.firstWhere((k) => k.contains('fine'));
+      final cell = Map<String, dynamic>.from(records.remove(key) as Map);
+      cell['value'] = {...cell['value'] as Map, 'ytid': id};
+      records[jsonEncode(['likedSongs', '', id])] = cell;
+      library['document']['records'] = records;
+      final body = utf8.encode(
+        jsonEncode(
+          await envelope('merge', {
+            'categories': library['categories'],
+            'library': library,
+          }),
+        ),
+      );
+      final result = await send('merge', body);
+      expect(result.status, 400, reason: 'id ${jsonEncode(id)}');
+    }
+  }, skip: skip);
+
   test(
     'a storage failure after the right PIN is not a wrong PIN',
     () async {

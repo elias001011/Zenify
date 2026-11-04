@@ -53,6 +53,10 @@ const _kindKeys = <String, String>{
   'moodsTuning': 'moodsTuning',
 };
 
+/// A clock beyond this wins every conflict for good, and counting on from it
+/// would run out of integers: no honest device gets anywhere near it.
+const int _maxClock = 1 << 53;
+
 class SyncDocument {
   SyncDocument({Map<String, dynamic>? records, this.clock = 0})
     : records = records ?? {};
@@ -61,7 +65,8 @@ class SyncDocument {
     if (![2, syncSchemaVersion].contains(raw['version']) ||
         raw['records'] is! Map ||
         raw['clock'] is! int ||
-        raw['clock'] < 0) {
+        raw['clock'] < 0 ||
+        raw['clock'] > _maxClock) {
       throw const FormatException('Unsupported sync document');
     }
     validateSyncJson(raw);
@@ -73,6 +78,7 @@ class SyncDocument {
           cell is! Map ||
           cell['clock'] is! int ||
           cell['clock'] < 0 ||
+          cell['clock'] > _maxClock ||
           cell['device'] is! String ||
           cell['device'].length > 128 ||
           cell['deleted'] is! bool) {
@@ -85,6 +91,7 @@ class SyncDocument {
         _validateStamp(migrated['generation']);
         records[entry.key] = migrated;
       }
+      _validateKey(key);
       if (cell['deleted'] != true) _validateValue(key, cell['value']);
       records[entry.key] = _portableCell(key[0], records[entry.key] as Map);
     }
@@ -493,9 +500,11 @@ class SyncDocument {
             : item is Map
             ? item['ytid']?.toString()
             : null;
-        // An entry without an id cannot be tracked: it stays on this device
-        // instead of stopping the whole library from syncing.
+        // An entry without an id, or with one that cannot be exchanged,
+        // cannot be tracked: it stays on this device instead of stopping the
+        // whole library from syncing.
         if (id == null || id.isEmpty) continue;
+        if (kind != 'searchHistory' && !isSafeId(id)) continue;
         if (ids.contains(id)) continue;
         ids.add(id);
         result[_key(kind, parent, id)] = strings
@@ -526,7 +535,7 @@ class SyncDocument {
     }
     void playlist(Map item, String? folder) {
       final id = item['ytid']?.toString();
-      if (id == null || id.isEmpty || item['list'] is! List) {
+      if (id == null || !isSyncableId(id) || item['list'] is! List) {
         throw const FormatException('Invalid custom playlist');
       }
       final metadata = _portableMap(item)..remove('list');
@@ -535,7 +544,7 @@ class SyncDocument {
       final ids = <String>[];
       for (final song in item['list']) {
         final songId = song is Map ? song['ytid']?.toString() : null;
-        if (songId == null || songId.isEmpty) continue;
+        if (songId == null || !isSyncableId(songId)) continue;
         if (!ids.contains(songId)) ids.add(songId);
         result[_key('playlistSong', id, songId)] = _portableMap(song as Map);
       }
@@ -555,7 +564,10 @@ class SyncDocument {
         .map((e) => e['ytid'].toString())
         .toList();
     for (final item in folders) {
-      if (item is! Map || item['id'] is! String || item['playlists'] is! List) {
+      if (item is! Map ||
+          item['id'] is! String ||
+          !isSyncableId(item['id'] as String) ||
+          item['playlists'] is! List) {
         throw const FormatException('Invalid folder');
       }
       final id = item['id'] as String;
@@ -653,13 +665,38 @@ class SyncDocument {
     return portable(encodeSyncValue(raw)) as Map<String, dynamic>;
   }
 
-  static void _validateValue(List<String> parts, Object? value) {
-    final kind = parts[0];
+  /// Ids become part of file names (downloads, covers) on the device that
+  /// receives them: nothing that climbs out of a folder, no control
+  /// characters, a sane length. Ids from YouTube and local files
+  /// (`local:0123abcd`) all pass.
+  static bool isSafeId(String id) =>
+      id.length <= 128 &&
+      !id.contains('..') &&
+      !id.runes.any((c) => c < 0x20 || c == 0x7f || c == 0x2f || c == 0x5c);
+
+  /// Whether a library entry with this id is exchanged at all; the others
+  /// stay on the device that has them.
+  static bool isSyncableId(String? id) =>
+      id != null && id.isNotEmpty && isSafeId(id);
+
+  /// What names a record, deleted or not.
+  static void _validateKey(List<String> parts) {
     if (parts[1].length > 1024 || parts[2].length > 1024) {
       throw const FormatException('Invalid record id');
     }
+    // A search is free text; every other id names something.
+    if (!parts[0].startsWith('searchHistory') &&
+        !(isSafeId(parts[1]) && isSafeId(parts[2]))) {
+      throw const FormatException('Invalid record id');
+    }
+  }
+
+  static void _validateValue(List<String> parts, Object? value) {
+    final kind = parts[0];
+    final named = !kind.startsWith('searchHistory');
     if (kind.endsWith('Order')) {
-      if (value is! List || value.any((e) => e is! String)) {
+      if (value is! List ||
+          value.any((e) => e is! String || (named && !isSafeId(e)))) {
         throw const FormatException('Invalid order');
       }
     } else if (kind == 'recapMonth') {
