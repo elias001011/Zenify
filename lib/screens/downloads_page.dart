@@ -28,6 +28,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/song_replacement.dart';
 import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/utilities/app_utils.dart';
@@ -125,10 +126,10 @@ class DownloadsPage extends StatelessWidget {
                                 l10n.downloadsUnavailable,
                                 FluentIcons.cloud_off_24_filled,
                                 unavailable,
-                                // Once every download is over, one swap
-                                // covers every playlist.
+                                // One swap covers every playlist, as soon as
+                                // there is a song to swap.
                                 action: ListenableBuilder(
-                                  listenable: replacementOffer,
+                                  listenable: offlineMode,
                                   builder: (context, _) {
                                     final songs = canOfferReplacement
                                         ? _inPlaylists(unavailable)

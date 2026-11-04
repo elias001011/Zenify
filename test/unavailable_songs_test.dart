@@ -487,21 +487,21 @@ void main() {
       );
     });
 
-    testWidgets('waits until every download is over, and for a margin', (
+    testWidgets('shows as soon as a song fails, with downloads running', (
       tester,
     ) async {
       final manager = DownloadManager.instance;
       await tester.pumpWidget(app(notice()));
-      unavailableSongs.ids.value = {'b'};
-      // Another playlist's download is running: this one may still lose songs.
+      // Another download is running, and the person may cancel it: the song
+      // that is gone needs its swap now.
       final entry = manager.queued(song('z'));
       await tester.pump();
-      expect(find.byType(FilledButton), findsNothing);
+      unavailableSongs.ids.value = {'b'};
+      await tester.pump();
+      expect(find.byType(FilledButton), findsOneWidget);
 
       manager.finished(entry);
-      await tester.pump(const Duration(milliseconds: 5));
-      expect(find.byType(FilledButton), findsNothing);
-      await tester.pump(const Duration(milliseconds: 40));
+      await tester.pump(const Duration(milliseconds: 60));
       expect(find.byType(FilledButton), findsOneWidget);
     });
 

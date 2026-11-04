@@ -23,6 +23,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/song_replacement.dart';
 import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/widgets/replace_unavailable_button.dart';
@@ -30,13 +31,13 @@ import 'package:musify/widgets/replace_unavailable_button.dart';
 final _changes = Listenable.merge([
   unavailableSongs.ids,
   userOfflineSongs,
-  replacementOffer,
+  offlineMode,
 ]);
 
-/// Tells, once a playlist's download is over, that some songs of it failed as
-/// unavailable on YouTube, and offers to dismiss that or to swap them for
-/// other uploads. Songs that are downloaded still play, so they are not
-/// counted.
+/// Tells, as soon as a song of a playlist fails as unavailable on YouTube,
+/// and offers to dismiss that or to swap them for other uploads, with the
+/// downloads still running or not. Songs that are downloaded still play, so
+/// they are not counted.
 class UnavailableNotice extends StatelessWidget {
   const UnavailableNotice({
     super.key,

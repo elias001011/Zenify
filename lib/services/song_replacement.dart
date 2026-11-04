@@ -198,23 +198,14 @@ class ReplacementPlan {
   final Set<String> notSearched;
 }
 
-/// Whether a replacement search or its review is under way: the button that
-/// started it must outlive the downloads that begin meanwhile.
+/// Whether a replacement search or its review is under way: only one runs at
+/// a time.
 final replacing = ValueNotifier<bool>(false);
 
-/// What decides [canOfferReplacement]; rebuild when any of it changes.
-final replacementOffer = Listenable.merge([
-  DownloadManager.instance.idle,
-  replacing,
-  offlineMode,
-]);
-
-/// Whether the notices and buttons to replace unavailable songs show: online,
-/// and once every download is over (a song may be queued by another playlist
-/// and still fail), or while a replacement is under way.
-bool get canOfferReplacement =>
-    !offlineMode.value &&
-    (DownloadManager.instance.idle.value || replacing.value);
+/// Whether the notices and buttons to replace unavailable songs show: online.
+/// A song needs the swap as soon as YouTube says it is gone, not when the
+/// downloads end: they may be cancelled, and the swap starts its own.
+bool get canOfferReplacement => !offlineMode.value;
 
 /// Searches replacements for [songs], unavailable on YouTube, among those a
 /// playlist you made holds (only [playlistId] when given) and still flagged.
