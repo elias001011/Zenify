@@ -256,6 +256,10 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   bool get shouldContinuePlayback =>
       _currentLoadingIndex >= 0 ? _queuePlayWhenReady : audioPlayer.playing;
 
+  /// A song is being loaded to play as soon as it is ready: what the controls
+  /// show meanwhile is playing, not a pause between two songs.
+  bool get _playsWhenLoaded => _currentLoadingIndex >= 0 && _queuePlayWhenReady;
+
   /// Whether the picker adds a song when the queue runs out: when the user
   /// chose it, and always for a queue the Moods started.
   bool get _continuesQueue =>
@@ -824,7 +828,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       final currentPosition = _position;
       final playerProcessingState = audioPlayer.processingState;
       final isPlaying =
-          audioPlayer.playing &&
+          (audioPlayer.playing || _playsWhenLoaded) &&
           playerProcessingState != ProcessingState.completed;
       final currentState = playbackState.valueOrNull;
       final newProcessingState =
@@ -1477,6 +1481,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           },
           androidCompactActionIndices: const [0, 1, 3],
           processingState: AudioProcessingState.loading,
+          playing: _playsWhenLoaded,
           speed: audioPlayer.speed,
           queueIndex:
               queueIndex ?? (_hasCurrentQueueIndex ? _currentQueueIndex : null),
@@ -1578,6 +1583,8 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       if (currentTransitionId == _currentLoadingTransitionId) {
         _currentLoadingIndex = -1;
         _currentLoadingTransitionId = -1;
+        // A song that failed to load plays nothing: the controls follow.
+        _updatePlaybackState();
       }
     }
   }
