@@ -189,7 +189,7 @@ Map<String, dynamic> applyListeningStatsDelta(
     incrementPlayCount: incrementPlayCount,
   );
 
-  return _storeDeltaMonth(stats, listenedAt, monthStats);
+  return _storeDeltaMonth(stats, listenedAt, monthStats, keep: ytid);
 }
 
 Map<String, dynamic> _monthStatsForDelta(
@@ -204,18 +204,26 @@ Map<String, dynamic> _monthStatsForDelta(
       : _normalizeMonth(_normalizeMap(stats['history'])[listenedMonthKey]);
 }
 
+/// [keep] is the song being written: it is never the one a full month drops,
+/// or a newcomer (a few seconds against the ones already there) would be cut
+/// the moment it qualifies, and everything listened to it after that with it.
 Map<String, dynamic> _storeDeltaMonth(
   Map<String, dynamic> stats,
   DateTime listenedAt,
-  Map<String, dynamic> monthStats,
-) {
+  Map<String, dynamic> monthStats, {
+  String? keep,
+}) {
   final currentMonthKey = stats['currentMonthKey']?.toString();
   final listenedMonthKey = listeningStatsMonthKey(listenedAt);
   final writesToCurrentMonth = currentMonthKey == listenedMonthKey;
   final songLimit = writesToCurrentMonth
       ? wrappedCurrentMonthSongsLimit
       : wrappedMonthlyHistorySongsLimit;
-  final trimmedMonth = _trimmedMonth(monthStats, songLimit: songLimit);
+  final trimmedMonth = _trimmedMonth(
+    monthStats,
+    songLimit: songLimit,
+    keep: keep,
+  );
 
   if (writesToCurrentMonth) {
     stats['currentMonth'] = trimmedMonth;
@@ -224,6 +232,7 @@ Map<String, dynamic> _storeDeltaMonth(
     final writtenMonth = _trimmedMonth(
       trimmedMonth,
       songLimit: wrappedMonthlyHistorySongsLimit,
+      keep: keep,
     );
     history[listenedMonthKey] = writtenMonth;
     // Re-pin the just-written month: retention is evaluated as of listenedAt,
@@ -542,6 +551,7 @@ void _upsertSongStats(
 Map<String, dynamic> _trimmedMonth(
   Map<String, dynamic> month, {
   required int songLimit,
+  String? keep,
 }) {
   final normalized = _normalizeMonth(month);
   final songs = _normalizeMap(normalized['songs'])
@@ -549,12 +559,12 @@ Map<String, dynamic> _trimmedMonth(
       final song = _normalizeMap(value);
       return _readInt(song['playCount']) <= 0;
     });
-  _trimSongs(songs, songLimit);
+  _trimSongs(songs, songLimit, keep: keep);
   normalized['songs'] = songs;
   return normalized;
 }
 
-void _trimSongs(Map<String, dynamic> songs, int limit) {
+void _trimSongs(Map<String, dynamic> songs, int limit, {String? keep}) {
   if (songs.length <= limit) return;
 
   final entries = songs.entries.toList()
@@ -563,10 +573,16 @@ void _trimSongs(Map<String, dynamic> songs, int limit) {
       final bMap = _normalizeMap(b.value);
       return _compareSongStats(aMap, bMap);
     });
+  final kept = entries.take(limit).toList();
+  if (keep != null &&
+      songs.containsKey(keep) &&
+      !kept.any((entry) => entry.key == keep)) {
+    kept[kept.length - 1] = MapEntry(keep, songs[keep]);
+  }
 
   songs
     ..clear()
-    ..addEntries(entries.take(limit));
+    ..addEntries(kept);
 }
 
 void _storeHistoryMonth(
