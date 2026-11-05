@@ -37,6 +37,7 @@ import 'package:musify/services/moods/taste.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/formatter.dart';
+import 'package:musify/utilities/listening_stats_utils.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart'
     show YoutubeHttpClient;
 import 'package:youtube_music_explode_dart/youtube_music_explode_dart.dart';
@@ -977,7 +978,7 @@ class MoodsService {
     final keys = listeningStatsService.availableMonthKeys.toList()
       ..sort((a, b) => b.compareTo(a));
     final now = DateTime.now();
-    final current = '${now.year}-${now.month.toString().padLeft(2, '0')}';
+    final current = listeningStatsMonthKey(now);
     return keys
         .where(
           (k) =>

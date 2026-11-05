@@ -445,7 +445,7 @@ class SyncDocument {
             : a['ytid'].toString().compareTo(b['ytid'].toString());
       });
     final date = now ?? DateTime.now();
-    final month = '${date.year}-${date.month.toString().padLeft(2, '0')}';
+    final month = listeningStatsMonthKey(date);
     final recap = entries('recapMonth');
     return {
       'wrappedListeningStats': {
