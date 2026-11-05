@@ -31,19 +31,6 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 class PlaylistSharingService {
   static const _expandBatch = 8;
 
-  static Map<String, dynamic> createCompactPlaylist(Map fullPlaylist) {
-    return {
-      'title': fullPlaylist['title'],
-      // A picked cover is the image itself, hundreds of kilobytes in a link;
-      // only an address is worth carrying.
-      if (fullPlaylist['image'] case final String image
-          when image.startsWith('http'))
-        'image': image,
-      'source': 'user-created',
-      'list': fullPlaylist['list'].map((song) => song['ytid']).toList(),
-    };
-  }
-
   static Future<Map<String, dynamic>> expandCompactPlaylist(
     Map<String, dynamic> compactPlaylist,
   ) async {
@@ -92,11 +79,6 @@ class PlaylistSharingService {
         }
       } catch (_) {}
     }
-  }
-
-  static String encodePlaylist(Map playlist) {
-    final compactPlaylist = createCompactPlaylist(playlist);
-    return base64Url.encode(utf8.encode(json.encode(compactPlaylist)));
   }
 
   static Future<Map<String, dynamic>?> decodeAndExpandPlaylist(
