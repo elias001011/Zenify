@@ -949,7 +949,10 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           _queueList.isNotEmpty) ||
       _continuesQueue;
 
-  void _handlePlaybackError() {
+  /// [failedIndex] is the queue entry that failed to load, when the caller
+  /// already moved the index back to the song that was playing: the retry
+  /// then goes on from the failed entry instead of loading it again.
+  void _handlePlaybackError({int? failedIndex}) {
     _consecutiveErrors++;
     logger.log(
       'Playback error occurred. Consecutive errors: $_consecutiveErrors',
@@ -963,11 +966,11 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     }
 
     if (_canRetryPlayback()) {
-      final failedSongIndex = _currentQueueIndex;
+      final currentIndexWhenFailed = _currentQueueIndex;
       Future.delayed(_errorRetryDelay, () {
         // Only retry if still on the same song (user didn't manually change tracks)
-        if (_currentQueueIndex == failedSongIndex) {
-          skipToNext();
+        if (_currentQueueIndex == currentIndexWhenFailed) {
+          _skipToNextFrom(failedIndex ?? _currentQueueIndex);
         }
       });
     } else {
@@ -1563,12 +1566,12 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
             mediaItem.add(previousMediaItem);
           }
           _updatePlaybackState();
-          _handlePlaybackError();
+          _handlePlaybackError(failedIndex: index);
         }
       }
     } catch (e, stackTrace) {
       logger.log('Error playing from queue', error: e, stackTrace: stackTrace);
-      _handlePlaybackError();
+      _handlePlaybackError(failedIndex: index);
     } finally {
       // Only reset if this is still the transition that started it
       if (currentTransitionId == _currentLoadingTransitionId) {
@@ -2673,13 +2676,13 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   Future<void> skipToQueueItem(int index) => skipToSong(index);
 
   @override
-  Future<void> skipToNext({bool playWhenReady = true}) async {
+  Future<void> skipToNext({bool playWhenReady = true}) =>
+      _skipToNextFrom(_currentQueueIndex, playWhenReady: playWhenReady);
+
+  Future<void> _skipToNextFrom(int index, {bool playWhenReady = true}) async {
     try {
-      if (_currentQueueIndex < _queueList.length - 1) {
-        await _playFromQueue(
-          _currentQueueIndex + 1,
-          playWhenReady: playWhenReady,
-        );
+      if (index < _queueList.length - 1) {
+        await _playFromQueue(index + 1, playWhenReady: playWhenReady);
       } else if (repeatNotifier.value == AudioServiceRepeatMode.all &&
           _queueList.isNotEmpty) {
         await _playFromQueue(0, playWhenReady: playWhenReady);
