@@ -377,16 +377,19 @@ class _UprightStageState extends State<_UprightStage>
         Expanded(
           child: LayoutBuilder(
             builder: (context, c) {
+              // A radio station shows no name or artist under the cover, as in
+              // Musify: the cover takes the room.
+              final titleSpace = isLive ? 0.0 : _titleHeight + _gap;
               final artSize = max(
                 _headerSize,
-                min(c.maxWidth, c.maxHeight - _titleHeight - _gap),
+                min(c.maxWidth, c.maxHeight - titleSpace),
               );
               // What the artwork and the song leave of the height goes above
               // the artwork and between it and the song: the song stays at the
               // bottom, next to playback.
               final slack = max<double>(
                 0,
-                c.maxHeight - (artSize + _gap + _titleHeight),
+                c.maxHeight - (artSize + titleSpace),
               );
               final artOrigin = Offset((c.maxWidth - artSize) / 2, slack / 2);
               // Laid out once at full size and scaled, so the artwork keeps
@@ -482,7 +485,7 @@ class _UprightStageState extends State<_UprightStage>
                             ),
                           ),
                         ),
-                      if (under > 0)
+                      if (under > 0 && !isLive)
                         Positioned(
                           key: const ValueKey('title'),
                           left: 0,
@@ -638,14 +641,14 @@ class _WideLayoutState extends State<_WideLayout>
                         ),
                       ),
                       const SizedBox(height: 20),
-                      NowPlayingTitle(
-                        metadata: metadata,
-                        titleSize: 22,
-                        artistSize: 16,
-                        spacing: 4,
-                      ),
-                      const SizedBox(height: 16),
                       if (!live) ...[
+                        NowPlayingTitle(
+                          metadata: metadata,
+                          titleSize: 22,
+                          artistSize: 16,
+                          spacing: 4,
+                        ),
+                        const SizedBox(height: 16),
                         const PlayerTransport(iconSize: 38, miniIconSize: 20),
                       ],
                       const SizedBox(height: 8),

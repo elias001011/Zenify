@@ -465,6 +465,58 @@ void main() {
     );
   }
 
+  for (final size in const [Size(420, 860), Size(1280, 800)]) {
+    testWidgets(
+      'a radio station shows no name or artist in the player ($size)',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        audioHandler = _Handler();
+        const page = MaterialApp(
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: NowPlayingPage(),
+        );
+
+        audioHandler.mediaItem.add(
+          const MediaItem(
+            id: 'radio',
+            title: 'Radio Example',
+            artist: 'Somewhere',
+            extras: {'ytid': 'radio', 'isLive': true},
+          ),
+        );
+        await tester.pumpWidget(page);
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byType(NowPlayingArtwork), findsOneWidget);
+        expect(find.byType(NowPlayingTitle), findsNothing);
+        expect(find.text('Radio Example'), findsNothing);
+        expect(find.byType(PlayerTransport), findsNothing);
+        expect(tester.takeException(), isNull);
+
+        audioHandler.mediaItem.add(
+          const MediaItem(
+            id: 'song',
+            title: 'A Song',
+            artist: 'An Artist',
+            extras: {'ytid': 'song'},
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+        expect(find.byType(NowPlayingTitle), findsOneWidget);
+        expect(find.text('A Song'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 30));
+      },
+    );
+  }
+
   testWidgets('lyrics stay open, beside playback, when the phone turns', (
     tester,
   ) async {
