@@ -3,7 +3,6 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
@@ -19,14 +18,7 @@ import 'support/app_harness.dart';
 void main() {
   useAppSettings();
 
-  Widget app(Key key) => MaterialApp(
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      ...GlobalMaterialLocalizations.delegates,
-    ],
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(body: MiniPlayer(key: key)),
-  );
+  Widget app(Key key) => localizedApp(Scaffold(body: MiniPlayer(key: key)));
 
   testWidgets('a mini player built later still shows the song', (tester) async {
     audioHandler = MusifyAudioHandler();

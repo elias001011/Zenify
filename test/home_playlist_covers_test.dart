@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/glow_row.dart';
 import 'package:musify/widgets/playlist_cube.dart';
@@ -17,14 +16,7 @@ Map _playlist(int index, {required bool zenify}) => {
   if (zenify) ...{'source': 'zenify', 'covers': List.filled(4, _image)},
 };
 
-Widget _app(Widget child) => MaterialApp(
-  localizationsDelegates: const [
-    AppLocalizations.delegate,
-    ...GlobalMaterialLocalizations.delegates,
-  ],
-  supportedLocales: AppLocalizations.supportedLocales,
-  home: Scaffold(body: Center(child: child)),
-);
+Widget _app(Widget child) => localizedApp(Scaffold(body: Center(child: child)));
 
 Widget _carousel(bool zenify) => SizedBox(
   height: 190,

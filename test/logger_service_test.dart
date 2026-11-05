@@ -1,8 +1,9 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/logger_service.dart';
+
+import 'support/app_harness.dart';
 
 void main() {
   testWidgets('the log keeps the latest entries only', (tester) async {
@@ -36,13 +37,8 @@ void main() {
 
     late BuildContext context;
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
+      localizedApp(
+        Builder(
           builder: (c) {
             context = c;
             return const SizedBox();

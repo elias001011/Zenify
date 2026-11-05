@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/screens/export_playlists_page.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/playlists_manager.dart';
@@ -29,17 +28,7 @@ void main() {
         ],
       },
     ];
-    await tester.pumpWidget(
-      const MaterialApp(
-        locale: Locale('en'),
-        localizationsDelegates: [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: ExportPlaylistsPage(),
-      ),
-    );
+    await tester.pumpWidget(localizedApp(const ExportPlaylistsPage()));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 

@@ -3,11 +3,11 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/data_manager.dart';
+
+import '../support/app_harness.dart';
 
 final class MemoryFile extends PlatformFile {
   MemoryFile(this.name, this.data);
@@ -68,13 +68,8 @@ void main() {
   Future<BuildContext> contextFor(WidgetTester tester) async {
     late BuildContext result;
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
+      localizedApp(
+        Builder(
           builder: (context) {
             result = context;
             return const SizedBox();

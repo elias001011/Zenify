@@ -186,13 +186,8 @@ void main() {
     'a radio station only offers the sleep timer and like',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            ...GlobalMaterialLocalizations.delegates,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
+        localizedApp(
+          Scaffold(
             body: Center(
               child: PlayerActions(
                 metadata: const MediaItem(
@@ -219,13 +214,8 @@ void main() {
     'the player volume opens above its button, adjusts and restores mute',
     (tester) async {
       await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            ...GlobalMaterialLocalizations.delegates,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
+        localizedApp(
+          Scaffold(
             body: Align(
               alignment: Alignment.bottomCenter,
               child: PlayerActions(
@@ -330,14 +320,12 @@ void main() {
       PlaybackState(processingState: AudioProcessingState.ready, queueIndex: 0),
     );
     await tester.pumpWidget(
-      const MaterialApp(
-        localizationsDelegates: [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: Align(alignment: Alignment.bottomCenter, child: MiniPlayer()),
+      localizedApp(
+        const Scaffold(
+          body: Align(
+            alignment: Alignment.bottomCenter,
+            child: MiniPlayer(),
+          ),
         ),
       ),
     );

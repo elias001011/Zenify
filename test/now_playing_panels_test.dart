@@ -108,16 +108,7 @@ void main() {
             extras: {'ytid': 'badge'},
           ),
         );
-        await tester.pumpWidget(
-          const MaterialApp(
-            localizationsDelegates: [
-              AppLocalizations.delegate,
-              ...GlobalMaterialLocalizations.delegates,
-            ],
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: NowPlayingPage(),
-          ),
-        );
+        await tester.pumpWidget(localizedApp(const NowPlayingPage()));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 600));
         const badgeText = '192 kbps • Opus';
@@ -197,16 +188,7 @@ void main() {
         audioHandler.mediaItem.add(
           const MediaItem(id: 'a', title: 'Online', extras: {'ytid': 'a'}),
         );
-        await tester.pumpWidget(
-          const MaterialApp(
-            localizationsDelegates: [
-              AppLocalizations.delegate,
-              ...GlobalMaterialLocalizations.delegates,
-            ],
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: NowPlayingPage(),
-          ),
-        );
+        await tester.pumpWidget(localizedApp(const NowPlayingPage()));
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 600));
         await tester.tap(find.byTooltip('Lyrics'));
@@ -259,16 +241,7 @@ void main() {
         const Size(900, 560),
       ]) {
         tester.view.physicalSize = size;
-        await tester.pumpWidget(
-          const MaterialApp(
-            localizationsDelegates: [
-              AppLocalizations.delegate,
-              ...GlobalMaterialLocalizations.delegates,
-            ],
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: NowPlayingPage(),
-          ),
-        );
+        await tester.pumpWidget(localizedApp(const NowPlayingPage()));
         await tester.pump();
         if (find.byType(QueueWidget).evaluate().isEmpty) {
           await tester.tap(find.byTooltip('Queue'));
@@ -309,16 +282,7 @@ void main() {
       const MediaItem(id: 'test', title: 'Song', extras: {'ytid': 'test'}),
     );
 
-    await tester.pumpWidget(
-      const MaterialApp(
-        localizationsDelegates: [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: NowPlayingPage(),
-      ),
-    );
+    await tester.pumpWidget(localizedApp(const NowPlayingPage()));
     await tester.pump(const Duration(milliseconds: 300));
 
     await tester.tap(find.byTooltip('Lyrics'));
@@ -367,16 +331,7 @@ void main() {
           extras: {'ytid': 'test'},
         ),
       );
-      await tester.pumpWidget(
-        const MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            ...GlobalMaterialLocalizations.delegates,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: NowPlayingPage(),
-        ),
-      );
+      await tester.pumpWidget(localizedApp(const NowPlayingPage()));
       await tester.pump(const Duration(milliseconds: 300));
 
       // The song is glued to the bar, lined up with it, and the artwork takes
@@ -422,16 +377,7 @@ void main() {
             extras: {'ytid': 'test'},
           ),
         );
-        await tester.pumpWidget(
-          const MaterialApp(
-            localizationsDelegates: [
-              AppLocalizations.delegate,
-              ...GlobalMaterialLocalizations.delegates,
-            ],
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: NowPlayingPage(),
-          ),
-        );
+        await tester.pumpWidget(localizedApp(const NowPlayingPage()));
         await tester.pump(const Duration(milliseconds: 300));
 
         final play = tester.getSize(
@@ -459,14 +405,7 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
         audioHandler = _Handler();
-        const page = MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            ...GlobalMaterialLocalizations.delegates,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: NowPlayingPage(),
-        );
+        final page = localizedApp(const NowPlayingPage());
 
         audioHandler.mediaItem.add(
           const MediaItem(
@@ -513,16 +452,7 @@ void main() {
     audioHandler.mediaItem.add(
       const MediaItem(id: 'test', title: 'Song', extras: {'ytid': 'test'}),
     );
-    await tester.pumpWidget(
-      const MaterialApp(
-        localizationsDelegates: [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: NowPlayingPage(),
-      ),
-    );
+    await tester.pumpWidget(localizedApp(const NowPlayingPage()));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.byTooltip('Lyrics'));
     await tester.pump();

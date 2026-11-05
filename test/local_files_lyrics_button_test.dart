@@ -1,7 +1,6 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
@@ -24,16 +23,11 @@ void main() {
 
     for (final id in ['local:0123abcd', 'online-song']) {
       await tester.pumpWidget(
-        MaterialApp(
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            ...GlobalMaterialLocalizations.delegates,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
+        localizedApp(
+          Scaffold(
             body: PlayerActions(
               metadata: MediaItem(id: id, title: 'Song', extras: {'ytid': id}),
-                onPanel: (_) {},
+              onPanel: (_) {},
             ),
           ),
         ),

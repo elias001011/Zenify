@@ -127,13 +127,8 @@ void main() {
       ];
       userOfflineSongs.value = userLikedSongsList.value;
       searchHistoryNotifier.value = ['Blue hour', 'The Sea'];
-      Widget app(String query) => MaterialApp(
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: IndexedStack(
+      Widget app(String query) => localizedApp(
+        IndexedStack(
           index: 1,
           children: [
             const SearchPage(key: ValueKey('cached')),
