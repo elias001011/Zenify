@@ -393,7 +393,7 @@ void main() {
   ]) {
     for (final scale in [1.0, 1.8]) {
       testWidgets(
-        'desktop playback fits with fixed volume ($size, text $scale)',
+        'desktop playback fits with the volume in the actions ($size, text $scale)',
         (tester) async {
           debugDefaultTargetPlatformOverride = TargetPlatform.linux;
           tester.view.physicalSize = size;
@@ -422,10 +422,12 @@ void main() {
           final title = tester.getRect(find.byType(NowPlayingTitle));
           expect(
             title.top - cover.bottom,
-            closeTo(20, 0.1),
+            inInclusiveRange(20, 20 + 40 * scale),
             reason:
                 'The artwork must stay grouped with its title on tall windows',
           );
+          // The phone's player: the song at the left, over the bar's edge.
+          expect(title.left, closeTo(progress.left, 0.1));
           expect(cover.center.dx, closeTo(progress.center.dx, 0.1));
           expect(cover.width, lessThanOrEqualTo(progress.width));
           expect(
@@ -463,20 +465,29 @@ void main() {
             tester.getCenter(find.byIcon(FluentIcons.pause_24_filled)).dy,
             closeTo(play.dy, 0.1),
           );
-          expect(find.byType(DesktopVolumeControl), findsOneWidget);
-          expect(find.byType(DesktopVolumeButton), findsNothing);
+          // The volume is a button among the actions, like in every layout;
+          // its bar only exists while it is open.
+          expect(find.byType(DesktopVolumeControl), findsNothing);
           expect(
-            tester.getTopLeft(find.byType(DesktopVolumeControl)).dy,
-            greaterThanOrEqualTo(
-              tester.getBottomLeft(find.byType(PlayerActions)).dy,
+            find.descendant(
+              of: find.byType(PlayerActions),
+              matching: find.byType(DesktopVolumeButton),
             ),
-          );
-          await tester.ensureVisible(find.byType(DesktopVolumeControl));
-          await tester.pump(const Duration(milliseconds: 400));
-          expect(
-            find.byType(DesktopVolumeControl).hitTestable(),
             findsOneWidget,
           );
+          expect(
+            find.byType(DesktopVolumeButton).hitTestable(),
+            findsOneWidget,
+          );
+          await tester.tap(find.byType(DesktopVolumeButton));
+          await tester.pump(const Duration(milliseconds: 300));
+          final bar = tester.getRect(find.byType(DesktopVolumeControl));
+          expect(
+            bar.bottom,
+            lessThan(tester.getRect(find.byType(DesktopVolumeButton)).top),
+          );
+          expect(bar.left, greaterThanOrEqualTo(0));
+          expect(bar.right, lessThanOrEqualTo(size.width));
           expect(tester.takeException(), isNull);
           await tester.pumpWidget(const SizedBox());
           debugDefaultTargetPlatformOverride = null;

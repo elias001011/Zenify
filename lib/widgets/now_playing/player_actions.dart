@@ -50,13 +50,11 @@ class PlayerActions extends StatefulWidget {
     this.panel,
     this.onPanel,
     this.miniPlayer = false,
-    this.showVolume = true,
     this.showAddToPlaylist = true,
   });
 
   final MediaItem metadata;
   final bool miniPlayer;
-  final bool showVolume;
 
   /// Off where the button sits beside the song instead.
   final bool showAddToPlaylist;
@@ -156,8 +154,7 @@ class _PlayerActionsState extends State<PlayerActions> {
             active: widget.panel == PlayerPanel.queue,
             onPressed: () => widget.onPanel?.call(PlayerPanel.queue),
           ),
-        if (widget.showVolume && supportsDesktopVolumeControl)
-          const DesktopVolumeButton(),
+        if (supportsDesktopVolumeControl) const DesktopVolumeButton(),
         ValueListenableBuilder<Duration?>(
           valueListenable: sleepTimerNotifier,
           builder: (context, timer, _) => PlayerActionButton(

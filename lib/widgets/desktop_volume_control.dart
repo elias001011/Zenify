@@ -35,11 +35,17 @@ IconData volumeIcon(double volume) {
   return FluentIcons.speaker_2_24_regular;
 }
 
-/// Mute and a volume slider, scrolled with the mouse wheel too.
+/// The volume bar: a thin upright pill, filled from the bottom up to the
+/// volume, with the speaker at its foot. Dragging or tapping the bar sets the
+/// volume, the speaker mutes and the mouse wheel scrolls it.
 class DesktopVolumeControl extends StatelessWidget {
-  const DesktopVolumeControl({super.key, this.sliderWidth = 132});
+  const DesktopVolumeControl({super.key, this.length = defaultLength});
 
-  final double sliderWidth;
+  static const double thickness = 36;
+  static const double defaultLength = 152;
+  static const double _iconSize = 20;
+
+  final double length;
 
   @override
   Widget build(BuildContext context) {
@@ -50,70 +56,116 @@ class DesktopVolumeControl extends StatelessWidget {
       initialData: audioHandler.volume,
       builder: (context, snapshot) {
         final volume = (snapshot.data ?? 1.0).clamp(0.0, 1.0);
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: Icon(volumeIcon(volume), color: colors.onSurfaceVariant),
-              iconSize: 22,
-              constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
-              tooltip: context.l10n!.volume,
-              style: IconButton.styleFrom(
-                backgroundColor: Colors.transparent,
-                foregroundColor: colors.onSurfaceVariant,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                side: BorderSide.none,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
+        // The speaker is drawn twice: in the track's colour, and in the
+        // fill's inverse where the fill reaches it.
+        Widget speaker(Color color) => Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: (thickness - _iconSize) / 2),
+            child: Icon(volumeIcon(volume), size: _iconSize, color: color),
+          ),
+        );
+        return SizedBox(
+          width: thickness,
+          height: length,
+          child: Listener(
+            onPointerSignal: _scrolled,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(thickness / 2),
+              child: Stack(
+                children: [
+                  // A slider lies down; turned up it grows from the bottom,
+                  // whatever the reading direction.
+                  Positioned.fill(
+                    child: RotatedBox(
+                      quarterTurns: 3,
+                      child: Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: SliderTheme(
+                          data: SliderTheme.of(context).copyWith(
+                            trackHeight: thickness,
+                            trackShape: const RectangularSliderTrackShape(),
+                            activeTrackColor: colors.onSurface,
+                            inactiveTrackColor: colors.surfaceContainerHighest,
+                            thumbShape: SliderComponentShape.noThumb,
+                            overlayShape: SliderComponentShape.noOverlay,
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Slider(
+                            value: volume,
+                            semanticFormatterCallback: (value) =>
+                                '${(value * 100).round()}%',
+                            onChanged: audioHandler.setVolume,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Stack(
+                        children: [
+                          speaker(colors.onSurfaceVariant),
+                          ClipRect(
+                            clipper: _FillClipper(volume),
+                            child: speaker(colors.surfaceContainerHighest),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: thickness,
+                    child: Tooltip(
+                      message: context.l10n!.volume,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: audioHandler.toggleMute,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              onPressed: audioHandler.toggleMute,
             ),
-            SizedBox(
-              width: sliderWidth,
-              height: 32,
-              child: _buildSlider(context, volume),
-            ),
-          ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildSlider(BuildContext context, double volume) {
-    final colors = Theme.of(context).colorScheme;
-    final slider = SliderTheme(
-      data: SliderTheme.of(context).copyWith(
-        trackHeight: 4,
-        activeTrackColor: colors.onSurfaceVariant,
-        inactiveTrackColor: colors.surfaceContainerHighest,
-        thumbColor: colors.onSurfaceVariant,
-        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 4),
-        overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-      ),
-      child: Slider(
-        value: volume,
-        semanticFormatterCallback: (value) => '${(value * 100).round()}%',
-        onChanged: audioHandler.setVolume,
-      ),
-    );
-    return Listener(
-      onPointerSignal: (event) {
-        if (event is! PointerScrollEvent) return;
-        final delta = event.scrollDelta.dy != 0
-            ? event.scrollDelta.dy
-            : event.scrollDelta.dx;
-        if (delta == 0) return;
-        GestureBinding.instance.pointerSignalResolver.register(event, (_) {
-          audioHandler.setVolume(
-            (audioHandler.volume - delta / 400).clamp(0.0, 1.0),
-          );
-        });
-      },
-      child: slider,
-    );
+  void _scrolled(PointerSignalEvent event) {
+    if (event is! PointerScrollEvent) return;
+    final delta = event.scrollDelta.dy != 0
+        ? event.scrollDelta.dy
+        : event.scrollDelta.dx;
+    if (delta == 0) return;
+    GestureBinding.instance.pointerSignalResolver.register(event, (_) {
+      audioHandler.setVolume(
+        (audioHandler.volume - delta / 400).clamp(0.0, 1.0),
+      );
+    });
   }
+}
+
+/// The part of the bar that the fill covers, from the bottom.
+class _FillClipper extends CustomClipper<Rect> {
+  const _FillClipper(this.fraction);
+
+  final double fraction;
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTRB(
+    0,
+    size.height - size.height * fraction,
+    size.width,
+    size.height,
+  );
+
+  @override
+  bool shouldReclip(_FillClipper old) => old.fraction != fraction;
 }
 
 /// The volume button of the player and the desktop mini player, opening
@@ -124,27 +176,29 @@ class DesktopVolumeButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!supportsDesktopVolumeControl) return const SizedBox.shrink();
+    final colors = Theme.of(context).colorScheme;
     return MenuAnchor(
-      alignmentOffset: const Offset(-102, -60),
-      style: const MenuStyle(
+      alignmentOffset: const Offset(
+        -DesktopVolumeControl.thickness / 2,
+        -(DesktopVolumeControl.defaultLength + 10),
+      ),
+      style: MenuStyle(
         alignment: Alignment.topCenter,
-        elevation: WidgetStatePropertyAll(4),
-        padding: WidgetStatePropertyAll(
-          EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        elevation: const WidgetStatePropertyAll(4),
+        shadowColor: WidgetStatePropertyAll(
+          Colors.black.withValues(alpha: 0.22),
         ),
+        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+        backgroundColor: WidgetStatePropertyAll(colors.surfaceContainerHighest),
         shape: WidgetStatePropertyAll(
-          RoundedRectangleBorder(
-            borderRadius: BorderRadius.all(Radius.circular(20)),
+          StadiumBorder(
+            side: BorderSide(
+              color: colors.outlineVariant.withValues(alpha: 0.6),
+            ),
           ),
         ),
       ),
-      menuChildren: const [
-        SizedBox(
-          width: 188,
-          height: 44,
-          child: Center(child: DesktopVolumeControl()),
-        ),
-      ],
+      menuChildren: const [DesktopVolumeControl()],
       builder: (context, controller, child) => StreamBuilder<double>(
         stream: audioHandler.volumeStream,
         initialData: audioHandler.volume,

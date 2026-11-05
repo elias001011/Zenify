@@ -93,24 +93,20 @@ void main() {
   );
 
   testWidgets(
-    'desktop control uses theme colors and publishes volume changes',
+    'desktop control is a filled pill that publishes volume changes',
     (tester) async {
       await mount(tester);
-      final colors = Theme.of(tester.element(find.byType(IconButton)))
-          .colorScheme;
-      final button = tester.widget<IconButton>(find.byType(IconButton));
-      expect(button.style!.backgroundColor!.resolve({}), Colors.transparent);
-      expect(button.style!.side!.resolve({}), BorderSide.none);
-      expect((button.icon as Icon).color, colors.onSurfaceVariant);
-      expect(
-        button.tooltip,
-        AppLocalizations.of(tester.element(find.byType(IconButton)))!.volume,
-      );
+      final colors = Theme.of(tester.element(find.byType(Slider))).colorScheme;
+      final size = tester.getSize(find.byType(DesktopVolumeControl));
+      expect(size.width, DesktopVolumeControl.thickness);
+      expect(size.height, DesktopVolumeControl.defaultLength);
       final slider = tester.widget<Slider>(find.byType(Slider));
       final theme = SliderTheme.of(tester.element(find.byType(Slider)));
-      expect(theme.trackHeight, 4);
-      expect(theme.activeTrackColor, colors.onSurfaceVariant);
+      expect(theme.trackHeight, DesktopVolumeControl.thickness);
+      expect(theme.activeTrackColor, colors.onSurface);
       expect(theme.inactiveTrackColor, colors.surfaceContainerHighest);
+      expect(theme.thumbShape, SliderComponentShape.noThumb);
+      expect(find.byTooltip('Localized volume'), findsOneWidget);
       slider.onChanged!(0.75);
       await tester.pumpAndSettle();
       expect(audioHandler.volume, 0.75);
@@ -119,6 +115,35 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(tester.widget<Slider>(find.byType(Slider)).value, 0.25);
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.linux,
+      TargetPlatform.windows,
+    }),
+  );
+
+  testWidgets(
+    'tapping or dragging the bar sets the volume, the speaker mutes',
+    (tester) async {
+      await mount(tester);
+      final bar = tester.getRect(find.byType(DesktopVolumeControl));
+      // Upright: the volume grows from the bottom.
+      Offset at(double volume) =>
+          Offset(bar.center.dx, bar.bottom - bar.height * volume);
+      await tester.tapAt(at(0.8));
+      await tester.pumpAndSettle();
+      expect(audioHandler.volume, closeTo(0.8, 0.02));
+      await tester.dragFrom(at(0.8), Offset(0, bar.height * 0.4));
+      await tester.pumpAndSettle();
+      expect(audioHandler.volume, closeTo(0.4, 0.05));
+
+      final speaker = find.byTooltip('Localized volume');
+      await tester.tap(speaker);
+      await tester.pumpAndSettle();
+      expect(audioHandler.volume, 0);
+      await tester.tap(speaker);
+      await tester.pumpAndSettle();
+      expect(audioHandler.volume, closeTo(0.4, 0.05));
     },
     variant: const TargetPlatformVariant({
       TargetPlatform.linux,
@@ -164,7 +189,7 @@ void main() {
   for (final platform in [TargetPlatform.android, TargetPlatform.iOS]) {
     testWidgets('$platform keeps the desktop control hidden', (tester) async {
       await mount(tester);
-      expect(find.byType(IconButton), findsNothing);
+      expect(find.byType(Tooltip), findsNothing);
       expect(find.byType(Slider), findsNothing);
     }, variant: TargetPlatformVariant.only(platform));
   }
@@ -235,16 +260,16 @@ void main() {
       await tester.pumpAndSettle();
       final slider = find.byType(Slider);
       expect(slider, findsOneWidget);
-      expect(tester.getRect(slider).width, greaterThanOrEqualTo(120));
-      expect(tester.getRect(slider).width, lessThanOrEqualTo(180));
-      expect(
-        tester.getRect(slider).bottom,
-        lessThanOrEqualTo(openerRect.bottom),
-      );
+      // A thin bar, centred right above the button.
+      final bar = tester.getRect(find.byType(DesktopVolumeControl));
+      expect(bar.width, DesktopVolumeControl.thickness);
+      expect(bar.height, DesktopVolumeControl.defaultLength);
+      expect(bar.center.dx, closeTo(openerRect.center.dx, 1));
+      expect(openerRect.top - bar.bottom, inInclusiveRange(4, 16));
 
       final mute = find.descendant(
         of: find.byType(DesktopVolumeControl),
-        matching: find.byType(IconButton),
+        matching: find.byType(Tooltip),
       );
       await tester.tap(mute);
       await tester.pumpAndSettle();
@@ -284,7 +309,7 @@ void main() {
           ),
         ),
       );
-      final buttons = find.byType(IconButton);
+      final buttons = find.byType(Tooltip);
       tester.widget<Slider>(find.byType(Slider).first).onChanged!(0.35);
       await tester.pumpAndSettle();
       expect(tester.widget<Slider>(find.byType(Slider).last).value, 0.35);

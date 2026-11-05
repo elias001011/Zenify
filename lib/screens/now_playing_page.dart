@@ -29,7 +29,6 @@ import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/app_notice.dart';
 import 'package:musify/widgets/artwork_glow.dart';
-import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/now_playing/lyrics_panel.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
@@ -133,9 +132,8 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                 metadata: metadata,
                 panel: panel,
                 onPanel: _onPanel,
-                showVolume: layout != _PlayerLayout.wide,
-                // Upright phones have it beside the song.
-                showAddToPlaylist: layout != _PlayerLayout.upright,
+                // Beside the song everywhere but on a phone on its side.
+                showAddToPlaylist: layout == _PlayerLayout.sideways,
               );
               // Its own group: during the slide its surfaces sit over the shell's.
               return BackdropGroup(
@@ -270,7 +268,7 @@ class _CompactLayout extends StatelessWidget {
               Expanded(child: controls),
             ],
           )
-        : _UprightStage(
+        : _PlaybackStage(
             metadata: metadata,
             panel: panel,
             onClosePanel: onClosePanel,
@@ -296,33 +294,49 @@ class _CompactLayout extends StatelessWidget {
   }
 }
 
-/// The upright phone player. The song and playback sit together at the
-/// bottom, where the thumb is; above them the artwork takes the whole width,
-/// or, with a panel, the same artwork shrinks into a header beside the song
-/// and the panel fills the rest, as Tidal does. One layout that moves, not a
-/// second page over the first, and playback does not move with it.
-class _UprightStage extends StatefulWidget {
-  const _UprightStage({
+/// What the player shows of the song, upright phones and the wide player
+/// alike: the artwork over the whole width, the song and its playlist button
+/// at its foot, then the progress bar and the buttons. On a phone the song and
+/// playback sit together at the bottom, where the thumb is, and, with a panel,
+/// the same artwork shrinks into a header beside the song and the panel fills
+/// the rest, as Tidal does: one layout that moves, not a second page over the
+/// first, and playback does not move with it. The wide player, whose panel
+/// opens beside it, gives the stage [fill] false: it takes the height it needs
+/// and the player centres it.
+class _PlaybackStage extends StatefulWidget {
+  const _PlaybackStage({
     required this.metadata,
-    required this.panel,
-    required this.onClosePanel,
     required this.buttonSizes,
+    this.panel,
+    this.onClosePanel,
+    this.fill = true,
+    this.noticeAbove = true,
   });
 
   final MediaItem metadata;
-  final PlayerPanel? panel;
-  final VoidCallback onClosePanel;
   final PlayerButtonSizes buttonSizes;
+  final PlayerPanel? panel;
+  final VoidCallback? onClosePanel;
+  final bool fill;
+
+  /// Where notices float: above the progress bar, or, if the player puts them
+  /// in its corner, nowhere here.
+  final bool noticeAbove;
 
   @override
-  State<_UprightStage> createState() => _UprightStageState();
+  State<_PlaybackStage> createState() => _PlaybackStageState();
 }
 
-class _UprightStageState extends State<_UprightStage>
+class _PlaybackStageState extends State<_PlaybackStage>
     with SingleTickerProviderStateMixin {
   static const _headerSize = 56.0;
-  static const _titleHeight = 72.0;
-  static const _gap = 24.0;
+
+  // A phone has room to spare; the wide player takes only what the song needs,
+  // so that its cover is as big as the window allows.
+  double get _titleHeight =>
+      (widget.fill ? 72 : 60) *
+      max(1, MediaQuery.textScalerOf(context).scale(1));
+  double get _gap => widget.fill ? 24 : 20;
 
   late final _controller = AnimationController(
     vsync: this,
@@ -342,7 +356,7 @@ class _UprightStageState extends State<_UprightStage>
   late PlayerPanel? _builtPanel = widget.panel;
 
   @override
-  void didUpdateWidget(_UprightStage oldWidget) {
+  void didUpdateWidget(_PlaybackStage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.panel == oldWidget.panel) return;
     if (widget.panel != null) {
@@ -372,166 +386,166 @@ class _UprightStageState extends State<_UprightStage>
     final screen = MediaQuery.sizeOf(context);
     final isLive = metadata.extras?['isLive'] ?? false;
 
-    return Column(
-      children: [
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, c) {
-              // A radio station shows no name or artist under the cover, as in
-              // Musify: the cover takes the room.
-              final titleSpace = isLive ? 0.0 : _titleHeight + _gap;
-              final artSize = max(
-                _headerSize,
-                min(c.maxWidth, c.maxHeight - titleSpace),
-              );
-              // What the artwork and the song leave of the height goes above
-              // the artwork and between it and the song: the song stays at the
-              // bottom, next to playback.
-              final slack = max<double>(
-                0,
-                c.maxHeight - (artSize + titleSpace),
-              );
-              final artOrigin = Offset((c.maxWidth - artSize) / 2, slack / 2);
-              // Laid out once at full size and scaled, so the artwork keeps
-              // its decoded image while it moves.
-              final artwork = NowPlayingArtwork(
-                metadata: metadata,
-                size: artSize,
-                slideOnSkip: widget.panel == null,
-              );
-              // Built once: the frames of the move only reposition and fade
-              // them.
-              final panel = _builtPanel == PlayerPanel.queue
-                  ? const QueueWidget(embedded: true)
-                  : LyricsPanel(metadata: metadata);
-              // Lined up with the progress bar under it, as the artwork is.
-              // The button to put the song in a playlist, or like it, sits
-              // at the end of the song's line.
-              final addToPlaylist = AddToPlaylistButton(
-                metadata: metadata,
-                beside: true,
-              );
-              final songTitle = Align(
-                alignment: AlignmentDirectional.bottomStart,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: NowPlayingTitle(
-                        metadata: metadata,
-                        titleSize: getResponsiveTitleFontSize(screen) + 2,
-                        artistSize: getResponsiveArtistFontSize(screen) + 1,
-                        spacing: 6,
-                        alignment: CrossAxisAlignment.start,
-                      ),
-                    ),
-                    addToPlaylist,
-                  ],
+    final area = LayoutBuilder(
+      builder: (context, c) {
+        // A radio station shows no name or artist under the cover, as in
+        // Musify: the cover takes the room.
+        final titleSpace = isLive ? 0.0 : _titleHeight + _gap;
+        final artSize = max(
+          _headerSize,
+          min(c.maxWidth, c.maxHeight - titleSpace),
+        );
+        // What the artwork and the song leave of the height goes above
+        // the artwork and between it and the song: the song stays at the
+        // bottom, next to playback.
+        final slack = widget.fill
+            ? max<double>(0, c.maxHeight - (artSize + titleSpace))
+            : 0.0;
+        final artOrigin = Offset((c.maxWidth - artSize) / 2, slack / 2);
+        // Laid out once at full size and scaled, so the artwork keeps
+        // its decoded image while it moves.
+        final artwork = NowPlayingArtwork(
+          metadata: metadata,
+          size: artSize,
+          slideOnSkip: widget.panel == null,
+        );
+        // Built once: the frames of the move only reposition and fade
+        // them.
+        final panel = _builtPanel == PlayerPanel.queue
+            ? const QueueWidget(embedded: true)
+            : LyricsPanel(metadata: metadata);
+        // Lined up with the progress bar under it, as the artwork is.
+        // The button to put the song in a playlist, or like it, sits
+        // at the end of the song's line.
+        final addToPlaylist = AddToPlaylistButton(
+          metadata: metadata,
+          beside: true,
+        );
+        final songTitle = Align(
+          alignment: AlignmentDirectional.bottomStart,
+          child: Row(
+            children: [
+              Expanded(
+                child: NowPlayingTitle(
+                  metadata: metadata,
+                  titleSize: getResponsiveTitleFontSize(screen) + 2,
+                  artistSize: getResponsiveArtistFontSize(screen) + 1,
+                  spacing: 6,
+                  alignment: CrossAxisAlignment.start,
                 ),
-              );
-              final headerTitle = Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: NowPlayingTitle(
-                        metadata: metadata,
-                        titleSize: 17,
-                        artistSize: 14,
-                        spacing: 2,
-                        alignment: CrossAxisAlignment.start,
-                      ),
-                    ),
-                    addToPlaylist,
-                  ],
-                ),
-              );
-
-              return AnimatedBuilder(
-                animation: _progress,
-                child: artwork,
-                builder: (context, artwork) {
-                  final t = _progress.value;
-                  final shown = artSize + (_headerSize - artSize) * t;
-                  final art = Rect.fromLTWH(
-                    artOrigin.dx * (1 - t),
-                    artOrigin.dy * (1 - t),
-                    shown,
-                    shown,
-                  );
-                  // The title under the artwork stays where it is and leaves;
-                  // the header's arrives beside the artwork.
-                  final under = 1 - const Interval(0, 0.5).transform(t);
-                  final beside = const Interval(0.5, 1).transform(t);
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Keyed, so the artwork keeps its state (image, waves)
-                      // while the others come and go before it.
-                      if (_builtPanel != null)
-                        Positioned.fill(
-                          key: const ValueKey('panel'),
-                          top: _headerSize + 12,
-                          child: FadeTransition(
-                            opacity: _panelFade,
-                            child: IgnorePointer(
-                              ignoring: t < 1,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                child: KeyedSubtree(
-                                  key: ValueKey(_builtPanel),
-                                  child: panel,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (under > 0 && !isLive)
-                        Positioned(
-                          key: const ValueKey('title'),
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          height: _titleHeight,
-                          child: Opacity(opacity: under, child: songTitle),
-                        ),
-                      if (beside > 0)
-                        Positioned(
-                          key: const ValueKey('header'),
-                          left: art.right + 14,
-                          right: 0,
-                          top: art.center.dy - _headerSize / 2,
-                          height: _headerSize,
-                          child: Opacity(opacity: beside, child: headerTitle),
-                        ),
-                      Positioned(
-                        key: const ValueKey('artwork'),
-                        left: art.left,
-                        top: art.top,
-                        child: Transform.scale(
-                          scale: shown / artSize,
-                          alignment: Alignment.topLeft,
-                          // Same tree in both states, so the artwork keeps
-                          // its state; as the header it goes back.
-                          child: GestureDetector(
-                            onTap: t > 0 ? widget.onClosePanel : null,
-                            child: AbsorbPointer(
-                              absorbing: t > 0,
-                              child: artwork,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              );
-            },
+              ),
+              addToPlaylist,
+            ],
           ),
-        ),
+        );
+        final headerTitle = Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: Row(
+            children: [
+              Expanded(
+                child: NowPlayingTitle(
+                  metadata: metadata,
+                  titleSize: 17,
+                  artistSize: 14,
+                  spacing: 2,
+                  alignment: CrossAxisAlignment.start,
+                ),
+              ),
+              addToPlaylist,
+            ],
+          ),
+        );
+
+        final stage = AnimatedBuilder(
+          animation: _progress,
+          child: artwork,
+          builder: (context, artwork) {
+            final t = _progress.value;
+            final shown = artSize + (_headerSize - artSize) * t;
+            final art = Rect.fromLTWH(
+              artOrigin.dx * (1 - t),
+              artOrigin.dy * (1 - t),
+              shown,
+              shown,
+            );
+            // The title under the artwork stays where it is and leaves;
+            // the header's arrives beside the artwork.
+            final under = 1 - const Interval(0, 0.5).transform(t);
+            final beside = const Interval(0.5, 1).transform(t);
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Keyed, so the artwork keeps its state (image, waves)
+                // while the others come and go before it.
+                if (_builtPanel != null)
+                  Positioned.fill(
+                    key: const ValueKey('panel'),
+                    top: _headerSize + 12,
+                    child: FadeTransition(
+                      opacity: _panelFade,
+                      child: IgnorePointer(
+                        ignoring: t < 1,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: KeyedSubtree(
+                            key: ValueKey(_builtPanel),
+                            child: panel,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (under > 0 && !isLive)
+                  Positioned(
+                    key: const ValueKey('title'),
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    height: _titleHeight,
+                    child: Opacity(opacity: under, child: songTitle),
+                  ),
+                if (beside > 0)
+                  Positioned(
+                    key: const ValueKey('header'),
+                    left: art.right + 14,
+                    right: 0,
+                    top: art.center.dy - _headerSize / 2,
+                    height: _headerSize,
+                    child: Opacity(opacity: beside, child: headerTitle),
+                  ),
+                Positioned(
+                  key: const ValueKey('artwork'),
+                  left: art.left,
+                  top: art.top,
+                  child: Transform.scale(
+                    scale: shown / artSize,
+                    alignment: Alignment.topLeft,
+                    // Same tree in both states, so the artwork keeps
+                    // its state; as the header it goes back.
+                    child: GestureDetector(
+                      onTap: t > 0 ? widget.onClosePanel : null,
+                      child: AbsorbPointer(absorbing: t > 0, child: artwork),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+        return widget.fill
+            ? stage
+            : SizedBox(height: artSize + titleSpace, child: stage);
+      },
+    );
+    final transport = PlayerTransport(sizes: widget.buttonSizes);
+    return Column(
+      mainAxisSize: widget.fill ? MainAxisSize.max : MainAxisSize.min,
+      children: [
+        if (widget.fill) Expanded(child: area) else Flexible(child: area),
         if (!isLive) ...[
           const SizedBox(height: 14),
           // Notices float above the progress bar, not over the buttons.
-          NoticeAbove(child: PlayerTransport(sizes: widget.buttonSizes)),
+          if (widget.noticeAbove) NoticeAbove(child: transport) else transport,
           const SizedBox(height: 8),
         ],
       ],
@@ -612,7 +626,6 @@ class _WideLayoutState extends State<_WideLayout>
   @override
   Widget build(BuildContext context) {
     final metadata = widget.metadata;
-    final live = metadata.extras?['isLive'] == true;
     return Column(
       children: [
         const _CloseButton(),
@@ -629,35 +642,18 @@ class _WideLayoutState extends State<_WideLayout>
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      // The phone's own stage, the panel beside it instead of
+                      // over it.
                       Flexible(
-                        child: LayoutBuilder(
-                          builder: (context, art) => Center(
-                            heightFactor: 1,
-                            child: NowPlayingArtwork(
-                              metadata: metadata,
-                              size: min(width, art.maxHeight),
-                            ),
-                          ),
+                        child: _PlaybackStage(
+                          metadata: metadata,
+                          buttonSizes: phoneButtonSizes(width),
+                          fill: false,
+                          noticeAbove: false,
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      if (!live) ...[
-                        NowPlayingTitle(
-                          metadata: metadata,
-                          titleSize: 22,
-                          artistSize: 16,
-                          spacing: 4,
-                        ),
-                        const SizedBox(height: 16),
-                        const PlayerTransport(iconSize: 38, miniIconSize: 20),
-                      ],
                       const SizedBox(height: 8),
                       Center(child: widget.actions),
-                      const SizedBox(height: 12),
-                      if (supportsDesktopVolumeControl)
-                        const Center(
-                          child: DesktopVolumeControl(sliderWidth: 180),
-                        ),
                       const SizedBox(height: 16),
                     ],
                   ),
