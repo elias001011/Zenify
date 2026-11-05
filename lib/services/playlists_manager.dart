@@ -165,13 +165,15 @@ Future<List<dynamic>> getUserPlaylists() async {
   final futures = userPlaylists.value.map((playlistID) async {
     try {
       final plist = await ytClient.playlists.get(playlistID);
-      return {
+      final playlist = {
         'ytid': plist.id.toString(),
         'title': plist.title,
         'image': null,
         'source': 'user-youtube',
         'list': [],
       };
+      _updateOnlineCache(playlist);
+      return playlist;
     } catch (e, stackTrace) {
       logger.log(
         'Error occurred while fetching the playlist:',
@@ -188,11 +190,7 @@ Future<List<dynamic>> getUserPlaylists() async {
     }
   });
 
-  final results = await Future.wait(futures);
-  for (final result in results) {
-    _updateOnlineCache(result);
-  }
-  return results.toList();
+  return Future.wait(futures);
 }
 
 Future<String> addUserPlaylist(String input, BuildContext context) async {
@@ -1173,16 +1171,11 @@ Future<Map?> _fetchYouTubePlaylist(String id) async {
   // 1. Local DB / in-memory caches (no network).
   var playlist = _findPlaylistById(playlists, id);
 
-  // 2. User-added YouTube playlists.
-  if (playlist == null) {
-    final userPlaylists = await getUserPlaylists();
-    playlist = _findPlaylistById(userPlaylists, id);
-  }
-
-  // 3. Previously fetched online playlists.
+  // 2. Previously fetched online playlists.
   playlist ??= _findPlaylistById(onlinePlaylists.value, id);
 
-  // 4. Fetch from YouTube as a last resort.
+  // 3. Fetch from YouTube as a last resort: only this playlist, an added one
+  // included, never every playlist the user added.
   if (playlist == null) {
     try {
       final ytPlaylist = await ytClient.playlists.get(id);
@@ -1204,7 +1197,7 @@ Future<Map?> _fetchYouTubePlaylist(String id) async {
     }
   }
 
-  // 5. Populate the song list if it is absent or empty.
+  // 4. Populate the song list if it is absent or empty.
   final list = playlist['list'];
   if (list == null || (list is List && list.isEmpty)) {
     playlist['list'] = await _loadSongsForPlaylist(playlist);
