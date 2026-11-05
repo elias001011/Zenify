@@ -7,4 +7,6 @@
     <exclude domain="root" path="app_flutter/tracks" />
     <exclude domain="root" path="app_flutter/artworks" />
     <exclude domain="root" path="app_flutter/local_files" />
+    <exclude domain="root" path="app_flutter/cache.hive" />
+    <exclude domain="root" path="app_flutter/cache.lock" />
 </full-backup-content>
