@@ -225,23 +225,6 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     audioPlayer.duration ?? mediaItem.valueOrNull?.duration ?? Duration.zero,
   );
 
-  late final Stream<PlaybackState> _playbackStateStream = playbackState
-      .distinct((prev, curr) {
-        final prevPositionBucket =
-            prev.updatePosition.inMilliseconds ~/
-            _positionDataThreshold.inMilliseconds;
-        final currPositionBucket =
-            curr.updatePosition.inMilliseconds ~/
-            _positionDataThreshold.inMilliseconds;
-        return prev.playing == curr.playing &&
-            prev.processingState == curr.processingState &&
-            prev.queueIndex == curr.queueIndex &&
-            prev.speed == curr.speed &&
-            prevPositionBucket == currPositionBucket;
-      })
-      .asBroadcastStream();
-
-  Stream<PlaybackState> get playbackStateStream => _playbackStateStream;
   Stream<List<Map>> get queueAsMapStream => _queueMapStream.stream;
   int get currentQueueIndex => _currentQueueIndex;
   bool get _hasCurrentQueueIndex =>
