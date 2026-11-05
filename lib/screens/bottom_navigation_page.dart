@@ -30,8 +30,8 @@ import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_bottom_sheet.dart'
     show closeCurrentBottomSheet;
+import 'package:musify/utilities/flutter_toast.dart' show ToastInset;
 import 'package:musify/widgets/app_logo.dart';
-import 'package:musify/widgets/app_notice.dart';
 import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/mini_player.dart';
 
@@ -65,6 +65,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
   @override
   void dispose() {
     offlineMode.removeListener(_onOfflineModeChanged);
+    ToastInset.bottom = 0;
     super.dispose();
   }
 
@@ -172,13 +173,10 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
       screenWidth - _margin * 2,
     );
 
+    ToastInset.bottom = safeBottom + _margin + dockHeight;
     return Stack(
       children: [
         _withInsets(context, bottom: _margin * 2 + dockHeight),
-        NoticeDockInset(
-          extent: safeBottom + _margin + dockHeight,
-          right: screenWidth - _margin - dockWidth,
-        ),
         Positioned(
           left: _margin,
           width: dockWidth,
@@ -231,6 +229,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
       onTap: () => _onTabTapped(index, items),
     );
 
+    ToastInset.bottom = playing ? _margin + MiniPlayer.playerHeight : 0;
     // The rail floats over the page like the dock on phones, so the page's
     // background reaches the window's edge behind it.
     return Stack(
@@ -266,10 +265,6 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
               ),
             ),
           ),
-        ),
-        NoticeDockInset(
-          extent: playing ? _margin + MiniPlayer.playerHeight : 0,
-          left: _margin * 2 + _railWidth,
         ),
         if (playing)
           const Positioned(

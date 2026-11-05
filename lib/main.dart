@@ -67,7 +67,6 @@ import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/sharing_intent.dart';
 import 'package:musify/utilities/startup_support.dart';
 import 'package:musify/widgets/app_motion.dart';
-import 'package:musify/widgets/app_notice.dart';
 import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/spotify_import_intro.dart';
 import 'package:path_provider/path_provider.dart';
@@ -329,7 +328,12 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
             locale: languageSetting,
             routerConfig: NavigationManager.router,
             builder: (context, child) {
-              final app = MusicSurfaceTheme(child: NoticeHost(child: child!));
+              // Inside the theme and the desktop zoom, so toasts measure the
+              // same window as the pages they float over.
+              final app = ScaffoldMessenger(
+                key: toastMessengerKey,
+                child: MusicSurfaceTheme(child: child!),
+              );
               return AppMotion(
                 child: isDesktopPlatform
                     ? DesktopTitleBarTheme(

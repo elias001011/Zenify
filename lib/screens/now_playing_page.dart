@@ -27,7 +27,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
-import 'package:musify/widgets/app_notice.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/now_playing/lyrics_panel.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
@@ -310,7 +309,6 @@ class _PlaybackStage extends StatefulWidget {
     this.panel,
     this.onClosePanel,
     this.fill = true,
-    this.noticeAbove = true,
   });
 
   final MediaItem metadata;
@@ -318,10 +316,6 @@ class _PlaybackStage extends StatefulWidget {
   final PlayerPanel? panel;
   final VoidCallback? onClosePanel;
   final bool fill;
-
-  /// Where notices float: above the progress bar, or, if the player puts them
-  /// in its corner, nowhere here.
-  final bool noticeAbove;
 
   @override
   State<_PlaybackStage> createState() => _PlaybackStageState();
@@ -537,15 +531,13 @@ class _PlaybackStageState extends State<_PlaybackStage>
             : SizedBox(height: artSize + titleSpace, child: stage);
       },
     );
-    final transport = PlayerTransport(sizes: widget.buttonSizes);
     return Column(
       mainAxisSize: widget.fill ? MainAxisSize.max : MainAxisSize.min,
       children: [
         if (widget.fill) Expanded(child: area) else Flexible(child: area),
         if (!isLive) ...[
           const SizedBox(height: 14),
-          // Notices float above the progress bar, not over the buttons.
-          if (widget.noticeAbove) NoticeAbove(child: transport) else transport,
+          PlayerTransport(sizes: widget.buttonSizes),
           const SizedBox(height: 8),
         ],
       ],
@@ -629,8 +621,6 @@ class _WideLayoutState extends State<_WideLayout>
     return Column(
       children: [
         const _CloseButton(),
-        // The middle belongs to playback: notices go to the corner.
-        const NoticeCorner(),
         Expanded(
           child: LayoutBuilder(
             builder: (context, c) {
@@ -649,7 +639,6 @@ class _WideLayoutState extends State<_WideLayout>
                           metadata: metadata,
                           buttonSizes: phoneButtonSizes(width),
                           fill: false,
-                          noticeAbove: false,
                         ),
                       ),
                       const SizedBox(height: 8),

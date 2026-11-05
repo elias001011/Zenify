@@ -178,6 +178,24 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       color: effectiveColorScheme.outlineVariant,
       thickness: 1,
     ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: effectiveColorScheme.surfaceContainer,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(
+          color: effectiveColorScheme.outlineVariant.withValues(alpha: 0.35),
+          width: 0.8,
+        ),
+      ),
+      // The snack bar takes this style whole, not on top of the ambient one.
+      contentTextStyle: base.textTheme.bodyMedium?.copyWith(
+        fontSize: 14,
+        color: effectiveColorScheme.onSurface,
+      ),
+      actionTextColor: effectiveColorScheme.primary,
+    ),
     visualDensity: VisualDensity.adaptivePlatformDensity,
     useMaterial3: true,
   );

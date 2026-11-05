@@ -8,7 +8,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
-import 'package:musify/widgets/app_notice.dart';
 
 import 'support/app_harness.dart';
 
@@ -94,8 +93,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(userLikedSongsList.value.map((s) => s['ytid']), ['a']);
     expect(find.byType(AlertDialog), findsNothing);
-    expect(AppNotices.current.value?.text, 'Added to liked songs');
-    AppNotices.dismiss();
+    expect(find.text('Added to liked songs'), findsOneWidget);
   });
 
   testWidgets('a liked song shows it, and the same tap takes the like back', (
@@ -111,8 +109,7 @@ void main() {
     await tester.tap(find.text('Liked songs'));
     await tester.pumpAndSettle();
     expect(userLikedSongsList.value, isEmpty);
-    expect(AppNotices.current.value?.text, 'Removed from liked songs');
-    AppNotices.dismiss();
+    expect(find.text('Removed from liked songs'), findsOneWidget);
   });
 
   testWidgets('many songs, and local files, have no liked songs row', (

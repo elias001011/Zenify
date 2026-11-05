@@ -11,7 +11,6 @@ import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/widgets/app_notice.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/marquee.dart';
@@ -100,7 +99,6 @@ void main() {
     );
     expect(find.byIcon(FluentIcons.heart_24_filled), findsOneWidget);
     expect(find.byType(DesktopVolumeButton), findsNothing);
-    AppNotices.dismiss();
     await tester.pumpWidget(const SizedBox());
     debugDefaultTargetPlatformOverride = null;
   });
