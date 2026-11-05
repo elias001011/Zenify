@@ -526,7 +526,7 @@ class PlaybackTransportControls extends StatelessWidget {
                   PlaybackIconButton(
                     iconColor: switch (PlayerChrome.of(context)) {
                       PlayerChromeStyle.plain => colorScheme.onSurface,
-                      PlayerChromeStyle.dock => colorScheme.primary,
+                      PlayerChromeStyle.dock => colorScheme.onSurface,
                       PlayerChromeStyle.soft => colorScheme.onPrimary,
                     },
                     backgroundColor: switch (PlayerChrome.of(context)) {

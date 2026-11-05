@@ -311,7 +311,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
             child: live
                 ? PlaybackIconButton(
                     iconSize: dockButtonSizes.play,
-                    iconColor: colors.primary,
+                    iconColor: colors.onSurface,
                     backgroundColor: Colors.transparent,
                     filled: true,
                     buttonSize: dockButtonSizes.box,
