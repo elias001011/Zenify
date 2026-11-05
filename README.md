@@ -42,7 +42,7 @@ never offers them, so install them by hand.
 
 ## Screenshots
 
-Taken from the app itself, running on Linux, with a real library.
+Taken from the app itself, running on Linux, with a sample library: the playlists and songs are invented, and the album covers only decorate them.
 
 ![Zenify home on a desktop](assets/screenshots/desktop-home.jpg)
 
@@ -55,6 +55,14 @@ Moods, a personal Mix and playlists made for you, on Home:
 | ![Zenify player with synced lyrics](assets/screenshots/desktop-player-lyrics.jpg) | ![Zenify playlist](assets/screenshots/desktop-playlist.jpg) |
 
 ![Zenify library](assets/screenshots/desktop-library.jpg)
+
+Downloads with progress, failures and retry, in one queue:
+
+![Zenify download manager](assets/screenshots/desktop-downloads.jpg)
+
+Listening recap, with the minutes, top artist and top songs of the month:
+
+![Zenify listening recap](assets/screenshots/desktop-recap.jpg)
 
 ### On a phone
 
