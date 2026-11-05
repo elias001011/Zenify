@@ -249,7 +249,9 @@ void main() {
     // No filled circle behind it: the phone's mini player has none either.
     expect(playButton.style!.backgroundColor!.resolve({}), Colors.transparent);
     expect(playButton.style!.shape!.resolve({}), isA<CircleBorder>());
-    expect(tester.getSize(playControl).width, 44);
+    expect(tester.getSize(playControl).width, dockButtonSizes.box);
+    // The phone's progress bar, under the five buttons.
+    expect(find.byType(PositionSlider), findsOneWidget);
     expect(find.byTooltip('Queue'), findsNothing);
     expect(find.byTooltip('Lyrics'), findsNothing);
     final bar = tester.getRect(find.byType(MiniPlayer));
@@ -262,6 +264,28 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     debugDefaultTargetPlatformOverride = null;
   });
+
+  for (final width in const [900.0, 1100.0]) {
+    testWidgets(
+      'desktop mini fits its five buttons and bar in ${width.toInt()}',
+      (tester) async {
+        tester.view.physicalSize = Size(width, 800);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+        audioHandler.mediaItem.add(songA);
+        await tester.pumpWidget(app(const MiniPlayer(wide: true)));
+        await tester.pump(const Duration(milliseconds: 400));
+        final buttons = tester.getRect(find.byType(PlaybackTransportControls));
+        final bar = tester.getRect(find.byType(PositionSlider));
+        expect(bar.width, greaterThan(buttons.width));
+        expect(bar.top, greaterThanOrEqualTo(buttons.bottom - 1));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox());
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
+  }
 
   testWidgets('artist biography stays readable when expanded on desktop', (
     tester,

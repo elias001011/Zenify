@@ -34,7 +34,6 @@ import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/download_progress_icon.dart';
-import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_chrome.dart';
 
 /// Side panels of the player: shown beside it on wide screens, as sheets on
@@ -160,11 +159,6 @@ class _PlayerActionsState extends State<PlayerActions> {
     Widget actions(bool hasQueue) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.miniPlayer && !isRadioStation) ...[
-          const PlaybackModeButton(repeat: false),
-          const SizedBox(width: 2),
-          const PlaybackModeButton(repeat: true),
-        ],
         // A local file has no lyrics to look up, so it gets no button,
         // unless the panel is open: then the button is how to close it.
         if (!widget.miniPlayer &&

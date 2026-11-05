@@ -33,6 +33,7 @@ import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
 import 'package:musify/widgets/now_playing/player_chrome.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
+import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/skip_icon_button.dart';
 import 'package:musify/widgets/song_artwork.dart';
 import 'package:rxdart/rxdart.dart';
@@ -246,6 +247,51 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
     ),
   );
 
+  /// The phone's buttons, in its order and proportions: shuffle, previous,
+  /// play, next and repeat, with the progress bar under them.
+  Widget _transport(BuildContext context) {
+    const sizes = dockButtonSizes;
+    final box = BoxConstraints(minWidth: sizes.box, minHeight: sizes.box);
+    const padding = EdgeInsets.all(6);
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PlaybackModeButton(
+              repeat: false,
+              size: sizes.mode,
+              constraints: box,
+              padding: padding,
+            ),
+            const SizedBox(width: 6),
+            PlaybackTransportControls(
+              colorScheme: widget.colorScheme,
+              buttonConstraints: box,
+              buttonPadding: padding,
+              controlIconSize: sizes.play,
+              skipIconSize: sizes.skip,
+              playButtonSize: sizes.box,
+              buttonSpacing: 4,
+              minButtonSize: sizes.box,
+              playPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(width: 6),
+            PlaybackModeButton(
+              repeat: true,
+              size: sizes.mode,
+              constraints: box,
+              padding: padding,
+            ),
+          ],
+        ),
+        const SizedBox(height: 2),
+        const PositionSlider(inline: true),
+      ],
+    );
+  }
+
   Widget _wideBody(BuildContext context) => LayoutBuilder(
     builder: (context, c) {
       final colors = widget.colorScheme;
@@ -261,28 +307,16 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
             ),
           ),
           SizedBox(
-            width: 164,
+            width: live ? 164 : math.min(440, c.maxWidth * 0.4),
             child: live
                 ? PlaybackIconButton(
-                    iconSize: 32,
+                    iconSize: dockButtonSizes.play,
                     iconColor: colors.primary,
                     backgroundColor: Colors.transparent,
                     filled: true,
-                    buttonSize: 44,
+                    buttonSize: dockButtonSizes.box,
                   )
-                : PlaybackTransportControls(
-                    colorScheme: colors,
-                    buttonConstraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 44,
-                    ),
-                    buttonPadding: const EdgeInsets.all(6),
-                    controlIconSize: 32,
-                    skipIconSize: 26,
-                    buttonSpacing: 0,
-                    minButtonSize: 44,
-                    playPadding: const EdgeInsets.all(10),
-                  ),
+                : _transport(context),
           ),
           Expanded(
             child: Align(
