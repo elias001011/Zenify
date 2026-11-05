@@ -7,6 +7,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/audio_service.dart';
+import 'package:musify/services/common_services.dart';
 import 'package:musify/services/download_manager.dart';
 import 'package:musify/widgets/download_progress_icon.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
@@ -95,6 +96,26 @@ void main() {
     expect(tester.widget<IconButton>(button()).onPressed, isNotNull);
     manager.finished(other);
 
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('the tooltip says what the button does now', (tester) async {
+    await tester.pumpWidget(actions('a'));
+    await tester.pump();
+    expect(find.byTooltip('Make available offline'), findsOneWidget);
+    expect(find.byTooltip('Remove from offline'), findsNothing);
+
+    userOfflineSongs.value = [
+      {'ytid': 'a', 'title': 'A'},
+    ];
+    await tester.pumpWidget(actions('b'));
+    await tester.pumpWidget(actions('a'));
+    await tester.pump();
+    expect(find.byTooltip('Remove from offline'), findsOneWidget);
+    expect(find.byTooltip('Make available offline'), findsNothing);
+
+    userOfflineSongs.value = [];
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 3));
   });

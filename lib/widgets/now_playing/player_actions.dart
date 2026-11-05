@@ -178,7 +178,9 @@ class _PlayerActionsState extends State<PlayerActions> {
               return PlayerActionButton(
                 icon: FluentIcons.cloud_arrow_down_24_regular,
                 activeIcon: FluentIcons.cloud_off_24_filled,
-                tooltip: l10n.makeOffline,
+                tooltip: _songOfflineStatus.value
+                    ? l10n.removeOffline
+                    : l10n.makeOffline,
                 active: _songOfflineStatus.value,
                 busy: download == null ? null : DownloadProgressIcon(download),
                 onPressed: audioId == null || download != null
