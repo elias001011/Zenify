@@ -128,12 +128,12 @@ Everything from Musify:
 - Online song search with suggestions
 - Offline listening support
 - Import & export your data and never lose it
-- Custom playlists from a link, and Spotify playlist import (the songs it could not find can be matched by hand)
+- Custom playlists, Spotify playlist import (the songs it could not find can be matched by hand) and, on Android, opening the playlist links Musify shares (Zenify does not create them)
 - Listening recaps
 - Radio stations
 - Synced lyrics
 - SponsorBlock support
-- Built-in equalizer with presets
+- Built-in equalizer with presets (Android)
 - No ads, no subscriptions
 - Material UI, accent colors and dynamic colors (Android 12+)
 - 21 languages
@@ -146,11 +146,12 @@ New in Zenify:
 - **A new player**: the artwork with the song and playback under it. Lyrics
   and queue open beside it in wide windows; in narrow windows they share the artwork's
   space through the same animated transition. Tapping the artwork switches
-  to sound waves. They follow the music when audio levels are available and
-  keep a gentle motion with the simple reading or when capture is unavailable.
-  Choose simple or precise reading from the player; paused or buffering audio
-  freezes the waves. Android keeps the
-  screen awake while lyrics are open.
+  to sound waves. With the precise reading, chosen in Settings (on Android it
+  asks for audio access), they follow the music's frequencies; with the simple
+  reading, or when audio levels are unavailable, they keep a gentle motion of
+  their own. While nothing plays (paused, buffering, loading) the waves go down
+  to a row of dots and rest. Android keeps the screen awake while lyrics are
+  open and music plays.
 - **Moods and personal playlists**: start a Mix or choose a mood, and find
   daily, discovery and genre playlists below Time Machine on Home. Tune
   discovery, exclude genres or block artists in Settings. Moods can be
@@ -237,6 +238,7 @@ What is here besides the app itself, and what it is for.
 | `scripts/release_version.sh`, `update.sh` | Read the version from `pubspec.yaml` (`release_version` adds a hotfix number) and write it to `lib/constants/version.dart`. The release workflow and the packaging use them. |
 | `scripts/checker.dart`, `scripts/checkdb.sh` | Check that the built-in playlists and albums still exist on YouTube and have artwork; the report goes to `checker.txt`. |
 | `announcement.json` | A link the home page shows as an announcement while it is set; the app reads it from this branch. |
+| `.github/workflows/ci.yml` | Runs the analyzer and the tests on every push to `master` and every pull request; a second job runs the native player tests with libmpv. |
 | `.github/workflows/release.yml` | Builds the Android, Linux and Windows files and publishes them as a draft release. |
 | `.github/workflows/debug.yml`, `validate_windows.yml` | Run by hand: a debug APK, and a full check of the Windows package (tests, startup, icons, installer). |
 | `.github/scripts/`, `.github/installer/` | The release's helpers: startup and icon checks, the `.deb` and `.tar.gz` packaging, the Windows installer (Inno Setup). |
