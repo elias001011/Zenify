@@ -738,43 +738,53 @@ class _LibraryPageState extends State<LibraryPage> {
       sliver: MusicSliverSurface(
         sliver: SliverList.builder(
           itemCount: playlists.length,
-          itemBuilder: (BuildContext context, index) {
-            final playlist = playlists[index];
-            final isArtist = playlist['source']?.toString() == 'youtube-artist';
-            final borderRadius = getItemBorderRadius(
-              index,
-              playlists.length,
-              hasItemsBefore: hasItemsBefore,
-              hasItemsAfter: hasItemsAfter,
-            );
-            return PlaylistBar(
-              key: listItemKey('library_playlist', index, playlist),
-              playlist['title'],
-              playlistId: playlist['ytid'],
-              playlistArtwork: playlist['image'],
-              cubeIcon: isArtist
-                  ? FluentIcons.person_24_filled
-                  : FluentIcons.text_bullet_list_24_filled,
-              isAlbum: isArtist ? false : playlist['isAlbum'],
-              playlistData:
-                  isArtist ||
-                      playlist['source'] == 'user-created' ||
-                      playlist['source'] == 'user-youtube' ||
-                      isOfflinePlaylists
-                  ? playlist
-                  : null,
-              onDelete:
-                  playlist['source'] == 'user-created' ||
-                      playlist['source'] == 'user-youtube' ||
-                      isOfflinePlaylists
-                  ? () => isOfflinePlaylists
-                        ? _showRemoveOfflinePlaylistDialog(playlist)
-                        : _showRemovePlaylistDialog(playlist)
-                  : null,
-              borderRadius: borderRadius,
-            );
-          },
+          itemBuilder: (BuildContext context, index) => _playlistRow(
+            playlists[index],
+            index,
+            playlists.length,
+            isOfflinePlaylists: isOfflinePlaylists,
+            hasItemsBefore: hasItemsBefore,
+            hasItemsAfter: hasItemsAfter,
+          ),
         ),
+      ),
+    );
+  }
+
+  PlaylistBar _playlistRow(
+    Map playlist,
+    int index,
+    int count, {
+    required bool isOfflinePlaylists,
+    required bool hasItemsBefore,
+    required bool hasItemsAfter,
+  }) {
+    final isArtist = playlist['source']?.toString() == 'youtube-artist';
+    final isEditable =
+        playlist['source'] == 'user-created' ||
+        playlist['source'] == 'user-youtube';
+    return PlaylistBar(
+      key: listItemKey('library_playlist', index, playlist),
+      playlist['title'],
+      playlistId: playlist['ytid'],
+      playlistArtwork: playlist['image'],
+      cubeIcon: isArtist
+          ? FluentIcons.person_24_filled
+          : FluentIcons.text_bullet_list_24_filled,
+      isAlbum: isArtist ? false : playlist['isAlbum'],
+      playlistData: isArtist || isEditable || isOfflinePlaylists
+          ? playlist
+          : null,
+      onDelete: isEditable || isOfflinePlaylists
+          ? () => isOfflinePlaylists
+                ? _showRemoveOfflinePlaylistDialog(playlist)
+                : _showRemovePlaylistDialog(playlist)
+          : null,
+      borderRadius: getItemBorderRadius(
+        index,
+        count,
+        hasItemsBefore: hasItemsBefore,
+        hasItemsAfter: hasItemsAfter,
       ),
     );
   }
@@ -818,37 +828,14 @@ class _LibraryPageState extends State<LibraryPage> {
       physics: const NeverScrollableScrollPhysics(),
       itemCount: playlists.length,
       padding: hasItemsAfter ? EdgeInsets.zero : commonListViewBottomPadding,
-      itemBuilder: (BuildContext context, index) {
-        final playlist = playlists[index];
-        final borderRadius = getItemBorderRadius(
-          index,
-          playlists.length,
-          hasItemsBefore: hasItemsBefore,
-          hasItemsAfter: hasItemsAfter,
-        );
-        return PlaylistBar(
-          key: listItemKey('library_playlist', index, playlist),
-          playlist['title'],
-          playlistId: playlist['ytid'],
-          playlistArtwork: playlist['image'],
-          isAlbum: playlist['isAlbum'],
-          playlistData:
-              playlist['source'] == 'user-created' ||
-                  playlist['source'] == 'user-youtube' ||
-                  isOfflinePlaylists
-              ? playlist
-              : null,
-          onDelete:
-              playlist['source'] == 'user-created' ||
-                  playlist['source'] == 'user-youtube' ||
-                  isOfflinePlaylists
-              ? () => isOfflinePlaylists
-                    ? _showRemoveOfflinePlaylistDialog(playlist)
-                    : _showRemovePlaylistDialog(playlist)
-              : null,
-          borderRadius: borderRadius,
-        );
-      },
+      itemBuilder: (BuildContext context, index) => _playlistRow(
+        playlists[index],
+        index,
+        playlists.length,
+        isOfflinePlaylists: isOfflinePlaylists,
+        hasItemsBefore: hasItemsBefore,
+        hasItemsAfter: hasItemsAfter,
+      ),
     );
   }
 
