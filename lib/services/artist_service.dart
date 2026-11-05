@@ -451,10 +451,14 @@ Future<Map<String, dynamic>?> _getArtistCatalogFromProfile(
     }
 
     final artistPlaylist = artistPlaylistData(artist, songs: catalog.songs);
-    // A refresh may immediately read this key to update another view. Finish
-    // the local write before exposing the new catalog so stale data cannot win
-    // that race.
-    await addOrUpdateData<Map>('cache', cacheKey, artistPlaylist);
+    // A catalog with releases missing is shown this time but not kept: kept,
+    // it would stand in for the whole one for as long as the cache lasts.
+    if (catalog.isComplete) {
+      // A refresh may immediately read this key to update another view. Finish
+      // the local write before exposing the new catalog so stale data cannot
+      // win that race.
+      await addOrUpdateData<Map>('cache', cacheKey, artistPlaylist);
+    }
     return artistPlaylist;
   } catch (e, stackTrace) {
     logger.log(
