@@ -1,29 +1,17 @@
-import 'dart:io';
-
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/song_selection_bar.dart';
 import 'package:musify/widgets/song_selection_controller.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  late Directory dir;
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('zenify_selection');
-    Hive.init(dir.path);
-    for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(box);
-    }
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings();
 
   testWidgets('desktop arrows and wheel reach all batch actions', (
     tester,

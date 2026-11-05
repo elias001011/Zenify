@@ -1,10 +1,7 @@
-import 'dart:io';
-
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
@@ -17,21 +14,10 @@ import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
 import 'package:musify/widgets/song_artwork.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  late Directory dir;
-
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('musify_mini_player');
-    Hive.init(dir.path);
-    for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(box);
-    }
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings();
 
   Widget app(Key key) => MaterialApp(
     localizationsDelegates: const [

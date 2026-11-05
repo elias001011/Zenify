@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/screens/user_songs_page.dart';
@@ -9,19 +6,10 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  late Directory directory;
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('zenify_user_songs');
-    Hive.init(directory.path);
-    for (final name in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(name);
-    }
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
-  });
+  useAppSettings();
 
   Widget page(String name) => MaterialApp(
     locale: const Locale('en'),

@@ -1,8 +1,5 @@
-import 'dart:io';
-
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -10,21 +7,10 @@ import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/recommended_songs_section.dart';
 import 'package:musify/widgets/song_bar.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  late Directory directory;
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp(
-      'zenify_recommendation_surface',
-    );
-    Hive.init(directory.path);
-    for (final name in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(name);
-    }
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
-  });
+  useAppSettings();
 
   for (final sliver in [false, true]) {
     testWidgets(

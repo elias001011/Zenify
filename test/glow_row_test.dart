@@ -1,27 +1,15 @@
-import 'dart:io';
-
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/glow_row.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  late Directory dir;
-
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('musify_glow_row');
-    Hive.init(dir.path);
-    await Hive.openBox('settings');
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings(boxes: ['settings']);
 
   Widget row() => MaterialApp(
     home: Scaffold(

@@ -5,12 +5,14 @@ import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 
-void useAppSettings() {
+void useAppSettings({
+  List<String> boxes = const ['settings', 'user', 'userNoBackup', 'cache'],
+}) {
   late Directory directory;
   setUpAll(() async {
     directory = await Directory.systemTemp.createTemp('zenify_test');
     Hive.init(directory.path);
-    for (final name in ['settings', 'user', 'userNoBackup', 'cache']) {
+    for (final name in boxes) {
       await Hive.openBox(name);
     }
   });

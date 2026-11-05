@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
@@ -12,6 +10,8 @@ import 'package:musify/services/audio_service.dart';
 import 'package:musify/widgets/app_motion.dart';
 import 'package:musify/widgets/mini_player.dart';
 import 'package:musify/widgets/position_slider.dart';
+
+import 'support/app_harness.dart';
 
 /// A player that stopped: it knows where it is, but emits nothing.
 class _Handler extends MusifyAudioHandler {
@@ -27,20 +27,7 @@ class _Handler extends MusifyAudioHandler {
 }
 
 void main() {
-  late Directory dir;
-
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('zenify_position_resume');
-    Hive.init(dir.path);
-    for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(box);
-    }
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings();
 
   Future<_Handler> pumpApp(WidgetTester tester, Widget child) async {
     final handler = _Handler();

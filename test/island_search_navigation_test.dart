@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
@@ -13,19 +11,10 @@ import 'package:musify/widgets/custom_search_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/song_bar.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  late Directory dir;
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('zenify_island_search');
-    Hive.init(dir.path);
-    for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(box);
-    }
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings();
 
   testWidgets(
     'filter stays live; Enter opens global and Back preserves it; offline stays local',

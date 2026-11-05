@@ -1,26 +1,14 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/widgets/overflow_menu_button.dart';
 import 'package:musify/widgets/song_bar.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  late Directory directory;
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('zenify_song_bar_reuse');
-    Hive.init(directory.path);
-    for (final name in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(name);
-    }
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
-  });
+  useAppSettings();
 
   Map song(String id) => {
     'ytid': id,

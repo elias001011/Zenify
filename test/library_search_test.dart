@@ -1,28 +1,14 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/library_search.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  late Directory dir;
-
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('musify_library_search');
-    Hive.init(dir.path);
-    for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(box);
-    }
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings();
 
   Map song(String id, String title, String artist) => {
     'ytid': id,
