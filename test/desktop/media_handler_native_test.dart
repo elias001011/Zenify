@@ -217,9 +217,18 @@ void main() {
         expect(handler.audioPlayer.playing, false);
       });
 
-      test(
-        'pause during a playing track change prevents automatic resume',
-        () async {
+      // The handler is built as desktop in setUp (as Android it would start the
+      // audio session); the platform is read at each call, so this is enough.
+      void usePlatform(String platform) {
+        if (platform == 'android') {
+          debugDefaultTargetPlatformOverride = TargetPlatform.android;
+        }
+      }
+
+      for (final platform in ['desktop', 'android']) {
+        test('pause during a playing track change prevents automatic resume '
+            '($platform)', () async {
+          usePlatform(platform);
           await handler.play();
           await waitFor(() => handler.audioPlayer.playing);
           var pausedDuringLoad = false;
@@ -237,48 +246,54 @@ void main() {
           expect(pausedDuringLoad, true);
           expect(handler.currentQueueIndex, 1);
           expect(handler.audioPlayer.playing, false);
-        },
-      );
-
-      test('pause during a song change is published at once', () async {
-        await handler.play();
-        await waitFor(() => handler.audioPlayer.playing);
-        bool? published;
-        final subscription = handler.audioPlayer.processingStateStream.listen((
-          state,
-        ) {
-          if (state.name == 'loading' && published == null) {
-            handler.pause();
-            published = handler.playbackState.value.playing;
-          }
         });
-        addTearDown(subscription.cancel);
-        await navigate('Next');
-        expect(
-          published,
-          isFalse,
-          reason: 'The controls kept saying playing after pause',
-        );
-      });
 
-      test('play during a song change is published at once', () async {
-        bool? published;
-        final subscription = handler.audioPlayer.processingStateStream.listen((
-          state,
-        ) {
-          if (state.name == 'loading' && published == null) {
-            handler.play();
-            published = handler.playbackState.value.playing;
-          }
-        });
-        addTearDown(subscription.cancel);
-        await navigate('Next');
-        expect(
-          published,
-          isTrue,
-          reason: 'The controls kept saying paused after play',
+        test(
+          'pause during a song change is published at once ($platform)',
+          () async {
+            usePlatform(platform);
+            await handler.play();
+            await waitFor(() => handler.audioPlayer.playing);
+            bool? published;
+            final subscription = handler.audioPlayer.processingStateStream
+                .listen((state) {
+                  if (state.name == 'loading' && published == null) {
+                    handler.pause();
+                    published = handler.playbackState.value.playing;
+                  }
+                });
+            addTearDown(subscription.cancel);
+            await navigate('Next');
+            expect(
+              published,
+              isFalse,
+              reason: 'The controls kept saying playing after pause',
+            );
+          },
         );
-      });
+
+        test(
+          'play during a song change is published at once ($platform)',
+          () async {
+            usePlatform(platform);
+            bool? published;
+            final subscription = handler.audioPlayer.processingStateStream
+                .listen((state) {
+                  if (state.name == 'loading' && published == null) {
+                    handler.play();
+                    published = handler.playbackState.value.playing;
+                  }
+                });
+            addTearDown(subscription.cancel);
+            await navigate('Next');
+            expect(
+              published,
+              isTrue,
+              reason: 'The controls kept saying paused after play',
+            );
+          },
+        );
+      }
 
       test('app navigation retains its existing autoplay default', () async {
         await handler.skipToNext();
