@@ -31,3 +31,32 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test --concurrency=2
+
+  native-audio:
+    name: Native audio tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Becomes blocking after three green runs.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmpv-dev pulseaudio
+      - name: Resolve Flutter version
+        run: |
+          echo "FLUTTER_VERSION=$(sed -n 's/^  flutter: \^*//p' pubspec.yaml)" >> "$GITHUB_ENV"
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+      - run: flutter pub get
+      - name: Start a silent audio output
+        run: |
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-null-sink sink_name=zenify-test
+      - name: Test with the real player
+        env:
+          MUSIFY_TEST_LIBMPV: /usr/lib/x86_64-linux-gnu/libmpv.so.2
+        run: flutter test test/desktop
