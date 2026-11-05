@@ -2721,7 +2721,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           playWhenReady: playWhenReady,
         );
       } else if (_historyList.isNotEmpty) {
-        final lastSong = cloneMap(_historyList.removeLast());
+        final lastSong = cloneMap(_historyList.removeAt(0));
         _queueList.insert(0, lastSong);
         _currentQueueIndex = 0;
         _currentLoadingIndex = -1;

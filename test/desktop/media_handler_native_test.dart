@@ -5,6 +5,7 @@ import 'package:dbus/dbus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:musify/services/audio_service.dart';
@@ -18,6 +19,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory directory;
   late File wav;
+  late File shortWav;
   late MusifyAudioHandler handler;
   LinuxMediaControls? controls;
   DBusServer? bus;
@@ -51,16 +53,17 @@ void main() {
     }
   }
 
+  Map<String, dynamic> song(String id, {File? file}) => {
+    'ytid': id,
+    'title': id,
+    'artist': 'Native test',
+    'audioPath': (file ?? wav).path,
+    'highResImage': '',
+    'lowResImage': '',
+    'isLive': false,
+  };
+
   Future<void> loadQueue() async {
-    Map<String, dynamic> song(String id) => {
-      'ytid': id,
-      'title': id,
-      'artist': 'Native test',
-      'audioPath': wav.path,
-      'highResImage': '',
-      'lowResImage': '',
-      'isLive': false,
-    };
     await handler.addPlaylistToQueue([song('first'), song('second')]);
     await handler.skipToSong(0);
     await waitFor(() => handler.audioPlayer.playing);
@@ -83,6 +86,8 @@ void main() {
         }
         wav = File('${directory.path}/silence.wav');
         await wav.writeAsBytes(silentWav(size: 320000));
+        shortWav = File('${directory.path}/short.wav');
+        await shortWav.writeAsBytes(silentWav(size: 16000));
       });
       tearDownAll(() async {
         await Future<void>.delayed(const Duration(seconds: 2));
@@ -310,6 +315,26 @@ void main() {
         await handler.removeFromQueue(0);
         expect(handler.mediaItem.value!.title, 'second');
         expect(handler.audioPlayer.playing, true);
+      });
+
+      test('Previous goes back to the song that finished last', () async {
+        await handler.addPlaylistToQueue([
+          song('a', file: shortWav),
+          song('b', file: shortWav),
+        ], replace: true);
+        await waitFor(
+          () =>
+              handler.mediaItem.value?.title == 'b' &&
+              handler.audioPlayer.processingState == ProcessingState.ready,
+        );
+        await waitFor(
+          () =>
+              handler.audioPlayer.processingState == ProcessingState.completed,
+        );
+        await handler.skipToSong(0);
+        await handler.pause();
+        await handler.skipToPrevious(playWhenReady: false);
+        expect(handler.mediaItem.value!.title, 'b');
       });
 
       test('app navigation retains its existing autoplay default', () async {
