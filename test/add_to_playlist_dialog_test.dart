@@ -53,6 +53,13 @@ void main() {
     userPlaylistFolders.value = [];
     userCustomPlaylists.value = [
       {'ytid': 'p1', 'title': 'Road trip', 'list': []},
+      {
+        'ytid': 'p2',
+        'title': 'Focus',
+        'list': [
+          {'ytid': 'a', 'title': 'Song A'},
+        ],
+      },
     ];
   });
 
@@ -68,8 +75,21 @@ void main() {
       tester.getTopLeft(find.text('Liked songs')).dy,
       lessThan(tester.getTopLeft(find.text('Road trip')).dy),
     );
-    expect(find.byIcon(FluentIcons.add_circle_24_regular), findsOneWidget);
-    expect(find.byIcon(FluentIcons.checkmark_circle_24_filled), findsNothing);
+    // The liked songs and the playlist without the song: a plus; the one with
+    // it: a check.
+    expect(find.byIcon(FluentIcons.add_circle_24_regular), findsNWidgets(2));
+    expect(find.byIcon(FluentIcons.checkmark_circle_24_filled), findsOneWidget);
+    expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsNothing);
+    expect(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Focus'),
+          matching: find.byType(InkWell),
+        ),
+        matching: find.byIcon(FluentIcons.checkmark_circle_24_filled),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('one tap likes the song and closes the dialog', (tester) async {
@@ -87,7 +107,11 @@ void main() {
   ) async {
     userLikedSongsList.value = [song];
     await _open(tester, _app(song: song));
-    expect(find.byIcon(FluentIcons.checkmark_circle_24_filled), findsOneWidget);
+    // The liked songs and the playlist that has the song.
+    expect(
+      find.byIcon(FluentIcons.checkmark_circle_24_filled),
+      findsNWidgets(2),
+    );
     await tester.tap(find.text('Liked songs'));
     await tester.pumpAndSettle();
     expect(userLikedSongsList.value, isEmpty);
@@ -109,6 +133,9 @@ void main() {
     );
     expect(find.text('Liked songs'), findsNothing);
     expect(find.text('Road trip'), findsOneWidget);
+    // Many songs: no way to say "in it", so the rows keep their chevron.
+    expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsNWidgets(2));
+    expect(find.byIcon(FluentIcons.checkmark_circle_24_filled), findsNothing);
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     await _open(tester, _app(song: {'ytid': 'local:/a.mp3', 'title': 'Local'}));

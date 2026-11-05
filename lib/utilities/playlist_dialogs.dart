@@ -29,6 +29,7 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/utilities/map_utils.dart';
 import 'package:musify/utilities/playlist_image_picker.dart';
 import 'package:musify/widgets/dialog_item.dart';
 
@@ -500,36 +501,10 @@ void showAddToPlaylistDialog(
                                       left: 16,
                                       right: 16,
                                     ),
-                                    child: DialogItem(
-                                      icon: FluentIcons
-                                          .text_bullet_list_24_filled,
-                                      iconColor: colorScheme.tertiary,
-                                      iconBgColor:
-                                          colorScheme.tertiaryContainer,
-                                      label: p['title'] ?? '',
-                                      onTap: () {
-                                        if (song != null) {
-                                          showToast(
-                                            context,
-                                            addSongInCustomPlaylist(
-                                              context,
-                                              p['ytid'],
-                                              song,
-                                            ),
-                                          );
-                                        } else if (songs != null &&
-                                            songs.isNotEmpty) {
-                                          showToast(
-                                            context,
-                                            addSongsInCustomPlaylist(
-                                              context,
-                                              p['ytid'],
-                                              songs,
-                                            ),
-                                          );
-                                        }
-                                        Navigator.pop(context);
-                                      },
+                                    child: _PlaylistItem(
+                                      playlist: p,
+                                      song: song,
+                                      songs: songs,
                                     ),
                                   ),
                               ],
@@ -542,33 +517,10 @@ void showAddToPlaylistDialog(
 
                         return Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: DialogItem(
-                            icon: FluentIcons.text_bullet_list_24_filled,
-                            iconColor: colorScheme.tertiary,
-                            iconBgColor: colorScheme.tertiaryContainer,
-                            label: playlist['title'] ?? '',
-                            onTap: () {
-                              if (song != null) {
-                                showToast(
-                                  context,
-                                  addSongInCustomPlaylist(
-                                    context,
-                                    playlist['ytid'],
-                                    song,
-                                  ),
-                                );
-                              } else if (songs != null && songs.isNotEmpty) {
-                                showToast(
-                                  context,
-                                  addSongsInCustomPlaylist(
-                                    context,
-                                    playlist['ytid'],
-                                    songs,
-                                  ),
-                                );
-                              }
-                              Navigator.pop(context);
-                            },
+                          child: _PlaylistItem(
+                            playlist: playlist,
+                            song: song,
+                            songs: songs,
                           ),
                         );
                       },
@@ -626,13 +578,7 @@ class _LikedSongsItem extends StatelessWidget {
           iconBgColor: colorScheme.primary,
           backgroundColor: colorScheme.primaryContainer,
           label: l10n.likedSongs,
-          trailing: Icon(
-            liked
-                ? FluentIcons.checkmark_circle_24_filled
-                : FluentIcons.add_circle_24_regular,
-            color: liked ? colorScheme.primary : colorScheme.onSurfaceVariant,
-            size: 24,
-          ),
+          trailing: _InListMark(inList: liked),
           onTap: () {
             showToast(
               context,
@@ -644,6 +590,69 @@ class _LikedSongsItem extends StatelessWidget {
           },
         );
       },
+    );
+  }
+}
+
+/// A playlist the song can go in. With one song, it also says whether the song
+/// is already in it; with many, it has the chevron of a row that opens.
+class _PlaylistItem extends StatelessWidget {
+  const _PlaylistItem({required this.playlist, this.song, this.songs});
+
+  final Map playlist;
+  final dynamic song;
+  final List<dynamic>? songs;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final ytid = song is Map ? songYtid(song as Map) : null;
+    return DialogItem(
+      icon: FluentIcons.text_bullet_list_24_filled,
+      iconColor: colorScheme.tertiary,
+      iconBgColor: colorScheme.tertiaryContainer,
+      label: playlist['title'] ?? '',
+      trailing: ytid == null
+          ? null
+          : _InListMark(
+              inList:
+                  playlist['list'] is List &&
+                  findSongByYtid(playlist['list'] as List, ytid) != null,
+            ),
+      onTap: () {
+        if (song != null) {
+          showToast(
+            context,
+            addSongInCustomPlaylist(context, playlist['ytid'], song),
+          );
+        } else if (songs != null && songs!.isNotEmpty) {
+          showToast(
+            context,
+            addSongsInCustomPlaylist(context, playlist['ytid'], songs!),
+          );
+        }
+        Navigator.pop(context);
+      },
+    );
+  }
+}
+
+/// At the end of a row of the dialog: a check when the song is in it, a plus
+/// when it is not.
+class _InListMark extends StatelessWidget {
+  const _InListMark({required this.inList});
+
+  final bool inList;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Icon(
+      inList
+          ? FluentIcons.checkmark_circle_24_filled
+          : FluentIcons.add_circle_24_regular,
+      color: inList ? colorScheme.primary : colorScheme.onSurfaceVariant,
+      size: 24,
     );
   }
 }
