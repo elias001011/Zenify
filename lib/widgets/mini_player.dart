@@ -27,6 +27,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/marquee.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
@@ -39,17 +40,22 @@ import 'package:musify/widgets/song_artwork.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// What the mini player's body shows besides the song: the playback state
-/// and whether there is a next song. Position is left out, so the body
-/// rebuilds when these change, not on every tick; only the ring follows it.
-typedef _ControlsState = ({PlaybackState playback, bool hasNext});
+/// and whether there is a next song after this one in the queue (`multiple`:
+/// there is more than one song, for the repeat mode to wrap around to).
+/// Position is left out, so the body rebuilds when these change, not on every
+/// tick; only the ring follows it.
+typedef _ControlsState = ({
+  PlaybackState playback,
+  bool hasNext,
+  bool multiple,
+});
 
 _ControlsState _controlsState(PlaybackState playback, List<MediaItem> queue) =>
     (
       playback: playback,
       hasNext:
-          queue.length > 1 &&
-          ((playback.queueIndex ?? 0) < queue.length - 1 ||
-              playback.repeatMode == AudioServiceRepeatMode.all),
+          queue.length > 1 && (playback.queueIndex ?? 0) < queue.length - 1,
+      multiple: queue.length > 1,
     );
 
 /// The stream doesn't replay, so a mini player built later (the layout
@@ -81,6 +87,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
       ).distinct(
         (a, b) =>
             a.hasNext == b.hasNext &&
+            a.multiple == b.multiple &&
             a.playback.playing == b.playback.playing &&
             a.playback.processingState == b.playback.processingState,
       );
@@ -102,20 +109,29 @@ class _MiniPlayerState extends State<MiniPlayer> {
               final metadata = mediaSnapshot.data;
               if (metadata == null) return const SizedBox.shrink();
 
-              return StreamBuilder<_ControlsState>(
-                initialData: _currentControlsState(),
-                stream: _controlsStateStream,
-                builder: (context, stateSnapshot) {
-                  final state = stateSnapshot.data;
-                  if (state == null) return const SizedBox.shrink();
-                  return _MiniPlayerBody(
-                    wide: widget.wide && constraints.maxWidth >= 900,
-                    colorScheme: colorScheme,
-                    metadata: metadata,
-                    playbackState: state.playback,
-                    hasNext: state.hasNext,
-                  );
-                },
+              // The repeat mode is no part of the stream: repeating all wraps
+              // the last song around to the first.
+              return ValueListenableBuilder<AudioServiceRepeatMode>(
+                valueListenable: repeatNotifier,
+                builder: (context, repeatMode, _) =>
+                    StreamBuilder<_ControlsState>(
+                      initialData: _currentControlsState(),
+                      stream: _controlsStateStream,
+                      builder: (context, stateSnapshot) {
+                        final state = stateSnapshot.data;
+                        if (state == null) return const SizedBox.shrink();
+                        return _MiniPlayerBody(
+                          wide: widget.wide && constraints.maxWidth >= 900,
+                          colorScheme: colorScheme,
+                          metadata: metadata,
+                          playbackState: state.playback,
+                          hasNext:
+                              state.hasNext ||
+                              (state.multiple &&
+                                  repeatMode == AudioServiceRepeatMode.all),
+                        );
+                      },
+                    ),
               );
             },
           ),

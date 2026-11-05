@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
@@ -104,6 +105,62 @@ void main() {
       await tester.pump(const Duration(seconds: 30));
     },
   );
+
+  group('Next on the compact mini player', () {
+    Future<void> mount(
+      WidgetTester tester,
+      AudioServiceRepeatMode mode,
+      Object key,
+    ) async {
+      repeatNotifier.value = mode;
+      addTearDown(() => repeatNotifier.value = AudioServiceRepeatMode.none);
+      audioHandler = MusifyAudioHandler();
+      // Its own first updates would otherwise replace the state set below.
+      await tester.pump(const Duration(milliseconds: 400));
+      audioHandler.mediaItem.add(const MediaItem(id: 'b', title: 'B'));
+      audioHandler.queue.add(const [
+        MediaItem(id: 'a', title: 'A'),
+        MediaItem(id: 'b', title: 'B'),
+      ]);
+      // The last of two songs.
+      audioHandler.playbackState.add(
+        PlaybackState(playing: true, queueIndex: 1),
+      );
+      await tester.pumpWidget(app(ValueKey(key)));
+      await tester.pump(const Duration(milliseconds: 400));
+    }
+
+    Future<void> unmount(WidgetTester tester) async {
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 30));
+    }
+
+    testWidgets('shows on the last song while repeating all', (tester) async {
+      await mount(tester, AudioServiceRepeatMode.all, 'repeat-all');
+      expect(find.byIcon(FluentIcons.next_24_filled), findsOneWidget);
+      await unmount(tester);
+    });
+
+    testWidgets('is hidden on the last song when not repeating', (
+      tester,
+    ) async {
+      await mount(tester, AudioServiceRepeatMode.none, 'repeat-none');
+      expect(find.byIcon(FluentIcons.next_24_filled), findsNothing);
+      await unmount(tester);
+    });
+
+    testWidgets('follows the repeat mode once mounted', (tester) async {
+      await mount(tester, AudioServiceRepeatMode.none, 'repeat-switch');
+      expect(find.byIcon(FluentIcons.next_24_filled), findsNothing);
+      repeatNotifier.value = AudioServiceRepeatMode.all;
+      await tester.pump();
+      expect(find.byIcon(FluentIcons.next_24_filled), findsOneWidget);
+      repeatNotifier.value = AudioServiceRepeatMode.none;
+      await tester.pump();
+      expect(find.byIcon(FluentIcons.next_24_filled), findsNothing);
+      await unmount(tester);
+    });
+  });
 
   for (final platform in [TargetPlatform.linux, TargetPlatform.android]) {
     testWidgets('the compact ${platform.name} mini player has the ring', (
