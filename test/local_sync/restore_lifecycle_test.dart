@@ -119,6 +119,40 @@ void main() {
     expect(changed, isTrue);
     expect(Hive.box('user').get('likedSongs'), ['restored']);
   });
+  testWidgets('a restore keeps the settings that belong to this device', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      // This device: the visualizer is on and the system colour is off.
+      await Hive.box('settings').put('showPlayerVisualizer', true);
+      await Hive.box('settings').put('useSystemColor', false);
+      final sourceUser = await Hive.openBox('sourceuser');
+      await sourceUser.put('likedSongs', ['restored']);
+      await sourceUser.flush();
+      // The backup comes from another device with the opposite choices.
+      final sourceSettings = await Hive.openBox('sourcesettings');
+      await sourceSettings.put('showPlayerVisualizer', false);
+      await sourceSettings.put('useSystemColor', true);
+      await sourceSettings.put('theme', 'dark');
+      await sourceSettings.flush();
+      FilePickerPlatform.instance = FakePicker([
+        MemoryFile('user.hive', await File(sourceUser.path!).readAsBytes()),
+        MemoryFile(
+          'settings.hive',
+          await File(sourceSettings.path!).readAsBytes(),
+        ),
+      ]);
+    });
+    final context = await contextFor(tester);
+    final result = await tester.runAsync(() => restoreData(context));
+    expect(result!.success, isTrue);
+    final settings = Hive.box('settings');
+    // What is about the library comes from the backup...
+    expect(settings.get('theme'), 'dark');
+    // ...what is about this device stays as it was.
+    expect(settings.get('showPlayerVisualizer'), isTrue);
+    expect(settings.get('useSystemColor'), isFalse);
+  });
   for (final failRollback in [false, true]) {
     testWidgets(
       'a failed restore reports whether rollback failed: $failRollback',

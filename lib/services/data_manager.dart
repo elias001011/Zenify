@@ -304,6 +304,8 @@ const _deviceSettings = [
   'waveReading',
   'equalizerEnabled',
   'equalizerBandGains',
+  'showPlayerVisualizer',
+  'useSystemColor',
 ];
 
 const _libraryBoxes = ['user', 'settings'];
