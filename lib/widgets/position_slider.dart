@@ -24,7 +24,6 @@ import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/utilities/formatter.dart';
 import 'package:musify/widgets/now_playing/audio_quality_badge.dart';
-import 'package:musify/widgets/now_playing/player_chrome.dart';
 
 class PositionSlider extends StatefulWidget {
   /// The track and the times reach the edges of the space they are given, so
@@ -51,7 +50,6 @@ class _PositionSliderState extends State<PositionSlider> {
 
   @override
   Widget build(BuildContext context) {
-    final minimal = PlayerChrome.minimalOf(context);
     final colorScheme = Theme.of(context).colorScheme;
     final listening = TickerMode.valuesOf(context).enabled;
     return StreamBuilder<PositionData>(
@@ -89,28 +87,22 @@ class _PositionSliderState extends State<PositionSlider> {
         final slider = SliderTheme(
           data: SliderTheme.of(context).copyWith(
             padding: EdgeInsets.zero,
-            trackHeight: minimal ? (widget.inline ? 4 : 5) : null,
-            trackShape: minimal ? const RoundedRectSliderTrackShape() : null,
+            trackHeight: widget.inline ? 4 : 5,
+            trackShape: const RoundedRectSliderTrackShape(),
             // The thumb makes the bar easy to find and to grab; the short bar
             // of the mini player has none.
-            thumbShape: minimal
-                ? RoundSliderThumbShape(
-                    enabledThumbRadius: widget.inline ? 0 : 6,
-                    elevation: 0,
-                    pressedElevation: 0,
-                  )
-                : null,
-            thumbColor: minimal ? colorScheme.onSurface : null,
-            overlayShape: minimal
-                ? const RoundSliderOverlayShape(overlayRadius: 8)
-                : null,
-            activeTrackColor: minimal ? colorScheme.onSurface : null,
-            inactiveTrackColor: minimal
-                ? colorScheme.onSurface.withValues(alpha: 0.2)
-                : null,
+            thumbShape: RoundSliderThumbShape(
+              enabledThumbRadius: widget.inline ? 0 : 6,
+              elevation: 0,
+              pressedElevation: 0,
+            ),
+            thumbColor: colorScheme.onSurface,
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 8),
+            activeTrackColor: colorScheme.onSurface,
+            inactiveTrackColor: colorScheme.onSurface.withValues(alpha: 0.2),
           ),
           child: SizedBox(
-            height: minimal ? (widget.inline ? 16 : 28) : null,
+            height: widget.inline ? 16 : 28,
             child: Slider(
               value: currentValue.clamp(0.0, maxDuration),
               onChanged: (value) {
@@ -149,7 +141,7 @@ class _PositionSliderState extends State<PositionSlider> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             slider,
-            SizedBox(height: minimal ? 4 : 8),
+            const SizedBox(height: 4),
             _buildPositionRow(context, _positionData),
           ],
         );
@@ -174,10 +166,7 @@ class _PositionSliderState extends State<PositionSlider> {
       );
 
   Widget _buildPositionRow(BuildContext context, PositionData positionData) {
-    final minimal = PlayerChrome.minimalOf(context);
-    final textStyle = minimal
-        ? _timeStyle(context, size: 12)
-        : const TextStyle(fontSize: 15);
+    final textStyle = _timeStyle(context, size: 12);
 
     return Stack(
       alignment: Alignment.center,

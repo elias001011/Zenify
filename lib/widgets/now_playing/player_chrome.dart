@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-enum PlayerChromeStyle { soft, plain, dock }
+enum PlayerChromeStyle { plain, dock }
 
 /// Shares presentation choices without duplicating playback controls.
 class PlayerChrome extends InheritedWidget {
@@ -8,11 +8,7 @@ class PlayerChrome extends InheritedWidget {
   final PlayerChromeStyle style;
 
   static PlayerChromeStyle of(BuildContext context) =>
-      context.dependOnInheritedWidgetOfExactType<PlayerChrome>()?.style ??
-      PlayerChromeStyle.soft;
-
-  static bool minimalOf(BuildContext context) =>
-      of(context) != PlayerChromeStyle.soft;
+      context.dependOnInheritedWidgetOfExactType<PlayerChrome>()!.style;
 
   @override
   bool updateShouldNotify(PlayerChrome oldWidget) => style != oldWidget.style;

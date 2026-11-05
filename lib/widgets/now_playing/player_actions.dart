@@ -34,7 +34,6 @@ import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/download_progress_icon.dart';
-import 'package:musify/widgets/now_playing/player_chrome.dart';
 
 /// Side panels of the player: shown beside it on wide screens, as sheets on
 /// phones.
@@ -336,9 +335,7 @@ class PlayerActionButton extends StatelessWidget {
         tooltip: tooltip,
         style: IconButton.styleFrom(
           minimumSize: const Size.square(48),
-          backgroundColor: active && !PlayerChrome.minimalOf(context)
-              ? color.withValues(alpha: 0.15)
-              : Colors.transparent,
+          backgroundColor: Colors.transparent,
           side: BorderSide.none,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),

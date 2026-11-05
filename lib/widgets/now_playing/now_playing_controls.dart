@@ -413,16 +413,8 @@ class PlaybackModeButton extends StatelessWidget {
           constraints: constraints,
           padding: padding,
           style: IconButton.styleFrom(
-            foregroundColor: active
-                ? (PlayerChrome.minimalOf(context)
-                      ? colors.primary
-                      : colors.onPrimary)
-                : colors.onSurfaceVariant,
-            backgroundColor: PlayerChrome.minimalOf(context)
-                ? Colors.transparent
-                : active
-                ? colors.primary
-                : colors.surfaceContainerHighest.withValues(alpha: 0.45),
+            foregroundColor: active ? colors.primary : colors.onSurfaceVariant,
+            backgroundColor: Colors.transparent,
             side: BorderSide.none,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
@@ -524,16 +516,8 @@ class PlaybackTransportControls extends StatelessWidget {
                   ),
                   SizedBox(width: buttonSpacing),
                   PlaybackIconButton(
-                    iconColor: switch (PlayerChrome.of(context)) {
-                      PlayerChromeStyle.plain => colorScheme.onSurface,
-                      PlayerChromeStyle.dock => colorScheme.onSurface,
-                      PlayerChromeStyle.soft => colorScheme.onPrimary,
-                    },
-                    backgroundColor: switch (PlayerChrome.of(context)) {
-                      PlayerChromeStyle.plain => Colors.transparent,
-                      PlayerChromeStyle.dock => Colors.transparent,
-                      PlayerChromeStyle.soft => colorScheme.primary,
-                    },
+                    iconColor: colorScheme.onSurface,
+                    backgroundColor: Colors.transparent,
                     filled: true,
                     buttonSize:
                         playButtonSize ??
@@ -611,12 +595,8 @@ class _PlaybackControlButton extends StatelessWidget {
       iconSize: skipIconSize ?? controlIconSize * 0.75,
       onPressed: isEnabled ? onPressed : null,
       style: IconButton.styleFrom(
-        backgroundColor: PlayerChrome.minimalOf(context)
-            ? Colors.transparent
-            : colorScheme.surfaceContainerHighest,
-        disabledBackgroundColor: PlayerChrome.minimalOf(context)
-            ? Colors.transparent
-            : colorScheme.surfaceContainerHighest,
+        backgroundColor: Colors.transparent,
+        disabledBackgroundColor: Colors.transparent,
         side: BorderSide.none,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         padding: buttonPadding,
