@@ -55,9 +55,23 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   final _repaint = ValueNotifier<int>(0);
   late final Ticker _ticker = createTicker(_tick);
 
-  /// The bars move at 30 frames a second: the music is read that often, and
-  /// more would only cost.
-  static const _frame = Duration(milliseconds: 28);
+  /// The bars are drawn 48 times a second. The music is read less often, and
+  /// the bars ease towards each reading, so the extra frames smooth the motion.
+  static const _fps = 48;
+  static const _frameMicroseconds = 1000000 ~/ _fps;
+
+  /// After a pause the reader stays on this long, so a short one does not set
+  /// it up again, and start it cold, at the resume.
+  static const _readerGrace = Duration(seconds: 15);
+
+  /// With the precise reading, how long after play the bars wait at rest for
+  /// the first reading, rather than rise on their own motion and then jump to
+  /// the music, which is louder.
+  static const _musicWait = Duration(milliseconds: 600);
+
+  /// A reading that is all zeros this soon after play is the reader warming up,
+  /// not silence: the bars keep their own motion instead of falling to dots.
+  static const _warmUp = Duration(milliseconds: 400);
   late final StreamSubscription<PlaybackState> _playingSubscription;
   late final StreamSubscription<String?> _trackSubscription;
   late final AppLifecycleListener _lifecycle;
@@ -68,8 +82,17 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   bool _visible = true;
   bool _tickerEnabled = true;
   bool _connecting = false;
+
+  /// The precise reading can be read: readings are on their way.
+  bool _expectLevels = false;
   int _connectionGeneration = 0;
   Duration _last = Duration.zero;
+
+  /// When the next frame is due, in microseconds of the ticker's clock: kept as
+  /// a schedule, so a screen that is not a multiple of 48 Hz still averages 48.
+  int _due = 0;
+  Timer? _releaseReader;
+  final _sincePlay = Stopwatch();
   double _time = 0;
   double _beat = 0;
 
@@ -95,8 +118,11 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     // The same state as the play button shows: a skip's moment of loading
     // does not send the bars down and up again.
     _playingSubscription = settledPlaybackState().listen((state) {
+      final wasReady = _ready;
       _ready =
           state.playing && state.processingState == AudioProcessingState.ready;
+      if (_ready && !wasReady) _sincePlay.reset();
+      if (_ready) _sincePlay.start();
       if (!_ready) _clearLevel();
       _updateMotion();
     });
@@ -111,9 +137,10 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _onReadingChanged() {
-    _connectionGeneration++;
-    unawaited(_levels?.cancel());
-    _levels = null;
+    _releaseReader?.cancel();
+    _releaseReader = null;
+    _expectLevels = false;
+    _stopReader();
     _clearLevel();
     _updateMotion();
   }
@@ -152,12 +179,19 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     final generation = _connectionGeneration;
     _connecting = true;
     try {
-      if (await AudioLevels.available &&
+      final available = await AudioLevels.available;
+      if (mounted) _expectLevels = available;
+      if (available &&
           mounted &&
           _moving &&
           generation == _connectionGeneration) {
         _levels = AudioLevels.listen().listen((level) {
           if (!_moving) return;
+          if (_sincePlay.elapsed < _warmUp &&
+              level.loud == 0 &&
+              level.bands.every((band) => band == 0)) {
+            return;
+          }
           _level = level;
           _stale?.cancel();
           _stale = Timer(const Duration(milliseconds: 600), () {
@@ -176,15 +210,24 @@ class _WaveVisualizerState extends State<WaveVisualizer>
 
   void _updateMotion() {
     if (_moving) {
+      _releaseReader?.cancel();
+      _releaseReader = null;
       unawaited(_connect());
       if (!_ticker.isActive) _ticker.start();
       return;
     }
-    // Nothing to follow: stop listening to the audio.
-    _connectionGeneration++;
-    unawaited(_levels?.cancel());
-    _levels = null;
+    // Nothing to follow: stop listening to the audio. Out of view at once;
+    // paused but in view, after a moment, so a short pause does not make the
+    // resume start the reader afresh.
     _clearLevel();
+    if (_levels != null) {
+      if (_active) {
+        _releaseReader ??= Timer(_readerGrace, _stopReader);
+      } else {
+        _releaseReader?.cancel();
+        _stopReader();
+      }
+    }
     // Paused but in view, the bars go down rather than stay frozen mid-beat;
     // out of view they simply stop where they are.
     if (_active && !_isQuiet) {
@@ -194,15 +237,25 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     }
   }
 
+  void _stopReader() {
+    _releaseReader = null;
+    _connectionGeneration++;
+    unawaited(_levels?.cancel());
+    _levels = null;
+  }
+
   void _rest() {
     _ticker.stop();
     _last = Duration.zero;
+    _due = 0;
   }
 
   void _tick(Duration elapsed) {
-    if (elapsed - _last < _frame) return;
+    if (elapsed.inMicroseconds < _due) return;
     final dt = min((elapsed - _last).inMicroseconds / 1e6, 0.1);
     _last = elapsed;
+    // Back on schedule if a frame came late, rather than catching up.
+    _due = max(_due + _frameMicroseconds, elapsed.inMicroseconds);
     _advance(dt);
     if (!_ready && _isQuiet) {
       _heights.fillRange(0, _bars, 0);
@@ -215,8 +268,11 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     _time += dt;
     final level = _level;
     _beat = max(level?.onset ?? 0, _beat * pow(0.02, dt).toDouble());
+    final rising =
+        _ready &&
+        !(level == null && _expectLevels && _sincePlay.elapsed < _musicWait);
     _energy +=
-        ((_ready ? 1 : 0) - _energy) * (1 - exp(-(_ready ? 9 : 12) * dt));
+        ((rising ? 1 : 0) - _energy) * (1 - exp(-(rising ? 9 : 12) * dt));
     _blend += ((level == null ? 0 : 1) - _blend) * (1 - exp(-8 * dt));
     for (var i = 0; i < _bars; i++) {
       final reach = (i - (_bars - 1) / 2).abs() / ((_bars - 1) / 2);
@@ -247,6 +303,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   void dispose() {
     waveReading.removeListener(_onReadingChanged);
     _lifecycle.dispose();
+    _releaseReader?.cancel();
     _stale?.cancel();
     unawaited(_playingSubscription.cancel());
     unawaited(_trackSubscription.cancel());

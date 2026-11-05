@@ -155,6 +155,30 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  for (final hertz in [60, 90, 120]) {
+    testWidgets('waves are drawn 48 times a second on a $hertz Hz screen', (
+      tester,
+    ) async {
+      handler.ready();
+      await tester.pumpWidget(wave());
+      // Past the first frames, which only start the clock.
+      await tester.pump(const Duration(milliseconds: 500));
+      final tick = Duration(microseconds: 1000000 ~/ hertz);
+      var drawn = 0;
+      var before = heights(tester);
+      for (var i = 0; i < hertz * 2; i++) {
+        await tester.pump(tick);
+        final now = heights(tester);
+        if (now.toString() != before.toString()) drawn++;
+        before = now;
+      }
+      // Two seconds: 96 frames, give or take the schedule's rounding.
+      expect(drawn, inInclusiveRange(92, 100));
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
+
   testWidgets('buffering, idle and completed settle the waves until ready', (
     tester,
   ) async {

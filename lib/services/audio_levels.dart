@@ -23,6 +23,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart'
     show AppLifecycleListener, AppLifecycleState, WidgetsBinding;
@@ -118,6 +119,17 @@ class AudioLevels {
   }
 
   static StreamController<AudioLevel>? _levels;
+  static var _normalizer = _Normalizer();
+  static String? _normalizedTrack;
+
+  /// Forgets the shared reader and the song's peaks, so each test starts clean.
+  @visibleForTesting
+  static void resetForTesting() {
+    unawaited(_levels?.close());
+    _levels = null;
+    _normalizer = _Normalizer();
+    _normalizedTrack = null;
+  }
 
   /// Levels while listened to; check [available] first. Every listener shares
   /// one reader, which stops with the last one and while the app is out of
@@ -139,17 +151,17 @@ class AudioLevels {
             if (!listening || !visible) {
               await source?.cancel();
               source = null;
-            } else if (source == null) {
-              var normalizer = _Normalizer();
-              String? track;
-              source = (isDesktopPlatform ? _mpvFrames() : _androidFrames())
+            } else {
+              source ??= (isDesktopPlatform ? _mpvFrames() : _androidFrames())
                   .listen((frame) {
+                    // The song's peaks outlive a pause: starting them afresh
+                    // at the resume reads the first sound as the loudest.
                     final current = audioHandler.mediaItem.valueOrNull?.id;
-                    if (current != track) {
-                      track = current;
-                      normalizer = _Normalizer();
+                    if (current != _normalizedTrack) {
+                      _normalizedTrack = current;
+                      _normalizer = _Normalizer();
                     }
-                    _levels?.add(normalizer(frame));
+                    _levels?.add(_normalizer(frame));
                   });
             }
           })
@@ -323,7 +335,22 @@ class _Normalizer {
   double _riseAverage = 0;
   double _risePeak = 1e-4;
 
+  /// The first reading of a song is no peak: taken as one it reads every band
+  /// as full, and the bars jump. Its peaks start a little above it.
+  bool _primed = false;
+
   AudioLevel call(_Frame frame) {
+    if (!_primed && frame.loud > 0) {
+      _primed = true;
+      _loudPeak = max(_loudPeak, frame.loud * 1.6);
+      for (
+        var i = 0;
+        i < AudioLevels.bandCount && i < frame.bands.length;
+        i++
+      ) {
+        _bandPeaks[i] = max(_bandPeaks[i], frame.bands[i] * 1.6);
+      }
+    }
     _loudPeak = max(frame.loud, _loudPeak * 0.997);
     final bands = <double>[];
     for (var i = 0; i < AudioLevels.bandCount; i++) {
