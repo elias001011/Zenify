@@ -170,61 +170,6 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       backgroundColor: effectiveColorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
     ),
-    navigationBarTheme: base.navigationBarTheme.copyWith(
-      backgroundColor: bgColor,
-      elevation: 0,
-      height: 70,
-      indicatorColor: effectiveColorScheme.primaryContainer,
-      iconTheme: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return IconThemeData(
-            color: effectiveColorScheme.onPrimaryContainer,
-            size: 24,
-          );
-        }
-        return IconThemeData(
-          color: effectiveColorScheme.onSurfaceVariant,
-          size: 24,
-        );
-      }),
-      labelTextStyle: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return TextStyle(
-            color: effectiveColorScheme.onSurface,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          );
-        }
-        return TextStyle(
-          color: effectiveColorScheme.onSurfaceVariant,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-        );
-      }),
-    ),
-    navigationRailTheme: base.navigationRailTheme.copyWith(
-      backgroundColor: bgColor,
-      elevation: 0,
-      indicatorColor: effectiveColorScheme.primaryContainer,
-      selectedIconTheme: IconThemeData(
-        color: effectiveColorScheme.onPrimaryContainer,
-        size: 24,
-      ),
-      unselectedIconTheme: IconThemeData(
-        color: effectiveColorScheme.onSurfaceVariant,
-        size: 24,
-      ),
-      selectedLabelTextStyle: TextStyle(
-        color: effectiveColorScheme.onSurface,
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-      ),
-      unselectedLabelTextStyle: TextStyle(
-        color: effectiveColorScheme.onSurfaceVariant,
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-      ),
-    ),
     popupMenuTheme: base.popupMenuTheme.copyWith(
       color: effectiveColorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -232,24 +177,6 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
     dividerTheme: base.dividerTheme.copyWith(
       color: effectiveColorScheme.outlineVariant,
       thickness: 1,
-    ),
-    snackBarTheme: SnackBarThemeData(
-      backgroundColor: effectiveColorScheme.secondaryContainer,
-      closeIconColor: effectiveColorScheme.onSecondaryContainer,
-      contentTextStyle: TextStyle(
-        color: effectiveColorScheme.onSecondaryContainer,
-        fontWeight: FontWeight.w500,
-      ),
-      behavior: SnackBarBehavior.floating,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-          color: effectiveColorScheme.outlineVariant,
-          width: 0.2,
-        ),
-      ),
-      elevation: 0,
-      actionTextColor: effectiveColorScheme.secondary,
     ),
     visualDensity: VisualDensity.adaptivePlatformDensity,
     useMaterial3: true,
