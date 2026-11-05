@@ -124,6 +124,7 @@ void reloadSongLibraryStateFromStorage() {
 // Timeouts and durations used across manifest fetching and cache validation.
 const Duration _manifestTimeout = Duration(seconds: 30);
 const Duration _cacheValidationDuration = Duration(hours: 1);
+const Duration _urlValidationTimeout = Duration(seconds: 5);
 
 /// Whether another address could get what this one was refused: a refused
 /// stream (a 403 is a plain [YoutubeExplodeException]), a limit, a block, a
@@ -204,10 +205,9 @@ Future<String?> _getCachedSongUrl(
 /// Checks if a cached URL still responds successfully.
 Future<bool> _validateCachedUrl(String songId, String cachedUrl) async {
   try {
-    final response = await http.head(
-      Uri.parse(cachedUrl),
-      headers: streamPlaybackHeaders(songId),
-    );
+    final response = await http
+        .head(Uri.parse(cachedUrl), headers: streamPlaybackHeaders(songId))
+        .timeout(_urlValidationTimeout);
     return response.statusCode >= 200 && response.statusCode < 300;
   } catch (_) {
     return false;
