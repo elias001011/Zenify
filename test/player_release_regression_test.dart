@@ -246,10 +246,8 @@ void main() {
       (widget) => widget is IconButton && widget.tooltip == 'Play',
     );
     final playButton = tester.widget<IconButton>(playControl);
-    expect(
-      playButton.style!.backgroundColor!.resolve({}),
-      Theme.of(tester.element(playControl)).colorScheme.primary,
-    );
+    // No filled circle behind it: the phone's mini player has none either.
+    expect(playButton.style!.backgroundColor!.resolve({}), Colors.transparent);
     expect(playButton.style!.shape!.resolve({}), isA<CircleBorder>());
     expect(tester.getSize(playControl).width, 44);
     expect(find.byTooltip('Queue'), findsNothing);

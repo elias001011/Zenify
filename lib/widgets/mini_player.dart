@@ -264,9 +264,11 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
             width: 164,
             child: live
                 ? PlaybackIconButton(
-                    iconSize: 22,
-                    iconColor: colors.onPrimary,
-                    backgroundColor: colors.primary,
+                    iconSize: 32,
+                    iconColor: colors.primary,
+                    backgroundColor: Colors.transparent,
+                    filled: true,
+                    buttonSize: 44,
                   )
                 : PlaybackTransportControls(
                     colorScheme: colors,
@@ -275,8 +277,9 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
                       minHeight: 44,
                     ),
                     buttonPadding: const EdgeInsets.all(6),
-                    controlIconSize: 22,
-                    buttonSpacing: 8,
+                    controlIconSize: 32,
+                    skipIconSize: 26,
+                    buttonSpacing: 0,
                     minButtonSize: 44,
                     playPadding: const EdgeInsets.all(10),
                   ),
