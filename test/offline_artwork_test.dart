@@ -3,9 +3,10 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/widgets/song_bar.dart';
+
+import 'support/app_harness.dart';
 
 void main() {
   late Directory directory;
@@ -30,16 +31,8 @@ void main() {
     'lowResImage': 'https://i.ytimg.com/vi/$ytid/hqdefault.jpg',
   };
 
-  Future<void> mount(WidgetTester tester) => tester.pumpWidget(
-    MaterialApp(
-      localizationsDelegates: const [
-        AppLocalizations.delegate,
-        ...GlobalMaterialLocalizations.delegates,
-      ],
-      supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(body: SongBar(listed, false)),
-    ),
-  );
+  Future<void> mount(WidgetTester tester) =>
+      tester.pumpWidget(localizedApp(Scaffold(body: SongBar(listed, false))));
 
   testWidgets('a downloaded song shows its downloaded cover in any list', (
     tester,

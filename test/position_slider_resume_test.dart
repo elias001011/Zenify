@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/models/position_data.dart';
 import 'package:musify/services/audio_service.dart';
@@ -39,14 +38,7 @@ void main() {
       () => binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed),
     );
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(body: AppMotion(child: child)),
-      ),
+      localizedApp(Scaffold(body: AppMotion(child: child))),
     );
     await tester.pump(const Duration(milliseconds: 400));
     return handler;

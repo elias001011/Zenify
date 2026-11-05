@@ -6,7 +6,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/audio_service.dart';
@@ -24,6 +23,8 @@ import 'package:musify/widgets/now_playing/wave_visualizer.dart';
 import 'package:musify/widgets/playlist_page/playlist_header.dart';
 import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/queue_list_view.dart';
+
+import 'support/app_harness.dart';
 
 class _Handler extends MusifyAudioHandler {
   _Handler() {
@@ -45,14 +46,7 @@ class _Handler extends MusifyAudioHandler {
 
 const songA = MediaItem(id: 'a', title: 'Song A', extras: {'ytid': 'a'});
 const songB = MediaItem(id: 'b', title: 'Song B', extras: {'ytid': 'b'});
-Widget app(Widget child) => MaterialApp(
-  localizationsDelegates: const [
-    AppLocalizations.delegate,
-    ...GlobalMaterialLocalizations.delegates,
-  ],
-  supportedLocales: AppLocalizations.supportedLocales,
-  home: Scaffold(body: child),
-);
+Widget app(Widget child) => localizedApp(Scaffold(body: child));
 
 void main() {
   late Directory dir;
@@ -401,13 +395,8 @@ void main() {
           addTearDown(tester.view.reset);
           audioHandler.mediaItem.add(songA);
           await tester.pumpWidget(
-            MaterialApp(
-              localizationsDelegates: const [
-                AppLocalizations.delegate,
-                ...GlobalMaterialLocalizations.delegates,
-              ],
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: MediaQuery(
+            localizedApp(
+              MediaQuery(
                 data: MediaQueryData(
                   size: size,
                   textScaler: TextScaler.linear(scale),

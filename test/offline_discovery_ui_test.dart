@@ -77,15 +77,7 @@ void main() {
     offlinePlaylistService.offlinePlaylists.value = [];
   });
 
-  Widget app(Widget child) => MaterialApp(
-    locale: const Locale('en'),
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      ...GlobalMaterialLocalizations.delegates,
-    ],
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(body: child),
-  );
+  Widget app(Widget child) => localizedApp(Scaffold(body: child));
 
   void size(WidgetTester tester) {
     tester.view.physicalSize = const Size(1200, 1800);

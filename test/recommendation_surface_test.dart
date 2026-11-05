@@ -1,7 +1,6 @@
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/recommended_songs_section.dart';
@@ -23,13 +22,8 @@ void main() {
         final controller = ScrollController();
         final capture = GlobalKey();
         await tester.pumpWidget(
-          MaterialApp(
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              ...GlobalMaterialLocalizations.delegates,
-            ],
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: RepaintBoundary(
+          localizedApp(
+            RepaintBoundary(
               key: capture,
               child: Scaffold(
                 backgroundColor: const Color(0xFF26364D),

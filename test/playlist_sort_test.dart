@@ -1,7 +1,6 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/screens/playlist_page.dart';
 import 'package:musify/services/audio_service.dart';
@@ -52,13 +51,8 @@ void main() {
     addTearDown(tester.view.reset);
     audioHandler = _Handler();
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: PlaylistPage(playlistData: userCustomPlaylists.value.single),
+      localizedApp(
+        PlaylistPage(playlistData: userCustomPlaylists.value.single),
       ),
     );
     await tester.pump();
@@ -123,14 +117,7 @@ void main() {
       addTearDown(tester.view.reset);
       audioHandler = _Handler();
       await tester.pumpWidget(
-        const MaterialApp(
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            ...GlobalMaterialLocalizations.delegates,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: PlaylistPage(playlistId: 'PLmissing'),
-        ),
+        localizedApp(const PlaylistPage(playlistId: 'PLmissing')),
       );
       await tester.pump();
       await tester.pump(const Duration(seconds: 1));
