@@ -510,6 +510,9 @@ class _CircularPlayButton extends StatelessWidget {
         children: [
           RepaintBoundary(
             child: StreamBuilder<PositionData>(
+              // A new state when the screen comes back, as in the position
+              // slider.
+              key: ValueKey(TickerMode.valuesOf(context).enabled),
               initialData: audioHandler.currentPositionData,
               stream: TickerMode.valuesOf(context).enabled
                   ? audioHandler.positionDataStream
