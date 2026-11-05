@@ -41,15 +41,56 @@ void main() {
     pinnedPlaylistIds.value = ['deleted', 'p1', 'p2', 'p3', 'p4'];
 
     expect(togglePinnedPlaylist('p5', context), isTrue);
-    expect(pinnedPlaylistIds.value, ['p1', 'p2', 'p3', 'p4', 'p5']);
-    expect(pinnedPlaylistIds.value, hasLength(pinnedPlaylistsLimit));
+    expect(pinnedPlaylistIds.value, ['deleted', 'p1', 'p2', 'p3', 'p4', 'p5']);
+    expect(
+      resolvePinnedPlaylists(pinnedPlaylistIds.value),
+      hasLength(pinnedPlaylistsLimit),
+    );
     // The sixth is turned down; the five stay.
     userCustomPlaylists.value = [
       ...userCustomPlaylists.value,
       {'ytid': 'p6', 'title': 'Playlist 6', 'list': <Map>[]},
     ];
     expect(togglePinnedPlaylist('p6', context), isFalse);
-    expect(pinnedPlaylistIds.value, hasLength(pinnedPlaylistsLimit));
+    expect(pinnedPlaylistIds.value, isNot(contains('p6')));
+    expect(
+      resolvePinnedPlaylists(pinnedPlaylistIds.value),
+      hasLength(pinnedPlaylistsLimit),
+    );
+  });
+
+  testWidgets('a pin whose playlist has not loaded yet is kept', (
+    tester,
+  ) async {
+    late BuildContext context;
+    await tester.pumpWidget(
+      Builder(
+        builder: (c) {
+          context = c;
+          return const SizedBox();
+        },
+      ),
+    );
+    userCustomPlaylists.value = [
+      for (var i = 1; i <= 2; i++)
+        {'ytid': 'p$i', 'title': 'Playlist $i', 'list': <Map>[]},
+    ];
+    onlinePlaylists.value = [];
+    // A YouTube playlist the user added: offline it is not in memory yet.
+    pinnedPlaylistIds.value = ['PLyoutube', 'p1'];
+
+    expect(togglePinnedPlaylist('p2', context), isTrue);
+    expect(pinnedPlaylistIds.value, ['PLyoutube', 'p1', 'p2']);
+    expect(togglePinnedPlaylist('p1', context), isFalse);
+    expect(pinnedPlaylistIds.value, ['PLyoutube', 'p2']);
+
+    onlinePlaylists.value = [
+      {'ytid': 'PLyoutube', 'title': 'Mix', 'list': <Map>[]},
+    ];
+    expect(
+      resolvePinnedPlaylists(pinnedPlaylistIds.value).map((p) => p['ytid']),
+      ['PLyoutube', 'p2'],
+    );
   });
 
   testWidgets('a pinned Zenify playlist is kept and listed', (tester) async {

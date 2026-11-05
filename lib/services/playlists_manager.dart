@@ -1591,24 +1591,18 @@ bool isPlaylistPinned(String playlistId) =>
     pinnedPlaylistIds.value.contains(playlistId);
 
 bool togglePinnedPlaylist(String playlistId, BuildContext context) {
-  // Pins whose playlist is gone (deleted, unliked, restored from another
-  // device) are not listed, so they must not take a place from a new one.
-  final current = [
-    for (final id in pinnedPlaylistIds.value)
-      if (id == playlistId || _searchAppPlaylistsById(id) != null) id,
-  ];
-  if (current.length != pinnedPlaylistIds.value.length) {
-    pinnedPlaylistIds.value = current;
-    unawaited(addOrUpdateData<List>('user', 'pinnedPlaylistIds', current));
-    return togglePinnedPlaylist(playlistId, context);
-  }
+  final current = List<String>.from(pinnedPlaylistIds.value);
   if (current.contains(playlistId)) {
     current.remove(playlistId);
     pinnedPlaylistIds.value = current;
     unawaited(addOrUpdateData<List>('user', 'pinnedPlaylistIds', current));
     return false;
   }
-  if (current.length >= pinnedPlaylistsLimit) {
+  // Pins whose playlist is gone (deleted, unliked, restored from another
+  // device) are not listed, so they must not take a place from a new one. They
+  // are only left out of the count: a playlist that has not loaded yet (the
+  // app is offline) looks gone too, and its pin has to stay.
+  if (resolvePinnedPlaylists(current).length >= pinnedPlaylistsLimit) {
     return false;
   }
   current.add(playlistId);
