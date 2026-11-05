@@ -19,6 +19,7 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 
 const appName = 'Zenify';
@@ -57,5 +58,11 @@ const commonBarPadding = EdgeInsetsDirectional.symmetric(
   horizontal: 12,
 );
 const commonBarArtworkSize = 52.0;
+
+/// The like icon of a list row, by whether the row is liked.
+const likeStatusIcons = {
+  true: FluentIcons.heart_off_24_regular,
+  false: FluentIcons.heart_24_regular,
+};
 
 const commonPlaylistArtworkDivision = 1.75;

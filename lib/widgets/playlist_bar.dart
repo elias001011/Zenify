@@ -76,11 +76,6 @@ class PlaylistBar extends StatelessWidget {
   static const double artworkSize = 60;
   static const double iconSize = 27;
 
-  static const likeStatusToIconMapper = {
-    true: FluentIcons.heart_off_24_regular,
-    false: FluentIcons.heart_24_regular,
-  };
-
   // Helper to determine if this is a folder
   bool get isFolder =>
       playlistData != null && PlaylistUtils.isFolder(playlistData!);
@@ -259,7 +254,7 @@ class PlaylistBar extends StatelessWidget {
                       if (!isFolder && (onDelete == null || !isUserCreated))
                         buildPopupMenuItem<String>(
                           value: 'like',
-                          icon: likeStatusToIconMapper[isLiked]!,
+                          icon: likeStatusIcons[isLiked]!,
                           label: isLiked
                               ? context.l10n!.removeFromLikedPlaylists
                               : context.l10n!.addToLikedPlaylists,

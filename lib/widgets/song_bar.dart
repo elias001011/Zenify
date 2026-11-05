@@ -98,10 +98,7 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
           builder: (_, value, __) {
             return Row(
               children: [
-                Icon(
-                  _SongBarState.likeStatusToIconMapper[value],
-                  color: colorScheme.primary,
-                ),
+                Icon(likeStatusIcons[value], color: colorScheme.primary),
                 const SizedBox(width: 8),
                 Text(
                   value ? removeFromLikedSongsText : addToLikedSongsText,
@@ -352,11 +349,6 @@ class SongBar extends StatefulWidget {
 }
 
 class _SongBarState extends State<SongBar> {
-  static const likeStatusToIconMapper = {
-    true: FluentIcons.heart_off_24_regular,
-    false: FluentIcons.heart_24_regular,
-  };
-
   late ValueNotifier<bool> _songLikeStatus;
   late ValueNotifier<bool> _songOfflineStatus;
   late ValueNotifier<bool> _songDownloadStatus;
