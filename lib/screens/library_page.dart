@@ -426,6 +426,7 @@ class _LibraryPageState extends State<LibraryPage> {
                               FluentIcons.add_24_regular,
                               color: colorScheme.onSurfaceVariant,
                             ),
+                            tooltip: context.l10n!.addPlaylist,
                           ),
                         ],
                       ),
@@ -564,6 +565,7 @@ class _LibraryPageState extends State<LibraryPage> {
                     FluentIcons.add_24_regular,
                     color: colorScheme.onSurfaceVariant,
                   ),
+                  tooltip: context.l10n!.addPlaylist,
                 ),
               ),
               AsyncLoader<List<dynamic>>(
