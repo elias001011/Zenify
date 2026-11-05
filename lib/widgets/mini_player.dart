@@ -160,28 +160,8 @@ class _MiniPlayerBody extends StatefulWidget {
   State<_MiniPlayerBody> createState() => _MiniPlayerBodyState();
 }
 
-class _MiniPlayerBodyState extends State<_MiniPlayerBody>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _animationController;
-  late final Animation<double> _scaleAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 100),
-      vsync: this,
-    );
-    _scaleAnimation = Tween<double>(begin: 1, end: 0.98).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
-  }
+class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
+  bool _pressed = false;
 
   static const double _dragThresholdForNavigation = 10;
 
@@ -200,44 +180,41 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody>
     final colorScheme = widget.colorScheme;
     final metadata = widget.metadata;
 
-    return AnimatedBuilder(
-      animation: _scaleAnimation,
-      builder: (context, child) {
-        return Transform.scale(
-          scale: _scaleAnimation.value,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (_) => _animationController.forward(),
-            onTapUp: (_) => _animationController.reverse(),
-            onTapCancel: () => _animationController.reverse(),
-            onVerticalDragUpdate: _handleVerticalDrag,
-            onTap: _navigateToNowPlaying,
-            child: SizedBox(
-              height: MiniPlayer.playerHeight,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  child: widget.wide
-                      ? _wideBody(context)
-                      : Row(
-                          children: [
-                            _ArtworkWidget(metadata: metadata),
-                            Expanded(child: _metadata(context)),
-                            _ControlsWidget(
-                              colorScheme: colorScheme,
-                              playbackState: widget.playbackState,
-                              hasNext: widget.hasNext,
-                              duration: metadata.duration,
-                            ),
-                          ],
+    return AnimatedScale(
+      scale: _pressed ? 0.98 : 1,
+      duration: const Duration(milliseconds: 100),
+      curve: Curves.easeInOut,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onVerticalDragUpdate: _handleVerticalDrag,
+        onTap: _navigateToNowPlaying,
+        child: SizedBox(
+          height: MiniPlayer.playerHeight,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: widget.wide
+                  ? _wideBody(context)
+                  : Row(
+                      children: [
+                        _ArtworkWidget(metadata: metadata),
+                        Expanded(child: _metadata(context)),
+                        _ControlsWidget(
+                          colorScheme: colorScheme,
+                          playbackState: widget.playbackState,
+                          hasNext: widget.hasNext,
+                          duration: metadata.duration,
                         ),
-                ),
-              ),
+                      ],
+                    ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 
