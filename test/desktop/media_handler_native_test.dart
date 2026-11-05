@@ -295,6 +295,23 @@ void main() {
         );
       }
 
+      test(
+        'removing the current song while paused does not play the next',
+        () async {
+          await handler.removeFromQueue(0);
+          expect(handler.mediaItem.value!.title, 'second');
+          expect(handler.audioPlayer.playing, false);
+        },
+      );
+
+      test('removing the current song while playing keeps playing', () async {
+        await handler.play();
+        await waitFor(() => handler.audioPlayer.playing);
+        await handler.removeFromQueue(0);
+        expect(handler.mediaItem.value!.title, 'second');
+        expect(handler.audioPlayer.playing, true);
+      });
+
       test('app navigation retains its existing autoplay default', () async {
         await handler.skipToNext();
         expect(handler.currentQueueIndex, 1);

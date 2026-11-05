@@ -1313,6 +1313,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         _rebuildOriginalQueueEntryIndex();
       }
 
+      // Read before the loading index is cleared: it is what tells a song that
+      // is loading to play from a paused one.
+      final keepPlaying = shouldContinuePlayback;
       if (index == _currentLoadingIndex) {
         _currentLoadingIndex = -1;
         _currentLoadingTransitionId = -1;
@@ -1329,7 +1332,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           if (_currentQueueIndex >= _queueList.length) {
             _currentQueueIndex = _queueList.length - 1;
           }
-          await _playFromQueue(_currentQueueIndex);
+          await _playFromQueue(_currentQueueIndex, playWhenReady: keepPlaying);
         }
       }
 
