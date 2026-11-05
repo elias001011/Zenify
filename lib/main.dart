@@ -64,6 +64,7 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/language_utils.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/utilities/playlist_utils.dart';
+import 'package:musify/utilities/shared_playlist_dialog.dart';
 import 'package:musify/utilities/sharing_intent.dart';
 import 'package:musify/utilities/startup_support.dart';
 import 'package:musify/widgets/app_motion.dart';
@@ -644,20 +645,30 @@ void handleIncomingLink(Uri? uri) async {
   }
 
   try {
-    final encodedPlaylist = uri.pathSegments[1];
-    final playlist = await PlaylistSharingService.decodeAndExpandPlaylist(
-      encodedPlaylist,
+    final parsed = PlaylistSharingService.parseCompactPlaylist(
+      uri.pathSegments[1],
     );
-
-    if (playlist == null) {
+    if (parsed == null) {
       _showPlaylistError();
       return;
     }
 
-    // Ensure the incoming playlist has a unique id so it can be removed later
-    if (playlist['ytid'] == null || playlist['ytid'].toString().isEmpty) {
-      playlist['ytid'] = PlaylistUtils.generateCustomPlaylistId();
+    // No request is made until the user agrees.
+    final accepted = await confirmSharedPlaylistImport(
+      NavigationManager().context,
+      title: parsed['title'] as String,
+      songCount: (parsed['list'] as List).length,
+    );
+    if (!accepted) return;
+
+    final playlist = await PlaylistSharingService.expandCompactPlaylist(parsed);
+    if ((playlist['list'] as List).isEmpty) {
+      _showPlaylistError();
+      return;
     }
+
+    // The shared link carries no id; give it one so it can be removed later.
+    playlist['ytid'] = PlaylistUtils.generateCustomPlaylistId();
 
     // Check for duplicate by title and song ytids
     final incomingYtids = (playlist['list'] as List<dynamic>)

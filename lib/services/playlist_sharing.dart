@@ -30,7 +30,66 @@ import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
 class PlaylistSharingService {
   static const _expandBatch = 8;
+  static const maxSongs = 1000;
+  static const maxTitleLength = 100;
+  static const maxImageLength = 2048;
 
+  static final _videoId = RegExp(r'^[A-Za-z0-9_-]{11}$');
+  // Control characters plus bidi and zero-width overrides.
+  static final _unsafeTitleChars = RegExp(
+    r'[\u0000-\u001F\u007F-\u009F\u200B-\u200F'
+    r'\u202A-\u202E\u2066-\u2069\uFEFF]',
+  );
+
+  /// Decodes a shared link and keeps only what Zenify writes itself:
+  /// title, optional http(s) image, a fixed source and 1..[maxSongs] video
+  /// ids. Returns null for anything else; makes no network request.
+  static Map<String, dynamic>? parseCompactPlaylist(String encodedPlaylist) {
+    try {
+      final decoded = json.decode(
+        utf8.decode(base64Url.decode(encodedPlaylist)),
+      );
+      if (decoded is! Map) return null;
+
+      final rawTitle = decoded['title'];
+      if (rawTitle is! String) return null;
+      final cleanTitle = rawTitle.replaceAll(_unsafeTitleChars, '').trim();
+      final title = String.fromCharCodes(cleanTitle.runes.take(maxTitleLength))
+          .trim();
+      if (title.isEmpty) return null;
+
+      final rawList = decoded['list'];
+      if (rawList is! List || rawList.isEmpty || rawList.length > maxSongs) {
+        return null;
+      }
+      final list = <String>[];
+      for (final id in rawList) {
+        if (id is! String || !_videoId.hasMatch(id)) return null;
+        list.add(id);
+      }
+
+      final image = decoded['image'];
+      return {
+        'title': title,
+        if (image is String && _isWebImage(image)) 'image': image,
+        'source': 'user-created',
+        'list': list,
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool _isWebImage(String image) {
+    if (image.length > maxImageLength) return false;
+    final uri = Uri.tryParse(image);
+    return uri != null &&
+        uri.hasScheme &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+  }
+
+  /// Fetches the songs of a map from [parseCompactPlaylist].
   static Future<Map<String, dynamic>> expandCompactPlaylist(
     Map<String, dynamic> compactPlaylist,
   ) async {
@@ -78,19 +137,6 @@ class PlaylistSharingService {
           ytClient?.close();
         }
       } catch (_) {}
-    }
-  }
-
-  static Future<Map<String, dynamic>?> decodeAndExpandPlaylist(
-    String encodedPlaylist,
-  ) async {
-    try {
-      final jsonString = utf8.decode(base64Url.decode(encodedPlaylist));
-      final compactPlaylist = json.decode(jsonString) as Map<String, dynamic>;
-      return await expandCompactPlaylist(compactPlaylist);
-    } catch (e, stackTrace) {
-      logger.log('Failed to decode playlist', error: e, stackTrace: stackTrace);
-      return null;
     }
   }
 }
