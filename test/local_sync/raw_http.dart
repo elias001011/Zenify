@@ -73,6 +73,32 @@ class RawHttp {
     return status ?? -1;
   }
 
+  /// Waits until the whole reply has arrived: its chunked body has ended, the
+  /// length it declared is there, or the connection closed. A big reply over
+  /// a network comes in many pieces, unlike one over loopback.
+  Future<void> awaitBody([Duration limit = const Duration(seconds: 20)]) async {
+    final stop = DateTime.now().add(limit);
+    while (!_complete && !closed && DateTime.now().isBefore(stop)) {
+      _data = Completer<void>();
+      await _data.future.timeout(
+        const Duration(milliseconds: 100),
+        onTimeout: () {},
+      );
+    }
+  }
+
+  bool get _complete {
+    final all = text;
+    final end = all.indexOf('\r\n\r\n');
+    if (end < 0) return false;
+    final head = all.substring(0, end).toLowerCase();
+    if (head.contains('transfer-encoding: chunked')) {
+      return all.endsWith('\r\n0\r\n\r\n');
+    }
+    final length = RegExp(r'content-length: (\d+)').firstMatch(head);
+    return length == null || all.length - end - 4 >= int.parse(length[1]!);
+  }
+
   Future<bool> awaitClosed([Duration limit = const Duration(seconds: 10)]) =>
       _closed.future.timeout(limit).then((_) => true, onError: (_) => false);
 }

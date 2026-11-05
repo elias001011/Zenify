@@ -134,8 +134,7 @@ void main() {
       )
       ..add(body);
     final status = await raw.awaitStatus();
-    // The body follows the status line in the same read, or just after.
-    await Future<void>.delayed(const Duration(milliseconds: 50));
+    await raw.awaitBody();
     final reply = raw.body;
     raw.socket.destroy();
     return (status: status, body: reply);
