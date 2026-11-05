@@ -203,7 +203,15 @@ class ListeningStatsService {
     if (!wrappedEnabled.value) return;
 
     final song = currentSong;
-    if (song == null) return;
+    if (song == null) {
+      // What plays is not the queue's song (one played outside the queue):
+      // its open session goes on, without the time it was paused.
+      if (_sessionSong != null) {
+        _sessionLastTick = _now();
+        _sessionLastAudioPlayerPlaying = true;
+      }
+      return;
+    }
 
     final ytid = song['ytid']?.toString();
     if (ytid == null || ytid.isEmpty) return;

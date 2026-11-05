@@ -370,7 +370,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         _updatePlaybackState();
         listeningStatsService.handlePlayerStateForListeningStats(
           state,
-          currentSong: currentSong,
+          currentSong: _songForStats,
         );
         if (state.processingState == ProcessingState.idle &&
             !state.playing &&
@@ -449,6 +449,11 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         currentId.isNotEmpty &&
         sourceTag.id == currentId;
   }
+
+  /// The queue song, while it is what the player holds. When something else
+  /// plays (a radio station), the recap has no queue song to credit.
+  Map? get _songForStats =>
+      _playerSourceMatchesCurrentSong() ? currentSong : null;
 
   bool _currentPlayerSourceIsClipped() {
     // A clipped SponsorBlock child can report only its own duration. Keeping
@@ -603,7 +608,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   void startListeningStatsSessionIfNeeded() {
     listeningStatsService.startListeningSessionIfNeeded(
-      currentSong: currentSong,
+      currentSong: _songForStats,
       isPlaying:
           audioPlayer.playing &&
           audioPlayer.processingState == ProcessingState.ready,
@@ -1893,7 +1898,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         }),
       );
       if (audioPlayer.processingState == ProcessingState.ready) {
-        listeningStatsService.resumeListeningSession(currentSong: currentSong);
+        listeningStatsService.resumeListeningSession(
+          currentSong: _songForStats,
+        );
       }
     } catch (e, stackTrace) {
       logger.log('Error in play()', error: e, stackTrace: stackTrace);

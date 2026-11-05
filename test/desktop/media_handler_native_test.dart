@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
@@ -10,7 +11,9 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/linux_media_controls.dart';
+import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/utilities/listening_stats_utils.dart';
 
 import '../support/audio_fixture.dart';
 
@@ -335,6 +338,41 @@ void main() {
         await handler.pause();
         await handler.skipToPrevious(playWhenReady: false);
         expect(handler.mediaItem.value!.title, 'b');
+      });
+
+      int listenedSeconds() => monthTotalSeconds(
+        Map<String, dynamic>.from(
+          listeningStatsService.monthStats(
+                listeningStatsMonthKey(DateTime.now()),
+              ) ??
+              const {},
+        ),
+      );
+
+      test('a queue song is credited to the recap while it plays', () async {
+        final before = listenedSeconds();
+        await handler.play();
+        await waitFor(() => handler.audioPlayer.playing);
+        await Future<void>.delayed(const Duration(milliseconds: 1500));
+        await handler.pause();
+        expect(listenedSeconds(), greaterThan(before));
+      });
+
+      test('a radio station is not credited to the queue song', () async {
+        final before = listenedSeconds();
+        // It only returns when the station pauses, so it is not awaited.
+        unawaited(
+          handler.playRadioStream(
+            id: 'station',
+            name: 'Radio',
+            streamUrl: wav.uri.toString(),
+            image: '',
+          ),
+        );
+        await waitFor(() => handler.audioPlayer.playing);
+        await Future<void>.delayed(const Duration(milliseconds: 1500));
+        await handler.pause();
+        expect(listenedSeconds(), before);
       });
 
       test('app navigation retains its existing autoplay default', () async {
