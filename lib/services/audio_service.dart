@@ -1860,8 +1860,10 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> play() async {
-    if (isDesktopPlatform && _currentLoadingIndex >= 0)
+    if (isDesktopPlatform && _currentLoadingIndex >= 0) {
       _queuePlayWhenReady = true;
+      _updatePlaybackState();
+    }
     try {
       if (audioPlayer.audioSource == null) {
         if (_hasCurrentQueueIndex) {
@@ -1906,8 +1908,10 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> pause() async {
-    if (isDesktopPlatform && _currentLoadingIndex >= 0)
+    if (isDesktopPlatform && _currentLoadingIndex >= 0) {
       _queuePlayWhenReady = false;
+      _updatePlaybackState();
+    }
     try {
       final wasPlaying = audioPlayer.playing;
       await audioPlayer.pause();

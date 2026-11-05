@@ -240,6 +240,46 @@ void main() {
         },
       );
 
+      test('pause during a song change is published at once', () async {
+        await handler.play();
+        await waitFor(() => handler.audioPlayer.playing);
+        bool? published;
+        final subscription = handler.audioPlayer.processingStateStream.listen((
+          state,
+        ) {
+          if (state.name == 'loading' && published == null) {
+            handler.pause();
+            published = handler.playbackState.value.playing;
+          }
+        });
+        addTearDown(subscription.cancel);
+        await navigate('Next');
+        expect(
+          published,
+          isFalse,
+          reason: 'The controls kept saying playing after pause',
+        );
+      });
+
+      test('play during a song change is published at once', () async {
+        bool? published;
+        final subscription = handler.audioPlayer.processingStateStream.listen((
+          state,
+        ) {
+          if (state.name == 'loading' && published == null) {
+            handler.play();
+            published = handler.playbackState.value.playing;
+          }
+        });
+        addTearDown(subscription.cancel);
+        await navigate('Next');
+        expect(
+          published,
+          isTrue,
+          reason: 'The controls kept saying paused after play',
+        );
+      });
+
       test('app navigation retains its existing autoplay default', () async {
         await handler.skipToNext();
         expect(handler.currentQueueIndex, 1);
