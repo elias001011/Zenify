@@ -169,9 +169,14 @@ Future<void> cleanupOldCacheEntries() async {
     final cacheBox = await _openBox('cache');
     final now = DateTime.now();
 
-    // Get all keys except the ones with _date suffix
+    // Get all keys except the ones with _date suffix. The Moods date their
+    // own entries and keep some of them past any age, so they are left alone.
     final keys = cacheBox.keys
-        .where((k) => !k.toString().endsWith('_date'))
+        .where(
+          (k) =>
+              !k.toString().endsWith('_date') &&
+              !k.toString().startsWith('moods:'),
+        )
         .toList();
 
     for (final key in keys) {

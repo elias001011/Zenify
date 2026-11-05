@@ -409,6 +409,8 @@ Future<String?> initialisation() async {
       Hive.openBox('cache'),
     ]);
     if (importedLibrary) await forgetImportedSyncIdentity();
+    // Entries that are never asked for again would stay in the cache forever.
+    unawaited(cleanupOldCacheEntries());
     // Copies older builds left pointing at the picker's cache.
     unawaited(keepLocalFileCopies().then((_) => removeUnlistedLocalCopies()));
 
