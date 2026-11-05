@@ -462,11 +462,11 @@ void showAddToPlaylistDialog(
                                   colorScheme.surfaceContainerLow,
                               backgroundColor:
                                   colorScheme.surfaceContainerLowest,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: commonBarRadius,
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: commonCustomBarRadius,
                               ),
-                              collapsedShape: RoundedRectangleBorder(
-                                borderRadius: commonBarRadius,
+                              collapsedShape: const RoundedRectangleBorder(
+                                borderRadius: commonCustomBarRadius,
                               ),
                               tilePadding: const EdgeInsets.symmetric(
                                 horizontal: 12,

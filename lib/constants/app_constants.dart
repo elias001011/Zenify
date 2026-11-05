@@ -34,13 +34,6 @@ const recommendedCubesNumber = 8;
 const suggestedPlaylistsNumber = 16;
 
 const commonSingleChildScrollViewPadding = EdgeInsets.symmetric(horizontal: 10);
-var commonBarRadius = BorderRadius.circular(16);
-var commonBarTitleStyle = const TextStyle(
-  fontSize: 15,
-  fontWeight: FontWeight.bold,
-);
-const commonMiniArtworkRadius = 8.0;
-
 const commonCustomBarRadius = BorderRadius.all(Radius.circular(16));
 const commonCustomBarRadiusFirst = BorderRadius.vertical(
   top: Radius.circular(16),

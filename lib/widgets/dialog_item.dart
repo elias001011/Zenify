@@ -56,7 +56,7 @@ class DialogItem extends StatelessWidget {
       padding: padding,
       child: Material(
         color: backgroundColor ?? colorScheme.surfaceContainerLow,
-        borderRadius: commonBarRadius,
+        borderRadius: commonCustomBarRadius,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
