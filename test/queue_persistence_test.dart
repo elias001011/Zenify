@@ -1,8 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:musify/services/queue_persistence_service.dart';
+
+import 'support/app_harness.dart';
 
 Map song(int index) => {
   'ytid': 'song${index % 5}',
@@ -14,22 +14,13 @@ Map song(int index) => {
 };
 
 void main() {
-  late Directory directory;
   late QueuePersistenceService memory;
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('zenify_queue');
-    Hive.init(directory.path);
-    await Hive.openBox('userNoBackup');
-  });
+  useAppSettings(boxes: ['userNoBackup']);
   setUp(() async {
     await Hive.box('userNoBackup').clear();
     memory = QueuePersistenceService();
   });
   tearDown(() => memory.flush());
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
-  });
 
   test('a queue that could not be written is written again', () async {
     final songs = [for (var i = 0; i < 4; i++) song(i)];

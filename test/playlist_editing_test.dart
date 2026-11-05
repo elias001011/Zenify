@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
@@ -12,6 +10,8 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/song_bar.dart';
 import 'package:musify/widgets/song_selection_bar.dart';
+
+import 'support/app_harness.dart';
 
 Map playlist(String id, {List<String> ids = const ['a', 'b', 'c']}) => {
   'ytid': id,
@@ -31,14 +31,7 @@ class _Handler extends MusifyAudioHandler {
 }
 
 void main() {
-  late Directory directory;
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('zenify_playlist_edit');
-    Hive.init(directory.path);
-    for (final name in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(name);
-    }
-  });
+  useAppSettings();
   setUp(() {
     offlineMode.value = true;
     userCustomPlaylists.value = [playlist('source')];
@@ -51,10 +44,6 @@ void main() {
         ],
       },
     ];
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
   });
 
   test('reorder preserves the canonical list and latest metadata in root and folder', () async {

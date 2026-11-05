@@ -1,25 +1,21 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/desktop_window_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../support/app_harness.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  late Directory directory;
   final calls = <MethodCall>[];
   const channel = MethodChannel('window_manager');
 
+  useAppSettings(boxes: ['settings']);
   setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('zenify_title_bar');
-    Hive.init(directory.path);
-    await Hive.openBox('settings');
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, (call) async {
           calls.add(call);
@@ -40,8 +36,6 @@ void main() {
   tearDownAll(() async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(channel, null);
-    await Hive.close();
-    await directory.delete(recursive: true);
   });
 
   testWidgets(

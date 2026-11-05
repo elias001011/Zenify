@@ -1,31 +1,21 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
+
+import 'support/app_harness.dart';
 
 /// Regression test for gokadzev/Musify#953: after the last song in the queue
 /// completes, just_audio keeps `playing == true`, and the resulting
 /// `PlayerState(playing: true, completed)` event must not start a new
 /// listening session that keeps counting idle wall-clock time.
 void main() {
-  late Directory dir;
   final song = {'ytid': 'aaa', 'title': 'A', 'artist': 'x', 'duration': 5};
 
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('musify_stats_test');
-    Hive.init(dir.path);
-    await Hive.openBox('settings');
-    await Hive.openBox('user');
+  useAppSettings(boxes: ['settings', 'user']);
+  setUpAll(() {
     wrappedEnabled.value = true;
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
   });
 
   int monthTotal(ListeningStatsService service) {

@@ -1,13 +1,12 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/glow_row.dart';
 import 'package:musify/widgets/playlist_cube.dart';
 import 'package:musify/widgets/zenify_cover.dart';
+
+import 'support/app_harness.dart';
 
 const _title = 'Sua playlist do dia com músicas favoritas';
 const _image = 'assets/icons/ic_launcher.png';
@@ -38,16 +37,9 @@ Widget _carousel(bool zenify) => SizedBox(
 );
 
 void main() {
-  late Directory directory;
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('zenify_home_covers');
-    Hive.init(directory.path);
-    await Hive.openBox('settings');
+  useAppSettings(boxes: ['settings']);
+  setUpAll(() {
     dynamicBackground.value = false;
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
   });
 
   for (final textScale in [1.0, 1.8]) {

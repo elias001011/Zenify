@@ -1,31 +1,18 @@
-import 'dart:io';
-
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:musify/services/audio_service_android_auto.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  late Directory temporaryDirectory;
   late _FakeAndroidAutoHost host;
   late AndroidAutoBrowser browser;
 
-  setUpAll(() async {
-    temporaryDirectory = await Directory.systemTemp.createTemp(
-      'musify_android_auto_test',
-    );
-    Hive.init(temporaryDirectory.path);
-    await Hive.openBox('userNoBackup');
-  });
+  useAppSettings(boxes: ['userNoBackup']);
 
   setUp(() {
     host = _FakeAndroidAutoHost();
     browser = AndroidAutoBrowser(host);
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await temporaryDirectory.delete(recursive: true);
   });
 
   test('browsable root exposes the expected categories', () async {

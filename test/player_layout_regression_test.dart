@@ -1,9 +1,7 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/models/position_data.dart';
@@ -16,6 +14,7 @@ import 'package:musify/widgets/now_playing/lyric_line_fill.dart';
 import 'package:musify/widgets/now_playing/synced_lyrics_view.dart';
 import 'package:musify/widgets/playlist_page/playlist_sliver_app_bar.dart';
 
+import 'support/app_harness.dart';
 import 'support/wave_test_handler.dart';
 
 class _LyricsHandler extends WaveTestHandler {
@@ -28,18 +27,9 @@ class _LyricsHandler extends WaveTestHandler {
 }
 
 void main() {
-  late Directory dir;
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('zenify_player_layout');
-    Hive.init(dir.path);
-    for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(box);
-    }
+  useAppSettings();
+  setUpAll(() {
     floatingEffect.value = FloatingEffect.solid;
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
   });
 
   testWidgets('compact lyrics rise and stretch smoothly without overshoot', (

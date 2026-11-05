@@ -12,23 +12,15 @@ import 'package:musify/services/local_sync/sync_security.dart';
 import 'package:musify/services/local_sync_service.dart';
 
 import 'local_sync/fixtures.dart';
+import 'support/app_harness.dart';
 
 void main() {
-  late Directory directory;
   late LocalSyncService server;
   late String ownId;
   late String secret;
   const peerId = 'trusted-fixture';
   var sequence = 0;
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp(
-      'musify_secure_transport',
-    );
-    Hive.init(directory.path);
-    for (final name in ['user', 'userNoBackup', 'settings', 'cache']) {
-      await Hive.openBox(name);
-    }
-  });
+  useAppSettings();
   late DateTime pairingClock;
   setUp(() async {
     pairingClock = DateTime(2026, 11, 3);
@@ -47,10 +39,6 @@ void main() {
   });
   tearDown(() async {
     await server.dispose();
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
   });
 
   Future<http.Response> post(

@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,19 +6,14 @@ import 'package:musify/main.dart' show logger;
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/settings_manager.dart';
 
+import '../support/app_harness.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  late Directory directory;
   late MusifyAudioHandler handler;
   late int logCount;
 
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('musify_navigation');
-    Hive.init(directory.path);
-    for (final name in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(name);
-    }
-  });
+  useAppSettings();
 
   setUp(() async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
@@ -39,11 +32,6 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 250));
     expect(logger.getLogCount(), logCount);
     debugDefaultTargetPlatformOverride = null;
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
   });
 
   Map<String, dynamic> song(String id) => {

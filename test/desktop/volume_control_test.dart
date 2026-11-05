@@ -1,11 +1,9 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/localization/app_localizations_en.dart';
@@ -14,6 +12,8 @@ import 'package:musify/services/audio_service.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/mini_player.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
+
+import '../support/app_harness.dart';
 
 class _Handler extends MusifyAudioHandler {
   final changes = StreamController<double>.broadcast();
@@ -50,16 +50,9 @@ class _VolumeDelegate extends LocalizationsDelegate<AppLocalizations> {
 }
 
 void main() {
-  late Directory directory;
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('musify_volume_test');
-    Hive.init(directory.path);
-    for (final name in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(name);
-    }
-  });
+  useAppSettings();
   setUp(() async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     audioHandler = _Handler();
@@ -72,10 +65,6 @@ void main() {
     await audioHandler.audioPlayer.dispose();
     await Future<void>.delayed(const Duration(milliseconds: 200));
     debugDefaultTargetPlatformOverride = null;
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
   });
 
   Future<void> mount(WidgetTester tester) => tester.pumpWidget(
