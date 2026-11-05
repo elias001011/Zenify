@@ -360,7 +360,7 @@ void main() {
 
       test('a radio station is not credited to the queue song', () async {
         final before = listenedSeconds();
-        // It only returns when the station pauses, so it is not awaited.
+        // Not awaited: the test waits for the station to be playing.
         unawaited(
           handler.playRadioStream(
             id: 'station',

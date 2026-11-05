@@ -70,6 +70,7 @@ class RadioStationsPage extends StatelessWidget {
                           streamUrl: station.streamUrl,
                           image: station.image,
                           genre: station.genre,
+                          stations: stations,
                         );
 
                         if (!success && context.mounted) {

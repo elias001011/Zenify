@@ -53,8 +53,10 @@ typedef _ControlsState = ({
 _ControlsState _controlsState(PlaybackState playback, List<MediaItem> queue) =>
     (
       playback: playback,
-      hasNext:
-          queue.length > 1 && (playback.queueIndex ?? 0) < queue.length - 1,
+      // A station is alone in its queue: the next one is the handler's to say.
+      hasNext: audioHandler.mediaItem.valueOrNull?.extras?['isLive'] == true
+          ? audioHandler.canSkipToNext
+          : queue.length > 1 && (playback.queueIndex ?? 0) < queue.length - 1,
       multiple: queue.length > 1,
     );
 
@@ -241,12 +243,33 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
     ),
   );
 
+  static const _dockPadding = EdgeInsets.all(6);
+
+  /// Previous, play and next, in the dock's proportions.
+  Widget _dockControls() {
+    const sizes = dockButtonSizes;
+    return PlaybackTransportControls(
+      colorScheme: widget.colorScheme,
+      buttonConstraints: BoxConstraints(
+        minWidth: sizes.box,
+        minHeight: sizes.box,
+      ),
+      buttonPadding: _dockPadding,
+      controlIconSize: sizes.play,
+      skipIconSize: sizes.skip,
+      playButtonSize: sizes.box,
+      buttonSpacing: 4,
+      minButtonSize: sizes.box,
+      playPadding: EdgeInsets.zero,
+    );
+  }
+
   /// The phone's buttons, in its order and proportions: shuffle, previous,
   /// play, next and repeat, with the progress bar under them.
   Widget _transport(BuildContext context) {
     const sizes = dockButtonSizes;
     final box = BoxConstraints(minWidth: sizes.box, minHeight: sizes.box);
-    const padding = EdgeInsets.all(6);
+    const padding = _dockPadding;
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
@@ -260,17 +283,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
               padding: padding,
             ),
             const SizedBox(width: 6),
-            PlaybackTransportControls(
-              colorScheme: widget.colorScheme,
-              buttonConstraints: box,
-              buttonPadding: padding,
-              controlIconSize: sizes.play,
-              skipIconSize: sizes.skip,
-              playButtonSize: sizes.box,
-              buttonSpacing: 4,
-              minButtonSize: sizes.box,
-              playPadding: EdgeInsets.zero,
-            ),
+            _dockControls(),
             const SizedBox(width: 6),
             PlaybackModeButton(
               repeat: true,
@@ -288,7 +301,6 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
 
   Widget _wideBody(BuildContext context) => LayoutBuilder(
     builder: (context, c) {
-      final colors = widget.colorScheme;
       final live = widget.metadata.extras?['isLive'] == true;
       return Row(
         children: [
@@ -302,15 +314,9 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
           ),
           SizedBox(
             width: live ? 164 : math.min(440, c.maxWidth * 0.4),
-            child: live
-                ? PlaybackIconButton(
-                    iconSize: dockButtonSizes.play,
-                    iconColor: colors.onSurface,
-                    backgroundColor: Colors.transparent,
-                    filled: true,
-                    buttonSize: dockButtonSizes.box,
-                  )
-                : _transport(context),
+            // A station has no progress bar, shuffle or repeat: just previous,
+            // play and next.
+            child: live ? Center(child: _dockControls()) : _transport(context),
           ),
           Expanded(
             child: Align(

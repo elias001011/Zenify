@@ -249,13 +249,16 @@ const dockButtonSizes = (play: 30.0, box: 40.0, skip: 21.6, mode: 18.0);
 class PlayerTransport extends StatelessWidget {
   /// Either the [sizes] of the buttons, taken as given, or the [iconSize] of
   /// the play button and the [miniIconSize] of shuffle and repeat, which are
-  /// scaled down as the room gets narrower.
+  /// scaled down as the room gets narrower. With [controlsOnly], just previous,
+  /// play and next, centred: a radio station has no progress bar, shuffle or
+  /// repeat.
   const PlayerTransport({
     super.key,
     this.sizes,
     this.iconSize,
     this.miniIconSize,
     this.gap = 6,
+    this.controlsOnly = false,
   }) : assert(
          (sizes != null) != (iconSize != null && miniIconSize != null),
          'Give the sizes of the buttons, or the icon sizes to scale.',
@@ -266,6 +269,9 @@ class PlayerTransport extends StatelessWidget {
 
   /// Between the times and the buttons.
   final double gap;
+
+  /// Only previous, play and next.
+  final bool controlsOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -334,6 +340,19 @@ class PlayerTransport extends StatelessWidget {
                 miniControlSize) /
             2;
 
+        final controls = PlaybackTransportControls(
+          colorScheme: colorScheme,
+          buttonConstraints: buttonConstraints,
+          buttonPadding: buttonPadding,
+          controlIconSize: controlIconSize,
+          buttonSpacing: buttonSpacing,
+          minButtonSize: minButtonSize,
+          playPadding: playPadding,
+          skipIconSize: sizes?.skip,
+          playButtonSize: sizes?.box,
+        );
+        if (controlsOnly) return Center(child: controls);
+
         return Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -351,21 +370,7 @@ class PlayerTransport extends StatelessWidget {
                   ),
                 ),
                 SizedBox(width: buttonSpacing),
-                Expanded(
-                  child: Center(
-                    child: PlaybackTransportControls(
-                      colorScheme: colorScheme,
-                      buttonConstraints: buttonConstraints,
-                      buttonPadding: buttonPadding,
-                      controlIconSize: controlIconSize,
-                      buttonSpacing: buttonSpacing,
-                      minButtonSize: minButtonSize,
-                      playPadding: playPadding,
-                      skipIconSize: sizes?.skip,
-                      playButtonSize: sizes?.box,
-                    ),
-                  ),
-                ),
+                Expanded(child: Center(child: controls)),
                 SizedBox(width: buttonSpacing),
                 Transform.translate(
                   offset: Offset(iconInset, 0),
@@ -488,9 +493,15 @@ class PlaybackTransportControls extends StatelessWidget {
     return StreamBuilder<List<MediaItem>>(
       stream: audioHandler.queue,
       builder: (context, snapshot) {
+        // A station is a radio: previous and next switch station, and repeat
+        // has no meaning for it. Switching pushes a new queue, so this
+        // rebuilds with it.
+        final live =
+            audioHandler.mediaItem.valueOrNull?.extras?['isLive'] == true;
         return ValueListenableBuilder<AudioServiceRepeatMode>(
           valueListenable: repeatNotifier,
           builder: (_, repeatMode, __) {
+            final repeats = !live && repeatMode != AudioServiceRepeatMode.none;
             return FittedBox(
               fit: BoxFit.scaleDown,
               child: Row(
@@ -499,9 +510,7 @@ class PlaybackTransportControls extends StatelessWidget {
                   _PlaybackControlButton(
                     icon: FluentIcons.previous_24_filled,
                     forward: false,
-                    isEnabled:
-                        audioHandler.hasPrevious ||
-                        repeatMode != AudioServiceRepeatMode.none,
+                    isEnabled: audioHandler.hasPrevious || repeats,
                     tooltip: context.l10n!.skipToPrevious,
                     onPressed: () => audioHandler.skipToPrevious(),
                     colorScheme: colorScheme,
@@ -528,11 +537,10 @@ class PlaybackTransportControls extends StatelessWidget {
                   _PlaybackControlButton(
                     icon: FluentIcons.next_24_filled,
                     forward: true,
-                    isEnabled:
-                        audioHandler.hasNext ||
-                        repeatMode != AudioServiceRepeatMode.none,
+                    isEnabled: audioHandler.hasNext || repeats,
                     tooltip: context.l10n!.skipToNext,
-                    onPressed: () => repeatMode == AudioServiceRepeatMode.one
+                    onPressed: () =>
+                        !live && repeatMode == AudioServiceRepeatMode.one
                         ? audioHandler.playAgain()
                         : audioHandler.skipToNext(),
                     colorScheme: colorScheme,

@@ -30,6 +30,7 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/constants/clients.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
+import 'package:musify/models/radio_model.dart';
 import 'package:musify/services/audio_service_android_auto.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
@@ -115,6 +116,11 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   bool _completionHandlerLoadStarted = false;
   String? _lastError;
   int _consecutiveErrors = 0;
+
+  // The stations of the list the playing radio station was chosen from, in
+  // order: previous and next switch among them. Empty when it was played alone.
+  List<RadioStation> _radioStations = const [];
+  bool _radioSwitching = false;
 
   // Timers and sleep-timer state.
   late final _sleepTimer = SleepTimer(
@@ -233,8 +239,21 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   Map? get currentSong =>
       _hasCurrentQueueIndex ? _queueList[_currentQueueIndex] : null;
 
-  bool get hasNext =>
-      _hasCurrentQueueIndex && _currentQueueIndex < _queueList.length - 1;
+  /// A radio station plays, not a song of the queue (which a station leaves
+  /// untouched, so it may still hold the songs that played before it). A live
+  /// video in the queue is a queue song: its id is the queue's current one.
+  bool get _playsRadio {
+    final item = mediaItem.valueOrNull;
+    return item?.extras?['isLive'] == true &&
+        item?.extras?['ytid']?.toString() != currentSong?['ytid']?.toString();
+  }
+
+  /// Whether previous and next have another station to switch to.
+  bool get _canSkipRadio => _playsRadio && _radioStations.length > 1;
+
+  bool get hasNext => _playsRadio
+      ? _canSkipRadio
+      : _hasCurrentQueueIndex && _currentQueueIndex < _queueList.length - 1;
 
   bool get shouldContinuePlayback =>
       _currentLoadingIndex >= 0 ? _queuePlayWhenReady : audioPlayer.playing;
@@ -249,20 +268,25 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       playNextSongAutomatically.value || _queueKeepsGoing;
   bool _queueKeepsGoing = false;
 
-  bool get hasPrevious => _currentQueueIndex > 0 || _historyList.isNotEmpty;
+  bool get hasPrevious => _playsRadio
+      ? _canSkipRadio
+      : _currentQueueIndex > 0 || _historyList.isNotEmpty;
 
-  bool get canSkipToNext =>
-      _hasCurrentQueueIndex &&
-      (hasNext ||
-          repeatNotifier.value == AudioServiceRepeatMode.all ||
-          (_continuesQueue &&
-              audioPlayer.playing &&
-              !offlineMode.value &&
-              repeatNotifier.value == AudioServiceRepeatMode.none &&
-              _currentLoadingIndex == -1));
+  bool get canSkipToNext => _playsRadio
+      ? _canSkipRadio
+      : _hasCurrentQueueIndex &&
+            (hasNext ||
+                repeatNotifier.value == AudioServiceRepeatMode.all ||
+                (_continuesQueue &&
+                    audioPlayer.playing &&
+                    !offlineMode.value &&
+                    repeatNotifier.value == AudioServiceRepeatMode.none &&
+                    _currentLoadingIndex == -1));
 
   List<MediaControl> _controls(bool playing) {
-    final hasMultipleTracks = _queueList.length > 1;
+    final hasMultipleTracks = _playsRadio
+        ? _canSkipRadio
+        : _queueList.length > 1;
 
     return [
       if (hasMultipleTracks)
@@ -953,6 +977,13 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   /// already moved the index back to the song that was playing: the retry
   /// then goes on from the failed entry instead of loading it again.
   void _handlePlaybackError({int? failedIndex}) {
+    if (_playsRadio) {
+      // A station has no queue to carry on in: the user picks another one,
+      // and the songs that played before it must not start by themselves.
+      logger.log('Radio station failed to play', error: _lastError);
+      _lastError = null;
+      return;
+    }
     _consecutiveErrors++;
     logger.log(
       'Playback error occurred. Consecutive errors: $_consecutiveErrors',
@@ -979,6 +1010,8 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }
 
   Future<void> _handleSongCompletion() async {
+    // A station whose stream ends is not a song of the queue: nothing follows.
+    if (_playsRadio) return;
     try {
       if (_hasCurrentQueueIndex) {
         _addToHistory(_queueList[_currentQueueIndex]);
@@ -2462,15 +2495,22 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     }
   }
 
-  /// Play a radio stream directly without queue management
+  /// Play a radio stream directly without queue management. [stations] is the
+  /// list it was chosen from, in order: previous and next then switch station
+  /// within it, wrapping around. Without it (or when it does not hold this
+  /// station) there is nothing to skip to.
   Future<bool> playRadioStream({
     required String id,
     required String name,
     required String streamUrl,
     required String image,
     String? genre,
+    List<RadioStation>? stations,
   }) async {
     try {
+      _radioStations = stations != null && stations.any((s) => s.id == id)
+          ? List.of(stations)
+          : const [];
       // Create a song-like map for the radio stream
       final radioSong = {
         'id': id,
@@ -2497,6 +2537,8 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       final mediaItem = mapToMediaItem(radioSong);
       this.mediaItem.add(mediaItem);
       queue.add([mediaItem]);
+      // So the notification's buttons are the new list's from the start.
+      _updatePlaybackState(force: true);
 
       // Build audio source from stream URL
       final audioSource = await buildAudioSource(
@@ -2521,14 +2563,18 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         wasPlaying: wasPlayingBeforeSwap,
       );
 
-      await audioPlayer.play().catchError((Object e, StackTrace stackTrace) {
-        logger.log(
-          'Error starting radio playback',
-          error: e,
-          stackTrace: stackTrace,
-        );
-        _lastError = e.toString();
-      });
+      // play() only completes when playback pauses: the station is on the air
+      // once it is called, so neither the caller nor a skip waits for that.
+      unawaited(
+        audioPlayer.play().catchError((Object e, StackTrace stackTrace) {
+          logger.log(
+            'Error starting radio playback',
+            error: e,
+            stackTrace: stackTrace,
+          );
+          _lastError = e.toString();
+        }),
+      );
 
       _updatePlaybackState();
       return true;
@@ -2676,8 +2722,41 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   Future<void> skipToQueueItem(int index) => skipToSong(index);
 
   @override
-  Future<void> skipToNext({bool playWhenReady = true}) =>
-      _skipToNextFrom(_currentQueueIndex, playWhenReady: playWhenReady);
+  Future<void> skipToNext({bool playWhenReady = true}) => _playsRadio
+      ? _skipRadio(1)
+      : _skipToNextFrom(_currentQueueIndex, playWhenReady: playWhenReady);
+
+  /// Switches to the station [step] places on in the list the playing one was
+  /// chosen from, wrapping around at both ends. A tap while the previous
+  /// switch is still loading is ignored, so two never load at once.
+  Future<void> _skipRadio(int step) async {
+    if (!_canSkipRadio || _radioSwitching) return;
+    _radioSwitching = true;
+    try {
+      final stations = _radioStations;
+      final current = stations.indexWhere(
+        (station) => station.id == mediaItem.valueOrNull?.id,
+      );
+      if (current < 0) return;
+      final target = stations[(current + step) % stations.length];
+      await playRadioStream(
+        id: target.id,
+        name: target.name,
+        streamUrl: target.streamUrl,
+        image: target.image,
+        genre: target.genre,
+        stations: stations,
+      );
+    } catch (e, stackTrace) {
+      logger.log(
+        'Error skipping to another radio station',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    } finally {
+      _radioSwitching = false;
+    }
+  }
 
   Future<void> _skipToNextFrom(int index, {bool playWhenReady = true}) async {
     try {
@@ -2707,6 +2786,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> skipToPrevious({bool playWhenReady = true}) async {
+    if (_playsRadio) return _skipRadio(-1);
     try {
       if (_currentQueueIndex > 0) {
         await _playFromQueue(

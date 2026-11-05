@@ -420,7 +420,8 @@ void main() {
         expect(find.byType(NowPlayingArtwork), findsOneWidget);
         expect(find.byType(NowPlayingTitle), findsNothing);
         expect(find.text('Radio Example'), findsNothing);
-        expect(find.byType(PlayerTransport), findsNothing);
+        // Only its buttons, no progress bar, shuffle or repeat.
+        expect(find.byType(PositionSlider), findsNothing);
         expect(tester.takeException(), isNull);
 
         audioHandler.mediaItem.add(

@@ -228,13 +228,19 @@ class _CompactLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final isLive = metadata.extras?['isLive'] ?? false;
+    final isLive = metadata.extras?['isLive'] == true;
     final iconSize = size.width < 360 ? 42.0 : (size.width < 400 ? 48.0 : 52.0);
     final miniIconSize = size.width < 360 ? 20.0 : 24.0;
     const margin = 20.0;
 
     final controls = isLive
-        ? const SizedBox.shrink()
+        // Just the buttons of a station, centred beside the cover.
+        ? LayoutBuilder(
+            builder: (context, c) => PlayerTransport(
+              sizes: phoneButtonSizes(c.maxWidth),
+              controlsOnly: true,
+            ),
+          )
         : NowPlayingControls(
             size: size,
             adjustedIconSize: iconSize,
@@ -378,7 +384,7 @@ class _PlaybackStageState extends State<_PlaybackStage>
   Widget build(BuildContext context) {
     final metadata = widget.metadata;
     final screen = MediaQuery.sizeOf(context);
-    final isLive = metadata.extras?['isLive'] ?? false;
+    final isLive = metadata.extras?['isLive'] == true;
 
     final area = LayoutBuilder(
       builder: (context, c) {
@@ -535,11 +541,10 @@ class _PlaybackStageState extends State<_PlaybackStage>
       mainAxisSize: widget.fill ? MainAxisSize.max : MainAxisSize.min,
       children: [
         if (widget.fill) Expanded(child: area) else Flexible(child: area),
-        if (!isLive) ...[
-          const SizedBox(height: 14),
-          PlayerTransport(sizes: widget.buttonSizes),
-          const SizedBox(height: 8),
-        ],
+        const SizedBox(height: 14),
+        // A station has no progress bar, shuffle or repeat: just its buttons.
+        PlayerTransport(sizes: widget.buttonSizes, controlsOnly: isLive),
+        const SizedBox(height: 8),
       ],
     );
   }

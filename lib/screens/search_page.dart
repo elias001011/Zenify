@@ -679,8 +679,14 @@ class _SearchPageState extends State<SearchPage> {
           ? maxSongsInList
           : _radioStationsSearchResult.length;
 
+      // The ones shown: previous and next go through them.
+      final shownStations = _radioStationsSearchResult.sublist(
+        0,
+        stationsCount,
+      );
+
       for (var index = 0; index < stationsCount; index++) {
-        final station = _radioStationsSearchResult[index];
+        final station = shownStations[index];
         final isLast = index == stationsCount - 1;
 
         widgets.add(
@@ -696,6 +702,7 @@ class _SearchPageState extends State<SearchPage> {
                   streamUrl: station.streamUrl,
                   image: station.image,
                   genre: station.genre,
+                  stations: shownStations,
                 );
                 if (!success && context.mounted) {
                   showToast(context, context.l10n!.failedPlayingRadio);
