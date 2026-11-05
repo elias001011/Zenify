@@ -8,17 +8,16 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/screens/replace_review_page.dart';
 import 'package:musify/services/artist_service.dart' show ytMusicClient;
+import 'package:musify/services/common_services.dart' show getSongDetails;
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/song_replacement.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/formatter.dart';
+import 'package:musify/utilities/playlist_csv_import.dart';
 import 'package:musify/utilities/url_launcher.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
-
-/// A CSV row and its original position, used to preserve playlist order.
-typedef _ImportRow = ({int index, String title, String artist});
 
 class ImportSpotifyPlaylistPage extends StatefulWidget {
   const ImportSpotifyPlaylistPage({super.key});
@@ -77,52 +76,18 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
       showToast(context, context.l10n!.enterPlaylistName);
       return;
     }
-    final records = _parseCsv(_csvController.text);
-    if (records.length < 2) {
-      showToast(context, context.l10n!.spotifyPlaylistEmpty);
-      return;
+    final parsed = playlistCsvRows(parseCsv(_csvController.text));
+    switch (parsed.problem) {
+      case PlaylistCsvProblem.empty:
+        showToast(context, context.l10n!.spotifyPlaylistEmpty);
+        return;
+      case PlaylistCsvProblem.invalid:
+        showToast(context, context.l10n!.spotifyPlaylistInvalid);
+        return;
+      case null:
+        break;
     }
-
-    final headers = records.first
-        .map((header) => header.replaceFirst('\ufeff', '').trim().toLowerCase())
-        .toList();
-    bool isNameColumn(String header) =>
-        !header.contains('id') &&
-        !header.contains('uri') &&
-        !header.contains('url') &&
-        !header.contains('genre');
-    final songIndex = headers.indexWhere(
-      (header) =>
-          (header.contains('song') || header.contains('track')) &&
-          isNameColumn(header),
-    );
-    final artistIndex = headers.indexWhere(
-      (header) => header.contains('artist') && isNameColumn(header),
-    );
-    if (songIndex == -1 || artistIndex == -1) {
-      showToast(context, context.l10n!.spotifyPlaylistInvalid);
-      return;
-    }
-
-    final songs = records.skip(1).where((row) {
-      return row.length > songIndex &&
-          row.length > artistIndex &&
-          row[songIndex].trim().isNotEmpty;
-    }).toList();
-    if (songs.isEmpty) {
-      showToast(context, context.l10n!.spotifyPlaylistEmpty);
-      return;
-    }
-
-    final rows = songs.indexed
-        .map(
-          (entry) => (
-            index: entry.$1,
-            title: entry.$2[songIndex].trim(),
-            artist: entry.$2[artistIndex].trim(),
-          ),
-        )
-        .toList();
+    final rows = parsed.rows;
 
     _importRunning = true;
     setState(() {
@@ -133,7 +98,7 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
 
     // Key results by their CSV position so retry results remain ordered.
     final foundByIndex = <int, Map>{};
-    List<_ImportRow> missingRows;
+    List<PlaylistCsvRow> missingRows;
     var rateLimited = false;
     var notSearched = <String>{};
     try {
@@ -243,7 +208,7 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
   }
 
   /// A row of the file as a song, the way the search and the review take it.
-  Map<String, dynamic> _asSong(_ImportRow row) => {
+  Map<String, dynamic> _asSong(PlaylistCsvRow row) => {
     'ytid': 'file:${row.index}',
     'title': row.title,
     'artist': row.artist,
@@ -251,21 +216,27 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
 
   /// Resolves [rows] in batches and stops when rate limiting is detected.
   /// Results are keyed by the rows' original positions for retry merging.
-  Future<({Map<int, Map> found, List<_ImportRow> missing, bool rateLimited})>
+  Future<
+    ({Map<int, Map> found, List<PlaylistCsvRow> missing, bool rateLimited})
+  >
   _searchBatch(
-    List<_ImportRow> rows, {
+    List<PlaylistCsvRow> rows, {
     required void Function(int processedCount) onProgress,
   }) async {
     final found = <int, Map>{};
-    final missing = <_ImportRow>[];
+    final missing = <PlaylistCsvRow>[];
     for (var i = 0; i < rows.length; i += _batchSize) {
       final batch = rows.skip(i).take(_batchSize).toList();
       final batchResults = await Future.wait(
         batch.map((row) async {
-          final (match, wasRateLimited) = await _findSongWithRetry(
-            '${row.title} ${row.artist}',
-            expectedArtist: row.artist,
-            expectedTitle: row.title,
+          final (match, wasRateLimited) = await resolveImportRow(
+            row,
+            byId: _songById,
+            search: (r) => _findSongWithRetry(
+              '${r.title} ${r.artist}',
+              expectedArtist: r.artist,
+              expectedTitle: r.title,
+            ),
           );
           return (row, match, wasRateLimited);
         }),
@@ -287,6 +258,17 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
       await Future.delayed(_batchPause);
     }
     return (found: found, missing: missing, rateLimited: false);
+  }
+
+  /// The song with YouTube id [ytid]. A rate limit gets the same single
+  /// retry as a search; the second one is left to the caller.
+  Future<Map?> _songById(String ytid) async {
+    try {
+      return await getSongDetails(0, ytid);
+    } on RequestLimitExceededException {
+      await Future.delayed(const Duration(seconds: 2));
+      return getSongDetails(0, ytid);
+    }
   }
 
   /// Returns the best match for [query], or `null` if none was found.
@@ -326,45 +308,6 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
       }
     }
     return (null, false);
-  }
-
-  List<List<String>> _parseCsv(String input) {
-    final rows = <List<String>>[];
-    var row = <String>[];
-    var field = StringBuffer();
-    var quoted = false;
-
-    for (var index = 0; index < input.length; index++) {
-      final character = input[index];
-      if (character == '"') {
-        if (quoted && index + 1 < input.length && input[index + 1] == '"') {
-          field.write('"');
-          index++;
-        } else {
-          quoted = !quoted;
-        }
-      } else if (character == ',' && !quoted) {
-        row.add(field.toString());
-        field = StringBuffer();
-      } else if ((character == '\n' || character == '\r') && !quoted) {
-        if (character == '\r' &&
-            index + 1 < input.length &&
-            input[index + 1] == '\n') {
-          index++;
-        }
-        row.add(field.toString());
-        field = StringBuffer();
-        if (row.any((value) => value.trim().isNotEmpty)) rows.add(row);
-        row = <String>[];
-      } else {
-        field.write(character);
-      }
-    }
-    if (field.isNotEmpty || row.isNotEmpty) {
-      row.add(field.toString());
-      if (row.any((value) => value.trim().isNotEmpty)) rows.add(row);
-    }
-    return rows;
   }
 
   @override
