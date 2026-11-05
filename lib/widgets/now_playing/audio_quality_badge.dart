@@ -43,10 +43,20 @@ String? _ytidOf(MediaItem? item) => item?.extras?['ytid']?.toString();
 /// as one more of them. It is about the stream, not the artwork, so it looks
 /// the same on every layout. While the setting is off it is not even built:
 /// nothing listens to the song and nothing is looked up.
-class AudioQualityBadge extends StatelessWidget {
+class AudioQualityBadge extends StatefulWidget {
   const AudioQualityBadge({super.key, required this.style});
 
   final TextStyle style;
+
+  @override
+  State<AudioQualityBadge> createState() => _AudioQualityBadgeState();
+}
+
+class _AudioQualityBadgeState extends State<AudioQualityBadge> {
+  // Kept across the rebuilds of the row it sits in, which come with every
+  // tick of the position: a new stream there would be listened to again each
+  // time.
+  late final _ytids = audioHandler.mediaItem.map(_ytidOf).distinct();
 
   @override
   Widget build(BuildContext context) => ValueListenableBuilder<bool>(
@@ -55,9 +65,9 @@ class AudioQualityBadge extends StatelessWidget {
         ? const SizedBox.shrink()
         : StreamBuilder<String?>(
             initialData: _ytidOf(audioHandler.mediaItem.valueOrNull),
-            stream: audioHandler.mediaItem.map(_ytidOf).distinct(),
+            stream: _ytids,
             builder: (context, snapshot) =>
-                _QualityTag(ytid: snapshot.data, style: style),
+                _QualityTag(ytid: snapshot.data, style: widget.style),
           ),
   );
 }
