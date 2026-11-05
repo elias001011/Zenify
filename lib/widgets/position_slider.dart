@@ -29,7 +29,11 @@ import 'package:musify/widgets/now_playing/player_chrome.dart';
 class PositionSlider extends StatefulWidget {
   /// The track and the times reach the edges of the space they are given, so
   /// the player's buttons and the artwork can line up with them.
-  const PositionSlider({super.key});
+  const PositionSlider({super.key, this.inline = false});
+
+  /// A short bar with the times on its two sides, on one line, for the desktop
+  /// mini player; by default the times are under the bar.
+  final bool inline;
 
   @override
   State<PositionSlider> createState() => _PositionSliderState();
@@ -48,6 +52,7 @@ class _PositionSliderState extends State<PositionSlider> {
   @override
   Widget build(BuildContext context) {
     final minimal = PlayerChrome.minimalOf(context);
+    final colorScheme = Theme.of(context).colorScheme;
     return StreamBuilder<PositionData>(
       stream: TickerMode.valuesOf(context).enabled
           ? audioHandler.positionDataStream
@@ -76,52 +81,69 @@ class _PositionSliderState extends State<PositionSlider> {
             ? _dragValue
             : _positionData.position.inSeconds.toDouble();
 
+        final slider = SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            padding: EdgeInsets.zero,
+            trackHeight: minimal ? (widget.inline ? 4 : 5) : null,
+            trackShape: minimal ? const RoundedRectSliderTrackShape() : null,
+            // The thumb makes the bar easy to find and to grab; the short bar
+            // of the mini player has none.
+            thumbShape: minimal
+                ? RoundSliderThumbShape(
+                    enabledThumbRadius: widget.inline ? 0 : 6,
+                    elevation: 0,
+                    pressedElevation: 0,
+                  )
+                : null,
+            thumbColor: minimal ? colorScheme.onSurface : null,
+            overlayShape: minimal
+                ? const RoundSliderOverlayShape(overlayRadius: 8)
+                : null,
+            activeTrackColor: minimal ? colorScheme.onSurface : null,
+            inactiveTrackColor: minimal
+                ? colorScheme.onSurface.withValues(alpha: 0.2)
+                : null,
+          ),
+          child: SizedBox(
+            height: minimal ? (widget.inline ? 16 : 28) : null,
+            child: Slider(
+              value: currentValue.clamp(0.0, maxDuration),
+              onChanged: (value) {
+                setState(() {
+                  _isDragging = true;
+                  _dragValue = value;
+                });
+              },
+              onChangeEnd: (value) {
+                audioHandler.seek(Duration(seconds: value.toInt()));
+                setState(() {
+                  _isDragging = false;
+                });
+              },
+              max: maxDuration,
+              semanticFormatterCallback: (value) =>
+                  formatDuration(value.toInt()),
+            ),
+          ),
+        );
+
+        if (widget.inline) {
+          final style = _timeStyle(context, size: 11);
+          return Row(
+            children: [
+              Text(_positionText(_positionData), style: style),
+              const SizedBox(width: 10),
+              Expanded(child: slider),
+              const SizedBox(width: 10),
+              Text(_durationText(_positionData), style: style),
+            ],
+          );
+        }
+
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                padding: EdgeInsets.zero,
-                trackHeight: minimal ? 4 : null,
-                trackShape: minimal
-                    ? const RoundedRectSliderTrackShape()
-                    : null,
-                thumbShape: minimal
-                    ? const RoundSliderThumbShape(enabledThumbRadius: 0)
-                    : null,
-                overlayShape: minimal
-                    ? const RoundSliderOverlayShape(overlayRadius: 8)
-                    : null,
-                activeTrackColor: minimal
-                    ? Theme.of(context).colorScheme.onSurface
-                    : null,
-                inactiveTrackColor: minimal
-                    ? Theme.of(context).colorScheme.onSurface
-                          .withValues(alpha: 0.2)
-                    : null,
-              ),
-              child: SizedBox(
-                height: minimal ? 28 : null,
-                child: Slider(
-                  value: currentValue.clamp(0.0, maxDuration),
-                  onChanged: (value) {
-                    setState(() {
-                      _isDragging = true;
-                      _dragValue = value;
-                    });
-                  },
-                  onChangeEnd: (value) {
-                    audioHandler.seek(Duration(seconds: value.toInt()));
-                    setState(() {
-                      _isDragging = false;
-                    });
-                  },
-                  max: maxDuration,
-                  semanticFormatterCallback: (value) =>
-                      formatDuration(value.toInt()),
-                ),
-              ),
-            ),
+            slider,
             SizedBox(height: minimal ? 4 : 8),
             _buildPositionRow(context, _positionData),
           ],
@@ -130,14 +152,27 @@ class _PositionSliderState extends State<PositionSlider> {
     );
   }
 
+  String _positionText(PositionData positionData) => formatDuration(
+    _isDragging ? _dragValue.toInt() : positionData.position.inSeconds,
+  );
+
+  String _durationText(PositionData positionData) =>
+      formatDuration(positionData.duration.inSeconds);
+
+  /// The times' style: figures of one width, so they do not shift as they
+  /// change.
+  TextStyle _timeStyle(BuildContext context, {required double size}) =>
+      TextStyle(
+        fontSize: size,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      );
+
   Widget _buildPositionRow(BuildContext context, PositionData positionData) {
-    final textStyle = TextStyle(
-      fontSize: PlayerChrome.minimalOf(context) ? 12 : 15,
-    );
-    final positionText = formatDuration(
-      _isDragging ? _dragValue.toInt() : positionData.position.inSeconds,
-    );
-    final durationText = formatDuration(positionData.duration.inSeconds);
+    final minimal = PlayerChrome.minimalOf(context);
+    final textStyle = minimal
+        ? _timeStyle(context, size: 12)
+        : const TextStyle(fontSize: 15);
 
     return Stack(
       alignment: Alignment.center,
@@ -145,8 +180,8 @@ class _PositionSliderState extends State<PositionSlider> {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(positionText, style: textStyle),
-            Text(durationText, style: textStyle),
+            Text(_positionText(positionData), style: textStyle),
+            Text(_durationText(positionData), style: textStyle),
           ],
         ),
         AudioQualityBadge(style: textStyle),

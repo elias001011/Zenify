@@ -221,18 +221,51 @@ Future<void> _copyNowPlayingSong(
   if (context.mounted) showToast(context, context.l10n!.songInfoCopied);
 }
 
+/// How big the playback buttons are, in dp: the play icon and the box that
+/// takes its touch, the icons of previous and next, and those of shuffle and
+/// repeat.
+typedef PlayerButtonSizes = ({
+  double play,
+  double box,
+  double skip,
+  double mode,
+});
+
+/// The phone's buttons for the width they have: the play icon takes 15% of
+/// it, from 44 to 56, and the other buttons follow its size.
+PlayerButtonSizes phoneButtonSizes(double width) {
+  final play = (width * 0.15).clamp(44.0, 56.0);
+  return (
+    play: play,
+    box: play + 12,
+    skip: play * 0.7,
+    mode: (width * 0.068).clamp(20.0, 24.0),
+  );
+}
+
+/// The same proportions in the mini player's 40 dp box.
+const dockButtonSizes = (play: 30.0, box: 40.0, skip: 21.6, mode: 18.0);
+
 /// The progress bar, the times and the playback buttons. One column, so the
 /// progress bar, the times and the icons of shuffle and repeat all begin and
 /// end at the same edges, the artwork's, whatever the layout around it.
 class PlayerTransport extends StatelessWidget {
+  /// Either the [sizes] of the buttons, taken as given, or the [iconSize] of
+  /// the play button and the [miniIconSize] of shuffle and repeat, which are
+  /// scaled down as the room gets narrower.
   const PlayerTransport({
     super.key,
-    required this.iconSize,
-    required this.miniIconSize,
+    this.sizes,
+    this.iconSize,
+    this.miniIconSize,
     this.gap = 6,
-  });
-  final double iconSize;
-  final double miniIconSize;
+  }) : assert(
+         (sizes != null) != (iconSize != null && miniIconSize != null),
+         'Give the sizes of the buttons, or the icon sizes to scale.',
+       );
+  final PlayerButtonSizes? sizes;
+  final double? iconSize;
+  final double? miniIconSize;
 
   /// Between the times and the buttons.
   final double gap;
@@ -241,10 +274,9 @@ class PlayerTransport extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final responsiveIconSize = screenWidth < 360 ? iconSize * 0.85 : iconSize;
-    final responsiveMiniIconSize = screenWidth < 360
-        ? miniIconSize * 0.85
-        : miniIconSize;
+    final scale = screenWidth < 360 ? 0.85 : 1.0;
+    final responsiveIconSize = (iconSize ?? 0) * scale;
+    final responsiveMiniIconSize = (miniIconSize ?? 0) * scale;
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
@@ -271,19 +303,21 @@ class PlayerTransport extends StatelessWidget {
         );
 
         final controlIconSize =
+            sizes?.play ??
             responsiveIconSize *
-            (isUltraTight
-                ? 0.75
-                : isTight
-                ? 0.85
-                : 0.92);
+                (isUltraTight
+                    ? 0.75
+                    : isTight
+                    ? 0.85
+                    : 0.92);
         final miniControlSize =
+            sizes?.mode ??
             responsiveMiniIconSize *
-            (isUltraTight
-                ? 0.8
-                : isTight
-                ? 0.9
-                : 1.0);
+                (isUltraTight
+                    ? 0.8
+                    : isTight
+                    ? 0.9
+                    : 1.0);
         final playPadding = EdgeInsets.all(
           responsiveIconSize *
               (isUltraTight
@@ -330,6 +364,8 @@ class PlayerTransport extends StatelessWidget {
                       buttonSpacing: buttonSpacing,
                       minButtonSize: minButtonSize,
                       playPadding: playPadding,
+                      skipIconSize: sizes?.skip,
+                      playButtonSize: sizes?.box,
                     ),
                   ),
                 ),
@@ -441,6 +477,7 @@ class PlaybackTransportControls extends StatelessWidget {
     required this.minButtonSize,
     required this.playPadding,
     this.skipIconSize,
+    this.playButtonSize,
   });
 
   final ColorScheme colorScheme;
@@ -453,6 +490,9 @@ class PlaybackTransportControls extends StatelessWidget {
 
   /// The icons of previous and next; by default a share of [controlIconSize].
   final double? skipIconSize;
+
+  /// The box of the play button; by default 44 in the dock and 52 elsewhere.
+  final double? playButtonSize;
 
   @override
   Widget build(BuildContext context) {
@@ -496,9 +536,10 @@ class PlaybackTransportControls extends StatelessWidget {
                     },
                     filled: true,
                     buttonSize:
-                        PlayerChrome.of(context) == PlayerChromeStyle.dock
-                        ? 44
-                        : 52,
+                        playButtonSize ??
+                        (PlayerChrome.of(context) == PlayerChromeStyle.dock
+                            ? 44
+                            : 52),
                     iconSize: controlIconSize,
                     padding: playPadding,
                   ),

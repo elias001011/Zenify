@@ -15,6 +15,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/now_playing/lyrics_panel.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
+import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/queue_list_view.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -367,7 +368,7 @@ void main() {
   });
 
   testWidgets(
-    'on a phone, playback sits under the song and drops down with a panel',
+    'on a phone, the song sits on playback and a panel opens above them',
     (tester) async {
       tester.view.physicalSize = const Size(420, 900);
       tester.view.devicePixelRatio = 1;
@@ -393,17 +394,24 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 300));
 
-      // Not a bar pinned to the bottom with a gap above it.
+      // The song is glued to the bar, lined up with it, and the artwork takes
+      // the whole width.
       final song = tester.getRect(find.byType(NowPlayingTitle));
       final resting = tester.getRect(find.byType(PlayerTransport));
       expect(resting.top - song.bottom, lessThan(48));
+      expect(song.left, closeTo(resting.left, 1));
+      expect(
+        tester.getRect(find.byType(NowPlayingArtwork)).width,
+        closeTo(resting.width, 1),
+      );
 
       await tester.tap(find.byTooltip('Lyrics'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 600));
       await tester.pump(const Duration(milliseconds: 600));
+      // Playback stays where the thumb is; only the artwork and the song move.
       final withPanel = tester.getRect(find.byType(PlayerTransport));
-      expect(withPanel.top, greaterThan(resting.top));
+      expect(withPanel.top, closeTo(resting.top, 1));
       expect(withPanel.bottom, lessThan(900));
       expect(tester.takeException(), isNull);
 
@@ -411,6 +419,52 @@ void main() {
       await tester.pump(const Duration(seconds: 30));
     },
   );
+
+  for (final size in const [Size(360, 740), Size(390, 844), Size(412, 915)]) {
+    testWidgets(
+      'the phone player fits ${size.width.toInt()}x${size.height.toInt()}, '
+      'with big buttons lined up with the bar',
+      (tester) async {
+        tester.view.physicalSize = size;
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        audioHandler = _Handler();
+        audioHandler.mediaItem.add(
+          const MediaItem(
+            id: 'test',
+            title: 'Song',
+            artist: 'Artist',
+            extras: {'ytid': 'test'},
+          ),
+        );
+        await tester.pumpWidget(
+          const MaterialApp(
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              ...GlobalMaterialLocalizations.delegates,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: NowPlayingPage(),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 300));
+
+        final play = tester.getSize(
+          find.byWidgetPredicate(
+            (widget) => widget is IconButton && widget.tooltip == 'Play',
+          ),
+        );
+        expect(play.width, greaterThanOrEqualTo(56));
+        final bar = tester.getRect(find.byType(PositionSlider));
+        expect(tester.getRect(find.byType(NowPlayingTitle)).left, bar.left);
+        expect(tester.getRect(find.byType(NowPlayingArtwork)).left, bar.left);
+        expect(tester.takeException(), isNull);
+
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump(const Duration(seconds: 30));
+      },
+    );
+  }
 
   testWidgets('lyrics stay open, beside playback, when the phone turns', (
     tester,
