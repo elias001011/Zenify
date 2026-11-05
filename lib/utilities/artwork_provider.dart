@@ -61,8 +61,6 @@ class ArtworkProvider {
     return provider;
   }
 
-  static void clearCache() => _cache.clear();
-
   /// [artwork] decoded at the size it is shown, [size] logical pixels wide,
   /// instead of at full resolution: a list row needs a few dozen pixels, not
   /// the whole cover in memory.
