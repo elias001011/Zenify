@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:musify/services/common_services.dart';
@@ -11,16 +9,10 @@ import 'package:musify/services/local_sync_service.dart';
 import 'package:musify/services/settings_manager.dart';
 
 import 'local_sync/fixtures.dart';
+import 'support/app_harness.dart';
 
 void main() {
-  late Directory directory;
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('musify_sync_store');
-    Hive.init(directory.path);
-    for (final name in ['user', 'userNoBackup', 'settings', 'cache']) {
-      await Hive.openBox(name);
-    }
-  });
+  useAppSettings();
   setUp(() async {
     LibraryMergeService.fault = null;
     listeningStatsService.reload();
@@ -28,10 +20,6 @@ void main() {
     for (final name in ['user', 'userNoBackup', 'settings', 'cache']) {
       await Hive.box(name).clear();
     }
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
   });
 
   test(

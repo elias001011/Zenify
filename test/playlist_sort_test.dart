@@ -1,8 +1,5 @@
-import 'dart:io';
-
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
@@ -13,6 +10,8 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/edit_playlist_dialog.dart';
 import 'package:musify/widgets/playlist_page/empty_playlist_state.dart';
 import 'package:musify/widgets/song_bar.dart';
+
+import 'support/app_harness.dart';
 
 Map playlist(String id, {List<String> ids = const ['a', 'b', 'c']}) => {
   'ytid': id,
@@ -32,14 +31,7 @@ class _Handler extends MusifyAudioHandler {
 }
 
 void main() {
-  late Directory directory;
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('zenify_playlist_edit');
-    Hive.init(directory.path);
-    for (final name in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(name);
-    }
-  });
+  useAppSettings();
   setUp(() {
     offlineMode.value = true;
     userCustomPlaylists.value = [playlist('source')];
@@ -52,10 +44,6 @@ void main() {
         ],
       },
     ];
-  });
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
   });
 
   Future<void> mount(WidgetTester tester) async {

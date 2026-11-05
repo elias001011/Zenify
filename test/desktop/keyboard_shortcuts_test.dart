@@ -1,24 +1,13 @@
-import 'dart:io';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/keyboard_shortcuts_manager.dart';
 
+import '../support/app_harness.dart';
+
 void main() {
-  late Directory dir;
-
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('musify_shortcuts');
-    Hive.init(dir.path);
-    await Hive.openBox('settings');
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings(boxes: ['settings']);
 
   tearDown(KeyboardShortcutsManager.resetToDefaults);
 

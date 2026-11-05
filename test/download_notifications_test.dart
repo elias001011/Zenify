@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,11 +6,12 @@ import 'package:musify/localization/app_localizations_en.dart';
 import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/download_notifications.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
   const channel = MethodChannel('zenify/downloads');
   final manager = DownloadManager.instance;
-  late Directory dir;
   late DownloadNotifications notifications;
   final calls = <MethodCall>[];
   var permissionGranted = true;
@@ -46,16 +45,7 @@ void main() {
     return null;
   }
 
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('musify_download_notices');
-    Hive.init(dir.path);
-    await Hive.openBox('userNoBackup');
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings(boxes: ['userNoBackup']);
 
   setUp(() async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;

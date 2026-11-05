@@ -1,10 +1,7 @@
-import 'dart:io';
-
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
@@ -18,6 +15,8 @@ import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/queue_list_view.dart';
 import 'package:rxdart/rxdart.dart';
+
+import 'support/app_harness.dart';
 
 class _Handler extends MusifyAudioHandler {
   _Handler() {
@@ -78,20 +77,7 @@ class _Handler extends MusifyAudioHandler {
 }
 
 void main() {
-  late Directory dir;
-
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('musify_player_panels');
-    Hive.init(dir.path);
-    for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(box);
-    }
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings();
 
   tearDown(() {
     debugDefaultTargetPlatformOverride = null;

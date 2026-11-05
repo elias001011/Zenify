@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -25,6 +24,8 @@ import 'package:musify/widgets/moods_row.dart';
 import 'package:musify/widgets/playlist_page/radio_button.dart';
 import 'package:musify/widgets/song_bar.dart';
 
+import 'support/app_harness.dart';
+
 class _Handler extends BaseAudioHandler implements MusifyAudioHandler {
   int playRequests = 0;
 
@@ -46,16 +47,9 @@ class _Handler extends BaseAudioHandler implements MusifyAudioHandler {
 }
 
 void main() {
-  late Directory directory;
   late _Handler handler;
 
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('zenify_offline_ui');
-    Hive.init(directory.path);
-    for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(box);
-    }
-  });
+  useAppSettings();
 
   setUp(() {
     handler = _Handler();
@@ -81,11 +75,6 @@ void main() {
     userOfflineSongs.value = [];
     userLikedSongsList.value = [];
     offlinePlaylistService.offlinePlaylists.value = [];
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
   });
 
   Widget app(Widget child) => MaterialApp(

@@ -8,21 +8,12 @@ import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
 
+import 'support/app_harness.dart';
+
 void main() {
-  late Directory dir;
   final manager = DownloadManager.instance;
 
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('musify_downloads');
-    Hive.init(dir.path);
-    await Hive.openBox('userNoBackup');
-    await Hive.openBox('settings');
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings(boxes: ['userNoBackup', 'settings']);
 
   setUp(() {
     manager

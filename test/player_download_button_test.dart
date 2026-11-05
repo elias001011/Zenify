@@ -1,8 +1,5 @@
-import 'dart:io';
-
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
@@ -13,26 +10,15 @@ import 'package:musify/widgets/download_progress_icon.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
 import 'package:rxdart/rxdart.dart';
 
+import 'support/app_harness.dart';
+
 class _Handler extends MusifyAudioHandler {
   @override
   Stream<List<Map>> get queueAsMapStream => BehaviorSubject.seeded(const []);
 }
 
 void main() {
-  late Directory dir;
-
-  setUpAll(() async {
-    dir = await Directory.systemTemp.createTemp('musify_download_button');
-    Hive.init(dir.path);
-    for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(box);
-    }
-  });
-
-  tearDownAll(() async {
-    await Hive.close();
-    await dir.delete(recursive: true);
-  });
+  useAppSettings();
 
   setUp(() {
     audioHandler = _Handler();

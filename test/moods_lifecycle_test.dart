@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'dart:isolate';
 import 'dart:math';
 
@@ -14,6 +13,8 @@ import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/moods/moods_worker.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/settings_manager.dart';
+
+import 'support/app_harness.dart';
 
 List<Map> _songs(String prefix) => [
   for (var i = 0; i < 10; i++)
@@ -47,16 +48,9 @@ Future<String> Function() _slowReading(SendPort started, SendPort finished) =>
 Future<int> _answer() async => 42;
 
 void main() {
-  late Directory directory;
   late _FixtureMoods service;
 
-  setUpAll(() async {
-    directory = await Directory.systemTemp.createTemp('zenify_moods_lifecycle');
-    Hive.init(directory.path);
-    for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(box);
-    }
-  });
+  useAppSettings();
   setUp(() async {
     for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
       await Hive.box(box).clear();
@@ -74,10 +68,6 @@ void main() {
     service = _FixtureMoods();
   });
   tearDown(() => service.dispose());
-  tearDownAll(() async {
-    await Hive.close();
-    await directory.delete(recursive: true);
-  });
 
   test(
     'current playlists regenerate immediately after changing the tuning',
