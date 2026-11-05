@@ -134,6 +134,8 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
                 panel: panel,
                 onPanel: _onPanel,
                 showVolume: layout != _PlayerLayout.wide,
+                // Upright phones have it beside the song.
+                showAddToPlaylist: layout != _PlayerLayout.upright,
               );
               // Its own group: during the slide its surfaces sit over the shell's.
               return BackdropGroup(
@@ -400,24 +402,44 @@ class _UprightStageState extends State<_UprightStage>
                   ? const QueueWidget(embedded: true)
                   : LyricsPanel(metadata: metadata);
               // Lined up with the progress bar under it, as the artwork is.
+              // The button to put the song in a playlist, or like it, sits
+              // at the end of the song's line.
+              final addToPlaylist = AddToPlaylistButton(
+                metadata: metadata,
+                beside: true,
+              );
               final songTitle = Align(
                 alignment: AlignmentDirectional.bottomStart,
-                child: NowPlayingTitle(
-                  metadata: metadata,
-                  titleSize: getResponsiveTitleFontSize(screen) + 2,
-                  artistSize: getResponsiveArtistFontSize(screen) + 1,
-                  spacing: 6,
-                  alignment: CrossAxisAlignment.start,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: NowPlayingTitle(
+                        metadata: metadata,
+                        titleSize: getResponsiveTitleFontSize(screen) + 2,
+                        artistSize: getResponsiveArtistFontSize(screen) + 1,
+                        spacing: 6,
+                        alignment: CrossAxisAlignment.start,
+                      ),
+                    ),
+                    addToPlaylist,
+                  ],
                 ),
               );
               final headerTitle = Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: NowPlayingTitle(
-                  metadata: metadata,
-                  titleSize: 17,
-                  artistSize: 14,
-                  spacing: 2,
-                  alignment: CrossAxisAlignment.start,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: NowPlayingTitle(
+                        metadata: metadata,
+                        titleSize: 17,
+                        artistSize: 14,
+                        spacing: 2,
+                        alignment: CrossAxisAlignment.start,
+                      ),
+                    ),
+                    addToPlaylist,
+                  ],
                 ),
               );
 

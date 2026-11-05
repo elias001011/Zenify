@@ -298,7 +298,6 @@ void main() {
           'Sleep timer',
           'Make available offline',
           'Add to playlist',
-          'Liked songs',
         ]) {
           final target = find.byTooltip(action).hitTestable();
           expect(target, findsOneWidget, reason: action);

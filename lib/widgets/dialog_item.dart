@@ -37,6 +37,8 @@ class DialogItem extends StatelessWidget {
     this.iconContainerSize = 44,
     this.fontSize = 15,
     this.showChevron = true,
+    this.backgroundColor,
+    this.trailing,
   });
 
   final IconData icon;
@@ -51,13 +53,19 @@ class DialogItem extends StatelessWidget {
   final double fontSize;
   final bool showChevron;
 
+  /// Sets the row apart from the others; the surface by default.
+  final Color? backgroundColor;
+
+  /// Takes the chevron's place.
+  final Widget? trailing;
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
       padding: padding,
       child: Material(
-        color: colorScheme.surfaceContainerLow,
+        color: backgroundColor ?? colorScheme.surfaceContainerLow,
         borderRadius: commonBarRadius,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -89,7 +97,9 @@ class DialogItem extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (showChevron)
+                if (trailing != null)
+                  trailing!
+                else if (showChevron)
                   Icon(
                     FluentIcons.chevron_right_24_regular,
                     color: colorScheme.onSurfaceVariant,

@@ -41,7 +41,8 @@ import 'package:musify/widgets/now_playing/player_chrome.dart';
 enum PlayerPanel { queue, lyrics }
 
 /// The player's actions besides playback: lyrics, queue, volume, sleep
-/// timer, download, add to playlist and like.
+/// timer, download and add to playlist. A song is liked from the add to
+/// playlist dialog; a radio station, which has no playlists, has a heart.
 class PlayerActions extends StatefulWidget {
   const PlayerActions({
     super.key,
@@ -50,11 +51,15 @@ class PlayerActions extends StatefulWidget {
     this.onPanel,
     this.miniPlayer = false,
     this.showVolume = true,
+    this.showAddToPlaylist = true,
   });
 
   final MediaItem metadata;
   final bool miniPlayer;
   final bool showVolume;
+
+  /// Off where the button sits beside the song instead.
+  final bool showAddToPlaylist;
 
   /// The panel open beside the player, highlighted.
   final PlayerPanel? panel;
@@ -67,7 +72,7 @@ class PlayerActions extends StatefulWidget {
 }
 
 class _PlayerActionsState extends State<PlayerActions> {
-  late final ValueNotifier<bool> _songLikeStatus;
+  late final ValueNotifier<bool> _radioLikeStatus;
   late final ValueNotifier<bool> _songOfflineStatus;
   String? get audioId => widget.metadata.extras?['ytid']?.toString();
   bool get isRadioStation => widget.metadata.extras?['isLive'] == true;
@@ -75,13 +80,8 @@ class _PlayerActionsState extends State<PlayerActions> {
   @override
   void initState() {
     super.initState();
-    if (isRadioStation) {
-      _songLikeStatus = ValueNotifier<bool>(isRadioStationLiked(audioId ?? ''));
-      userLikedRadioStations.addListener(_syncRadioLikeStatus);
-    } else {
-      _songLikeStatus = ValueNotifier<bool>(isSongAlreadyLiked(audioId));
-      userLikedSongsList.addListener(_syncLikeStatus);
-    }
+    _radioLikeStatus = ValueNotifier<bool>(isRadioStationLiked(audioId ?? ''));
+    userLikedRadioStations.addListener(_syncRadioLikeStatus);
     _songOfflineStatus = ValueNotifier<bool>(isSongAlreadyOffline(audioId));
     userOfflineSongs.addListener(_syncOfflineStatus);
     offlineMode.addListener(_onOfflineChanged);
@@ -89,17 +89,10 @@ class _PlayerActionsState extends State<PlayerActions> {
 
   void _onOfflineChanged() => setState(() {});
 
-  void _syncLikeStatus() {
-    final newStatus = isSongAlreadyLiked(audioId);
-    if (_songLikeStatus.value != newStatus) {
-      _songLikeStatus.value = newStatus;
-    }
-  }
-
   void _syncRadioLikeStatus() {
     final newStatus = isRadioStationLiked(audioId ?? '');
-    if (_songLikeStatus.value != newStatus) {
-      _songLikeStatus.value = newStatus;
+    if (_radioLikeStatus.value != newStatus) {
+      _radioLikeStatus.value = newStatus;
     }
   }
 
@@ -114,36 +107,18 @@ class _PlayerActionsState extends State<PlayerActions> {
   void didUpdateWidget(PlayerActions oldWidget) {
     super.didUpdateWidget(oldWidget);
     final oldAudioId = oldWidget.metadata.extras?['ytid']?.toString();
-    final oldRadio = oldWidget.metadata.extras?['isLive'] == true;
-    if (oldRadio != isRadioStation) {
-      if (oldRadio) {
-        userLikedRadioStations.removeListener(_syncRadioLikeStatus);
-        userLikedSongsList.addListener(_syncLikeStatus);
-      } else {
-        userLikedSongsList.removeListener(_syncLikeStatus);
-        userLikedRadioStations.addListener(_syncRadioLikeStatus);
-      }
-    }
-    if (oldAudioId != audioId || oldRadio != isRadioStation) {
-      if (isRadioStation) {
-        _songLikeStatus.value = isRadioStationLiked(audioId ?? '');
-      } else {
-        _songLikeStatus.value = isSongAlreadyLiked(audioId);
-      }
+    if (oldAudioId != audioId) {
+      _radioLikeStatus.value = isRadioStationLiked(audioId ?? '');
       _songOfflineStatus.value = isSongAlreadyOffline(audioId);
     }
   }
 
   @override
   void dispose() {
-    if (isRadioStation) {
-      userLikedRadioStations.removeListener(_syncRadioLikeStatus);
-    } else {
-      userLikedSongsList.removeListener(_syncLikeStatus);
-    }
+    userLikedRadioStations.removeListener(_syncRadioLikeStatus);
     offlineMode.removeListener(_onOfflineChanged);
     userOfflineSongs.removeListener(_syncOfflineStatus);
-    _songLikeStatus.dispose();
+    _radioLikeStatus.dispose();
     _songOfflineStatus.dispose();
     super.dispose();
   }
@@ -221,18 +196,11 @@ class _PlayerActionsState extends State<PlayerActions> {
               );
             },
           ),
-        if (online && !isRadioStation && !local)
-          PlayerActionButton(
-            icon: FluentIcons.album_add_24_regular,
-            tooltip: l10n.addToPlaylist,
-            onPressed: () => showAddToPlaylistDialog(
-              context,
-              song: mediaItemToMap(widget.metadata),
-            ),
-          ),
-        if (online && !local)
+        if (widget.showAddToPlaylist)
+          AddToPlaylistButton(metadata: widget.metadata),
+        if (online && isRadioStation)
           ValueListenableBuilder<bool>(
-            valueListenable: _songLikeStatus,
+            valueListenable: _radioLikeStatus,
             builder: (context, liked, _) => PlayerActionButton(
               icon: FluentIcons.heart_24_regular,
               activeIcon: FluentIcons.heart_24_filled,
@@ -256,25 +224,17 @@ class _PlayerActionsState extends State<PlayerActions> {
     final id = audioId;
     if (id == null) return;
 
-    final originalValue = _songLikeStatus.value;
-    _songLikeStatus.value = !originalValue;
+    final originalValue = _radioLikeStatus.value;
+    _radioLikeStatus.value = !originalValue;
 
     try {
-      if (isRadioStation) {
-        if (originalValue) {
-          await removeRadioStationFromLiked(id);
-        } else {
-          await addRadioStationToLiked(id);
-        }
+      if (originalValue) {
+        await removeRadioStationFromLiked(id);
       } else {
-        await updateSongLikeStatus(
-          audioId,
-          !originalValue,
-          songData: mediaItemToMap(widget.metadata),
-        );
+        await addRadioStationToLiked(id);
       }
     } catch (e) {
-      if (mounted && audioId == id) _songLikeStatus.value = originalValue;
+      if (mounted && audioId == id) _radioLikeStatus.value = originalValue;
       logger.log('Error toggling like status', error: e);
     }
   }
@@ -294,6 +254,51 @@ class _PlayerActionsState extends State<PlayerActions> {
   }
 }
 
+/// Opens the dialog to put the song in a playlist, or to like it. The icon
+/// turns into a filled heart once the song is liked, so the player still shows
+/// it. Hidden where there is nothing to add to: a radio station, a local file,
+/// offline.
+class AddToPlaylistButton extends StatelessWidget {
+  const AddToPlaylistButton({
+    super.key,
+    required this.metadata,
+    this.beside = false,
+  });
+
+  final MediaItem metadata;
+
+  /// Beside the song: a larger icon, which reaches the edge the progress bar
+  /// does.
+  final bool beside;
+
+  @override
+  Widget build(BuildContext context) {
+    final id = metadata.extras?['ytid']?.toString();
+    final hidden = metadata.extras?['isLive'] == true || isLocalSongId(id);
+    if (hidden) return const SizedBox.shrink();
+    return ListenableBuilder(
+      listenable: Listenable.merge([offlineMode, userLikedSongsList]),
+      builder: (context, _) {
+        if (offlineMode.value) return const SizedBox.shrink();
+        final button = PlayerActionButton(
+          icon: FluentIcons.album_add_24_regular,
+          activeIcon: FluentIcons.heart_24_filled,
+          tooltip: context.l10n!.addToPlaylist,
+          active: isSongAlreadyLiked(id),
+          iconSize: beside ? 28 : 24,
+          onPressed: () =>
+              showAddToPlaylistDialog(context, song: mediaItemToMap(metadata)),
+        );
+        if (!beside) return button;
+        final end = Directionality.of(context) == TextDirection.rtl
+            ? -12.0
+            : 12.0;
+        return Transform.translate(offset: Offset(end, 0), child: button);
+      },
+    );
+  }
+}
+
 /// One of the player's action buttons, tinted while [active].
 class PlayerActionButton extends StatelessWidget {
   const PlayerActionButton({
@@ -304,6 +309,7 @@ class PlayerActionButton extends StatelessWidget {
     this.activeIcon,
     this.active = false,
     this.busy,
+    this.iconSize = 24,
   });
 
   final IconData icon;
@@ -311,6 +317,7 @@ class PlayerActionButton extends StatelessWidget {
   final String tooltip;
   final VoidCallback? onPressed;
   final bool active;
+  final double iconSize;
 
   /// Takes the icon's place while something is under way.
   final Widget? busy;
@@ -328,7 +335,7 @@ class PlayerActionButton extends StatelessWidget {
               active ? activeIcon ?? icon : icon,
               color: active ? color : colorScheme.onSurfaceVariant,
             ),
-        iconSize: 24,
+        iconSize: iconSize,
         tooltip: tooltip,
         style: IconButton.styleFrom(
           minimumSize: const Size.square(48),

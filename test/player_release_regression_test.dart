@@ -12,6 +12,7 @@ import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/widgets/app_notice.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/marquee.dart';
@@ -86,19 +87,65 @@ void main() {
         app(PlayerActions(metadata: item, onPanel: (_) {}));
     await tester.pumpWidget(actions(songA));
     await tester.pump();
+    // The button to add to a playlist shows a liked song with a heart.
     expect(find.byIcon(FluentIcons.heart_24_filled), findsOneWidget);
+    expect(find.byIcon(FluentIcons.album_add_24_regular), findsNothing);
     await tester.pumpWidget(actions(songB));
     await tester.pump();
-    expect(find.byIcon(FluentIcons.heart_24_regular), findsOneWidget);
-    await tester.tap(find.byTooltip('Liked songs'));
-    await tester.pump();
+    expect(find.byIcon(FluentIcons.album_add_24_regular), findsOneWidget);
+    expect(find.byIcon(FluentIcons.heart_24_filled), findsNothing);
+    // A song is liked from the dialog of that button, not by a heart of its own.
+    expect(find.byTooltip('Liked songs'), findsNothing);
+    await tester.tap(find.byTooltip('Add to playlist'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Liked songs'));
+    await tester.pumpAndSettle();
     expect(
       userLikedSongsList.value.map((s) => s['ytid']),
       containsAll(['a', 'b']),
     );
+    expect(find.byIcon(FluentIcons.heart_24_filled), findsOneWidget);
     expect(find.byType(DesktopVolumeButton), findsNothing);
+    AppNotices.dismiss();
     await tester.pumpWidget(const SizedBox());
     debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('the add to playlist button can sit beside the song instead', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      app(
+        PlayerActions(
+          metadata: songA,
+          onPanel: (_) {},
+          showAddToPlaylist: false,
+        ),
+      ),
+    );
+    await tester.pump();
+    expect(find.byTooltip('Add to playlist'), findsNothing);
+    await tester.pumpWidget(app(const AddToPlaylistButton(metadata: songA)));
+    await tester.pump();
+    expect(find.byTooltip('Add to playlist'), findsOneWidget);
+    // Nothing to add a radio station or a local file to.
+    for (final item in [
+      const MediaItem(
+        id: 'r',
+        title: 'Radio',
+        extras: {'ytid': 'r', 'isLive': true},
+      ),
+      const MediaItem(
+        id: 'l',
+        title: 'Local',
+        extras: {'ytid': 'local:/a.mp3'},
+      ),
+    ]) {
+      await tester.pumpWidget(app(AddToPlaylistButton(metadata: item)));
+      await tester.pump();
+      expect(find.byTooltip('Add to playlist'), findsNothing);
+    }
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets(

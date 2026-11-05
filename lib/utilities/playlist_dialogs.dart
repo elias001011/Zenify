@@ -25,6 +25,8 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/services/common_services.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/playlist_image_picker.dart';
@@ -357,11 +359,22 @@ void showCreatePlaylistDialog(
   );
 }
 
+/// [song] when it can be liked: a song with an id that is not a local file.
+Map? _likableSong(dynamic song) {
+  if (song is! Map) return null;
+  final ytid = song['ytid']?.toString() ?? '';
+  return ytid.isEmpty || isLocalSongId(ytid) ? null : song;
+}
+
+/// The dialog to put [song], or [songs], in a playlist. A single song also
+/// gets the liked songs at the top, as a playlist that stands out, and one
+/// tap likes it or takes the like back.
 void showAddToPlaylistDialog(
   BuildContext context, {
   dynamic song,
   List<dynamic>? songs,
 }) {
+  final likableSong = _likableSong(song);
   showDialog(
     context: context,
     builder: (BuildContext context) {
@@ -393,162 +406,177 @@ void showAddToPlaylistDialog(
           constraints: BoxConstraints(
             maxHeight: math.min(440, MediaQuery.sizeOf(context).height * 0.6),
           ),
-          child: Builder(
-            builder: (context) {
-              final folders = userPlaylistFolders.value
-                  .where(
-                    (folder) =>
-                        folder['playlists'] != null &&
-                        (folder['playlists'] as List).isNotEmpty,
-                  )
-                  .toList();
-              final topLevelPlaylists = getPlaylistsNotInFolders();
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (likableSong != null) _LikedSongsItem(song: likableSong),
+              Flexible(
+                child: Builder(
+                  builder: (context) {
+                    final folders = userPlaylistFolders.value
+                        .where(
+                          (folder) =>
+                              folder['playlists'] != null &&
+                              (folder['playlists'] as List).isNotEmpty,
+                        )
+                        .toList();
+                    final topLevelPlaylists = getPlaylistsNotInFolders();
 
-              final hasAny =
-                  (folders.isNotEmpty) || (topLevelPlaylists.isNotEmpty);
+                    final hasAny =
+                        (folders.isNotEmpty) || (topLevelPlaylists.isNotEmpty);
 
-              if (!hasAny) {
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 32),
-                      child: Text(
-                        context.l10n!.noCustomPlaylists,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ],
-                );
-              }
-
-              return ListView.builder(
-                itemCount: folders.length + topLevelPlaylists.length,
-                shrinkWrap: true,
-                itemBuilder: (context, index) {
-                  if (index < folders.length) {
-                    final folder = folders[index];
-
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6),
-                      child: ExpansionTile(
-                        collapsedBackgroundColor:
-                            colorScheme.surfaceContainerLow,
-                        backgroundColor: colorScheme.surfaceContainerLowest,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: commonBarRadius,
-                        ),
-                        collapsedShape: RoundedRectangleBorder(
-                          borderRadius: commonBarRadius,
-                        ),
-                        tilePadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
-                        ),
-                        leading: Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            FluentIcons.folder_24_regular,
-                            color: colorScheme.secondary,
-                            size: 22,
-                          ),
-                        ),
-                        title: Text(
-                          folder['name'] ?? '',
-                          style: TextStyle(
-                            color: colorScheme.onSurface,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
-                        ),
+                    if (!hasAny) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          for (final p in (folder['playlists'] as List? ?? []))
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                left: 16,
-                                right: 16,
-                              ),
-                              child: DialogItem(
-                                icon: FluentIcons.text_bullet_list_24_filled,
-                                iconColor: colorScheme.tertiary,
-                                iconBgColor: colorScheme.tertiaryContainer,
-                                label: p['title'] ?? '',
-                                onTap: () {
-                                  if (song != null) {
-                                    showToast(
-                                      context,
-                                      addSongInCustomPlaylist(
-                                        context,
-                                        p['ytid'],
-                                        song,
-                                      ),
-                                    );
-                                  } else if (songs != null &&
-                                      songs.isNotEmpty) {
-                                    showToast(
-                                      context,
-                                      addSongsInCustomPlaylist(
-                                        context,
-                                        p['ytid'],
-                                        songs,
-                                      ),
-                                    );
-                                  }
-                                  Navigator.pop(context);
-                                },
-                              ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 32),
+                            child: Text(
+                              context.l10n!.noCustomPlaylists,
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                              textAlign: TextAlign.center,
                             ),
+                          ),
                         ],
-                      ),
-                    );
-                  }
+                      );
+                    }
 
-                  final playlistIndex = index - folders.length;
-                  final playlist = topLevelPlaylists[playlistIndex];
+                    return ListView.builder(
+                      itemCount: folders.length + topLevelPlaylists.length,
+                      shrinkWrap: true,
+                      itemBuilder: (context, index) {
+                        if (index < folders.length) {
+                          final folder = folders[index];
 
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: DialogItem(
-                      icon: FluentIcons.text_bullet_list_24_filled,
-                      iconColor: colorScheme.tertiary,
-                      iconBgColor: colorScheme.tertiaryContainer,
-                      label: playlist['title'] ?? '',
-                      onTap: () {
-                        if (song != null) {
-                          showToast(
-                            context,
-                            addSongInCustomPlaylist(
-                              context,
-                              playlist['ytid'],
-                              song,
-                            ),
-                          );
-                        } else if (songs != null && songs.isNotEmpty) {
-                          showToast(
-                            context,
-                            addSongsInCustomPlaylist(
-                              context,
-                              playlist['ytid'],
-                              songs,
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: ExpansionTile(
+                              collapsedBackgroundColor:
+                                  colorScheme.surfaceContainerLow,
+                              backgroundColor:
+                                  colorScheme.surfaceContainerLowest,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: commonBarRadius,
+                              ),
+                              collapsedShape: RoundedRectangleBorder(
+                                borderRadius: commonBarRadius,
+                              ),
+                              tilePadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              leading: Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.secondaryContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  FluentIcons.folder_24_regular,
+                                  color: colorScheme.secondary,
+                                  size: 22,
+                                ),
+                              ),
+                              title: Text(
+                                folder['name'] ?? '',
+                                style: TextStyle(
+                                  color: colorScheme.onSurface,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 15,
+                                ),
+                              ),
+                              children: [
+                                for (final p
+                                    in (folder['playlists'] as List? ?? []))
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: 16,
+                                      right: 16,
+                                    ),
+                                    child: DialogItem(
+                                      icon: FluentIcons
+                                          .text_bullet_list_24_filled,
+                                      iconColor: colorScheme.tertiary,
+                                      iconBgColor:
+                                          colorScheme.tertiaryContainer,
+                                      label: p['title'] ?? '',
+                                      onTap: () {
+                                        if (song != null) {
+                                          showToast(
+                                            context,
+                                            addSongInCustomPlaylist(
+                                              context,
+                                              p['ytid'],
+                                              song,
+                                            ),
+                                          );
+                                        } else if (songs != null &&
+                                            songs.isNotEmpty) {
+                                          showToast(
+                                            context,
+                                            addSongsInCustomPlaylist(
+                                              context,
+                                              p['ytid'],
+                                              songs,
+                                            ),
+                                          );
+                                        }
+                                        Navigator.pop(context);
+                                      },
+                                    ),
+                                  ),
+                              ],
                             ),
                           );
                         }
-                        Navigator.pop(context);
+
+                        final playlistIndex = index - folders.length;
+                        final playlist = topLevelPlaylists[playlistIndex];
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: DialogItem(
+                            icon: FluentIcons.text_bullet_list_24_filled,
+                            iconColor: colorScheme.tertiary,
+                            iconBgColor: colorScheme.tertiaryContainer,
+                            label: playlist['title'] ?? '',
+                            onTap: () {
+                              if (song != null) {
+                                showToast(
+                                  context,
+                                  addSongInCustomPlaylist(
+                                    context,
+                                    playlist['ytid'],
+                                    song,
+                                  ),
+                                );
+                              } else if (songs != null && songs.isNotEmpty) {
+                                showToast(
+                                  context,
+                                  addSongsInCustomPlaylist(
+                                    context,
+                                    playlist['ytid'],
+                                    songs,
+                                  ),
+                                );
+                              }
+                              Navigator.pop(context);
+                            },
+                          ),
+                        );
                       },
-                    ),
-                  );
-                },
-              );
-            },
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
         actionsAlignment: MainAxisAlignment.end,
@@ -573,4 +601,49 @@ void showAddToPlaylistDialog(
       );
     },
   );
+}
+
+/// The liked songs among the playlists: a row that stands out from them, which
+/// likes the song or, if it is liked, takes the like back.
+class _LikedSongsItem extends StatelessWidget {
+  const _LikedSongsItem({required this.song});
+
+  final Map song;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n!;
+    final ytid = song['ytid'].toString();
+    return ValueListenableBuilder<List>(
+      valueListenable: userLikedSongsList,
+      builder: (context, _, _) {
+        final liked = isSongAlreadyLiked(ytid);
+        return DialogItem(
+          padding: const EdgeInsets.fromLTRB(6, 0, 6, 6),
+          icon: FluentIcons.heart_24_filled,
+          iconColor: colorScheme.onPrimary,
+          iconBgColor: colorScheme.primary,
+          backgroundColor: colorScheme.primaryContainer,
+          label: l10n.likedSongs,
+          trailing: Icon(
+            liked
+                ? FluentIcons.checkmark_circle_24_filled
+                : FluentIcons.add_circle_24_regular,
+            color: liked ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            size: 24,
+          ),
+          onTap: () {
+            showToast(
+              context,
+              liked ? l10n.removedFromLikedSongs : l10n.addedToLikedSongs,
+              duration: const Duration(seconds: 1),
+            );
+            Navigator.pop(context);
+            updateSongLikeStatus(ytid, !liked, songData: song);
+          },
+        );
+      },
+    );
+  }
 }
