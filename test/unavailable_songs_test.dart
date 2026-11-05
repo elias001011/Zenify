@@ -3,7 +3,6 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
@@ -13,6 +12,8 @@ import 'package:musify/services/unavailable_songs.dart';
 import 'package:musify/utilities/formatter.dart';
 import 'package:musify/widgets/playlist_page/unavailable_notice.dart';
 import 'package:youtube_explode_dart/youtube_explode_dart.dart';
+
+import 'support/app_harness.dart';
 
 /// Searches and swaps everything found, as accepting the review does.
 Future<int> swap(Iterable<Map> songs, {String? playlistId}) async {
@@ -59,14 +60,7 @@ void main() {
     };
   });
 
-  Widget app(Widget child) => MaterialApp(
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      ...GlobalMaterialLocalizations.delegates,
-    ],
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(body: child),
-  );
+  Widget app(Widget child) => localizedApp(Scaffold(body: child));
 
   test('a song is unavailable until one of its downloads works', () {
     unavailableSongs

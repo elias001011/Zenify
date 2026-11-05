@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/screens/user_songs_page.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -11,15 +10,7 @@ import 'support/app_harness.dart';
 void main() {
   useAppSettings();
 
-  Widget page(String name) => MaterialApp(
-    locale: const Locale('en'),
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      ...GlobalMaterialLocalizations.delegates,
-    ],
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: UserSongsPage(page: name),
-  );
+  Widget page(String name) => localizedApp(UserSongsPage(page: name));
 
   for (final name in ['liked', 'recents', 'offline']) {
     testWidgets('$name offers adding its songs to a playlist, online only', (

@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/widgets/overflow_menu_button.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -17,14 +16,7 @@ void main() {
     'lowResImage': 'https://i.ytimg.com/vi/$id/hqdefault.jpg',
   };
 
-  Widget row(Map song) => MaterialApp(
-    localizationsDelegates: const [
-      AppLocalizations.delegate,
-      ...GlobalMaterialLocalizations.delegates,
-    ],
-    supportedLocales: AppLocalizations.supportedLocales,
-    home: Scaffold(body: SongBar(song, false)),
-  );
+  Widget row(Map song) => localizedApp(Scaffold(body: SongBar(song, false)));
 
   testWidgets('a row handed another song shows that song, liked or not', (
     tester,

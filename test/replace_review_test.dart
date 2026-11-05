@@ -5,9 +5,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/screens/replace_review_page.dart';
 import 'package:musify/services/song_replacement.dart';
+
+import 'support/app_harness.dart';
 
 Map song(String id, [String artist = 'Artist']) => {
   'ytid': id,
@@ -39,14 +40,8 @@ void main() {
     result = null;
     closed = false;
     await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('en'),
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
+      localizedApp(
+        Builder(
           builder: (context) => TextButton(
             onPressed: () async {
               result = await Navigator.of(context).push<Map<String, Map>>(

@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/song_selection_bar.dart';
 import 'package:musify/widgets/song_selection_controller.dart';
@@ -25,13 +24,8 @@ void main() {
     final selection = SongSelectionController()..start({'ytid': 'one'});
     addTearDown(selection.dispose);
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          ...GlobalMaterialLocalizations.delegates,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
+      localizedApp(
+        Scaffold(
           body: Center(
             child: SizedBox(
               width: 480,
@@ -99,13 +93,8 @@ void main() {
         offlineMode.value = false;
         final selection = SongSelectionController()..start({'ytid': 'one'});
         await tester.pumpWidget(
-          MaterialApp(
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              ...GlobalMaterialLocalizations.delegates,
-            ],
-            supportedLocales: AppLocalizations.supportedLocales,
-            home: Scaffold(
+          localizedApp(
+            Scaffold(
               body: Align(
                 alignment: Alignment.bottomCenter,
                 child: SongSelectionBar(
