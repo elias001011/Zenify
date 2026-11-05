@@ -1023,7 +1023,6 @@ Future<List> getPlaylists({
 Future<List<Map<String, dynamic>>> searchArtists(
   String query, {
   int limit = 5,
-  bool verifiedOnly = true,
 }) async {
   return searchVerifiedArtists(query, limit: limit);
 }
