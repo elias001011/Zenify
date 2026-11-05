@@ -221,7 +221,7 @@ Future<String> addUserPlaylist(String input, BuildContext context) async {
       return '${context.l10n!.playlistAlreadyExists}!';
     }
     userPlaylists.value = [...userPlaylists.value, playlistId];
-    unawaited(addOrUpdateData<List>('user', 'playlists', userPlaylists.value));
+    _saveUserPlaylists();
     return '${context.l10n!.addedSuccess}!';
   } catch (e, stackTrace) {
     logger.log('Error adding user playlist', error: e, stackTrace: stackTrace);
@@ -245,9 +245,7 @@ Future<String> addUserPlaylist(String input, BuildContext context) async {
     'createdAt': creationTime,
   };
   userCustomPlaylists.value = [...userCustomPlaylists.value, customPlaylist];
-  unawaited(
-    addOrUpdateData<List>('user', 'customPlaylists', userCustomPlaylists.value),
-  );
+  _saveUserCustomPlaylists();
   return ('${context.l10n!.addedSuccess}!', newPlaylistId);
 }
 
@@ -275,21 +273,9 @@ String addSongInCustomPlaylist(
       playlistSongs.add(song);
     }
     if (isFromFolder) {
-      unawaited(
-        addOrUpdateData<List>(
-          'user',
-          'playlistFolders',
-          userPlaylistFolders.value,
-        ),
-      );
+      _saveUserFolders();
     } else {
-      unawaited(
-        addOrUpdateData<List>(
-          'user',
-          'customPlaylists',
-          userCustomPlaylists.value,
-        ),
-      );
+      _saveUserCustomPlaylists();
     }
 
     offlinePlaylistService.checkAndAutoMarkOffline(customPlaylist);
@@ -344,21 +330,9 @@ String addSongsInCustomPlaylist(
 
     if (newSongs.isNotEmpty) {
       if (isFromFolder) {
-        unawaited(
-          addOrUpdateData<List>(
-            'user',
-            'playlistFolders',
-            userPlaylistFolders.value,
-          ),
-        );
+        _saveUserFolders();
       } else {
-        unawaited(
-          addOrUpdateData<List>(
-            'user',
-            'customPlaylists',
-            userCustomPlaylists.value,
-          ),
-        );
+        _saveUserCustomPlaylists();
       }
       offlinePlaylistService.checkAndAutoMarkOffline(customPlaylist);
       return context.l10n!.addedSuccess;
@@ -459,22 +433,10 @@ bool reorderCustomPlaylist(String playlistId, List<dynamic> orderedSongs) {
   found.playlist['list'] = [for (final id in ids) byId[id]];
   if (found.isFromFolder) {
     userPlaylistFolders.value = [...userPlaylistFolders.value];
-    unawaited(
-      addOrUpdateData<List>(
-        'user',
-        'playlistFolders',
-        userPlaylistFolders.value,
-      ),
-    );
+    _saveUserFolders();
   } else {
     userCustomPlaylists.value = [...userCustomPlaylists.value];
-    unawaited(
-      addOrUpdateData<List>(
-        'user',
-        'customPlaylists',
-        userCustomPlaylists.value,
-      ),
-    );
+    _saveUserCustomPlaylists();
   }
   return true;
 }
@@ -571,22 +533,10 @@ bool _storePlaylistSongs(Map playlist, List<dynamic> playlistSongs) {
 
       if (isInFolder) {
         userPlaylistFolders.value = List<Map>.from(userPlaylistFolders.value);
-        unawaited(
-          addOrUpdateData<List>(
-            'user',
-            'playlistFolders',
-            userPlaylistFolders.value,
-          ),
-        );
+        _saveUserFolders();
       } else {
         userCustomPlaylists.value = List<Map>.from(userCustomPlaylists.value);
-        unawaited(
-          addOrUpdateData<List>(
-            'user',
-            'customPlaylists',
-            userCustomPlaylists.value,
-          ),
-        );
+        _saveUserCustomPlaylists();
       }
     } else {
       final playlistId = playlist['ytid']?.toString();
@@ -601,13 +551,7 @@ bool _storePlaylistSongs(Map playlist, List<dynamic> playlistSongs) {
           'list': playlistSongs,
         };
         userLikedPlaylists.value = updatedLiked;
-        unawaited(
-          addOrUpdateData<List>(
-            'user',
-            'likedPlaylists',
-            userLikedPlaylists.value,
-          ),
-        );
+        _saveUserLikedPlaylists();
       }
 
       if (playlistId != null && playlistId.isNotEmpty) {
@@ -644,20 +588,12 @@ void removeUserPlaylist(String playlistId) {
   final likedChanged = _removePlaylistFromLikedPlaylists(normalizedId);
   _unpinPlaylist(normalizedId);
 
-  unawaited(addOrUpdateData<List>('user', 'playlists', userPlaylists.value));
+  _saveUserPlaylists();
   if (foldersChanged) {
-    unawaited(
-      addOrUpdateData<List>(
-        'user',
-        'playlistFolders',
-        userPlaylistFolders.value,
-      ),
-    );
+    _saveUserFolders();
   }
   if (likedChanged) {
-    unawaited(
-      addOrUpdateData<List>('user', 'likedPlaylists', userLikedPlaylists.value),
-    );
+    _saveUserLikedPlaylists();
   }
 }
 
@@ -702,30 +638,12 @@ void removeUserCustomPlaylist(dynamic playlist) {
     final likedChanged = _removePlaylistFromLikedPlaylists(playlistId);
     _unpinPlaylist(playlistId);
 
-    unawaited(
-      addOrUpdateData<List>(
-        'user',
-        'customPlaylists',
-        userCustomPlaylists.value,
-      ),
-    );
+    _saveUserCustomPlaylists();
     if (foldersChanged) {
-      unawaited(
-        addOrUpdateData<List>(
-          'user',
-          'playlistFolders',
-          userPlaylistFolders.value,
-        ),
-      );
+      _saveUserFolders();
     }
     if (likedChanged) {
-      unawaited(
-        addOrUpdateData<List>(
-          'user',
-          'likedPlaylists',
-          userLikedPlaylists.value,
-        ),
-      );
+      _saveUserLikedPlaylists();
     }
   } catch (e, stackTrace) {
     logger.log(
@@ -798,9 +716,7 @@ String createPlaylistFolder(String folderName, [BuildContext? context]) {
   };
 
   userPlaylistFolders.value = [...userPlaylistFolders.value, newFolder];
-  unawaited(
-    addOrUpdateData<List>('user', 'playlistFolders', userPlaylistFolders.value),
-  );
+  _saveUserFolders();
   return context?.l10n?.addedSuccess ?? 'Added successfully';
 }
 
@@ -833,9 +749,7 @@ String renamePlaylistFolder(
   updatedFolders[folderIndex]['name'] = newName.trim();
   userPlaylistFolders.value = updatedFolders;
 
-  unawaited(
-    addOrUpdateData<List>('user', 'playlistFolders', userPlaylistFolders.value),
-  );
+  _saveUserFolders();
   return context?.l10n?.folderUpdated ?? 'Folder updated successfully';
 }
 
@@ -896,21 +810,9 @@ String movePlaylistToFolder(
     userCustomPlaylists.value = updatedCustomPlaylists;
     userPlaylists.value = updatedYoutubePlaylists;
 
-    unawaited(
-      addOrUpdateData<List>(
-        'user',
-        'playlistFolders',
-        userPlaylistFolders.value,
-      ),
-    );
-    unawaited(
-      addOrUpdateData<List>(
-        'user',
-        'customPlaylists',
-        userCustomPlaylists.value,
-      ),
-    );
-    unawaited(addOrUpdateData<List>('user', 'playlists', userPlaylists.value));
+    _saveUserFolders();
+    _saveUserCustomPlaylists();
+    _saveUserPlaylists();
 
     return '${context.l10n!.addedSuccess}!';
   } catch (e, stackTrace) {
@@ -958,23 +860,9 @@ String deletePlaylistFolder(String folderId, [BuildContext? context]) {
       userCustomPlaylists.value = updatedCustomPlaylists;
       userPlaylists.value = updatedYoutubePlaylists;
 
-      unawaited(
-        addOrUpdateData<List>(
-          'user',
-          'playlistFolders',
-          userPlaylistFolders.value,
-        ),
-      );
-      unawaited(
-        addOrUpdateData<List>(
-          'user',
-          'customPlaylists',
-          userCustomPlaylists.value,
-        ),
-      );
-      unawaited(
-        addOrUpdateData<List>('user', 'playlists', userPlaylists.value),
-      );
+      _saveUserFolders();
+      _saveUserCustomPlaylists();
+      _saveUserPlaylists();
 
       return context?.l10n?.folderDeleted ?? 'Folder deleted successfully';
     }
@@ -1450,13 +1338,7 @@ Future<void> renameSongInPlaylist(
 
         if (isFromFolder) {
           userPlaylistFolders.value = List<Map>.from(userPlaylistFolders.value);
-          unawaited(
-            addOrUpdateData<List>(
-              'user',
-              'playlistFolders',
-              userPlaylistFolders.value,
-            ),
-          );
+          _saveUserFolders();
         } else {
           final updatedPlaylists = userCustomPlaylists.value
               .map((p) => p['ytid'] == playlistId ? playlist : p)
@@ -1527,9 +1409,7 @@ Future<void> updatePlaylistLikeStatus(
     }
 
     userLikedPlaylists.value = List<Map>.from(updatedLikedPlaylists);
-    unawaited(
-      addOrUpdateData<List>('user', 'likedPlaylists', userLikedPlaylists.value),
-    );
+    _saveUserLikedPlaylists();
   } catch (e, stackTrace) {
     logger.log(
       'Error updating playlist like status: ',
@@ -1595,7 +1475,7 @@ bool togglePinnedPlaylist(String playlistId, BuildContext context) {
   if (current.contains(playlistId)) {
     current.remove(playlistId);
     pinnedPlaylistIds.value = current;
-    unawaited(addOrUpdateData<List>('user', 'pinnedPlaylistIds', current));
+    _saveUserPinnedIds(current);
     return false;
   }
   // Pins whose playlist is gone (deleted, unliked, restored from another
@@ -1607,7 +1487,7 @@ bool togglePinnedPlaylist(String playlistId, BuildContext context) {
   }
   current.add(playlistId);
   pinnedPlaylistIds.value = current;
-  unawaited(addOrUpdateData<List>('user', 'pinnedPlaylistIds', current));
+  _saveUserPinnedIds(current);
   return true;
 }
 
@@ -1616,7 +1496,7 @@ void _unpinPlaylist(String playlistId) {
   final updated = List<String>.from(pinnedPlaylistIds.value)
     ..remove(playlistId);
   pinnedPlaylistIds.value = updated;
-  unawaited(addOrUpdateData<List>('user', 'pinnedPlaylistIds', updated));
+  _saveUserPinnedIds(updated);
 }
 
 /// Updates the offline playlist metadata (title, image, source) when a custom
@@ -1654,3 +1534,21 @@ Future<void> syncOfflinePlaylistMetadata(Map updatedPlaylist) async {
     addOrUpdateData<List>('userNoBackup', 'offlinePlaylists', offlinePlaylists),
   );
 }
+
+void _saveUserFolders() => unawaited(
+  addOrUpdateData<List>('user', 'playlistFolders', userPlaylistFolders.value),
+);
+
+void _saveUserCustomPlaylists() => unawaited(
+  addOrUpdateData<List>('user', 'customPlaylists', userCustomPlaylists.value),
+);
+
+void _saveUserPlaylists() =>
+    unawaited(addOrUpdateData<List>('user', 'playlists', userPlaylists.value));
+
+void _saveUserLikedPlaylists() => unawaited(
+  addOrUpdateData<List>('user', 'likedPlaylists', userLikedPlaylists.value),
+);
+
+void _saveUserPinnedIds(List ids) =>
+    unawaited(addOrUpdateData<List>('user', 'pinnedPlaylistIds', ids));
