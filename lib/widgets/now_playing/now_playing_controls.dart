@@ -440,6 +440,7 @@ class PlaybackTransportControls extends StatelessWidget {
     required this.buttonSpacing,
     required this.minButtonSize,
     required this.playPadding,
+    this.skipIconSize,
   });
 
   final ColorScheme colorScheme;
@@ -449,6 +450,9 @@ class PlaybackTransportControls extends StatelessWidget {
   final double buttonSpacing;
   final double minButtonSize;
   final EdgeInsets playPadding;
+
+  /// The icons of previous and next; by default a share of [controlIconSize].
+  final double? skipIconSize;
 
   @override
   Widget build(BuildContext context) {
@@ -475,6 +479,7 @@ class PlaybackTransportControls extends StatelessWidget {
                     buttonConstraints: buttonConstraints,
                     buttonPadding: buttonPadding,
                     controlIconSize: controlIconSize,
+                    skipIconSize: skipIconSize,
                     minButtonSize: minButtonSize,
                   ),
                   SizedBox(width: buttonSpacing),
@@ -512,6 +517,7 @@ class PlaybackTransportControls extends StatelessWidget {
                     buttonConstraints: buttonConstraints,
                     buttonPadding: buttonPadding,
                     controlIconSize: controlIconSize,
+                    skipIconSize: skipIconSize,
                     minButtonSize: minButtonSize,
                   ),
                 ],
@@ -535,6 +541,7 @@ class _PlaybackControlButton extends StatelessWidget {
     required this.buttonConstraints,
     required this.buttonPadding,
     required this.controlIconSize,
+    required this.skipIconSize,
     required this.minButtonSize,
   });
 
@@ -547,6 +554,7 @@ class _PlaybackControlButton extends StatelessWidget {
   final BoxConstraints buttonConstraints;
   final EdgeInsets buttonPadding;
   final double controlIconSize;
+  final double? skipIconSize;
   final double minButtonSize;
 
   @override
@@ -559,7 +567,7 @@ class _PlaybackControlButton extends StatelessWidget {
           : colorScheme.onSurface.withValues(alpha: 0.3),
       tooltip: tooltip,
       constraints: buttonConstraints,
-      iconSize: controlIconSize * 0.65,
+      iconSize: skipIconSize ?? controlIconSize * 0.75,
       onPressed: isEnabled ? onPressed : null,
       style: IconButton.styleFrom(
         backgroundColor: PlayerChrome.minimalOf(context)

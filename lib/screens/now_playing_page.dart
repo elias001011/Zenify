@@ -230,8 +230,8 @@ class _CompactLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final isLive = metadata.extras?['isLive'] ?? false;
-    final iconSize = size.width < 360 ? 36.0 : (size.width < 400 ? 40.0 : 44.0);
-    final miniIconSize = size.width < 360 ? 18.0 : 22.0;
+    final iconSize = size.width < 360 ? 42.0 : (size.width < 400 ? 48.0 : 52.0);
+    final miniIconSize = size.width < 360 ? 20.0 : 24.0;
 
     final controls = isLive
         ? const SizedBox.shrink()
@@ -375,8 +375,11 @@ class _UprightStageState extends State<_UprightStage>
     final isLive = metadata.extras?['isLive'] ?? false;
 
     return Column(
+      // With no panel open the artwork, the song and playback are one group,
+      // centred: the progress bar sits under the song, not at the bottom.
+      mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Expanded(
+        Flexible(
           child: LayoutBuilder(
             builder: (context, c) {
               final artSize = max(
@@ -386,11 +389,10 @@ class _UprightStageState extends State<_UprightStage>
                   c.maxHeight - _titleHeight - _gap * 2,
                 ),
               );
-              // The artwork and the song under it, centred together.
-              final artOrigin = Offset(
-                (c.maxWidth - artSize) / 2,
-                (c.maxHeight - artSize - _gap - _titleHeight) / 2,
-              );
+              // The stage is as tall as the artwork and the song under it,
+              // and takes all the room once a panel opens.
+              final restHeight = artSize + _gap + _titleHeight;
+              final artOrigin = Offset((c.maxWidth - artSize) / 2, 0);
               // Laid out once at full size and scaled, so the artwork keeps
               // its decoded image while it moves.
               final artwork = NowPlayingArtwork(
@@ -427,6 +429,10 @@ class _UprightStageState extends State<_UprightStage>
                 child: artwork,
                 builder: (context, artwork) {
                   final t = _progress.value;
+                  final stageHeight = min(
+                    c.maxHeight,
+                    restHeight + (c.maxHeight - restHeight) * t,
+                  );
                   final shown = artSize + (_headerSize - artSize) * t;
                   final art = Rect.fromLTWH(
                     artOrigin.dx * (1 - t),
@@ -438,66 +444,69 @@ class _UprightStageState extends State<_UprightStage>
                   // with it and leaves, the header's arrives beside it.
                   final under = 1 - const Interval(0, 0.5).transform(t);
                   final beside = const Interval(0.5, 1).transform(t);
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Keyed, so the artwork keeps its state (image, waves)
-                      // while the others come and go before it.
-                      if (_builtPanel != null)
-                        Positioned.fill(
-                          key: const ValueKey('panel'),
-                          top: _headerSize + 12,
-                          child: FadeTransition(
-                            opacity: _panelFade,
-                            child: IgnorePointer(
-                              ignoring: t < 1,
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 200),
-                                child: KeyedSubtree(
-                                  key: ValueKey(_builtPanel),
-                                  child: panel,
+                  return SizedBox(
+                    height: stageHeight,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        // Keyed, so the artwork keeps its state (image, waves)
+                        // while the others come and go before it.
+                        if (_builtPanel != null)
+                          Positioned.fill(
+                            key: const ValueKey('panel'),
+                            top: _headerSize + 12,
+                            child: FadeTransition(
+                              opacity: _panelFade,
+                              child: IgnorePointer(
+                                ignoring: t < 1,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 200),
+                                  child: KeyedSubtree(
+                                    key: ValueKey(_builtPanel),
+                                    child: panel,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
-                        ),
-                      if (under > 0)
+                        if (under > 0)
+                          Positioned(
+                            key: const ValueKey('title'),
+                            left: 0,
+                            right: 0,
+                            top: art.bottom + _gap,
+                            height: _titleHeight,
+                            child: Opacity(opacity: under, child: songTitle),
+                          ),
+                        if (beside > 0)
+                          Positioned(
+                            key: const ValueKey('header'),
+                            left: art.right + 14,
+                            right: 0,
+                            top: art.center.dy - _headerSize / 2,
+                            height: _headerSize,
+                            child: Opacity(opacity: beside, child: headerTitle),
+                          ),
                         Positioned(
-                          key: const ValueKey('title'),
-                          left: 0,
-                          right: 0,
-                          top: art.bottom + _gap,
-                          height: _titleHeight,
-                          child: Opacity(opacity: under, child: songTitle),
-                        ),
-                      if (beside > 0)
-                        Positioned(
-                          key: const ValueKey('header'),
-                          left: art.right + 14,
-                          right: 0,
-                          top: art.center.dy - _headerSize / 2,
-                          height: _headerSize,
-                          child: Opacity(opacity: beside, child: headerTitle),
-                        ),
-                      Positioned(
-                        key: const ValueKey('artwork'),
-                        left: art.left,
-                        top: art.top,
-                        child: Transform.scale(
-                          scale: shown / artSize,
-                          alignment: Alignment.topLeft,
-                          // Same tree in both states, so the artwork keeps
-                          // its state; as the header it goes back.
-                          child: GestureDetector(
-                            onTap: t > 0 ? widget.onClosePanel : null,
-                            child: AbsorbPointer(
-                              absorbing: t > 0,
-                              child: artwork,
+                          key: const ValueKey('artwork'),
+                          left: art.left,
+                          top: art.top,
+                          child: Transform.scale(
+                            scale: shown / artSize,
+                            alignment: Alignment.topLeft,
+                            // Same tree in both states, so the artwork keeps
+                            // its state; as the header it goes back.
+                            child: GestureDetector(
+                              onTap: t > 0 ? widget.onClosePanel : null,
+                              child: AbsorbPointer(
+                                absorbing: t > 0,
+                                child: artwork,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   );
                 },
               );
@@ -505,7 +514,7 @@ class _UprightStageState extends State<_UprightStage>
           ),
         ),
         if (!isLive) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           // As wide as the artwork above it.
           FractionallySizedBox(
             widthFactor: _artworkShare,

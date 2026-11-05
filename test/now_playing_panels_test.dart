@@ -366,6 +366,52 @@ void main() {
     await tester.pump(const Duration(seconds: 30));
   });
 
+  testWidgets(
+    'on a phone, playback sits under the song and drops down with a panel',
+    (tester) async {
+      tester.view.physicalSize = const Size(420, 900);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      audioHandler = _Handler();
+      audioHandler.mediaItem.add(
+        const MediaItem(
+          id: 'test',
+          title: 'Song',
+          artist: 'Artist',
+          extras: {'ytid': 'test'},
+        ),
+      );
+      await tester.pumpWidget(
+        const MaterialApp(
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: NowPlayingPage(),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Not a bar pinned to the bottom with a gap above it.
+      final song = tester.getRect(find.byType(NowPlayingTitle));
+      final resting = tester.getRect(find.byType(PlayerTransport));
+      expect(resting.top - song.bottom, lessThan(48));
+
+      await tester.tap(find.byTooltip('Lyrics'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump(const Duration(milliseconds: 600));
+      final withPanel = tester.getRect(find.byType(PlayerTransport));
+      expect(withPanel.top, greaterThan(resting.top));
+      expect(withPanel.bottom, lessThan(900));
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(seconds: 30));
+    },
+  );
+
   testWidgets('lyrics stay open, beside playback, when the phone turns', (
     tester,
   ) async {
