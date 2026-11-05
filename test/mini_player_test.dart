@@ -162,4 +162,29 @@ void main() {
       await tester.pump(const Duration(seconds: 30));
     });
   }
+
+  testWidgets('a radio station has no ring: it has no length to follow', (
+    tester,
+  ) async {
+    audioHandler = MusifyAudioHandler();
+    audioHandler.mediaItem.add(
+      const MediaItem(
+        id: 'station',
+        title: 'Station',
+        extras: {'isLive': true},
+      ),
+    );
+    audioHandler.playbackState.add(
+      PlaybackState(playing: true, processingState: AudioProcessingState.ready),
+    );
+
+    await tester.pumpWidget(app(const ValueKey('radio')));
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.byType(StreamBuilder<PositionData>), findsNothing);
+    // The play button is still there.
+    expect(find.byType(IconButton), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 30));
+  });
 }

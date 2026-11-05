@@ -208,6 +208,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
                           playbackState: widget.playbackState,
                           hasNext: widget.hasNext,
                           duration: metadata.duration,
+                          live: metadata.extras?['isLive'] == true,
                         ),
                       ],
                     ),
@@ -417,12 +418,16 @@ class _ControlsWidget extends StatelessWidget {
     required this.playbackState,
     required this.hasNext,
     required this.duration,
+    required this.live,
   });
 
   final ColorScheme colorScheme;
   final PlaybackState playbackState;
   final bool hasNext;
   final Duration? duration;
+
+  /// A radio station has no length: no ring to fill around the play button.
+  final bool live;
 
   @override
   Widget build(BuildContext context) {
@@ -440,6 +445,7 @@ class _ControlsWidget extends StatelessWidget {
           colorScheme: colorScheme,
           playbackState: playbackState,
           duration: duration,
+          live: live,
         ),
         if (hasNext) ...[
           const SizedBox(width: 4),
@@ -464,6 +470,7 @@ class _CircularPlayButton extends StatelessWidget {
     required this.colorScheme,
     required this.playbackState,
     required this.duration,
+    required this.live,
   });
 
   final ColorScheme colorScheme;
@@ -471,6 +478,7 @@ class _CircularPlayButton extends StatelessWidget {
 
   /// The song's known length, until the player reports its own.
   final Duration? duration;
+  final bool live;
 
   @override
   Widget build(BuildContext context) {
@@ -485,37 +493,38 @@ class _CircularPlayButton extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          RepaintBoundary(
-            child: StreamBuilder<PositionData>(
-              // A new state when the screen comes back, as in the position
-              // slider.
-              key: ValueKey(TickerMode.valuesOf(context).enabled),
-              initialData: audioHandler.currentPositionData,
-              stream: TickerMode.valuesOf(context).enabled
-                  ? audioHandler.positionDataStream
-                  : const Stream.empty(),
-              builder: (context, snapshot) {
-                final position = snapshot.data;
-                final total =
-                    position != null && position.duration > Duration.zero
-                    ? position.duration
-                    : (duration ?? Duration.zero);
-                return CustomPaint(
-                  size: const Size(48, 48),
-                  painter: _CircularProgressPainter(
-                    progress: position == null || total == Duration.zero
-                        ? 0
-                        : (position.position.inMilliseconds /
-                                  total.inMilliseconds)
-                              .clamp(0.0, 1.0),
-                    backgroundColor: colorScheme.surfaceContainerHighest,
-                    progressColor: colorScheme.primary,
-                    strokeWidth: 3,
-                  ),
-                );
-              },
+          if (!live)
+            RepaintBoundary(
+              child: StreamBuilder<PositionData>(
+                // A new state when the screen comes back, as in the position
+                // slider.
+                key: ValueKey(TickerMode.valuesOf(context).enabled),
+                initialData: audioHandler.currentPositionData,
+                stream: TickerMode.valuesOf(context).enabled
+                    ? audioHandler.positionDataStream
+                    : const Stream.empty(),
+                builder: (context, snapshot) {
+                  final position = snapshot.data;
+                  final total =
+                      position != null && position.duration > Duration.zero
+                      ? position.duration
+                      : (duration ?? Duration.zero);
+                  return CustomPaint(
+                    size: const Size(48, 48),
+                    painter: _CircularProgressPainter(
+                      progress: position == null || total == Duration.zero
+                          ? 0
+                          : (position.position.inMilliseconds /
+                                    total.inMilliseconds)
+                                .clamp(0.0, 1.0),
+                      backgroundColor: colorScheme.surfaceContainerHighest,
+                      progressColor: colorScheme.primary,
+                      strokeWidth: 3,
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
           if (isLoading)
             SizedBox(
               width: 24,
