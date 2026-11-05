@@ -308,16 +308,19 @@ const _deviceSettings = [
 
 const _libraryBoxes = ['user', 'settings'];
 
+/// Whether [name] is a backup file of [boxName]: its own name, a numbered
+/// copy of it, or the "user (1).hive" an Android file manager gives a second
+/// copy saved to the same folder.
+bool _isBackupOf(String boxName, String name) =>
+    name == '$boxName.hive' ||
+    name.startsWith('${boxName}_') ||
+    RegExp('^$boxName \\(\\d+\\)\\.hive\$').hasMatch(name);
+
 /// The backup file name each box was picked with: either box can be
 /// restored alone.
 Map<String, String> matchBackupFiles(Iterable<String> names) => {
   for (final boxName in _libraryBoxes)
-    if (names
-            .where(
-              (name) =>
-                  name == '$boxName.hive' || name.startsWith('${boxName}_'),
-            )
-            .firstOrNull
+    if (names.where((name) => _isBackupOf(boxName, name)).firstOrNull
         case final name?)
       boxName: name,
 };

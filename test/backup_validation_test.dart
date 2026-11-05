@@ -56,6 +56,17 @@ void main() {
     ]);
     expect(matchBackupFiles(['favourites.hive']), isEmpty);
   });
+  test('a second copy saved in the same folder is still the backup', () {
+    // Android names it "user (1).hive" instead of replacing the first one.
+    expect(matchBackupFiles(['user (1).hive']).keys, ['user']);
+    expect(matchBackupFiles(['settings (12).hive']).keys, ['settings']);
+    expect(matchBackupFiles(['user (1).hive', 'settings (1).hive']).keys, [
+      'user',
+      'settings',
+    ]);
+    expect(matchBackupFiles(['username (1).hive']), isEmpty);
+    expect(matchBackupFiles(['user (x).hive']), isEmpty);
+  });
   test('rejects a nonempty Hive log with no remaining user entries', () async {
     final box = Hive.box('user');
     await box.delete('likedSongs');
