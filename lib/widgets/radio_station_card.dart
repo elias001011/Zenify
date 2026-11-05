@@ -32,12 +32,10 @@ class RadioStationCard extends StatefulWidget {
     super.key,
     required this.station,
     required this.onPressed,
-    this.onFavoritesChanged,
   });
 
   final RadioStation station;
   final VoidCallback onPressed;
-  final VoidCallback? onFavoritesChanged;
 
   @override
   State<RadioStationCard> createState() => _RadioStationCardState();
@@ -78,7 +76,6 @@ class _RadioStationCardState extends State<RadioStationCard> {
       } else {
         await addRadioStationToLiked(widget.station.id);
       }
-      widget.onFavoritesChanged?.call();
     } catch (e) {
       _isFavorited.value = wasFavorited; // revert on failure
     }

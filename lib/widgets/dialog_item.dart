@@ -32,11 +32,6 @@ class DialogItem extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.padding = const EdgeInsets.symmetric(vertical: 6),
-    this.iconRightPadding = 12,
-    this.iconSize = 22,
-    this.iconContainerSize = 44,
-    this.fontSize = 15,
-    this.showChevron = true,
     this.backgroundColor,
     this.trailing,
   });
@@ -47,11 +42,6 @@ class DialogItem extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final EdgeInsets padding;
-  final double iconRightPadding;
-  final double iconSize;
-  final double iconContainerSize;
-  final double fontSize;
-  final bool showChevron;
 
   /// Sets the row apart from the others; the surface by default.
   final Color? backgroundColor;
@@ -71,20 +61,17 @@ class DialogItem extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: EdgeInsets.symmetric(
-              horizontal: iconRightPadding,
-              vertical: 12,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             child: Row(
               children: [
                 Container(
-                  width: iconContainerSize,
-                  height: iconContainerSize,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: iconBgColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(icon, color: iconColor, size: iconSize),
+                  child: Icon(icon, color: iconColor, size: 22),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -93,13 +80,13 @@ class DialogItem extends StatelessWidget {
                     style: TextStyle(
                       color: colorScheme.onSurface,
                       fontWeight: FontWeight.w600,
-                      fontSize: fontSize,
+                      fontSize: 15,
                     ),
                   ),
                 ),
                 if (trailing != null)
                   trailing!
-                else if (showChevron)
+                else
                   Icon(
                     FluentIcons.chevron_right_24_regular,
                     color: colorScheme.onSurfaceVariant,

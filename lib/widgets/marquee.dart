@@ -27,7 +27,6 @@ class MarqueeWidget extends StatefulWidget {
   const MarqueeWidget({
     super.key,
     required this.child,
-    this.direction = Axis.horizontal,
     this.animationDuration = const Duration(milliseconds: 6000),
     this.backDuration = const Duration(milliseconds: 800),
     this.pauseDuration = const Duration(milliseconds: 800),
@@ -35,7 +34,6 @@ class MarqueeWidget extends StatefulWidget {
   });
 
   final Widget child;
-  final Axis direction;
   final Duration animationDuration, backDuration, pauseDuration;
   final bool manualScrollEnabled;
 
@@ -44,7 +42,7 @@ class MarqueeWidget extends StatefulWidget {
 }
 
 class _MarqueeWidgetState extends State<MarqueeWidget>
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin {
   late ScrollController _scrollController;
   bool _isAnimating = false;
   bool _enabled = true;
@@ -102,7 +100,7 @@ class _MarqueeWidgetState extends State<MarqueeWidget>
       },
       child: RepaintBoundary(
         child: SingleChildScrollView(
-          scrollDirection: widget.direction,
+          scrollDirection: Axis.horizontal,
           controller: _scrollController,
           physics: widget.manualScrollEnabled
               ? const AlwaysScrollableScrollPhysics()

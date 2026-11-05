@@ -108,17 +108,13 @@ class TopArtistTile extends StatelessWidget {
 /// app draws any song's, so it is the same wherever artists are listed. A
 /// circle with a person without a song.
 class ArtistAvatar extends StatelessWidget {
-  const ArtistAvatar(
-    this.song, {
-    this.size = ArtistTile.artworkSize,
-    super.key,
-  });
+  const ArtistAvatar(this.song, {super.key});
 
   final Map? song;
-  final double size;
 
   @override
   Widget build(BuildContext context) {
+    const size = ArtistTile.artworkSize;
     final song = this.song;
     if (song != null) {
       return SongArtworkWidget(

@@ -51,7 +51,6 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
   required ValueListenable<bool> songLikeStatus,
   required ValueListenable<bool> songOfflineStatus,
   required ValueNotifier<bool> songDownloadStatus,
-  required bool showQueueActions,
   bool isRecentSong = false,
   bool canRename = false,
   bool canRemove = false,
@@ -72,13 +71,12 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
   final renameSongText = l10n.renameSong;
 
   return [
-    if (showQueueActions)
-      buildPopupMenuItem<String>(
-        value: 'play_next',
-        icon: FluentIcons.receipt_play_24_regular,
-        label: playNextText,
-        colorScheme: colorScheme,
-      ),
+    buildPopupMenuItem<String>(
+      value: 'play_next',
+      icon: FluentIcons.receipt_play_24_regular,
+      label: playNextText,
+      colorScheme: colorScheme,
+    ),
     if (showGoToArtist)
       buildPopupMenuItem<String>(
         value: 'go_to_artist',
@@ -86,13 +84,12 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
         label: l10n.goToArtist,
         colorScheme: colorScheme,
       ),
-    if (showQueueActions)
-      buildPopupMenuItem<String>(
-        value: 'add_to_queue',
-        icon: FluentIcons.text_bullet_list_add_24_regular,
-        label: addToQueueText,
-        colorScheme: colorScheme,
-      ),
+    buildPopupMenuItem<String>(
+      value: 'add_to_queue',
+      icon: FluentIcons.text_bullet_list_add_24_regular,
+      label: addToQueueText,
+      colorScheme: colorScheme,
+    ),
     if (!offlineMode.value && !isLocal)
       PopupMenuItem<String>(
         value: 'like',
@@ -306,7 +303,6 @@ class SongBar extends StatefulWidget {
     this.onRemove,
     this.borderRadius = BorderRadius.zero,
     this.isFromLikedSongs = false,
-    this.showQueueActions = true,
     this.showPlayTime = false,
     this.playlistId,
     this.onRenamed,
@@ -331,7 +327,6 @@ class SongBar extends StatefulWidget {
   final bool showPlayTime;
   final BorderRadius borderRadius;
   final bool isFromLikedSongs;
-  final bool showQueueActions;
   final String? playlistId;
   final VoidCallback? onRenamed;
   final EdgeInsetsGeometry? barPadding;
@@ -679,7 +674,6 @@ class _SongBarState extends State<SongBar> {
       songLikeStatus: _songLikeStatus,
       songOfflineStatus: _songOfflineStatus,
       songDownloadStatus: _songDownloadStatus,
-      showQueueActions: widget.showQueueActions,
       isRecentSong: widget.isRecentSong == true,
       canRename: canRename,
       canRemove: widget.onRemove != null,

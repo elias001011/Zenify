@@ -110,9 +110,7 @@ class SongSelectionBar extends StatelessWidget {
     super.key,
     required this.controller,
     required this.visibleSongs,
-    this.showQueueActions = true,
     this.showLikeAction = true,
-    this.showPlaylistAction = true,
     this.showOfflineAction = true,
     this.onRemoveSelected,
     this.onMoveSelected,
@@ -124,9 +122,7 @@ class SongSelectionBar extends StatelessWidget {
   /// The songs currently on screen, for "select all".
   final List<Map> Function() visibleSongs;
 
-  final bool showQueueActions;
   final bool showLikeAction;
-  final bool showPlaylistAction;
   final bool showOfflineAction;
 
   /// Destructive, so the bar asks for a confirmation before running it.
@@ -192,7 +188,7 @@ class SongSelectionBar extends StatelessWidget {
     final isOffline = offlineMode.value;
 
     return [
-      if (showQueueActions) ...[
+      ...[
         _action(
           colorScheme: colorScheme,
           icon: FluentIcons.receipt_play_24_regular,
@@ -213,7 +209,7 @@ class SongSelectionBar extends StatelessWidget {
           label: l10n.addToLikedSongs,
           onPressed: () => _run(context, _likeSelected),
         ),
-      if (showPlaylistAction && !isOffline)
+      if (!isOffline)
         _action(
           colorScheme: colorScheme,
           icon: FluentIcons.album_add_24_regular,

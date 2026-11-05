@@ -31,9 +31,7 @@ class CustomBar extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.trailing,
-    this.backgroundColor,
     this.iconColor,
-    this.textColor,
     this.borderRadius = BorderRadius.zero,
     super.key,
   });
@@ -44,9 +42,7 @@ class CustomBar extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final Widget? trailing;
-  final Color? backgroundColor;
   final Color? iconColor;
-  final Color? textColor;
   final BorderRadius borderRadius;
 
   @override
@@ -55,7 +51,7 @@ class CustomBar extends StatelessWidget {
     final effectiveIconColor = iconColor ?? colorScheme.onSecondaryContainer;
 
     return Material(
-      color: backgroundColor ?? colorScheme.surfaceContainerLow,
+      color: colorScheme.surfaceContainerLow,
       borderRadius: borderRadius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -81,18 +77,15 @@ class CustomBar extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
-                        color: textColor ?? colorScheme.onSurface,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     if (description != null) ...[
                       const SizedBox(height: 2),
                       Text(
                         description!,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color:
-                              textColor?.withValues(alpha: 0.75) ??
-                              colorScheme.onSurfaceVariant,
-                        ),
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant),
                       ),
                     ],
                   ],

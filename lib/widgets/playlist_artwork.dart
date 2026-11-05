@@ -28,23 +28,18 @@ class PlaylistArtwork extends StatelessWidget {
   const PlaylistArtwork({
     super.key,
     required this.playlistArtwork,
-    this.playlistTitle,
     this.cubeIcon = FluentIcons.text_bullet_list_24_filled,
-    this.iconSize,
     this.size = 220,
   });
 
   final String? playlistArtwork;
-  final String? playlistTitle;
   final IconData cubeIcon;
-  final double? iconSize;
   final double size;
 
   Widget _nullArtwork() => NullArtworkWidget(
     icon: cubeIcon,
-    iconSize: iconSize ?? (size * 0.3), // Default to 30% of container size
+    iconSize: size * 0.3, // 30% of container size
     size: size,
-    title: playlistTitle,
     // The cube clips the corners.
     borderRadius: 0,
   );

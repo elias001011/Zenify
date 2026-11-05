@@ -29,18 +29,14 @@ class PlaylistCube extends StatelessWidget {
   const PlaylistCube(
     this.playlist, {
     super.key,
-    this.playlistData,
     this.cubeIcon = FluentIcons.text_bullet_list_24_filled,
     this.size = 220,
-    this.borderRadius = 16,
     this.showTypeLabel = true,
   });
 
-  final Map? playlistData;
   final Map playlist;
   final IconData cubeIcon;
   final double size;
-  final double borderRadius;
   final bool showTypeLabel;
 
   static const double typeLabelOffset = 10;
@@ -48,7 +44,7 @@ class PlaylistCube extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
+      borderRadius: BorderRadius.circular(16),
       child: Stack(
         children: [
           if (playlist['source'] == 'zenify')
