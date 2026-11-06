@@ -330,6 +330,7 @@
   "restoreUserData": "Restore user data",
   "restoredSuccess": "Data restored successfully",
   "search": "Search",
+  "searchFailed": "The search failed. Check your connection and try again.",
   "searchHistoryMsg": "Search history cleared",
   "seeAll": "See all",
   "selectDuration": "Select duration",

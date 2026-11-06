@@ -214,7 +214,13 @@ Future<bool> _validateCachedUrl(String songId, String cachedUrl) async {
   }
 }
 
-Future<List> fetchSongsList(String searchQuery) async {
+/// The songs YouTube finds for [searchQuery]. A search that fails gives an
+/// empty list, like one that finds nothing, unless [rethrowErrors] is set for
+/// a caller that has to tell them apart.
+Future<List> fetchSongsList(
+  String searchQuery, {
+  bool rethrowErrors = false,
+}) async {
   try {
     // If not in cache, perform the search
     final List<Video> searchResults = await ytClient.search.search(searchQuery);
@@ -225,6 +231,7 @@ Future<List> fetchSongsList(String searchQuery) async {
     return songsList;
   } catch (e, stackTrace) {
     logger.log('Error in fetchSongsList', error: e, stackTrace: stackTrace);
+    if (rethrowErrors) rethrow;
     return [];
   }
 }

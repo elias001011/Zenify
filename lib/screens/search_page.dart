@@ -268,6 +268,15 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
 
+    // Tells the online search failed (no connection, a timeout), once per
+    // search however many of its parts did.
+    var warned = false;
+    void warnFailed() {
+      if (warned) return;
+      warned = true;
+      showToast(context, context.l10n!.searchFailed);
+    }
+
     try {
       if (videoId != null) {
         final song = await getSongDetails(
@@ -283,10 +292,14 @@ class _SearchPageState extends State<SearchPage> {
         return;
       }
       final artistsFuture = searchArtists(query);
+      // A search that fails shows what the library found and says so: an
+      // empty page is also what a search with no results looks like.
+      var failed = false;
       Future<List> guarded(String what, Future<List> Function() fetch) async {
         try {
           return await fetch().timeout(const Duration(seconds: 15));
         } catch (e, stackTrace) {
+          failed = true;
           logger.log(
             'Error while searching online $what',
             error: e,
@@ -312,6 +325,7 @@ class _SearchPageState extends State<SearchPage> {
 
       final [songs, artists] = await top;
       if (!mounted || requestId != _latestSearchRequest) return;
+      if (failed) warnFailed();
       setState(() {
         _songsSearchResult = libraryFirst(
           _libraryResult.songs,
@@ -325,6 +339,7 @@ class _SearchPageState extends State<SearchPage> {
 
       final [albums, playlists] = await rest;
       if (!mounted || requestId != _latestSearchRequest) return;
+      if (failed) warnFailed();
       setState(() {
         _albumsSearchResult = libraryFirst(_libraryAlbums(true), albums);
         _playlistsSearchResult = libraryFirst(_libraryAlbums(false), playlists);
@@ -335,6 +350,7 @@ class _SearchPageState extends State<SearchPage> {
         error: e,
         stackTrace: stackTrace,
       );
+      if (mounted && requestId == _latestSearchRequest) warnFailed();
     } finally {
       if (mounted && requestId == _latestSearchRequest) {
         _fetchingSongs.value = false;
@@ -375,7 +391,7 @@ class _SearchPageState extends State<SearchPage> {
     String query,
     Future<List<Map<String, dynamic>>> artistsFuture,
   ) async {
-    final songs = await fetchSongsList(query);
+    final songs = await fetchSongsList(query, rethrowErrors: true);
     if (songs.isNotEmpty) return songs;
     final artists = await artistsFuture;
     final artistName = artists.firstOrNull?['title']?.toString().trim();
@@ -388,7 +404,7 @@ class _SearchPageState extends State<SearchPage> {
     };
 
     for (final fallbackQuery in fallbackQueries) {
-      final songs = await fetchSongsList(fallbackQuery);
+      final songs = await fetchSongsList(fallbackQuery, rethrowErrors: true);
       if (songs.isNotEmpty) return songs;
     }
 

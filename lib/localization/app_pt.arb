@@ -324,6 +324,7 @@
   "restoreUserData": "Restaurar dados do usuário",
   "restoredSuccess": "Dados restaurados com sucesso",
   "search": "Buscar",
+  "searchFailed": "A busca falhou. Verifique sua conexão e tente de novo.",
   "searchHistoryMsg": "Histórico de buscas limpo",
   "seeAll": "Ver tudo",
   "selectDuration": "Selecionar duração",
