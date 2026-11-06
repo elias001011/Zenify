@@ -100,7 +100,6 @@ class _GlowRowState extends State<GlowRow> {
       ),
     );
 
-    final rtl = Directionality.of(context) == TextDirection.rtl;
     return Stack(
       children: [
         list,
@@ -110,20 +109,17 @@ class _GlowRowState extends State<GlowRow> {
               valueListenable: _canScroll,
               builder: (context, canScroll, _) => Stack(
                 children: [
+                  // The chevrons flip with the text direction on their own.
                   if (canScroll.$1)
                     _ArrowButton(
                       alignment: AlignmentDirectional.centerStart,
-                      icon: rtl
-                          ? FluentIcons.chevron_right_24_regular
-                          : FluentIcons.chevron_left_24_regular,
+                      icon: FluentIcons.chevron_left_24_regular,
                       onPressed: () => _page(-1),
                     ),
                   if (canScroll.$2)
                     _ArrowButton(
                       alignment: AlignmentDirectional.centerEnd,
-                      icon: rtl
-                          ? FluentIcons.chevron_left_24_regular
-                          : FluentIcons.chevron_right_24_regular,
+                      icon: FluentIcons.chevron_right_24_regular,
                       onPressed: () => _page(1),
                     ),
                 ],

@@ -349,30 +349,35 @@ class PlayerTransport extends StatelessWidget {
           children: [
             const PositionSlider(),
             SizedBox(height: gap),
-            Row(
-              children: <Widget>[
-                Transform.translate(
-                  offset: Offset(-iconInset, 0),
-                  child: PlaybackModeButton(
-                    repeat: false,
-                    size: miniControlSize,
-                    constraints: buttonConstraints,
-                    padding: buttonPadding,
+            Directionality(
+              // Transport controls are not mirrored: their order, arrows and
+              // the offsets above stay as they are in a right-to-left language.
+              textDirection: TextDirection.ltr,
+              child: Row(
+                children: <Widget>[
+                  Transform.translate(
+                    offset: Offset(-iconInset, 0),
+                    child: PlaybackModeButton(
+                      repeat: false,
+                      size: miniControlSize,
+                      constraints: buttonConstraints,
+                      padding: buttonPadding,
+                    ),
                   ),
-                ),
-                SizedBox(width: buttonSpacing),
-                Expanded(child: Center(child: controls)),
-                SizedBox(width: buttonSpacing),
-                Transform.translate(
-                  offset: Offset(iconInset, 0),
-                  child: PlaybackModeButton(
-                    repeat: true,
-                    size: miniControlSize,
-                    constraints: buttonConstraints,
-                    padding: buttonPadding,
+                  SizedBox(width: buttonSpacing),
+                  Expanded(child: Center(child: controls)),
+                  SizedBox(width: buttonSpacing),
+                  Transform.translate(
+                    offset: Offset(iconInset, 0),
+                    child: PlaybackModeButton(
+                      repeat: true,
+                      size: miniControlSize,
+                      constraints: buttonConstraints,
+                      padding: buttonPadding,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ],
         );
@@ -479,70 +484,75 @@ class PlaybackTransportControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<List<MediaItem>>(
-      stream: audioHandler.queue,
-      builder: (context, snapshot) {
-        // A station is a radio: previous and next switch station, and repeat
-        // has no meaning for it. Switching pushes a new queue, so this
-        // rebuilds with it.
-        final live =
-            audioHandler.mediaItem.valueOrNull?.extras?['isLive'] == true;
-        return ValueListenableBuilder<AudioServiceRepeatMode>(
-          valueListenable: repeatNotifier,
-          builder: (_, repeatMode, __) {
-            final repeats = !live && repeatMode != AudioServiceRepeatMode.none;
-            return FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _PlaybackControlButton(
-                    icon: FluentIcons.previous_24_filled,
-                    forward: false,
-                    isEnabled: audioHandler.hasPrevious || repeats,
-                    tooltip: context.l10n!.skipToPrevious,
-                    onPressed: () => audioHandler.skipToPrevious(),
-                    colorScheme: colorScheme,
-                    buttonConstraints: buttonConstraints,
-                    buttonPadding: buttonPadding,
-                    controlIconSize: controlIconSize,
-                    skipIconSize: skipIconSize,
-                    minButtonSize: minButtonSize,
-                  ),
-                  SizedBox(width: buttonSpacing),
-                  PlaybackIconButton(
-                    iconColor: colorScheme.onSurface,
-                    backgroundColor: Colors.transparent,
-                    buttonSize:
-                        playButtonSize ??
-                        (PlayerChrome.of(context) == PlayerChromeStyle.dock
-                            ? 44
-                            : 52),
-                    iconSize: controlIconSize,
-                  ),
-                  SizedBox(width: buttonSpacing),
-                  _PlaybackControlButton(
-                    icon: FluentIcons.next_24_filled,
-                    forward: true,
-                    isEnabled: audioHandler.hasNext || repeats,
-                    tooltip: context.l10n!.skipToNext,
-                    onPressed: () =>
-                        !live && repeatMode == AudioServiceRepeatMode.one
-                        ? audioHandler.playAgain()
-                        : audioHandler.skipToNext(),
-                    colorScheme: colorScheme,
-                    buttonConstraints: buttonConstraints,
-                    buttonPadding: buttonPadding,
-                    controlIconSize: controlIconSize,
-                    skipIconSize: skipIconSize,
-                    minButtonSize: minButtonSize,
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+    // Previous, play and next keep their order and direction in every language.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: StreamBuilder<List<MediaItem>>(
+        stream: audioHandler.queue,
+        builder: (context, snapshot) {
+          // A station is a radio: previous and next switch station, and repeat
+          // has no meaning for it. Switching pushes a new queue, so this
+          // rebuilds with it.
+          final live =
+              audioHandler.mediaItem.valueOrNull?.extras?['isLive'] == true;
+          return ValueListenableBuilder<AudioServiceRepeatMode>(
+            valueListenable: repeatNotifier,
+            builder: (_, repeatMode, __) {
+              final repeats =
+                  !live && repeatMode != AudioServiceRepeatMode.none;
+              return FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _PlaybackControlButton(
+                      icon: FluentIcons.previous_24_filled,
+                      forward: false,
+                      isEnabled: audioHandler.hasPrevious || repeats,
+                      tooltip: context.l10n!.skipToPrevious,
+                      onPressed: () => audioHandler.skipToPrevious(),
+                      colorScheme: colorScheme,
+                      buttonConstraints: buttonConstraints,
+                      buttonPadding: buttonPadding,
+                      controlIconSize: controlIconSize,
+                      skipIconSize: skipIconSize,
+                      minButtonSize: minButtonSize,
+                    ),
+                    SizedBox(width: buttonSpacing),
+                    PlaybackIconButton(
+                      iconColor: colorScheme.onSurface,
+                      backgroundColor: Colors.transparent,
+                      buttonSize:
+                          playButtonSize ??
+                          (PlayerChrome.of(context) == PlayerChromeStyle.dock
+                              ? 44
+                              : 52),
+                      iconSize: controlIconSize,
+                    ),
+                    SizedBox(width: buttonSpacing),
+                    _PlaybackControlButton(
+                      icon: FluentIcons.next_24_filled,
+                      forward: true,
+                      isEnabled: audioHandler.hasNext || repeats,
+                      tooltip: context.l10n!.skipToNext,
+                      onPressed: () =>
+                          !live && repeatMode == AudioServiceRepeatMode.one
+                          ? audioHandler.playAgain()
+                          : audioHandler.skipToNext(),
+                      colorScheme: colorScheme,
+                      buttonConstraints: buttonConstraints,
+                      buttonPadding: buttonPadding,
+                      controlIconSize: controlIconSize,
+                      skipIconSize: skipIconSize,
+                      minButtonSize: minButtonSize,
+                    ),
+                  ],
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

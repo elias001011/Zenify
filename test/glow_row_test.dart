@@ -11,7 +11,11 @@ import 'support/app_harness.dart';
 void main() {
   useAppSettings(boxes: ['settings']);
 
-  Widget row() => MaterialApp(
+  Widget row({TextDirection? direction}) => MaterialApp(
+    builder: direction == null
+        ? null
+        : (context, child) =>
+              Directionality(textDirection: direction, child: child!),
     home: Scaffold(
       body: Center(
         child: SizedBox(
@@ -46,6 +50,47 @@ void main() {
     expect(find.byIcon(FluentIcons.chevron_left_24_regular), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
+
+  for (final direction in TextDirection.values) {
+    testWidgets('arrows point away from the row\'s edges ($direction)', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      await tester.pumpWidget(row(direction: direction));
+      await tester.pump();
+
+      // Where the arrow's glyph points on screen: its own face, flipped when
+      // the icon follows the text direction.
+      bool pointsLeft(Finder button) {
+        final finder = find.descendant(of: button, matching: find.byType(Icon));
+        final icon = tester.widget<Icon>(finder).icon!;
+        final flipped =
+            icon.matchTextDirection &&
+            Directionality.of(tester.element(finder)) == TextDirection.rtl;
+        return (icon == FluentIcons.chevron_left_24_regular) != flipped;
+      }
+
+      final buttons = find.byType(IconButton);
+      final rtl = direction == TextDirection.rtl;
+      // At the start only the arrow towards the end shows: on the right edge
+      // in a right-to-left row, where it points left.
+      expect(buttons, findsOneWidget);
+      expect(pointsLeft(buttons), rtl);
+      await tester.tap(buttons);
+      await tester.pumpAndSettle();
+
+      // Further in, one on each edge, each pointing outwards.
+      expect(buttons, findsNWidgets(2));
+      final firstIsLeft =
+          tester.getCenter(buttons.at(0)).dx <
+          tester.getCenter(buttons.at(1)).dx;
+      final left = buttons.at(firstIsLeft ? 0 : 1);
+      final right = buttons.at(firstIsLeft ? 1 : 0);
+      expect(pointsLeft(left), isTrue);
+      expect(pointsLeft(right), isFalse);
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
 
   testWidgets('phones get no arrows', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;

@@ -272,25 +272,29 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PlaybackModeButton(
-              repeat: false,
-              size: sizes.mode,
-              constraints: box,
-              padding: padding,
-            ),
-            const SizedBox(width: 6),
-            _dockControls(),
-            const SizedBox(width: 6),
-            PlaybackModeButton(
-              repeat: true,
-              size: sizes.mode,
-              constraints: box,
-              padding: padding,
-            ),
-          ],
+        Directionality(
+          // Transport controls are not mirrored in a right-to-left language.
+          textDirection: TextDirection.ltr,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PlaybackModeButton(
+                repeat: false,
+                size: sizes.mode,
+                constraints: box,
+                padding: padding,
+              ),
+              const SizedBox(width: 6),
+              _dockControls(),
+              const SizedBox(width: 6),
+              PlaybackModeButton(
+                repeat: true,
+                size: sizes.mode,
+                constraints: box,
+                padding: padding,
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 2),
         const PositionSlider(inline: true),
@@ -436,36 +440,40 @@ class _ControlsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (supportsDesktopVolumeControl) ...[
-          const DesktopVolumeButton(),
-          const SizedBox(width: 4),
-        ],
-        // The ring that follows the song, as on phones, wherever the mini
-        // player is compact. The wide one has room for the transport row, and
-        // a ring around its play button would be too big.
-        _CircularPlayButton(
-          colorScheme: colorScheme,
-          playbackState: playbackState,
-          duration: duration,
-          live: live,
-        ),
-        if (hasNext) ...[
-          const SizedBox(width: 4),
-          SkipIconButton(
-            forward: true,
-            onPressed: audioHandler.skipToNext,
-            splashColor: Colors.transparent,
-            highlightColor: Colors.transparent,
-            icon: FluentIcons.next_24_filled,
-            color: colorScheme.onSurfaceVariant,
-            iconSize: 24,
-            visualDensity: VisualDensity.compact,
+    // Play and next keep their order and direction in every language.
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (supportsDesktopVolumeControl) ...[
+            const DesktopVolumeButton(),
+            const SizedBox(width: 4),
+          ],
+          // The ring that follows the song, as on phones, wherever the mini
+          // player is compact. The wide one has room for the transport row, and
+          // a ring around its play button would be too big.
+          _CircularPlayButton(
+            colorScheme: colorScheme,
+            playbackState: playbackState,
+            duration: duration,
+            live: live,
           ),
+          if (hasNext) ...[
+            const SizedBox(width: 4),
+            SkipIconButton(
+              forward: true,
+              onPressed: audioHandler.skipToNext,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              icon: FluentIcons.next_24_filled,
+              color: colorScheme.onSurfaceVariant,
+              iconSize: 24,
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
