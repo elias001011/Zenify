@@ -22,6 +22,10 @@ class JustAudioMediaKit extends JustAudioPlatform {
   /// Keep buffering in memory unless disk caching is explicitly requested.
   static bool diskCache = false;
 
+  /// How much data the cache must hold before playback resumes after it ran
+  /// dry (mpv's `cache-pause-wait`, 1 s by default).
+  static Duration rebufferWait = const Duration(seconds: 8);
+
   /// The filters to prepare, asked once for each engine before its first
   /// source opens. UI listeners can read their metadata without rebuilding
   /// the output during playback, and an engine started later gets the

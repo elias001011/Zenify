@@ -34,6 +34,11 @@ class MediaKitPlayer extends AudioPlayerPlatform {
       'cache-on-disk',
       JustAudioMediaKit.diskCache ? 'yes' : 'no',
     );
+    await setProperty(
+      _player,
+      'cache-pause-wait',
+      '${JustAudioMediaKit.rebufferWait.inMilliseconds / 1000}',
+    );
     for (final filter in JustAudioMediaKit.audioFilters()) {
       try {
         await command(_player, ['af', 'add', filter]);

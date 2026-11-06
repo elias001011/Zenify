@@ -39,6 +39,7 @@ import 'package:musify/services/desktop_equalizer.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/music_radio.dart';
+import 'package:musify/services/playback_buffer.dart';
 import 'package:musify/services/queue_persistence_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/sleep_timer.dart';
@@ -59,13 +60,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       audioPipeline: androidEqualizer == null
           ? null
           : AudioPipeline(androidAudioEffects: [androidEqualizer]),
-      audioLoadConfiguration: const AudioLoadConfiguration(
-        androidLoadControl: AndroidLoadControl(
-          maxBufferDuration: Duration(seconds: 60),
-          bufferForPlaybackDuration: Duration(milliseconds: 500),
-          bufferForPlaybackAfterRebufferDuration: Duration(seconds: 3),
-        ),
-      ),
+      audioLoadConfiguration: playbackLoadConfiguration,
     );
 
     _androidAutoBrowser = AndroidAutoBrowser(this);
