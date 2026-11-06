@@ -102,4 +102,38 @@ void main() {
     expect(result.map((s) => s['ytid']), ['s2', 's1', 's3']);
     expect(result[1], same(mine));
   });
+
+  test('the library copy borrows the length the online result has', () {
+    final mine = song('s1', 'Blue Hour', 'Calm');
+    final alsoMine = song('s2', 'Blue', 'Calm');
+    final withLength = {...song('s3', 'Blue Moon', 'Other'), 'duration': 200};
+    final result = libraryFirst(
+      [alsoMine],
+      [
+        {...song('s2', 'Blue', 'Calm'), 'duration': 187},
+        {...song('s1', 'Blue Hour', 'Calm'), 'duration': 215},
+        withLength,
+      ],
+      known: {'s1': mine},
+    );
+
+    expect(result.map((s) => s['ytid']), ['s2', 's1', 's3']);
+    expect(result[0]['duration'], 187);
+    expect(result[1]['duration'], 215);
+    expect(result[2], same(withLength));
+    // The stored songs are not touched.
+    expect(mine.containsKey('duration'), isFalse);
+    expect(alsoMine.containsKey('duration'), isFalse);
+  });
+
+  test('a library copy with its own length keeps it', () {
+    final mine = {...song('s1', 'Blue Hour', 'Calm'), 'duration': 100};
+    final result = libraryFirst(
+      [mine],
+      [
+        {...song('s1', 'Blue Hour', 'Calm'), 'duration': 215},
+      ],
+    );
+    expect(result.single, same(mine));
+  });
 }

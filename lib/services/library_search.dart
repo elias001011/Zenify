@@ -100,6 +100,9 @@ Map<String, Map> librarySongsById() => {
 /// Search results with what the library holds first: [library] matches, then
 /// [online] results the library has under another title (shown as the
 /// library's copy, from [known]), then the rest. Each part keeps to [limit].
+///
+/// The library's copy of a song is what was stored when it was added, and may
+/// lack the length that the online result carries: it borrows it.
 List<Map> libraryFirst(
   List<Map> library,
   Iterable<dynamic> online, {
@@ -107,19 +110,31 @@ List<Map> libraryFirst(
   int limit = 15,
 }) {
   final seen = {for (final item in library) item['ytid']?.toString()};
+  final lengths = <String, Object>{
+    for (final item in online.whereType<Map>())
+      if (item['ytid']?.toString() case final id? when item['duration'] != null)
+        id: item['duration'] as Object,
+  };
+  Map withLength(Map song) {
+    final length = lengths[song['ytid']?.toString()];
+    return song['duration'] == null && length != null
+        ? {...song, 'duration': length}
+        : song;
+  }
+
   final owned = <Map>[];
   final rest = <Map>[];
   for (final item in online.whereType<Map>()) {
     final id = item['ytid']?.toString();
     if (id != null && !seen.add(id)) continue;
     if (known[id] case final mine?) {
-      owned.add(mine);
+      owned.add(withLength(mine));
     } else {
       rest.add(item);
     }
   }
   return [
-    ...library.take(limit),
+    ...library.take(limit).map(withLength),
     ...[...owned, ...rest].take(limit),
   ];
 }
