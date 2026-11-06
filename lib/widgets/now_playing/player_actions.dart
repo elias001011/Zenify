@@ -39,9 +39,10 @@ import 'package:musify/widgets/download_progress_icon.dart';
 /// phones.
 enum PlayerPanel { queue, lyrics }
 
-/// The player's actions besides playback: lyrics, queue, volume, sleep
-/// timer, download and add to playlist. A song is liked from the add to
-/// playlist dialog; a radio station, which has no playlists, has a heart.
+/// The player's actions besides playback: lyrics, queue, sleep timer,
+/// download, add to playlist and, on desktop, volume at the end. A song is
+/// liked from the add to playlist dialog; a radio station, which has no
+/// playlists, has a heart.
 class PlayerActions extends StatefulWidget {
   const PlayerActions({
     super.key,
@@ -153,7 +154,6 @@ class _PlayerActionsState extends State<PlayerActions> {
             active: widget.panel == PlayerPanel.queue,
             onPressed: () => widget.onPanel?.call(PlayerPanel.queue),
           ),
-        if (supportsDesktopVolumeControl) const DesktopVolumeButton(),
         ValueListenableBuilder<Duration?>(
           valueListenable: sleepTimerNotifier,
           builder: (context, timer, _) => PlayerActionButton(
@@ -207,6 +207,8 @@ class _PlayerActionsState extends State<PlayerActions> {
               onPressed: _toggleLike,
             ),
           ),
+        // The rightmost icon of the row.
+        if (supportsDesktopVolumeControl) const DesktopVolumeButton(),
       ],
     );
     if (widget.miniPlayer) return actions(false);

@@ -306,6 +306,43 @@ void main() {
     }),
   );
 
+  testWidgets('the volume button is the last of the player actions', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(900, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const item = MediaItem(id: 'test', title: 'Song', extras: {'ytid': 'test'});
+    audioHandler.queue.add([item]);
+    await tester.pumpWidget(
+      localizedApp(
+        Scaffold(
+          body: Center(
+            child: PlayerActions(
+              metadata: item,
+              panel: PlayerPanel.queue,
+              onPanel: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    final volume = tester.getCenter(find.byType(DesktopVolumeButton)).dx;
+    final buttons = find.byType(PlayerActionButton);
+    // Sleep timer, download, add to playlist and the volume itself at least.
+    expect(buttons, findsAtLeastNWidgets(4));
+    for (final button in buttons.evaluate()) {
+      expect(
+        tester.getCenter(find.byWidget(button.widget)).dx,
+        lessThanOrEqualTo(volume),
+      );
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(seconds: 2));
+  }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
+
   testWidgets('collapsed volume and popup fit a 400 px mini player', (
     tester,
   ) async {
