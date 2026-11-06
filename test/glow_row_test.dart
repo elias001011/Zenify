@@ -1,5 +1,6 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -97,6 +98,25 @@ void main() {
     await tester.pumpWidget(row());
     await tester.pump();
 
+    expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('a tablet gets the arrows while a mouse is connected', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    await tester.pumpWidget(row());
+    await tester.pump();
+    expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsNothing);
+
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: const Offset(5, 5));
+    await tester.pump();
+    expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsOneWidget);
+
+    await mouse.removePointer();
+    await tester.pump();
     expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsNothing);
     debugDefaultTargetPlatformOverride = null;
   });

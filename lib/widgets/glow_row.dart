@@ -103,30 +103,37 @@ class _GlowRowState extends State<GlowRow> {
     return Stack(
       children: [
         list,
-        if (isDesktopPlatform)
-          Positioned.fill(
-            child: ValueListenableBuilder<(bool, bool)>(
-              valueListenable: _canScroll,
-              builder: (context, canScroll, _) => Stack(
-                children: [
-                  // The chevrons flip with the text direction on their own.
-                  if (canScroll.$1)
-                    _ArrowButton(
-                      alignment: AlignmentDirectional.centerStart,
-                      icon: FluentIcons.chevron_left_24_regular,
-                      onPressed: () => _page(-1),
-                    ),
-                  if (canScroll.$2)
-                    _ArrowButton(
-                      alignment: AlignmentDirectional.centerEnd,
-                      icon: FluentIcons.chevron_right_24_regular,
-                      onPressed: () => _page(1),
-                    ),
-                ],
-              ),
-            ),
-          ),
+        // Arrows are for a mouse: a desktop, or a tablet with one connected.
+        ListenableBuilder(
+          listenable: mouseConnection,
+          builder: (context, _) => isDesktopPlatform || hasMouse
+              ? Positioned.fill(child: _arrows())
+              : const SizedBox.shrink(),
+        ),
       ],
+    );
+  }
+
+  Widget _arrows() {
+    return ValueListenableBuilder<(bool, bool)>(
+      valueListenable: _canScroll,
+      builder: (context, canScroll, _) => Stack(
+        children: [
+          // The chevrons flip with the text direction on their own.
+          if (canScroll.$1)
+            _ArrowButton(
+              alignment: AlignmentDirectional.centerStart,
+              icon: FluentIcons.chevron_left_24_regular,
+              onPressed: () => _page(-1),
+            ),
+          if (canScroll.$2)
+            _ArrowButton(
+              alignment: AlignmentDirectional.centerEnd,
+              icon: FluentIcons.chevron_right_24_regular,
+              onPressed: () => _page(1),
+            ),
+        ],
+      ),
     );
   }
 }
