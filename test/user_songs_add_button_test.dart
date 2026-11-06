@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/screens/user_songs_page.dart';
@@ -40,4 +42,49 @@ void main() {
       await tester.pump(const Duration(seconds: 2));
     });
   }
+
+  testWidgets('add button stays, disabled with a spinner, while it resolves', (
+    tester,
+  ) async {
+    final gate = Completer<Map?>();
+    await tester.pumpWidget(
+      localizedApp(
+        Scaffold(
+          body: PlaylistAddToPlaylistButton(resolvePlaylist: () => gate.future),
+        ),
+      ),
+    );
+    final button = find.descendant(
+      of: find.byType(PlaylistAddToPlaylistButton),
+      matching: find.byType(IconButton),
+    );
+    expect(tester.widget<IconButton>(button).onPressed, isNotNull);
+    expect(
+      find.descendant(
+        of: button,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsNothing,
+    );
+
+    await tester.tap(button);
+    await tester.pump();
+    // The same button, not a bare spinner in its place.
+    expect(button, findsOneWidget);
+    expect(tester.widget<IconButton>(button).onPressed, isNull);
+    expect(
+      find.descendant(
+        of: button,
+        matching: find.byType(CircularProgressIndicator),
+      ),
+      findsOneWidget,
+    );
+
+    gate.complete(null);
+    await tester.pump();
+    expect(tester.widget<IconButton>(button).onPressed, isNotNull);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 5));
+  });
 }

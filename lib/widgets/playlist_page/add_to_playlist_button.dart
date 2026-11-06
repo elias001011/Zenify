@@ -45,24 +45,16 @@ class _PlaylistAddToPlaylistButtonState
 
   @override
   Widget build(BuildContext context) {
-    if (_isResolving) {
-      return const SizedBox(
-        width: 48,
-        height: 48,
-        child: Center(
-          child: SizedBox(
-            width: 24,
-            height: 24,
-            child: CircularProgressIndicator(strokeWidth: 3),
-          ),
-        ),
-      );
-    }
-
+    // The button stays while it works, with the spinner in the icon's place.
     return IconButton.filledTonal(
-      icon: const Icon(FluentIcons.album_add_24_regular),
+      icon: _isResolving
+          ? const SizedBox.square(
+              dimension: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(FluentIcons.album_add_24_regular),
       iconSize: 24,
-      onPressed: _resolveAndAdd,
+      onPressed: _isResolving ? null : _resolveAndAdd,
       tooltip: context.l10n!.addToPlaylist,
     );
   }
