@@ -20,9 +20,7 @@
  */
 
 import 'dart:async';
-import 'dart:io';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
@@ -39,6 +37,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/formatter.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
+import 'package:musify/widgets/cover_image.dart';
 import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/no_artwork_cube.dart';
 import 'package:musify/widgets/overflow_menu_button.dart';
@@ -757,6 +756,37 @@ String? _firstNonEmptyString(Iterable<Object?> values) {
   return null;
 }
 
+/// A small round badge in the top right corner of a cover.
+class _ArtworkBadge extends StatelessWidget {
+  _ArtworkBadge.offline(ColorScheme colors)
+    : color = colors.tertiaryContainer,
+      icon = FluentIcons.cloud_off_24_filled,
+      iconColor = colors.onTertiaryContainer;
+
+  _ArtworkBadge.liked(ColorScheme colors)
+    : color = colors.primaryContainer,
+      icon = FluentIcons.heart_24_filled,
+      iconColor = colors.onPrimaryContainer;
+
+  final Color color;
+  final IconData icon;
+  final Color iconColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      top: 3,
+      right: 3,
+      child: Container(
+        width: 20,
+        height: 20,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        child: Icon(icon, size: 11, color: iconColor),
+      ),
+    );
+  }
+}
+
 class _OfflineArtwork extends StatelessWidget {
   const _OfflineArtwork({
     required this.artworkPath,
@@ -770,43 +800,11 @@ class _OfflineArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: size,
-      height: size,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: Stack(
-          children: [
-            Image.file(
-              File(artworkPath),
-              width: size,
-              height: size,
-              cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
-                  .round(),
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) =>
-                  NullArtworkWidget(iconSize: 30, size: size),
-            ),
-            Positioned(
-              top: 3,
-              right: 3,
-              child: Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: colorScheme.tertiaryContainer,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  FluentIcons.cloud_off_24_filled,
-                  size: 11,
-                  color: colorScheme.onTertiaryContainer,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return CoverImage(
+      source: artworkPath,
+      size: size,
+      error: NullArtworkWidget(iconSize: 30, size: size),
+      overlay: _ArtworkBadge.offline(colorScheme),
     );
   }
 }
@@ -832,79 +830,23 @@ class _OnlineArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isImageSmall = lowResImageUrl.contains('default.jpg');
-
     return SizedBox(
       width: size,
       height: size,
       child: Stack(
         alignment: Alignment.center,
         children: <Widget>[
-          if (lowResImageUrl.isEmpty)
-            NullArtworkWidget(iconSize: 30, size: size)
-          else
-            CachedNetworkImage(
-              imageUrl: lowResImageUrl,
-              width: size,
-              height: size,
-              fit: BoxFit.cover,
-              memCacheWidth: 256,
-              memCacheHeight: 256,
-              imageBuilder: (context, imageProvider) => ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Stack(
-                  children: [
-                    Image(
-                      image: imageProvider,
-                      fit: isImageSmall ? BoxFit.fill : BoxFit.cover,
-                      width: size,
-                      height: size,
-                      centerSlice: isImageSmall
-                          ? const Rect.fromLTRB(1, 1, 1, 1)
-                          : null,
-                    ),
-                    if (isOffline)
-                      Positioned(
-                        top: 3,
-                        right: 3,
-                        child: Container(
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: colorScheme.tertiaryContainer,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            FluentIcons.cloud_off_24_filled,
-                            size: 11,
-                            color: colorScheme.onTertiaryContainer,
-                          ),
-                        ),
-                      )
-                    else if (isLiked)
-                      Positioned(
-                        top: 3,
-                        right: 3,
-                        child: Container(
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primaryContainer,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            FluentIcons.heart_24_filled,
-                            size: 11,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              errorWidget: (context, url, error) =>
-                  NullArtworkWidget(iconSize: 30, size: size),
-            ),
+          CoverImage(
+            source: lowResImageUrl,
+            size: size,
+            fillLetterbox: true,
+            error: NullArtworkWidget(iconSize: 30, size: size),
+            overlay: isOffline
+                ? _ArtworkBadge.offline(colorScheme)
+                : isLiked
+                ? _ArtworkBadge.liked(colorScheme)
+                : null,
+          ),
           if (isDurationAvailable && !isOffline)
             Positioned(
               bottom: 4,

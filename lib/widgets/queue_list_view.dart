@@ -20,16 +20,15 @@
  */
 
 import 'dart:async';
-import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
+import 'package:musify/widgets/cover_image.dart';
 import 'package:musify/widgets/no_artwork_cube.dart';
 
 class QueueWidget extends StatefulWidget {
@@ -504,43 +503,16 @@ class _ArtworkThumbnail extends StatelessWidget {
   Widget build(BuildContext context) {
     final artworkPath =
         offlineArtworkPath(song['ytid']) ?? song['artworkPath'] as String?;
-    if (artworkPath != null && artworkPath.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Image.file(
-          File(artworkPath),
-          width: size,
-          height: size,
-          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _fallback(),
-        ),
-      );
-    }
-    final imageUrl = song['lowResImage']?.toString() ?? '';
-    if (imageUrl.isEmpty) return _fallback();
-    // Low-res YouTube 'default.jpg' thumbnails ship with baked-in black
-    // letterbox bars, so BoxFit.cover keeps them visible. Detect that case and
-    // stretch over the bars with fill + centerSlice, otherwise crop with cover —
-    // matching SongBar so the queue frames covers the same way (no black bars).
-    final isImageSmall = imageUrl.contains('default.jpg');
-    return CachedNetworkImage(
-      width: size,
-      height: size,
-      memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
-      imageUrl: imageUrl,
-      imageBuilder: (_, imageProvider) => ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: Image(
-          image: imageProvider,
-          width: size,
-          height: size,
-          fit: isImageSmall ? BoxFit.fill : BoxFit.cover,
-          centerSlice: isImageSmall ? const Rect.fromLTRB(1, 1, 1, 1) : null,
-        ),
-      ),
-      placeholder: (_, __) => _loading(),
-      errorWidget: (_, __, ___) => _fallback(),
+    return CoverImage(
+      source: artworkPath != null && artworkPath.isNotEmpty
+          ? artworkPath
+          : song['lowResImage']?.toString() ?? '',
+      size: size,
+      borderRadius: radius,
+      // Matches SongBar, so the queue frames covers the same way.
+      fillLetterbox: true,
+      placeholder: _loading(),
+      error: _fallback(),
     );
   }
 

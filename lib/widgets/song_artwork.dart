@@ -19,12 +19,10 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
-import 'dart:io';
-
 import 'package:audio_service/audio_service.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/utilities/mediaitem.dart';
+import 'package:musify/widgets/cover_image.dart';
 import 'package:musify/widgets/no_artwork_cube.dart';
 import 'package:musify/widgets/spinner.dart';
 
@@ -43,42 +41,12 @@ class SongArtworkWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final source = mediaItemArtworkSource(metadata);
-    if (source == null) {
-      return NullArtworkWidget(iconSize: errorWidgetIconSize, size: size);
-    }
-    return metadata.artUri!.scheme == 'file'
-        ? SizedBox(
-            width: size,
-            height: size,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(borderRadius),
-              child: Image.file(
-                File(source),
-                cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
-                    .round(),
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => NullArtworkWidget(
-                  iconSize: errorWidgetIconSize,
-                  size: size,
-                ),
-              ),
-            ),
-          )
-        : CachedNetworkImage(
-            width: size,
-            height: size,
-            imageUrl: source,
-            // Decoded at the size it is drawn, as the local files are.
-            memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
-                .round(),
-            imageBuilder: (context, imageProvider) => ClipRRect(
-              borderRadius: BorderRadius.circular(borderRadius),
-              child: Image(image: imageProvider, fit: BoxFit.cover),
-            ),
-            placeholder: (context, url) => const Spinner(),
-            errorWidget: (context, url, error) =>
-                NullArtworkWidget(iconSize: errorWidgetIconSize, size: size),
-          );
+    return CoverImage(
+      source: mediaItemArtworkSource(metadata) ?? '',
+      size: size,
+      borderRadius: borderRadius,
+      placeholder: const Spinner(),
+      error: NullArtworkWidget(iconSize: errorWidgetIconSize, size: size),
+    );
   }
 }

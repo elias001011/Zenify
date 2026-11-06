@@ -75,9 +75,10 @@ class ArtworkProvider {
     ImageProvider provider,
     double size,
     BuildContext context,
-  ) => ResizeImage.resizeIfNeeded(
-    (size * MediaQuery.devicePixelRatioOf(context)).round(),
-    null,
-    provider,
-  );
+  ) => ResizeImage.resizeIfNeeded(decodeWidth(size, context), null, provider);
+
+  /// The width in device pixels an image drawn [size] logical pixels wide is
+  /// decoded at.
+  static int decodeWidth(double size, BuildContext context) =>
+      (size * MediaQuery.devicePixelRatioOf(context)).round();
 }
