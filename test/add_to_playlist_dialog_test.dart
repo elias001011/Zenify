@@ -112,6 +112,33 @@ void main() {
     expect(find.text('Removed from liked songs'), findsOneWidget);
   });
 
+  testWidgets('a tap on a playlist without the song puts it in', (
+    tester,
+  ) async {
+    await _open(tester, _app(song: song));
+    await tester.tap(find.text('Road trip'));
+    await tester.pumpAndSettle();
+    final road = userCustomPlaylists.value.firstWhere((p) => p['ytid'] == 'p1');
+    expect((road['list'] as List).map((s) => s['ytid']), ['a']);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Song added'), findsOneWidget);
+  });
+
+  testWidgets('a tap on a playlist that has the song takes it out', (
+    tester,
+  ) async {
+    await _open(tester, _app(song: song));
+    await tester.tap(find.text('Focus'));
+    await tester.pumpAndSettle();
+    final focus = userCustomPlaylists.value.firstWhere(
+      (p) => p['ytid'] == 'p2',
+    );
+    expect(focus['list'], isEmpty);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('Song removed'), findsOneWidget);
+    expect(find.text('Song is already in the playlist'), findsNothing);
+  });
+
   testWidgets('many songs, and local files, have no liked songs row', (
     tester,
   ) async {

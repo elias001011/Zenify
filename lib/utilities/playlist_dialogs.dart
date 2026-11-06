@@ -349,7 +349,8 @@ Map? _likableSong(dynamic song) {
 
 /// The dialog to put [song], or [songs], in a playlist. A single song also
 /// gets the liked songs at the top, as a playlist that stands out, and one
-/// tap likes it or takes the like back.
+/// tap likes it or takes the like back. In the same way, one tap on a playlist
+/// puts the song in it or, if it is there, takes it out.
 void showAddToPlaylistDialog(
   BuildContext context, {
   dynamic song,
@@ -563,7 +564,8 @@ class _LikedSongsItem extends StatelessWidget {
 }
 
 /// A playlist the song can go in. With one song, it also says whether the song
-/// is already in it; with many, it has the chevron of a row that opens.
+/// is already in it, and the same tap takes it out (as the liked songs do);
+/// with many, it has the chevron of a row that opens.
 class _PlaylistItem extends StatelessWidget {
   const _PlaylistItem({required this.playlist, this.song, this.songs});
 
@@ -575,20 +577,26 @@ class _PlaylistItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final ytid = song is Map ? songYtid(song as Map) : null;
+    // The song as the playlist holds it, when it does.
+    final held = ytid != null && playlist['list'] is List
+        ? findSongByYtid(playlist['list'] as List, ytid)
+        : null;
     return DialogItem(
       icon: FluentIcons.text_bullet_list_24_filled,
       iconColor: colorScheme.tertiary,
       iconBgColor: colorScheme.tertiaryContainer,
       label: playlist['title'] ?? '',
-      trailing: ytid == null
-          ? null
-          : _InListMark(
-              inList:
-                  playlist['list'] is List &&
-                  findSongByYtid(playlist['list'] as List, ytid) != null,
-            ),
+      trailing: ytid == null ? null : _InListMark(inList: held != null),
       onTap: () {
-        if (song != null) {
+        if (held != null) {
+          final l10n = context.l10n!;
+          showToast(
+            context,
+            removeSongFromPlaylist(playlist, held)
+                ? l10n.songRemoved
+                : l10n.error,
+          );
+        } else if (song != null) {
           showToast(
             context,
             addSongInCustomPlaylist(context, playlist['ytid'], song),
