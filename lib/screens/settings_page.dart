@@ -621,7 +621,7 @@ class SettingsPage extends StatelessWidget {
           context.l10n!.reportBug,
           FluentIcons.bug_24_regular,
           description: context.l10n!.reportBugDescription,
-          onTap: () => launchURL(bugReportUri()),
+          onTap: () => launchURL(feedbackUri()),
         ),
         ValueListenableBuilder<int>(
           valueListenable: logger.logCount,

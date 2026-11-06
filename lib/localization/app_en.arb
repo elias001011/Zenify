@@ -478,8 +478,8 @@
     }
   },
   "removeLocalFile": "Remove from this list",
-  "reportBug": "Report a bug",
-  "reportBugDescription": "Opens a new issue on Zenify's GitHub with the version filled in.",
+  "reportBug": "Report bugs or suggest features",
+  "reportBugDescription": "Opens Zenify's GitHub, where you choose between a bug report and a feature suggestion.",
   "understand": "I understand",
   "undo": "Undo",
   "unpinFromLibrary": "Unpin from library",
