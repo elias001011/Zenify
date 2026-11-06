@@ -41,6 +41,7 @@ import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/section_header.dart';
+import 'package:musify/widgets/spinner.dart';
 
 Map<SyncCategory, String> syncCategoryLabels(AppLocalizations l10n) => {
   SyncCategory.favourites: l10n.syncFavourites,
@@ -578,7 +579,7 @@ class _LocalSyncPageState extends State<LocalSyncPage> {
       case LocalSyncStatus.scanning:
         return _StatusCard(
           children: [
-            const CircularProgressIndicator(),
+            const Spinner(),
             const SizedBox(height: 16),
             Text(l10n.syncScanning, textAlign: TextAlign.center),
           ],

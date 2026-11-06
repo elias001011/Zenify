@@ -1,0 +1,65 @@
+/*
+ *     Copyright (C) 2026 Valeri Gokadze
+ *
+ *     Musify is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     Musify is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ *
+ *
+ *     For more information about Musify, including how to contribute,
+ *     please visit: https://github.com/gokadzev/Musify
+ */
+
+import 'package:material_ui/material_ui.dart';
+
+/// A message in the middle of a page that has nothing to show, over an icon
+/// when it has one. The message is the muted variant colour unless
+/// [messageColor] says otherwise.
+class EmptyState extends StatelessWidget {
+  const EmptyState({
+    super.key,
+    this.icon,
+    required this.message,
+    this.messageColor,
+  });
+
+  final IconData? icon;
+  final String message;
+  final Color? messageColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 64, color: colorScheme.onSurface.withAlpha(120)),
+              const SizedBox(height: 16),
+            ],
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: messageColor ?? colorScheme.onSurfaceVariant,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

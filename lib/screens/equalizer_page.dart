@@ -28,6 +28,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/spinner.dart';
 
 class EqualizerPage extends StatefulWidget {
   const EqualizerPage({super.key});
@@ -213,7 +214,7 @@ class _EqualizerPageState extends State<EqualizerPage> {
         ),
       ],
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Spinner()
           : _params == null
           ? Center(
               child: Padding(

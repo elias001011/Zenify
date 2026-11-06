@@ -37,6 +37,7 @@ import 'package:musify/widgets/playback_icon_button.dart';
 import 'package:musify/widgets/position_slider.dart';
 import 'package:musify/widgets/skip_icon_button.dart';
 import 'package:musify/widgets/song_artwork.dart';
+import 'package:musify/widgets/spinner.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// What the mini player's body shows besides the song: the playback state
@@ -534,14 +535,7 @@ class _CircularPlayButton extends StatelessWidget {
               ),
             ),
           if (isLoading)
-            SizedBox(
-              width: 24,
-              height: 24,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.5,
-                valueColor: AlwaysStoppedAnimation<Color>(colorScheme.primary),
-              ),
-            )
+            const Spinner(size: 24, strokeWidth: 2.5)
           else
             IconButton(
               onPressed: isCompleted

@@ -21,17 +21,26 @@
 
 import 'package:material_ui/material_ui.dart';
 
+/// A loading spinner in the primary colour. Without a [size] it has its own
+/// size and sits in the middle of the room it is given; with one it is that
+/// box and nothing more, for the caller to place.
 class Spinner extends StatelessWidget {
-  const Spinner({super.key});
+  const Spinner({super.key, this.size, this.strokeWidth});
+
+  final double? size;
+  final double? strokeWidth;
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: CircularProgressIndicator(
-        valueColor: AlwaysStoppedAnimation<Color>(
-          Theme.of(context).colorScheme.primary,
-        ),
+    final spinner = CircularProgressIndicator(
+      strokeWidth: strokeWidth,
+      valueColor: AlwaysStoppedAnimation<Color>(
+        Theme.of(context).colorScheme.primary,
       ),
     );
+    final size = this.size;
+    return size == null
+        ? Center(child: spinner)
+        : SizedBox.square(dimension: size, child: spinner);
   }
 }

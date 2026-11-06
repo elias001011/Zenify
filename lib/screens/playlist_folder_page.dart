@@ -32,6 +32,7 @@ import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/dialog_item.dart';
 import 'package:musify/widgets/dialog_parts.dart';
+import 'package:musify/widgets/empty_state.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_bar.dart';
@@ -244,29 +245,10 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              FluentIcons.folder_24_regular,
-              size: 64,
-              color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              context.l10n!.emptyFolderMsg,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface.withAlpha(180),
-                fontSize: 16,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return EmptyState(
+      icon: FluentIcons.folder_24_regular,
+      message: context.l10n!.emptyFolderMsg,
+      messageColor: Theme.of(context).colorScheme.onSurface.withAlpha(180),
     );
   }
 

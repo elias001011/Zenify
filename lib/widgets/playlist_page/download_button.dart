@@ -28,6 +28,7 @@ import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/offline_playlist_dialogs.dart';
+import 'package:musify/widgets/spinner.dart';
 
 /// Downloads a playlist for offline playback, showing the download progress
 /// and turning into a "remove offline" button once every song is stored.
@@ -126,13 +127,7 @@ class _PlaylistDownloadButtonState extends State<PlaylistDownloadButton> {
                 return const SizedBox(
                   width: 48,
                   height: 48,
-                  child: Center(
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 3),
-                    ),
-                  ),
+                  child: Center(child: Spinner(size: 24, strokeWidth: 3)),
                 );
               }
 

@@ -22,6 +22,7 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/widgets/spinner.dart';
 
 class CustomSearchBar extends StatefulWidget {
   const CustomSearchBar({
@@ -139,16 +140,9 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
               valueListenable: widget.loadingProgressNotifier!,
               builder: (_, value, __) {
                 if (value) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: colorScheme.primary,
-                      ),
-                    ),
+                  return const Padding(
+                    padding: EdgeInsets.only(right: 8),
+                    child: Spinner(size: 20, strokeWidth: 2),
                   );
                 }
                 return const SizedBox.shrink();

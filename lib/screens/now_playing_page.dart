@@ -35,6 +35,7 @@ import 'package:musify/widgets/now_playing/now_playing_controls.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
 import 'package:musify/widgets/now_playing/player_chrome.dart';
 import 'package:musify/widgets/queue_list_view.dart';
+import 'package:musify/widgets/spinner.dart';
 
 class NowPlayingPage extends StatefulWidget {
   const NowPlayingPage({super.key});
@@ -141,7 +142,7 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
               builder: (context, snapshot) {
                 final metadata = snapshot.data;
                 if (metadata == null) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const Spinner();
                 }
                 final panel = _panel;
                 final actions = PlayerActions(

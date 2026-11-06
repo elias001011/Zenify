@@ -21,7 +21,9 @@
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/widgets/empty_state.dart';
 
+/// An [EmptyState] that fills what is left of a page's scroll view.
 class EmptyPlaylistState extends StatelessWidget {
   const EmptyPlaylistState({
     super.key,
@@ -36,30 +38,7 @@ class EmptyPlaylistState extends StatelessWidget {
   Widget build(BuildContext context) {
     return SliverFillRemaining(
       hasScrollBody: false,
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                icon,
-                size: 64,
-                color: Theme.of(context).colorScheme.onSurface.withAlpha(120),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: 16,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      child: EmptyState(icon: icon, message: message),
     );
   }
 }
