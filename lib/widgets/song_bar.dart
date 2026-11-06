@@ -449,6 +449,7 @@ class _SongBarState extends State<SongBar> {
           : widget.backgroundColor ?? colorScheme.surfaceContainerLow,
       borderRadius: widget.borderRadius,
       child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
         onTap: isSelecting ? widget.onSelectionToggle : _handleSongTap,
         onLongPress: widget.onLongPress,
         child: Padding(

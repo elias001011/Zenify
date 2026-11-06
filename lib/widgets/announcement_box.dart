@@ -48,6 +48,7 @@ class AnnouncementBox extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
           onTap: () => launchURL(Uri.parse(url)),
           child: Padding(
             padding: const EdgeInsets.all(16),

@@ -176,6 +176,7 @@ class ArtistTile extends StatelessWidget {
     final subtitle = this.subtitle;
 
     return InkWell(
+      mouseCursor: WidgetStateMouseCursor.clickable,
       borderRadius: BorderRadius.circular(12),
       onTap: onTap,
       child: Padding(

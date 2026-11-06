@@ -27,6 +27,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/services/lyrics/lyrics_models.dart';
+import 'package:musify/widgets/click_region.dart';
 import 'package:musify/widgets/now_playing/lyric_line_fill.dart';
 
 /// Shows time-synced lyrics: the current line is highlighted and kept in view,
@@ -269,11 +270,13 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
             icon: const Icon(FluentIcons.subtract_24_regular),
             onPressed: () => _changeOffset(-_offsetStep),
           ),
-          GestureDetector(
-            onTap: () => _changeOffset(Duration.zero),
-            child: Text(
-              _offsetLabel,
-              style: TextStyle(fontSize: 12, color: dimmed),
+          ClickRegion(
+            child: GestureDetector(
+              onTap: () => _changeOffset(Duration.zero),
+              child: Text(
+                _offsetLabel,
+                style: TextStyle(fontSize: 12, color: dimmed),
+              ),
             ),
           ),
           IconButton(
@@ -371,46 +374,48 @@ class _LyricRowState extends State<_LyricRow> {
         : _place == _Place.before
         ? -1.0
         : 1.0;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: widget.onTap,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(end: lean),
-        duration: reduceMotion
-            ? Duration.zero
-            : const Duration(milliseconds: 500),
-        curve: Curves.easeOutCubic,
-        builder: (context, lean, child) => Transform.translate(
-          offset: Offset(0, 3 * lean),
-          child: Transform.scale(
-            scaleX: 1,
-            scaleY: 1 - 0.02 * lean.abs(),
-            alignment: Alignment.bottomCenter,
-            child: child,
+    return ClickRegion(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: widget.onTap,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(end: lean),
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 500),
+          curve: Curves.easeOutCubic,
+          builder: (context, lean, child) => Transform.translate(
+            offset: Offset(0, 3 * lean),
+            child: Transform.scale(
+              scaleX: 1,
+              scaleY: 1 - 0.02 * lean.abs(),
+              alignment: Alignment.bottomCenter,
+              child: child,
+            ),
           ),
-        ),
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: spacious ? 18 : 6),
-          child: ValueListenableBuilder<double>(
-            valueListenable: current
-                ? widget.progress
-                : AlwaysStoppedAnimation<double>(
-                    _place == _Place.before ? 1 : 0,
-                  ),
-            builder: (context, progress, _) => LyricLineFill(
-              text: widget.line.text.isEmpty ? '♪' : widget.line.text,
-              style: style,
-              textAlign: spacious ? TextAlign.start : TextAlign.center,
-              progress: progress,
-              emphasis: current ? 1 : 0,
-              baseOpacity: current
-                  ? 0.38
-                  : _place == _Place.before
-                  ? 0.28
-                  : 0.45,
-              duration: reduceMotion
-                  ? Duration.zero
-                  : const Duration(milliseconds: 300),
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: spacious ? 18 : 6),
+            child: ValueListenableBuilder<double>(
+              valueListenable: current
+                  ? widget.progress
+                  : AlwaysStoppedAnimation<double>(
+                      _place == _Place.before ? 1 : 0,
+                    ),
+              builder: (context, progress, _) => LyricLineFill(
+                text: widget.line.text.isEmpty ? '♪' : widget.line.text,
+                style: style,
+                textAlign: spacious ? TextAlign.start : TextAlign.center,
+                progress: progress,
+                emphasis: current ? 1 : 0,
+                baseOpacity: current
+                    ? 0.38
+                    : _place == _Place.before
+                    ? 0.28
+                    : 0.45,
+                duration: reduceMotion
+                    ? Duration.zero
+                    : const Duration(milliseconds: 300),
+              ),
             ),
           ),
         ),

@@ -51,6 +51,7 @@ class ArtistBar extends StatelessWidget {
       borderRadius: borderRadius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
         onTap: onTap,
         child: Padding(
           padding: commonBarPadding,

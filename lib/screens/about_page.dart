@@ -237,6 +237,7 @@ class _SocialButton extends StatelessWidget {
       color: colorScheme.primaryContainer,
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
         onTap: onPressed,
         borderRadius: BorderRadius.circular(12),
         child: Tooltip(

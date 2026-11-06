@@ -56,6 +56,7 @@ class BottomSheetBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           clipBehavior: Clip.antiAlias,
           child: InkWell(
+            mouseCursor: WidgetStateMouseCursor.clickable,
             onTap: onTap,
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

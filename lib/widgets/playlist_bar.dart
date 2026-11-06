@@ -102,6 +102,7 @@ class PlaylistBar extends StatelessWidget {
       color: colorScheme.surfaceContainerLow,
       borderRadius: borderRadius,
       child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
         onTap: onPressed ?? _getDefaultOnPressed(context, updatedPlaylist),
         child: Padding(
           padding: commonBarPadding,

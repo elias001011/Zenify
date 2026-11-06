@@ -109,8 +109,23 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
   final effectiveColorScheme = neutralSurfaces(colorScheme);
   final bgColor = effectiveColorScheme.surface;
   final cardBgColor = effectiveColorScheme.surfaceContainerLow;
+  // Flutter keeps the arrow over its buttons on desktop (the native
+  // convention); here everything that can be tapped shows the hand, as it
+  // does on the web. Disabled ones keep the arrow.
+  const clickable = WidgetStateMouseCursor.clickable;
+  const clickableStyle = ButtonStyle(mouseCursor: clickable);
 
   return ThemeData(
+    iconButtonTheme: const IconButtonThemeData(style: clickableStyle),
+    filledButtonTheme: const FilledButtonThemeData(style: clickableStyle),
+    textButtonTheme: const TextButtonThemeData(style: clickableStyle),
+    outlinedButtonTheme: const OutlinedButtonThemeData(style: clickableStyle),
+    elevatedButtonTheme: const ElevatedButtonThemeData(style: clickableStyle),
+    segmentedButtonTheme: const SegmentedButtonThemeData(style: clickableStyle),
+    menuButtonTheme: const MenuButtonThemeData(style: clickableStyle),
+    switchTheme: const SwitchThemeData(mouseCursor: clickable),
+    checkboxTheme: const CheckboxThemeData(mouseCursor: clickable),
+    radioTheme: const RadioThemeData(mouseCursor: clickable),
     scaffoldBackgroundColor: bgColor,
     colorScheme: effectiveColorScheme,
     cardColor: cardBgColor,
@@ -145,8 +160,10 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
     listTileTheme: base.listTileTheme.copyWith(
       textColor: effectiveColorScheme.primary,
       iconColor: effectiveColorScheme.primary,
+      mouseCursor: clickable,
     ),
     sliderTheme: base.sliderTheme.copyWith(
+      mouseCursor: clickable,
       year2023: false,
       trackHeight: 12,
       thumbSize: WidgetStateProperty.all(const Size(6, 30)),
@@ -171,6 +188,7 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
     ),
     popupMenuTheme: base.popupMenuTheme.copyWith(
+      mouseCursor: clickable,
       color: effectiveColorScheme.surfaceContainer,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     ),

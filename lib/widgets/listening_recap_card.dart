@@ -154,6 +154,7 @@ class _RecapCard extends StatelessWidget {
         color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
           onTap: onTap,
           child: Padding(padding: const EdgeInsets.all(16), child: child),
         ),

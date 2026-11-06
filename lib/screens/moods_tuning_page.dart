@@ -305,6 +305,7 @@ class _GenreCard extends StatelessWidget {
           : theme.colorScheme.surfaceContainerLow,
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
         onTap: () => onChanged(!included),
         child: Padding(
           padding: const EdgeInsets.all(14),

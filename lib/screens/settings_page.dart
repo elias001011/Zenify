@@ -668,6 +668,7 @@ class SettingsPage extends StatelessWidget {
                   : BorderSide.none,
             ),
             child: InkWell(
+              mouseCursor: WidgetStateMouseCursor.clickable,
               customBorder: const CircleBorder(),
               onTap: () => _selectAccentColor(context, color),
               child: isSelected

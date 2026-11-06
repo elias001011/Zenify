@@ -37,6 +37,7 @@ import 'package:musify/utilities/async_loader.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
 import 'package:musify/widgets/announcement_box.dart';
 import 'package:musify/widgets/artwork_glow.dart';
+import 'package:musify/widgets/click_region.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/glow_row.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
@@ -251,11 +252,13 @@ class _HomePageState extends State<HomePage> {
         final playlist = playlists[index];
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: GestureDetector(
-            onTap: () => context.push(
-              '/home/playlist/${Uri.encodeComponent('${playlist['ytid']}')}',
+          child: ClickRegion(
+            child: GestureDetector(
+              onTap: () => context.push(
+                '/home/playlist/${Uri.encodeComponent('${playlist['ytid']}')}',
+              ),
+              child: PlaylistCube(playlist, size: height),
             ),
-            child: PlaylistCube(playlist, size: height),
           ),
         );
       },

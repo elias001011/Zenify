@@ -172,6 +172,7 @@ class _MoodButton extends StatelessWidget {
       button: true,
       label: label,
       child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
         onTap: busy ? null : onTap,
         borderRadius: BorderRadius.circular(16),
         child: SizedBox(

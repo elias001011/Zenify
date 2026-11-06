@@ -59,6 +59,7 @@ class DialogItem extends StatelessWidget {
         borderRadius: commonCustomBarRadius,
         clipBehavior: Clip.antiAlias,
         child: InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
           onTap: onTap,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),

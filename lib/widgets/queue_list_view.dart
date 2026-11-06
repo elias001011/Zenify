@@ -408,6 +408,7 @@ class QueueTile extends StatelessWidget {
             : Colors.transparent,
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
           splashColor: Colors.transparent,

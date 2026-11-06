@@ -55,6 +55,7 @@ class CustomBar extends StatelessWidget {
       borderRadius: borderRadius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
+        mouseCursor: WidgetStateMouseCursor.clickable,
         onTap: onTap,
         onLongPress: onLongPress,
         child: Padding(

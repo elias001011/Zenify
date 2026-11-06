@@ -22,6 +22,7 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/widgets/click_region.dart';
 import 'package:musify/widgets/floating_island.dart';
 
 /// The metadata and actions below a playlist, album or artist hero.
@@ -152,17 +153,19 @@ class _DescriptionState extends State<_Description> {
 
     return Padding(
       padding: const EdgeInsets.only(top: 16),
-      child: GestureDetector(
-        onTap: () => setState(() => _isExpanded = !_isExpanded),
-        child: Text(
-          widget.text,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            height: 1.4,
+      child: ClickRegion(
+        child: GestureDetector(
+          onTap: () => setState(() => _isExpanded = !_isExpanded),
+          child: Text(
+            widget.text,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.4,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: _isExpanded ? null : 3,
+            overflow: _isExpanded ? TextOverflow.clip : TextOverflow.ellipsis,
           ),
-          textAlign: TextAlign.center,
-          maxLines: _isExpanded ? null : 3,
-          overflow: _isExpanded ? TextOverflow.clip : TextOverflow.ellipsis,
         ),
       ),
     );
