@@ -811,14 +811,19 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      borderRadius: commonCustomBarRadius,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-        child: SizedBox(
-          width: double.infinity,
-          child: Column(children: children),
+    // A live region, so screen readers announce scanning, syncing, success and
+    // errors as they appear.
+    return Semantics(
+      liveRegion: true,
+      child: Material(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: commonCustomBarRadius,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+          child: SizedBox(
+            width: double.infinity,
+            child: Column(children: children),
+          ),
         ),
       ),
     );
