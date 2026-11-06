@@ -29,11 +29,13 @@ import 'package:just_audio/just_audio.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/constants/clients.dart';
 import 'package:musify/main.dart';
+import 'package:musify/models/equalizer_parameters.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/models/radio_model.dart';
 import 'package:musify/services/audio_service_android_auto.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/desktop_equalizer.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/music_radio.dart';
@@ -87,6 +89,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   // Player and service collaborators.
   late final AndroidEqualizer? _androidEqualizer;
+  final DesktopEqualizer? _desktopEqualizer = isDesktopPlatform
+      ? DesktopEqualizer()
+      : null;
   late final AudioPlayer audioPlayer;
   late final AndroidAutoBrowser _androidAutoBrowser;
   bool _equalizerInitialized = false;
@@ -720,14 +725,26 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     }
   }
 
-  Future<AndroidEqualizerParameters?> getEqualizerParameters() async {
+  /// The equalizer's bands and gains, or null while it cannot be reached.
+  Future<EqualizerParameters?> getEqualizerParameters() async {
+    if (_desktopEqualizer != null) return DesktopEqualizer.parameters;
     final equalizer = _androidEqualizer;
     if (equalizer == null) return null;
 
     final initialized = await _ensureEqualizerConfigured();
     if (!initialized) return null;
     try {
-      return await equalizer.parameters.timeout(const Duration(seconds: 2));
+      final params = await equalizer.parameters.timeout(
+        const Duration(seconds: 2),
+      );
+      return (
+        minDecibels: params.minDecibels,
+        maxDecibels: params.maxDecibels,
+        bands: [
+          for (final band in params.bands)
+            (centerFrequency: band.centerFrequency, gain: band.gain),
+        ],
+      );
     } catch (e, stackTrace) {
       logger.log(
         'Failed to get equalizer parameters',
@@ -738,7 +755,21 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     }
   }
 
+  void _saveEqualizerEnabled(bool enabled) {
+    equalizerEnabled.value = enabled;
+    unawaited(addOrUpdateData<bool>('settings', 'equalizerEnabled', enabled));
+  }
+
+  void _saveEqualizerGains(List<double> gains) {
+    equalizerBandGains.value = gains;
+    unawaited(
+      addOrUpdateData<List<double>>('settings', 'equalizerBandGains', gains),
+    );
+  }
+
   Future<void> setEqualizerEnabled(bool enabled) async {
+    // The desktop engine follows the saved value.
+    if (_desktopEqualizer != null) return _saveEqualizerEnabled(enabled);
     final equalizer = _androidEqualizer;
     if (equalizer == null) return;
 
@@ -746,8 +777,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     if (!initialized) return;
     try {
       await equalizer.setEnabled(enabled);
-      equalizerEnabled.value = enabled;
-      unawaited(addOrUpdateData<bool>('settings', 'equalizerEnabled', enabled));
+      _saveEqualizerEnabled(enabled);
     } catch (e, stackTrace) {
       logger.log(
         'Failed to set equalizer enabled state',
@@ -758,6 +788,15 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }
 
   Future<void> setEqualizerBandGain(int index, double gain) async {
+    if (_desktopEqualizer != null) {
+      final gains = DesktopEqualizer.savedGains();
+      if (index < 0 || index >= gains.length) return;
+      gains[index] = gain.clamp(
+        DesktopEqualizer.minDecibels,
+        DesktopEqualizer.maxDecibels,
+      );
+      return _saveEqualizerGains(gains);
+    }
     final equalizer = _androidEqualizer;
     if (equalizer == null) return;
 
@@ -773,11 +812,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       final clamped = gain.clamp(params.minDecibels, params.maxDecibels);
       await params.bands[index].setGain(clamped);
 
-      final gains = params.bands.map((band) => band.gain).toList();
-      equalizerBandGains.value = gains;
-      unawaited(
-        addOrUpdateData<List<double>>('settings', 'equalizerBandGains', gains),
-      );
+      _saveEqualizerGains(params.bands.map((band) => band.gain).toList());
     } catch (e, stackTrace) {
       logger.log(
         'Failed to set equalizer band gain',
@@ -788,6 +823,11 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }
 
   Future<void> resetEqualizerBands() async {
+    if (_desktopEqualizer != null) {
+      return _saveEqualizerGains(
+        List.filled(DesktopEqualizer.centerFrequencies.length, 0),
+      );
+    }
     final equalizer = _androidEqualizer;
     if (equalizer == null) return;
 
@@ -799,11 +839,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       for (final band in params.bands) {
         await band.setGain(0);
       }
-      final gains = List<double>.filled(params.bands.length, 0);
-      equalizerBandGains.value = gains;
-      unawaited(
-        addOrUpdateData<List<double>>('settings', 'equalizerBandGains', gains),
-      );
+      _saveEqualizerGains(List<double>.filled(params.bands.length, 0));
     } catch (e, stackTrace) {
       logger.log(
         'Failed to reset equalizer bands',

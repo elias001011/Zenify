@@ -34,7 +34,7 @@ class MediaKitPlayer extends AudioPlayerPlatform {
       'cache-on-disk',
       JustAudioMediaKit.diskCache ? 'yes' : 'no',
     );
-    for (final filter in JustAudioMediaKit.audioFilters) {
+    for (final filter in JustAudioMediaKit.audioFilters()) {
       try {
         await command(_player, ['af', 'add', filter]);
       } catch (error) {

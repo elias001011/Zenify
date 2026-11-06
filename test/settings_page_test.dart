@@ -168,6 +168,33 @@ void main() {
     });
   });
 
+  group('equalizer row', () {
+    final platforms = {
+      TargetPlatform.android: true,
+      TargetPlatform.linux: true,
+      TargetPlatform.windows: true,
+      TargetPlatform.iOS: false,
+    };
+    for (final MapEntry(key: platform, value: shown) in platforms.entries) {
+      testWidgets('is ${shown ? 'there' : 'hidden'} on ${platform.name}', (
+        tester,
+      ) async {
+        debugDefaultTargetPlatformOverride = platform;
+        // Only the desktop section reads it, for the downloads folder.
+        applicationDirPath = '/tmp/zenify-settings-test';
+        try {
+          await mount(tester);
+          expect(
+            barFinder(l10n.equalizer),
+            shown ? findsOneWidget : findsNothing,
+          );
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      });
+    }
+  });
+
   group('pickers', () {
     testWidgets('a phone picker is a dialog and applies the chosen option', (
       tester,
