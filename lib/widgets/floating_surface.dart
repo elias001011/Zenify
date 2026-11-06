@@ -19,10 +19,12 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' show ImageFilter, lerpDouble;
 
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/utilities/platform_utils.dart';
+import 'package:musify/widgets/blur_snapshot.dart';
 
 /// How opaque the floating chrome is under each [FloatingEffect]. It sits over
 /// scrolling text, so the simple translucency keeps most of its colour (music
@@ -38,7 +40,10 @@ double floatingOpacity(FloatingEffect effect, {required bool dark}) =>
 /// The rounded surface every floating element (top island, bottom dock,
 /// desktop rail, mini player) sits on, so they share one look.
 ///
-/// [floatingEffect] decides how much of the content behind shows through.
+/// [floatingEffect] decides how much of the content behind shows through. On
+/// a phone, blurred shows a [BlurSnapshot] taken while the content rests
+/// instead of blurring it live, and the translucent look while there is none
+/// (the content scrolls, or the surface is not under a [BlurSnapshotScope]).
 class FloatingSurface extends StatefulWidget {
   const FloatingSurface({
     super.key,
@@ -85,21 +90,25 @@ class _FloatingSurfaceState extends State<FloatingSurface> {
   Widget _build(BuildContext context, FloatingEffect effect) {
     final colorScheme = Theme.of(context).colorScheme;
     final dark = colorScheme.brightness == Brightness.dark;
-    final color = colorScheme.surfaceContainer.withValues(
-      alpha: floatingOpacity(effect, dark: dark),
-    );
     final borderRadius = widget.borderRadius;
+    // A phone does not blur what is behind a surface on every frame.
+    final onPhone = effect == FloatingEffect.blurred && isMobilePlatform;
+    final glass = onPhone || effect == FloatingEffect.translucent;
+    final opacity = floatingOpacity(
+      onPhone ? FloatingEffect.translucent : effect,
+      dark: dark,
+    );
 
-    final Widget surface = Material(
+    Widget surface(double fill) => Material(
       key: _contentKey,
-      color: color,
+      color: colorScheme.surfaceContainer.withValues(alpha: fill),
       borderRadius: borderRadius,
       clipBehavior: Clip.antiAlias,
       child: DecoratedBox(
         position: DecorationPosition.foreground,
-        // The translucent surface swaps the plain border for light on its
-        // edge; the child stays where it is, whatever the effect.
-        decoration: effect == FloatingEffect.translucent
+        // The glass surfaces swap the plain border for light on their edge;
+        // the child stays where it is, whatever the effect.
+        decoration: glass
             ? _GlassEdge(borderRadius: borderRadius, dark: dark)
             : BoxDecoration(
                 borderRadius: borderRadius,
@@ -112,17 +121,43 @@ class _FloatingSurfaceState extends State<FloatingSurface> {
       ),
     );
 
+    final snapshot = onPhone ? BlurSnapshot.of(context) : null;
+    if (snapshot != null) {
+      // The picture fades in and out as the content comes to rest and moves.
+      return TweenAnimationBuilder<double>(
+        tween: Tween(end: snapshot.ready ? 1 : 0),
+        duration: const Duration(milliseconds: 150),
+        builder: (context, shown, _) => CustomPaint(
+          painter: shown == 0
+              ? null
+              : _SnapshotPainter(snapshot, _contentKey, borderRadius, shown),
+          // Over the picture the surface is as opaque as over a live blur.
+          child: surface(
+            lerpDouble(
+              opacity,
+              floatingOpacity(FloatingEffect.blurred, dark: dark),
+              shown,
+            )!,
+          ),
+        ),
+      );
+    }
+
     switch (effect) {
-      case FloatingEffect.blurred:
+      case FloatingEffect.blurred when !onPhone:
         return ClipRRect(
           borderRadius: borderRadius,
           child: widget.grouped
-              ? BackdropFilter.grouped(filter: _blurFilter, child: surface)
-              : BackdropFilter(filter: _blurFilter, child: surface),
+              ? BackdropFilter.grouped(
+                  filter: _blurFilter,
+                  child: surface(opacity),
+                )
+              : BackdropFilter(filter: _blurFilter, child: surface(opacity)),
         );
       // A shadow under a see-through surface would darken what shows through.
+      case FloatingEffect.blurred:
       case FloatingEffect.translucent:
-        return surface;
+        return surface(opacity);
       case FloatingEffect.solid:
         return DecoratedBox(
           decoration: BoxDecoration(
@@ -135,10 +170,59 @@ class _FloatingSurfaceState extends State<FloatingSurface> {
               ),
             ],
           ),
-          child: surface,
+          child: surface(opacity),
         );
     }
   }
+}
+
+/// Draws the part of the [BlurSnapshot] that lies under the surface behind
+/// [surface], at [opacity].
+class _SnapshotPainter extends CustomPainter {
+  _SnapshotPainter(
+    this.snapshot,
+    this.surface,
+    this.borderRadius,
+    this.opacity,
+  );
+
+  final BlurSnapshot snapshot;
+  final GlobalKey surface;
+  final BorderRadius borderRadius;
+  final double opacity;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final image = snapshot.image;
+    final from = surface.currentContext?.findRenderObject();
+    final to = snapshot.key.currentContext?.findRenderObject();
+    if (image == null || from is! RenderBox || to is! RenderBox) return;
+    // The surface in the content's own coordinates, which the picture shares.
+    final area = MatrixUtils.transformRect(
+      from.getTransformTo(to),
+      Offset.zero & size,
+    );
+    const ratio = BlurSnapshot.pixelRatio;
+    final bounds = Offset.zero & size;
+    canvas
+      ..save()
+      ..clipRRect(borderRadius.toRRect(bounds))
+      ..drawImageRect(
+        image,
+        Rect.fromLTRB(
+          area.left * ratio,
+          area.top * ratio,
+          area.right * ratio,
+          area.bottom * ratio,
+        ),
+        bounds,
+        Paint()..color = Colors.white.withValues(alpha: opacity),
+      )
+      ..restore();
+  }
+
+  @override
+  bool shouldRepaint(_SnapshotPainter oldDelegate) => true;
 }
 
 /// The light the translucent surface catches, drawn over its fill: a faint

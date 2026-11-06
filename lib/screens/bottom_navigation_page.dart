@@ -30,6 +30,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart' show ToastInset;
 import 'package:musify/widgets/app_logo.dart';
+import 'package:musify/widgets/blur_snapshot.dart';
 import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/mini_player.dart';
 
@@ -95,31 +96,33 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
         }
       },
       child: Scaffold(
-        body: BackdropGroup(
-          backdropKey: _backdropKey,
-          // Pages reach under the status bar, so their background does too;
-          // each keeps its content and island below it.
-          child: SafeArea(
-            top: false,
-            bottom: false,
-            child: StreamBuilder<bool>(
-              initialData: audioHandler.mediaItem.value != null,
-              stream: _miniPlayerVisibilityStream,
-              builder: (context, snapshot) {
-                final playing = snapshot.data ?? false;
-                return ValueListenableBuilder<bool>(
-                  valueListenable: compactDesktopPlayer,
-                  builder: (context, compact, _) => isLargeScreen && !compact
-                      ? _buildDesktop(context, items, selected, playing)
-                      : _buildMobile(
-                          context,
-                          items,
-                          selected,
-                          playing,
-                          maxDockWidth: isLargeScreen ? 420 : null,
-                        ),
-                );
-              },
+        body: BlurSnapshotScope(
+          child: BackdropGroup(
+            backdropKey: _backdropKey,
+            // Pages reach under the status bar, so their background does too;
+            // each keeps its content and island below it.
+            child: SafeArea(
+              top: false,
+              bottom: false,
+              child: StreamBuilder<bool>(
+                initialData: audioHandler.mediaItem.value != null,
+                stream: _miniPlayerVisibilityStream,
+                builder: (context, snapshot) {
+                  final playing = snapshot.data ?? false;
+                  return ValueListenableBuilder<bool>(
+                    valueListenable: compactDesktopPlayer,
+                    builder: (context, compact, _) => isLargeScreen && !compact
+                        ? _buildDesktop(context, items, selected, playing)
+                        : _buildMobile(
+                            context,
+                            items,
+                            selected,
+                            playing,
+                            maxDockWidth: isLargeScreen ? 420 : null,
+                          ),
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -141,14 +144,18 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     double left = 0,
   }) {
     final media = MediaQuery.of(context);
-    return MediaQuery(
-      data: media.copyWith(
-        padding: media.padding.copyWith(
-          bottom: media.padding.bottom + bottom,
-          left: media.padding.left + left,
+    // The dock, rail and mini player are blurred from a picture of the pages,
+    // and not of themselves.
+    return BlurSnapshotSource(
+      child: MediaQuery(
+        data: media.copyWith(
+          padding: media.padding.copyWith(
+            bottom: media.padding.bottom + bottom,
+            left: media.padding.left + left,
+          ),
         ),
+        child: KeyedSubtree(key: _contentKey, child: widget.child),
       ),
-      child: KeyedSubtree(key: _contentKey, child: widget.child),
     );
   }
 
