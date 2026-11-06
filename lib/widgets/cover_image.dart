@@ -57,10 +57,16 @@ class CoverImage extends StatelessWidget {
   /// How round the picture's corners are.
   final double borderRadius;
 
-  /// Low-res YouTube 'default.jpg' thumbnails ship with baked-in black
-  /// letterbox bars, so BoxFit.cover keeps them visible. When set, those are
-  /// stretched over the bars with fill + centerSlice instead of cropped.
+  /// Low-res YouTube 'default.jpg' thumbnails are 4:3 with the 16:9 picture
+  /// in the middle and black bars above and below it, so BoxFit.cover keeps
+  /// the bars visible. When set, the picture is zoomed in until the bars fall
+  /// outside the square (see [letterboxZoom]).
   final bool fillLetterbox;
+
+  /// The share of a 'default.jpg' thumbnail that the picture takes up (the
+  /// rest is bars), as the zoom that leaves only the picture in the square:
+  /// 90 rows of 120 px wide, 67.5 of them the picture.
+  static const letterboxZoom = 90 / 67.5;
 
   /// Drawn over the picture, inside its rounded corners.
   final Widget? overlay;
@@ -72,14 +78,17 @@ class CoverImage extends StatelessWidget {
     final fill = fillLetterbox && isUrl && source.contains('default.jpg');
 
     Widget picture(ImageProvider provider, {ImageErrorWidgetBuilder? onError}) {
-      final image = Image(
-        image: ArtworkProvider.resized(provider, size, context),
+      // Decoded at the size it is shown; zoomed in, a larger one, so the
+      // part that shows keeps its sharpness.
+      final decoded = fill ? size * letterboxZoom * (4 / 3) : size;
+      Widget image = Image(
+        image: ArtworkProvider.resized(provider, decoded, context),
         width: size,
         height: size,
-        fit: fill ? BoxFit.fill : BoxFit.cover,
-        centerSlice: fill ? const Rect.fromLTRB(1, 1, 1, 1) : null,
+        fit: BoxFit.cover,
         errorBuilder: onError,
       );
+      if (fill) image = Transform.scale(scale: letterboxZoom, child: image);
       return ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: overlay == null ? image : Stack(children: [image, overlay!]),
