@@ -38,6 +38,7 @@ import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/services/song_fade.dart';
 import 'package:musify/services/update_manager.dart';
 import 'package:musify/theme/app_colors.dart';
 import 'package:musify/theme/app_themes.dart';
@@ -149,6 +150,21 @@ class SettingsPage extends StatelessWidget {
             FluentIcons.data_histogram_24_regular,
             onTap: () => context.push('/settings/equalizer'),
           ),
+        ValueListenableBuilder<int>(
+          valueListenable: songFadeSeconds,
+          builder: (context, seconds, _) => CustomBar(
+            context.l10n!.songFade,
+            FluentIcons.arrow_swap_24_regular,
+            description: context.l10n!.songFadeDescription,
+            trailing: Text(
+              _songFadeLabel(context, seconds),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+            onTap: () => _showSongFadePicker(context),
+          ),
+        ),
         const FloatingEffectBar(),
         const WaveReadingBar(),
         CustomBar(
@@ -800,6 +816,28 @@ class SettingsPage extends StatelessWidget {
               audioQualitySetting.value == availableQualities[index],
               icon: qualityIcons[index],
             ),
+        ],
+      ),
+    );
+  }
+
+  String _songFadeLabel(BuildContext context, int seconds) => seconds == 0
+      ? context.l10n!.songFadeOff
+      : context.l10n!.songFadeSeconds(seconds);
+
+  void _showSongFadePicker(BuildContext context) {
+    _showPickerDialog(
+      context,
+      title: context.l10n!.songFade,
+      content: ListView(
+        shrinkWrap: true,
+        children: [
+          for (final seconds in songFadeChoices)
+            BottomSheetBar(_songFadeLabel(context, seconds), () {
+              songFadeSeconds.value = seconds;
+              addOrUpdateData<int>('settings', 'songFadeSeconds', seconds);
+              Navigator.of(context, rootNavigator: true).pop();
+            }, songFadeSeconds.value == seconds),
         ],
       ),
     );

@@ -43,6 +43,7 @@ import 'package:musify/services/playback_buffer.dart';
 import 'package:musify/services/queue_persistence_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/services/sleep_timer.dart';
+import 'package:musify/services/song_fade.dart';
 import 'package:musify/utilities/map_utils.dart';
 import 'package:musify/utilities/media_duration.dart';
 import 'package:musify/utilities/mediaitem.dart';
@@ -106,6 +107,18 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   int _currentLoadingTransitionId = -1;
   double _volumeBeforeMute = 1;
 
+  // Volume. The user's choice is kept here (the sleep timer's fade moves it
+  // too); the player gets it times the fade between songs.
+  final BehaviorSubject<double> _volumeSubject = BehaviorSubject.seeded(1);
+  late final _songFade = SongFade(
+    read: _songFadeState,
+    write: () => _applyVolume().catchError((Object e, StackTrace stackTrace) {
+      logger.log('Error fading the volume', error: e, stackTrace: stackTrace);
+    }),
+  );
+  int _fadeInTransitionId = -1;
+  bool _advancingByItself = false;
+
   // Playback transition and state-update coordination.
   bool _isUpdatingState = false;
   bool _pendingPlaybackStateUpdate = false;
@@ -125,7 +138,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   // Timers and sleep-timer state.
   late final _sleepTimer = SleepTimer(
     readVolume: () => volume,
-    writeVolume: (value) => audioPlayer.setVolume(value),
+    writeVolume: _setUserVolume,
     onExpired: () async {
       final command = _sleepTimerCommand;
       sleepTimerExpired = true;
@@ -214,8 +227,46 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   Stream<PositionData> get positionDataStream => _positionDataStream;
 
-  Stream<double> get volumeStream => audioPlayer.volumeStream;
-  double get volume => audioPlayer.volume;
+  Stream<double> get volumeStream => _volumeSubject.stream;
+  double get volume => _volumeSubject.value;
+
+  Future<void> _setUserVolume(double value) {
+    _volumeSubject.add(value.clamp(0.0, 1.0));
+    return _applyVolume();
+  }
+
+  Future<void> _applyVolume() => audioPlayer.setVolume(volume * _songFade.gain);
+
+  /// Keeps the fade in step with the player. While a song loads the player
+  /// still holds the one before it: the fade waits for the new one.
+  void _updateSongFade() {
+    if (_currentLoadingIndex < 0) {
+      unawaited(_songFade.update());
+    } else {
+      _songFade.cancel();
+    }
+  }
+
+  /// Whether the song playing will be followed by another one by itself.
+  bool get _advancesByItself =>
+      !_playsRadio &&
+      !sleepTimerEndOfSong &&
+      switch (repeatNotifier.value) {
+        AudioServiceRepeatMode.one => false,
+        AudioServiceRepeatMode.all => _queueList.isNotEmpty,
+        _ => hasNext,
+      };
+
+  SongFadeState _songFadeState() => (
+    position: audioPlayer.position,
+    duration: audioPlayer.duration,
+    // SponsorBlock may cut a song into clips, each with positions of its own.
+    seconds: audioPlayer.sequence.length > 1 ? 0 : songFadeSeconds.value,
+    fadeOut: _advancesByItself,
+    playing:
+        audioPlayer.playing &&
+        audioPlayer.processingState == ProcessingState.ready,
+  );
 
   /// Where the song is: the saved spot while a restored queue has no source
   /// loaded yet, the player's position otherwise.
@@ -315,6 +366,11 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }
 
   void _setupEventSubscriptions() {
+    audioPlayer.positionStream.listen(
+      (_) => _updateSongFade(),
+      onError: (Object error, StackTrace stack) =>
+          _logStreamError('Song fade position failed', error, stack),
+    );
     audioPlayer.positionStream
         .where(
           (_) =>
@@ -375,6 +431,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         // Transport changes are infrequent and must reach every control
         // immediately; only queue/sequence bookkeeping is debounced.
         _updatePlaybackState();
+        _updateSongFade();
         listeningStatsService.handlePlayerStateForListeningStats(
           state,
           currentSong: _songForStats,
@@ -1053,8 +1110,13 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         // Repeat single song - play current song again
         await playAgain();
       } else {
-        // For all other cases (next song, repeat all, auto-play), skipToNext handles it
-        await skipToNext();
+        // For all other cases (next song, repeat all, auto-play), skipToNext handles it.
+        // It starts its transition before it first waits: that one is the
+        // song's own advance, and fades in.
+        _advancingByItself = true;
+        final next = skipToNext();
+        _advancingByItself = false;
+        await next;
       }
     } catch (e, stackTrace) {
       logger.log(
@@ -1580,6 +1642,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     // Start new transition
     _songTransitionCounter++;
     final currentTransitionId = _songTransitionCounter;
+    _fadeInTransitionId = _advancingByItself ? currentTransitionId : -1;
     _currentLoadingIndex = index;
     _currentLoadingTransitionId = currentTransitionId;
     _queuePlayWhenReady = playWhenReady;
@@ -1643,6 +1706,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         _currentLoadingTransitionId = -1;
         // A song that failed to load plays nothing: the controls follow.
         _updatePlaybackState();
+        _updateSongFade();
       }
     }
   }
@@ -1987,7 +2051,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   Future<void> setVolume(double value) async {
     try {
-      await audioPlayer.setVolume(value.clamp(0.0, 1.0));
+      await _setUserVolume(value);
     } catch (e, stackTrace) {
       logger.log('Error in setVolume()', error: e, stackTrace: stackTrace);
     }
@@ -2380,6 +2444,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
               audioPlayer.playing &&
               audioPlayer.processingState == ProcessingState.ready,
         );
+      // A song that fades in starts silent: set before it plays, not after.
+      _songFade.fadeIn = transitionId == _fadeInTransitionId;
+      await _songFade.update();
       final startPlayback = transitionId == null
           ? playWhenReady
           : _queuePlayWhenReady;

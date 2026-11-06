@@ -806,5 +806,10 @@
   "globalSearchOnEnterDescription": "Allow Enter to open global search from bars that filter the current screen. Available only while online.",
   "windowMinimize": "Minimize",
   "windowMaximize": "Maximize",
-  "windowRestore": "Restore window"
+  "windowRestore": "Restore window",
+  "songFade": "Fade between songs",
+  "songFadeDescription": "A song fades out as it ends and the next one fades in.",
+  "songFadeOff": "Off",
+  "songFadeSeconds": "{count, plural, =1{1 second} other{{count} seconds}}",
+  "@songFadeSeconds": {"placeholders": {"count": {"type": "int"}}}
 }

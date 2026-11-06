@@ -8,6 +8,7 @@ import 'package:musify/main.dart' as app;
 import 'package:musify/screens/settings_page.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/services/song_fade.dart';
 import 'package:musify/widgets/custom_bar.dart';
 
 import 'support/app_harness.dart';
@@ -193,6 +194,153 @@ void main() {
         }
       });
     }
+  });
+
+  group('fade between songs row', () {
+    final platforms = [
+      TargetPlatform.android,
+      TargetPlatform.iOS,
+      TargetPlatform.linux,
+      TargetPlatform.windows,
+    ];
+    setUp(() => songFadeSeconds.value = 0);
+    tearDown(() async {
+      songFadeSeconds.value = 0;
+      await Hive.box('settings').delete('songFadeSeconds');
+    });
+
+    for (final platform in platforms) {
+      testWidgets('is there on ${platform.name} and shows its value', (
+        tester,
+      ) async {
+        debugDefaultTargetPlatformOverride = platform;
+        // Only the desktop section reads it, for the downloads folder.
+        applicationDirPath = '/tmp/zenify-settings-test';
+        try {
+          await mount(tester);
+          expect(barFinder(l10n.songFade), findsOneWidget);
+          expect(
+            bar(tester, l10n.songFade).description,
+            l10n.songFadeDescription,
+          );
+          expect(
+            find.descendant(
+              of: barFinder(l10n.songFade),
+              matching: find.text(l10n.songFadeOff),
+            ),
+            findsOneWidget,
+          );
+
+          songFadeSeconds.value = 6;
+          await tester.pump();
+          expect(
+            find.descendant(
+              of: barFinder(l10n.songFade),
+              matching: find.text(l10n.songFadeSeconds(6)),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: barFinder(l10n.songFade),
+              matching: find.text(l10n.songFadeOff),
+            ),
+            findsNothing,
+          );
+        } finally {
+          debugDefaultTargetPlatformOverride = null;
+        }
+      });
+    }
+
+    testWidgets('opens a dialog of Off and six lengths and saves the choice', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(localizedApp(const SettingsPage()));
+        await tester.pump();
+
+        await Scrollable.ensureVisible(
+          tester.element(barFinder(l10n.songFade)),
+          alignment: 0.5,
+        );
+        await tester.pump();
+        await tester.tap(barFinder(l10n.songFade));
+        await tester.pumpAndSettle();
+
+        final dialog = find.byType(AlertDialog);
+        expect(dialog, findsOneWidget);
+        expect(
+          find.descendant(of: dialog, matching: find.text(l10n.songFade)),
+          findsOneWidget,
+        );
+        final options = [
+          l10n.songFadeOff,
+          for (final seconds in [2, 4, 6, 8, 10, 12])
+            l10n.songFadeSeconds(seconds),
+        ];
+        for (final option in options) {
+          expect(
+            find.descendant(of: dialog, matching: find.text(option)),
+            findsOneWidget,
+            reason: option,
+          );
+        }
+        expect(songFadeChoices, [0, 2, 4, 6, 8, 10, 12]);
+
+        await tester.tap(find.text(l10n.songFadeSeconds(8)));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AlertDialog), findsNothing);
+        // The Settings page stays, only the dialog closes.
+        expect(find.byType(SettingsPage), findsOneWidget);
+        expect(songFadeSeconds.value, 8);
+        expect(Hive.box('settings').get('songFadeSeconds'), 8);
+
+        // And back to off.
+        await tester.tap(barFinder(l10n.songFade));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: find.byType(AlertDialog),
+            matching: find.text(l10n.songFadeOff),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(songFadeSeconds.value, 0);
+        expect(Hive.box('settings').get('songFadeSeconds'), 0);
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
+
+    group('restoring a backup', () {
+      test('brings back the saved length', () async {
+        await Hive.box('settings').put('songFadeSeconds', 10);
+        reloadSettingsFromStorage();
+        expect(songFadeSeconds.value, 10);
+      });
+
+      test('turns it off for a library that never had it', () async {
+        // A Musify backup has no such key.
+        songFadeSeconds.value = 6;
+        await Hive.box('settings').delete('songFadeSeconds');
+        reloadSettingsFromStorage();
+        expect(songFadeSeconds.value, 0);
+      });
+
+      test('turns it off for a length that is not a choice', () async {
+        for (final stored in [7, -2, 99, 'six', 4.5]) {
+          await Hive.box('settings').put('songFadeSeconds', stored);
+          reloadSettingsFromStorage();
+          expect(songFadeSeconds.value, 0, reason: '$stored');
+        }
+      });
+    });
   });
 
   group('pickers', () {

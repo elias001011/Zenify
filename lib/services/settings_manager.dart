@@ -25,6 +25,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/screens/user_songs_page.dart';
 import 'package:musify/services/keyboard_shortcuts_manager.dart';
 import 'package:musify/services/local_files_service.dart';
+import 'package:musify/services/song_fade.dart';
 import 'package:musify/utilities/language_utils.dart';
 import 'package:musify/utilities/platform_utils.dart';
 
@@ -142,6 +143,17 @@ final audioQualitySetting = ValueNotifier<String>(
 
 final showAudioQualityBadge = ValueNotifier<bool>(
   Hive.box('settings').get('showAudioQualityBadge', defaultValue: false),
+);
+
+/// Seconds a song fades out and the next one fades in, from the choices of
+/// [songFadeChoices]; 0 is off. Zenify only: a library without it has no fade.
+int _readSongFadeSeconds(Box settings) {
+  final stored = settings.get('songFadeSeconds');
+  return stored is int && songFadeChoices.contains(stored) ? stored : 0;
+}
+
+final songFadeSeconds = ValueNotifier<int>(
+  _readSongFadeSeconds(Hive.box('settings')),
 );
 
 /// Off until turned on, except where local files already exist: they were
@@ -293,6 +305,7 @@ void reloadSettingsFromStorage() {
     'showAudioQualityBadge',
     defaultValue: false,
   );
+  songFadeSeconds.value = _readSongFadeSeconds(settings);
   showLocalFiles.value = _readShowLocalFiles(settings);
   interfaceScale.value = _readInterfaceScale();
   startMaximized.value = settings.get('startMaximized', defaultValue: false);
