@@ -1,13 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/utilities/flutter_bottom_sheet.dart';
 import 'package:musify/widgets/custom_search_bar.dart';
-
-const desktopPlatforms = TargetPlatformVariant({
-  TargetPlatform.linux,
-  TargetPlatform.windows,
-});
 
 void main() {
   testWidgets(
@@ -54,87 +48,6 @@ void main() {
       TargetPlatform.linux,
       TargetPlatform.windows,
       TargetPlatform.android,
-    }),
-  );
-
-  testWidgets('Escape dismisses a sheet after each opening tap', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => TextButton(
-              onPressed: () =>
-                  showCustomBottomSheet(context, const Text('Sheet content')),
-              child: const Text('Open'),
-            ),
-          ),
-        ),
-      ),
-    );
-    for (var i = 0; i < 3; i++) {
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
-      expect(find.text('Sheet content'), findsOneWidget);
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      expect(find.text('Sheet content'), findsNothing);
-    }
-    expect(tester.takeException(), isNull);
-  }, variant: desktopPlatforms);
-
-  testWidgets('Escape from an input inside a sheet dismisses it', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: Builder(
-            builder: (context) => TextButton(
-              onPressed: () =>
-                  showCustomBottomSheet(context, const TextField()),
-              child: const Text('Open'),
-            ),
-          ),
-        ),
-      ),
-    );
-    await tester.tap(find.text('Open'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byType(TextField));
-    await tester.enterText(find.byType(TextField), 'Draft');
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pumpAndSettle();
-    expect(find.byType(TextField), findsNothing);
-  }, variant: desktopPlatforms);
-  testWidgets(
-    'mobile keeps the original persistent sheet behavior',
-    (tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: Builder(
-              builder: (context) => TextButton(
-                onPressed: () =>
-                    showCustomBottomSheet(context, const Text('Sheet content')),
-                child: const Text('Open'),
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.tap(find.text('Open'));
-      await tester.pumpAndSettle();
-      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-      await tester.pumpAndSettle();
-      expect(find.text('Sheet content'), findsOneWidget);
-      closeCurrentBottomSheet();
-      await tester.pumpAndSettle();
-    },
-    variant: const TargetPlatformVariant({
-      TargetPlatform.android,
-      TargetPlatform.iOS,
     }),
   );
 }

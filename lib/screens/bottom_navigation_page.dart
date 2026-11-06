@@ -28,8 +28,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/utilities/flutter_bottom_sheet.dart'
-    show closeCurrentBottomSheet;
 import 'package:musify/utilities/flutter_toast.dart' show ToastInset;
 import 'package:musify/widgets/app_logo.dart';
 import 'package:musify/widgets/floating_surface.dart';
@@ -313,7 +311,6 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
 
   void _onTabTapped(int index, List<_NavigationItem> items) {
     final shellIndex = items[index].shellIndex;
-    closeCurrentBottomSheet();
     // Tapping the open tab again takes it back to its start.
     widget.child.goBranch(
       shellIndex,

@@ -42,7 +42,6 @@ import 'package:musify/services/update_manager.dart';
 import 'package:musify/theme/app_colors.dart';
 import 'package:musify/theme/app_themes.dart';
 import 'package:musify/utilities/bug_report.dart';
-import 'package:musify/utilities/flutter_bottom_sheet.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/language_utils.dart';
 import 'package:musify/utilities/platform_utils.dart';
@@ -628,97 +627,47 @@ class SettingsPage extends StatelessWidget {
   }
 
   void _showAccentColorPicker(BuildContext context) {
-    if (isDesktopPlatform) {
-      _showPickerDialog(
-        context,
-        title: context.l10n!.accentColor,
-        content: GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 10,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-          ),
-          itemCount: availableColors.length,
-          itemBuilder: (context, index) {
-            final color = availableColors[index];
-            final isSelected = color == primaryColorSetting;
-
-            return InkWell(
-              customBorder: const CircleBorder(),
-              onTap: () => _selectAccentColor(context, color),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: isSelected
-                      ? Border.all(
-                          color: Theme.of(context).colorScheme.onSurface,
-                          width: 3,
-                        )
-                      : null,
-                ),
-                child: isSelected
-                    ? Icon(
-                        FluentIcons.checkmark_20_filled,
-                        color: color.computeLuminance() > 0.5
-                            ? Colors.black
-                            : Colors.white,
-                        size: 20,
-                      )
-                    : null,
-              ),
-            );
-          },
-        ),
-      );
-      return;
-    }
-
     final colorScheme = Theme.of(context).colorScheme;
 
-    showCustomBottomSheet(
+    _showPickerDialog(
       context,
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-          ),
-          shrinkWrap: true,
-          physics: const BouncingScrollPhysics(),
-          itemCount: availableColors.length,
-          itemBuilder: (context, index) {
-            final color = availableColors[index];
-            final isSelected = color == primaryColorSetting;
+      title: context.l10n!.accentColor,
+      content: GridView.builder(
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 5,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+        ),
+        shrinkWrap: true,
+        itemCount: availableColors.length,
+        itemBuilder: (context, index) {
+          final color = availableColors[index];
+          final isSelected = color == primaryColorSetting;
 
-            return GestureDetector(
+          return Material(
+            color: color,
+            shape: CircleBorder(
+              side: isSelected
+                  ? BorderSide(color: colorScheme.onSurface, width: 3)
+                  : BorderSide.none,
+            ),
+            child: InkWell(
+              customBorder: const CircleBorder(),
               onTap: () => _selectAccentColor(context, color),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                decoration: BoxDecoration(
-                  color: color,
-                  shape: BoxShape.circle,
-                  border: isSelected
-                      ? Border.all(color: colorScheme.onSurface, width: 3)
-                      : null,
-                ),
-                child: isSelected
-                    ? Icon(
+              child: isSelected
+                  ? Center(
+                      child: Icon(
                         FluentIcons.checkmark_20_filled,
                         color: color.computeLuminance() > 0.5
                             ? Colors.black
                             : Colors.white,
                         size: 24,
-                      )
-                    : null,
-              ),
-            );
-          },
-        ),
+                      ),
+                    )
+                  : null,
+            ),
+          );
+        },
       ),
     );
   }
@@ -731,7 +680,7 @@ class SettingsPage extends StatelessWidget {
       useSystemColor: false,
     );
     showToast(context, context.l10n!.accentChangeMsg);
-    Navigator.of(context, rootNavigator: isDesktopPlatform).pop();
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   void _showThemeModePicker(BuildContext context) {
@@ -750,44 +699,31 @@ class SettingsPage extends StatelessWidget {
       context.l10n!.themeModeDark,
     ];
 
-    Widget buildModeBar(int index) {
-      final mode = availableModes[index];
-
-      return BottomSheetBar(
-        modeNames[index],
-        () {
-          addOrUpdateData<int>('settings', 'themeIndex', mode.index);
-          Musify.updateAppState(context, newThemeMode: mode);
-          Navigator.of(context, rootNavigator: isDesktopPlatform).pop();
-        },
-        themeMode == mode,
-        icon: modeIcons[index],
-      );
-    }
-
-    if (isDesktopPlatform) {
-      _showPickerDialog(
-        context,
-        title: context.l10n!.themeMode,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var index = 0; index < availableModes.length; index++)
-              buildModeBar(index),
-          ],
-        ),
-      );
-      return;
-    }
-
-    showCustomBottomSheet(
+    _showPickerDialog(
       context,
-      ListView.builder(
+      title: context.l10n!.themeMode,
+      content: ListView(
         shrinkWrap: true,
-        physics: const BouncingScrollPhysics(),
-        padding: commonListViewBottomPadding,
-        itemCount: availableModes.length,
-        itemBuilder: (context, index) => buildModeBar(index),
+        children: [
+          for (var index = 0; index < availableModes.length; index++)
+            BottomSheetBar(
+              modeNames[index],
+              () {
+                addOrUpdateData<int>(
+                  'settings',
+                  'themeIndex',
+                  availableModes[index].index,
+                );
+                Musify.updateAppState(
+                  context,
+                  newThemeMode: availableModes[index],
+                );
+                Navigator.of(context, rootNavigator: true).pop();
+              },
+              themeMode == availableModes[index],
+              icon: modeIcons[index],
+            ),
+        ],
       ),
     );
   }
@@ -800,43 +736,31 @@ class SettingsPage extends StatelessWidget {
         ? '$activeLanguageCode-$activeScriptCode'
         : activeLanguageCode;
 
-    Widget buildLanguageBar(int index) {
-      final language = availableLanguages[index];
-      final newLocale = getLocaleFromLanguageCode(language);
-      final newLocaleFullCode = newLocale.scriptCode != null
-          ? '${newLocale.languageCode}-${newLocale.scriptCode}'
-          : newLocale.languageCode;
-
-      return BottomSheetBar(getLanguageDisplayName(context, language), () {
-        addOrUpdateData<String>('settings', 'languageCode', newLocaleFullCode);
-        Musify.updateAppState(context, newLocale: newLocale);
-        showToast(context, context.l10n!.languageMsg);
-        Navigator.of(context, rootNavigator: isDesktopPlatform).pop();
-      }, activeLanguageFullCode == newLocaleFullCode);
-    }
-
-    if (isDesktopPlatform) {
-      _showPickerDialog(
-        context,
-        title: context.l10n!.language,
-        height: 460,
-        content: ListView.builder(
-          padding: commonListViewBottomPadding,
-          itemCount: availableLanguages.length,
-          itemBuilder: (context, index) => buildLanguageBar(index),
-        ),
-      );
-      return;
-    }
-
-    showCustomBottomSheet(
+    _showPickerDialog(
       context,
-      ListView.builder(
-        shrinkWrap: true,
-        physics: const BouncingScrollPhysics(),
+      title: context.l10n!.language,
+      height: 460,
+      content: ListView.builder(
         padding: commonListViewBottomPadding,
         itemCount: availableLanguages.length,
-        itemBuilder: (context, index) => buildLanguageBar(index),
+        itemBuilder: (context, index) {
+          final language = availableLanguages[index];
+          final newLocale = getLocaleFromLanguageCode(language);
+          final newLocaleFullCode = newLocale.scriptCode != null
+              ? '${newLocale.languageCode}-${newLocale.scriptCode}'
+              : newLocale.languageCode;
+
+          return BottomSheetBar(getLanguageDisplayName(context, language), () {
+            addOrUpdateData<String>(
+              'settings',
+              'languageCode',
+              newLocaleFullCode,
+            );
+            Musify.updateAppState(context, newLocale: newLocale);
+            showToast(context, context.l10n!.languageMsg);
+            Navigator.of(context, rootNavigator: true).pop();
+          }, activeLanguageFullCode == newLocaleFullCode);
+        },
       ),
     );
   }
@@ -854,49 +778,34 @@ class SettingsPage extends StatelessWidget {
       FluentIcons.speaker_2_24_filled,
     ];
 
-    Widget buildQualityBar(int index) {
-      final quality = availableQualities[index];
-
-      return BottomSheetBar(
-        qualityNames[index],
-        () {
-          addOrUpdateData<String>('settings', 'audioQuality', quality);
-          audioQualitySetting.value = quality;
-          showToast(context, context.l10n!.audioQualityMsg);
-          Navigator.of(context, rootNavigator: isDesktopPlatform).pop();
-        },
-        audioQualitySetting.value == quality,
-        icon: qualityIcons[index],
-      );
-    }
-
-    if (isDesktopPlatform) {
-      _showPickerDialog(
-        context,
-        title: context.l10n!.audioQuality,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var index = 0; index < availableQualities.length; index++)
-              buildQualityBar(index),
-          ],
-        ),
-      );
-      return;
-    }
-
-    showCustomBottomSheet(
+    _showPickerDialog(
       context,
-      ListView.builder(
+      title: context.l10n!.audioQuality,
+      content: ListView(
         shrinkWrap: true,
-        physics: const BouncingScrollPhysics(),
-        padding: commonListViewBottomPadding,
-        itemCount: availableQualities.length,
-        itemBuilder: (context, index) => buildQualityBar(index),
+        children: [
+          for (var index = 0; index < availableQualities.length; index++)
+            BottomSheetBar(
+              qualityNames[index],
+              () {
+                addOrUpdateData<String>(
+                  'settings',
+                  'audioQuality',
+                  availableQualities[index],
+                );
+                audioQualitySetting.value = availableQualities[index];
+                showToast(context, context.l10n!.audioQualityMsg);
+                Navigator.of(context, rootNavigator: true).pop();
+              },
+              audioQualitySetting.value == availableQualities[index],
+              icon: qualityIcons[index],
+            ),
+        ],
       ),
     );
   }
 
+  /// The one container of every Settings choice, a dialog on every platform.
   void _showPickerDialog(
     BuildContext context, {
     required String title,

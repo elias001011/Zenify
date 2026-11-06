@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hive/hive.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/localization/app_localizations.dart';
@@ -12,7 +13,7 @@ import 'package:musify/widgets/custom_bar.dart';
 import 'support/app_harness.dart';
 
 void main() {
-  useAppSettings();
+  useAppSettings(inMemory: true);
 
   final l10n = lookupAppLocalizations(const Locale('en'));
 
@@ -164,6 +165,60 @@ void main() {
       await mount(tester);
       expect(dot(l10n.themeMode), findsNothing);
       expect(dot(l10n.language), findsNothing);
+    });
+  });
+
+  group('pickers', () {
+    testWidgets('a phone picker is a dialog and applies the chosen option', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final before = audioQualitySetting.value;
+      addTearDown(() => audioQualitySetting.value = before);
+      try {
+        audioQualitySetting.value = 'high';
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(localizedApp(const SettingsPage()));
+        await tester.pump();
+
+        // Centred, as the floating title would cover a row at the top edge.
+        await Scrollable.ensureVisible(
+          tester.element(barFinder(l10n.audioQuality)),
+          alignment: 0.5,
+        );
+        await tester.pump();
+        await tester.tap(barFinder(l10n.audioQuality));
+        await tester.pumpAndSettle();
+
+        final dialog = find.byType(AlertDialog);
+        expect(dialog, findsOneWidget);
+        expect(
+          find.descendant(of: dialog, matching: find.text(l10n.audioQuality)),
+          findsOneWidget,
+        );
+        for (final option in [
+          l10n.audioQualityLow,
+          l10n.audioQualityMedium,
+          l10n.audioQualityHigh,
+        ]) {
+          expect(
+            find.descendant(of: dialog, matching: find.text(option)),
+            findsOneWidget,
+          );
+        }
+
+        await tester.tap(find.text(l10n.audioQualityLow));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(audioQualitySetting.value, 'low');
+        expect(Hive.box('settings').get('audioQuality'), 'low');
+        await Hive.box('settings').delete('audioQuality');
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     });
   });
 }
