@@ -15,6 +15,17 @@ import 'package:musify/widgets/song_artwork.dart';
 
 import 'support/app_harness.dart';
 
+class _Handler extends MusifyAudioHandler {
+  final calls = <String>[];
+
+  @override
+  Future<void> playAgain() async => calls.add('playAgain');
+
+  @override
+  Future<void> skipToNext({bool playWhenReady = true}) async =>
+      calls.add('skipToNext');
+}
+
 void main() {
   useAppSettings();
 
@@ -124,6 +135,35 @@ void main() {
     ) async {
       await mount(tester, AudioServiceRepeatMode.none, 'repeat-none');
       expect(find.byIcon(FluentIcons.next_24_filled), findsNothing);
+      await unmount(tester);
+    });
+
+    testWidgets('shows on the last song while repeating one, and plays it '
+        'again as the player does', (tester) async {
+      repeatNotifier.value = AudioServiceRepeatMode.one;
+      addTearDown(() => repeatNotifier.value = AudioServiceRepeatMode.none);
+      final handler = _Handler();
+      audioHandler = handler;
+      await tester.pump(const Duration(milliseconds: 400));
+      handler.mediaItem.add(const MediaItem(id: 'b', title: 'B'));
+      handler.queue.add(const [
+        MediaItem(id: 'a', title: 'A'),
+        MediaItem(id: 'b', title: 'B'),
+      ]);
+      handler.playbackState.add(PlaybackState(playing: true, queueIndex: 1));
+      await tester.pumpWidget(app(const ValueKey('repeat-one')));
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.tap(find.byIcon(FluentIcons.next_24_filled));
+      await tester.pump();
+      expect(handler.calls, ['playAgain']);
+
+      // Not repeating: the same button skips.
+      repeatNotifier.value = AudioServiceRepeatMode.all;
+      await tester.pump();
+      await tester.tap(find.byIcon(FluentIcons.next_24_filled));
+      await tester.pump();
+      expect(handler.calls, ['playAgain', 'skipToNext']);
       await unmount(tester);
     });
 

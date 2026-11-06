@@ -535,10 +535,7 @@ class PlaybackTransportControls extends StatelessWidget {
                       forward: true,
                       isEnabled: audioHandler.hasNext || repeats,
                       tooltip: context.l10n!.skipToNext,
-                      onPressed: () =>
-                          !live && repeatMode == AudioServiceRepeatMode.one
-                          ? audioHandler.playAgain()
-                          : audioHandler.skipToNext(),
+                      onPressed: audioHandler.skipOrRepeat,
                       colorScheme: colorScheme,
                       buttonConstraints: buttonConstraints,
                       buttonPadding: buttonPadding,

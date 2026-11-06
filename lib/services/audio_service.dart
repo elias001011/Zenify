@@ -2813,6 +2813,13 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     }
   }
 
+  /// What Next does in the players: with repeat one the song plays again, as
+  /// when it ends; otherwise the next one starts. A radio has no repeat.
+  Future<void> skipOrRepeat() =>
+      !_playsRadio && repeatNotifier.value == AudioServiceRepeatMode.one
+      ? playAgain()
+      : skipToNext();
+
   Future<void> playAgain() async {
     try {
       listeningStatsService.finishListeningSession(

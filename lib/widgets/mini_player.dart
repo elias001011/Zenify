@@ -40,15 +40,10 @@ import 'package:musify/widgets/song_artwork.dart';
 import 'package:rxdart/rxdart.dart';
 
 /// What the mini player's body shows besides the song: the playback state
-/// and whether there is a next song after this one in the queue (`multiple`:
-/// there is more than one song, for the repeat mode to wrap around to).
+/// and whether there is a next song after this one in the queue.
 /// Position is left out, so the body rebuilds when these change, not on every
 /// tick; only the ring follows it.
-typedef _ControlsState = ({
-  PlaybackState playback,
-  bool hasNext,
-  bool multiple,
-});
+typedef _ControlsState = ({PlaybackState playback, bool hasNext});
 
 _ControlsState _controlsState(PlaybackState playback, List<MediaItem> queue) =>
     (
@@ -57,7 +52,6 @@ _ControlsState _controlsState(PlaybackState playback, List<MediaItem> queue) =>
       hasNext: audioHandler.mediaItem.valueOrNull?.extras?['isLive'] == true
           ? audioHandler.canSkipToNext
           : queue.length > 1 && (playback.queueIndex ?? 0) < queue.length - 1,
-      multiple: queue.length > 1,
     );
 
 /// The stream doesn't replay, so a mini player built later (the layout
@@ -89,7 +83,6 @@ class _MiniPlayerState extends State<MiniPlayer> {
       ).distinct(
         (a, b) =>
             a.hasNext == b.hasNext &&
-            a.multiple == b.multiple &&
             a.playback.playing == b.playback.playing &&
             a.playback.processingState == b.playback.processingState,
       );
@@ -111,8 +104,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
               final metadata = mediaSnapshot.data;
               if (metadata == null) return const SizedBox.shrink();
 
-              // The repeat mode is no part of the stream: repeating all wraps
-              // the last song around to the first.
+              // The repeat mode is no part of the stream: repeating wraps the
+              // last song around to the first, or plays it again.
               return ValueListenableBuilder<AudioServiceRepeatMode>(
                 valueListenable: repeatNotifier,
                 builder: (context, repeatMode, _) =>
@@ -127,10 +120,12 @@ class _MiniPlayerState extends State<MiniPlayer> {
                           colorScheme: colorScheme,
                           metadata: metadata,
                           playbackState: state.playback,
+                          // The rule of the player's Next: a song after this one,
+                          // or a repeat mode to go on with.
                           hasNext:
                               state.hasNext ||
-                              (state.multiple &&
-                                  repeatMode == AudioServiceRepeatMode.all),
+                              (metadata.extras?['isLive'] != true &&
+                                  repeatMode != AudioServiceRepeatMode.none),
                         );
                       },
                     ),
@@ -463,7 +458,7 @@ class _ControlsWidget extends StatelessWidget {
             const SizedBox(width: 4),
             SkipIconButton(
               forward: true,
-              onPressed: audioHandler.skipToNext,
+              onPressed: audioHandler.skipOrRepeat,
               splashColor: Colors.transparent,
               highlightColor: Colors.transparent,
               icon: FluentIcons.next_24_filled,
