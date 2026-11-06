@@ -369,7 +369,6 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = Theme.of(context).colorScheme.primary;
     return IslandScaffold(
       background: const PageGlow(source: null, cacheKey: 'search_page'),
       title: context.l10n!.search,
@@ -508,7 +507,7 @@ class _SearchPageState extends State<SearchPage> {
                         );
                       },
                     )
-                  : _buildSearchResults(context, primaryColor),
+                  : _buildSearchResults(context),
             ),
             const MiniPlayerBottomSpace(),
           ],
@@ -517,7 +516,7 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildSearchResults(BuildContext context, Color primaryColor) {
+  Widget _buildSearchResults(BuildContext context) {
     final widgets = <Widget>[];
 
     // Artists section: the library's first.
@@ -527,11 +526,7 @@ class _SearchPageState extends State<SearchPage> {
     ];
     if (allArtists.isNotEmpty) {
       widgets.add(
-        SectionTitle(
-          context.l10n!.artists,
-          primaryColor,
-          icon: FluentIcons.person_24_filled,
-        ),
+        SectionTitle(context.l10n!.artists, icon: FluentIcons.person_24_filled),
       );
 
       final artists = allArtists;
@@ -579,7 +574,6 @@ class _SearchPageState extends State<SearchPage> {
       widgets.add(
         SectionTitle(
           context.l10n!.songs,
-          primaryColor,
           icon: FluentIcons.music_note_1_24_filled,
         ),
       );
@@ -603,11 +597,7 @@ class _SearchPageState extends State<SearchPage> {
     // Albums section
     if (_albumsSearchResult.isNotEmpty) {
       widgets.add(
-        SectionTitle(
-          context.l10n!.albums,
-          primaryColor,
-          icon: FluentIcons.album_24_filled,
-        ),
+        SectionTitle(context.l10n!.albums, icon: FluentIcons.album_24_filled),
       );
 
       final albumsCount = _albumsSearchResult.length;
@@ -636,7 +626,6 @@ class _SearchPageState extends State<SearchPage> {
       widgets.add(
         SectionTitle(
           context.l10n!.playlists,
-          primaryColor,
           icon: FluentIcons.text_bullet_list_24_filled,
         ),
       );
@@ -670,7 +659,6 @@ class _SearchPageState extends State<SearchPage> {
       widgets.add(
         SectionTitle(
           context.l10n!.radioStations,
-          primaryColor,
           icon: FluentIcons.speaker_2_24_filled,
         ),
       );

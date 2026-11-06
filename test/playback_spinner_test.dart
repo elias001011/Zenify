@@ -27,12 +27,13 @@ void main() {
             iconSize: 24,
             iconColor: Colors.white,
             backgroundColor: Colors.transparent,
+            buttonSize: 52,
           ),
         ),
       ),
     );
     await tester.pump(const Duration(milliseconds: 300));
-    final pause = find.byIcon(FluentIcons.pause_24_regular);
+    final pause = find.byIcon(FluentIcons.pause_24_filled);
     expect(pause, findsOneWidget);
 
     // A skip to a song that is offline or already prepared: the optimistic

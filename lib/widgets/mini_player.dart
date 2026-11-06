@@ -260,7 +260,6 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
       playButtonSize: sizes.box,
       buttonSpacing: 4,
       minButtonSize: sizes.box,
-      playPadding: EdgeInsets.zero,
     );
   }
 

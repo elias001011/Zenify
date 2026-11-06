@@ -60,7 +60,6 @@ void main() {
                     iconSize: 36,
                     iconColor: Colors.white,
                     backgroundColor: Colors.transparent,
-                    filled: true,
                     buttonSize: 52,
                   ),
                 ),

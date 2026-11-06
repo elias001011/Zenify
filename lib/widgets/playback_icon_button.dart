@@ -89,17 +89,13 @@ class PlaybackIconButton extends StatefulWidget {
     required this.iconSize,
     required this.iconColor,
     required this.backgroundColor,
-    this.padding,
-    this.filled = false,
-    this.buttonSize,
+    required this.buttonSize,
   });
 
   final double iconSize;
   final Color iconColor;
   final Color backgroundColor;
-  final EdgeInsets? padding;
-  final bool filled;
-  final double? buttonSize;
+  final double buttonSize;
 
   @override
   State<PlaybackIconButton> createState() => _PlaybackIconButtonState();
@@ -115,8 +111,6 @@ class _PlaybackIconButtonState extends State<PlaybackIconButton> {
     final iconSize = widget.iconSize;
     final iconColor = widget.iconColor;
     final backgroundColor = widget.backgroundColor;
-    final padding = widget.padding;
-    final filled = widget.filled;
     final buttonSize = widget.buttonSize;
     return StreamBuilder<PlaybackState>(
       initialData: audioHandler.playbackState.value,
@@ -152,12 +146,8 @@ class _PlaybackIconButtonState extends State<PlaybackIconButton> {
         } else {
           iconWidget = Icon(
             isPlaying
-                ? (filled
-                      ? FluentIcons.pause_24_filled
-                      : FluentIcons.pause_24_regular)
-                : (filled
-                      ? FluentIcons.play_24_filled
-                      : FluentIcons.play_24_regular),
+                ? FluentIcons.pause_24_filled
+                : FluentIcons.play_24_filled,
             color: iconColor,
             size: iconSize,
           );
@@ -167,46 +157,22 @@ class _PlaybackIconButtonState extends State<PlaybackIconButton> {
 
         // Desktop's plain transport uses the same centred IconButton layout
         // as its neighbours, with an explicit box and no oversized inner padding.
-        if (filled && buttonSize != null) {
-          return SizedBox.square(
-            dimension: buttonSize,
-            child: IconButton(
-              tooltip: semanticLabel,
-              onPressed: onPressed,
-              iconSize: iconSize,
-              padding: EdgeInsets.zero,
-              style: IconButton.styleFrom(
-                minimumSize: Size.square(buttonSize),
-                fixedSize: Size.square(buttonSize),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                backgroundColor: backgroundColor,
-                side: BorderSide.none,
-                shape: const CircleBorder(),
-              ),
-              icon: PlaybackIconSwitcher(
-                stateKey: (processingState, isPlaying),
-                child: iconWidget,
-              ),
+        return SizedBox.square(
+          dimension: buttonSize,
+          child: IconButton(
+            tooltip: semanticLabel,
+            onPressed: onPressed,
+            iconSize: iconSize,
+            padding: EdgeInsets.zero,
+            style: IconButton.styleFrom(
+              minimumSize: Size.square(buttonSize),
+              fixedSize: Size.square(buttonSize),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              backgroundColor: backgroundColor,
+              side: BorderSide.none,
+              shape: const CircleBorder(),
             ),
-          );
-        }
-
-        return RawMaterialButton(
-          elevation: 0,
-          onPressed: onPressed,
-          fillColor: backgroundColor,
-          splashColor: Colors.transparent,
-          padding: padding ?? EdgeInsets.all(iconSize * 0.35),
-          shape: const CircleBorder(),
-          constraints: BoxConstraints.tightFor(
-            width: buttonSize ?? iconSize * 2,
-            height: buttonSize ?? iconSize * 2,
-          ),
-          materialTapTargetSize: MaterialTapTargetSize.padded,
-          child: Semantics(
-            label: semanticLabel,
-            button: true,
-            child: PlaybackIconSwitcher(
+            icon: PlaybackIconSwitcher(
               stateKey: (processingState, isPlaying),
               child: iconWidget,
             ),

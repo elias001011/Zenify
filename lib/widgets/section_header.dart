@@ -38,13 +38,7 @@ class SectionHeader extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Expanded(
-          child: SectionTitle(
-            title,
-            Theme.of(context).colorScheme.primary,
-            icon: icon,
-          ),
-        ),
+        Expanded(child: SectionTitle(title, icon: icon)),
         if (actionButton != null) actionButton!,
       ],
     );

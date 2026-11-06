@@ -321,14 +321,6 @@ class PlayerTransport extends StatelessWidget {
                     : isTight
                     ? 0.9
                     : 1.0);
-        final playPadding = EdgeInsets.all(
-          responsiveIconSize *
-              (isUltraTight
-                  ? 0.30
-                  : isTight
-                  ? 0.36
-                  : 0.45),
-        );
         // The room around the icon of shuffle and repeat inside their buttons:
         // the buttons are moved out by it, so the icons, not their touch
         // areas, are what lines up with the progress bar and the times.
@@ -347,7 +339,6 @@ class PlayerTransport extends StatelessWidget {
           controlIconSize: controlIconSize,
           buttonSpacing: buttonSpacing,
           minButtonSize: minButtonSize,
-          playPadding: playPadding,
           skipIconSize: sizes?.skip,
           playButtonSize: sizes?.box,
         );
@@ -469,7 +460,6 @@ class PlaybackTransportControls extends StatelessWidget {
     required this.controlIconSize,
     required this.buttonSpacing,
     required this.minButtonSize,
-    required this.playPadding,
     this.skipIconSize,
     this.playButtonSize,
   });
@@ -480,7 +470,6 @@ class PlaybackTransportControls extends StatelessWidget {
   final double controlIconSize;
   final double buttonSpacing;
   final double minButtonSize;
-  final EdgeInsets playPadding;
 
   /// The icons of previous and next; by default a share of [controlIconSize].
   final double? skipIconSize;
@@ -524,14 +513,12 @@ class PlaybackTransportControls extends StatelessWidget {
                   PlaybackIconButton(
                     iconColor: colorScheme.onSurface,
                     backgroundColor: Colors.transparent,
-                    filled: true,
                     buttonSize:
                         playButtonSize ??
                         (PlayerChrome.of(context) == PlayerChromeStyle.dock
                             ? 44
                             : 52),
                     iconSize: controlIconSize,
-                    padding: playPadding,
                   ),
                   SizedBox(width: buttonSpacing),
                   _PlaybackControlButton(
