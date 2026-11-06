@@ -104,8 +104,6 @@ class SettingsPage extends StatelessWidget {
     Color activatedColor,
     Color inactivatedColor,
   ) {
-    final isOffline = offlineMode.value;
-
     return Column(
       children: [
         SectionHeader(
@@ -116,19 +114,19 @@ class SettingsPage extends StatelessWidget {
           context.l10n!.accentColor,
           FluentIcons.color_24_regular,
           borderRadius: commonCustomBarRadiusFirst,
-          trailing: isDesktopPlatform
-              ? Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: primaryColorSetting,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                  ),
-                )
-              : null,
+          // The colour in use, which dynamic colour makes differ from the
+          // chosen one.
+          trailing: Container(
+            width: 26,
+            height: 26,
+            decoration: BoxDecoration(
+              color: primaryColor,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+          ),
           onTap: () => _showAccentColorPicker(context),
         ),
         CustomBar(
@@ -283,7 +281,7 @@ class SettingsPage extends StatelessWidget {
               context.l10n!.offlineMode,
               FluentIcons.cloud_off_24_regular,
               description: context.l10n!.offlineModeDescription,
-              borderRadius: isOffline && isFdroidBuild
+              borderRadius: value && isFdroidBuild
                   ? commonCustomBarRadiusLast
                   : BorderRadius.zero,
               trailing: Switch(
@@ -294,23 +292,27 @@ class SettingsPage extends StatelessWidget {
           },
         ),
         if (!isFdroidBuild)
+          // Last bar of the card only while offline hides what follows it.
           ValueListenableBuilder<bool>(
-            valueListenable: shouldWeCheckUpdates,
-            builder: (_, value, __) {
-              return CustomBar(
-                context.l10n!.automaticUpdateChecks,
-                FluentIcons.arrow_sync_24_regular,
-                description: context.l10n!.automaticUpdateChecksDescription,
-                borderRadius: offlineMode.value
-                    ? commonCustomBarRadiusLast
-                    : BorderRadius.zero,
-                trailing: Switch(
-                  value: value,
-                  onChanged: (value) =>
-                      _toggleAutomaticUpdateChecks(context, value),
-                ),
-              );
-            },
+            valueListenable: offlineMode,
+            builder: (_, offline, __) => ValueListenableBuilder<bool>(
+              valueListenable: shouldWeCheckUpdates,
+              builder: (_, value, __) {
+                return CustomBar(
+                  context.l10n!.automaticUpdateChecks,
+                  FluentIcons.arrow_sync_24_regular,
+                  description: context.l10n!.automaticUpdateChecksDescription,
+                  borderRadius: offline
+                      ? commonCustomBarRadiusLast
+                      : BorderRadius.zero,
+                  trailing: Switch(
+                    value: value,
+                    onChanged: (value) =>
+                        _toggleAutomaticUpdateChecks(context, value),
+                  ),
+                );
+              },
+            ),
           ),
       ],
     );
