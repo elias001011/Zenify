@@ -43,6 +43,7 @@ import 'package:musify/widgets/download_progress_icon.dart';
 import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/no_artwork_cube.dart';
 import 'package:musify/widgets/overflow_menu_button.dart';
+import 'package:musify/widgets/playlist_page/radio_button.dart';
 import 'package:musify/widgets/popup_menu_item.dart';
 import 'package:musify/widgets/rename_song_dialog.dart';
 
@@ -90,6 +91,14 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
       label: addToQueueText,
       colorScheme: colorScheme,
     ),
+    // The radio comes from YouTube Music: online, and not for a local file.
+    if (!offlineMode.value && !isLocal)
+      buildPopupMenuItem<String>(
+        value: 'start_radio',
+        icon: FluentIcons.live_24_regular,
+        label: l10n.startRadio,
+        colorScheme: colorScheme,
+      ),
     if (!offlineMode.value && !isLocal)
       PopupMenuItem<String>(
         value: 'like',
@@ -235,6 +244,11 @@ Future<void> _handleSongMenuAction({
       } catch (e) {
         logger.log('Error removing from recently played', error: e);
       }
+      break;
+    case 'start_radio':
+      await startRadio(context, [
+        Map.from(song as Map),
+      ], name: song['title']?.toString() ?? '');
       break;
     case 'offline':
       await _toggleSongOfflineStatus(context, song, ytid, songOfflineStatus);

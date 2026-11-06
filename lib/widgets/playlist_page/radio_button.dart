@@ -26,9 +26,27 @@ import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 
-/// Starts a radio from an artist or a playlist (see
-/// [MoodsService.playRadio]). Online only: the radio comes from YouTube
-/// Music.
+/// Starts the radio of [seeds], named for [name], and says so when it cannot.
+/// Online only. Returns whether it started.
+Future<bool> startRadio(
+  BuildContext context,
+  List<Map> seeds, {
+  required String name,
+  int perArtist = 3,
+}) async {
+  if (offlineMode.value) return false;
+  final l10n = context.l10n!;
+  final started = await moodsService
+      .playRadio(seeds, title: l10n.radioOf(name), perArtist: perArtist)
+      .catchError((_) => false);
+  if (!started && !offlineMode.value && context.mounted) {
+    showToast(context, l10n.radioUnavailable);
+  }
+  return started;
+}
+
+/// Starts a radio from an artist or a playlist (see [startRadio]). Online
+/// only: the radio comes from YouTube Music.
 class StartRadioButton extends StatefulWidget {
   const StartRadioButton({
     super.key,
@@ -54,18 +72,13 @@ class _StartRadioButtonState extends State<StartRadioButton> {
   Future<void> _start() async {
     if (offlineMode.value) return;
     setState(() => _starting = true);
-    final l10n = context.l10n!;
-    final started = await moodsService
-        .playRadio(
-          widget.seeds(),
-          title: l10n.radioOf(widget.name),
-          perArtist: widget.perArtist,
-        )
-        .catchError((_) => false);
-    if (!mounted) return;
-    setState(() => _starting = false);
-    if (!started && !offlineMode.value)
-      showToast(context, l10n.radioUnavailable);
+    await startRadio(
+      context,
+      widget.seeds(),
+      name: widget.name,
+      perArtist: widget.perArtist,
+    );
+    if (mounted) setState(() => _starting = false);
   }
 
   @override
