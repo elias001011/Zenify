@@ -36,6 +36,9 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
   bool _exporting = false;
   bool _loading = false;
 
+  /// What the island's search shortcut filters the playlists by, lowercase.
+  String _query = '';
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -67,10 +70,15 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
     if (!_selected.remove(entry.id)) _selected.add(entry.id);
   });
 
-  void _toggleAll(List<ExportEntry> entries) => setState(() {
-    final all = _selected.length == entries.length;
-    _selected.clear();
-    if (!all) _selected.addAll(entries.map((entry) => entry.id));
+  /// Ticks every playlist in [shown], or unticks them when all are ticked.
+  /// What the filter hides keeps its choice.
+  void _toggleAll(List<ExportEntry> shown) => setState(() {
+    final ids = shown.map((entry) => entry.id);
+    if (ids.every(_selected.contains)) {
+      _selected.removeAll(ids);
+    } else {
+      _selected.addAll(ids);
+    }
   });
 
   Future<void> _export() async {
@@ -150,17 +158,20 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
   @override
   Widget build(BuildContext context) {
     final entries = _entries;
+    final shown = [
+      for (final entry in entries ?? const <ExportEntry>[])
+        if (_query.isEmpty || entry.title.toLowerCase().contains(_query)) entry,
+    ];
     final allSelected =
-        entries != null &&
-        entries.isNotEmpty &&
-        _selected.length == entries.length;
+        shown.isNotEmpty &&
+        shown.every((entry) => _selected.contains(entry.id));
     return IslandScaffold(
       background: const PageGlow(
         source: null,
         cacheKey: 'export_playlists_page',
       ),
       title: context.l10n!.exportPlaylistsCsv,
-      globalSearch: false,
+      onFilter: (value) => setState(() => _query = value.trim().toLowerCase()),
       body: ReadablePadding(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         builder: (context, padding) => CustomScrollView(
@@ -182,6 +193,8 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
                           )
                         else if (entries.isEmpty)
                           Text(context.l10n!.exportPlaylistsEmpty)
+                        else if (shown.isEmpty)
+                          Text(context.l10n!.noLibraryMatches)
                         else ...[
                           CustomBar(
                             context.l10n!.selectAll,
@@ -191,23 +204,21 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
                               value: allSelected,
                               onChanged: _exporting
                                   ? null
-                                  : (_) => _toggleAll(entries),
+                                  : (_) => _toggleAll(shown),
                             ),
-                            onTap: _exporting
-                                ? null
-                                : () => _toggleAll(entries),
+                            onTap: _exporting ? null : () => _toggleAll(shown),
                           ),
                           const SizedBox(height: 12),
                         ],
                       ],
                     ),
                   ),
-                  if (entries != null && entries.isNotEmpty)
+                  if (shown.isNotEmpty)
                     MusicSliverSurface(
                       sliver: SliverList.builder(
-                        itemCount: entries.length,
+                        itemCount: shown.length,
                         itemBuilder: (context, index) {
-                          final entry = entries[index];
+                          final entry = shown[index];
                           return PlaylistBar(
                             key: ValueKey(entry.id),
                             entry.title,
@@ -215,7 +226,7 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
                             cubeIcon: _icon(entry.source),
                             borderRadius: getItemBorderRadius(
                               index,
-                              entries.length,
+                              shown.length,
                             ),
                             trailing: Checkbox(
                               value: _selected.contains(entry.id),
