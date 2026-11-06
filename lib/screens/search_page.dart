@@ -43,7 +43,6 @@ import 'package:musify/widgets/artist_bar.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
-import 'package:musify/widgets/custom_search_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_bar.dart';
@@ -140,6 +139,35 @@ class _SearchPageState extends State<SearchPage> {
     _handledSearchFocusRequest = searchFocusRequest.value;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _inputNode.requestFocus();
+    });
+  }
+
+  void _onQueryChanged(String query) {
+    // debounce suggestions to avoid rapid API calls
+    _debounce?.cancel();
+    final requestId = ++_latestSuggestionRequest;
+
+    // An emptied field goes back to the search history, and the history only
+    // shows while nothing has been found yet. Dropping the suggestions is not
+    // enough: the results of the last search have to go with them.
+    if (query.isEmpty) {
+      unawaited(search());
+      return;
+    }
+    // Suggestions come from YouTube.
+    if (offlineMode.value) return;
+
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
+      final searchSuggestions = await getSearchSuggestions(query);
+
+      if (!mounted ||
+          requestId != _latestSuggestionRequest ||
+          _searchBar.text != query) {
+        return;
+      }
+
+      _suggestionsList = List<String>.from(searchSuggestions);
+      if (mounted) setState(() {});
     });
   }
 
@@ -373,75 +401,21 @@ class _SearchPageState extends State<SearchPage> {
       background: const PageGlow(source: null, cacheKey: 'search_page'),
       title: context.l10n!.search,
       globalSearch: false,
+      pageSearch: IslandPageSearch(
+        controller: _searchBar,
+        focusNode: _inputNode,
+        loading: _fetchingSongs,
+        onChanged: _onQueryChanged,
+        onSubmitted: (_) => unawaited(_submitSearch()),
+      ),
       body: SingleChildScrollView(
-        padding: withIslandInset(context, commonSingleChildScrollViewPadding),
+        // A little air between the island and the first list.
+        padding: withIslandInset(
+          context,
+          commonSingleChildScrollViewPadding.copyWith(top: 8),
+        ),
         child: Column(
           children: <Widget>[
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth > 600;
-                final bar = ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxWidth: isWide ? 600 : double.infinity,
-                  ),
-                  child: CustomSearchBar(
-                    loadingProgressNotifier: _fetchingSongs,
-                    controller: _searchBar,
-                    focusNode: _inputNode,
-                    labelText: '${context.l10n!.search}...',
-                    onChanged: (value) {
-                      // debounce suggestions to avoid rapid API calls
-                      _debounce?.cancel();
-                      final query = value;
-                      final requestId = ++_latestSuggestionRequest;
-
-                      // An emptied field goes back to the search history, and
-                      // the history only shows while nothing has been found
-                      // yet. Dropping the suggestions is not enough: the
-                      // results of the last search have to go with them.
-                      if (query.isEmpty) {
-                        unawaited(search());
-                        return;
-                      }
-                      // Suggestions come from YouTube.
-                      if (offlineMode.value) return;
-
-                      _debounce = Timer(
-                        const Duration(milliseconds: 300),
-                        () async {
-                          final searchSuggestions = await getSearchSuggestions(
-                            query,
-                          );
-
-                          if (!mounted ||
-                              requestId != _latestSuggestionRequest ||
-                              _searchBar.text != query) {
-                            return;
-                          }
-
-                          _suggestionsList = List<String>.from(
-                            searchSuggestions,
-                          );
-                          if (mounted) setState(() {});
-                        },
-                      );
-                    },
-                    onSubmitted: (String value) {
-                      _submitSearch();
-                    },
-                  ),
-                );
-                if (isWide) {
-                  return Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [bar],
-                  );
-                } else {
-                  return bar;
-                }
-              },
-            ),
-
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),
               child:

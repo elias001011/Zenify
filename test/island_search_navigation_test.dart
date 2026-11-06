@@ -7,7 +7,6 @@ import 'package:musify/screens/search_page.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/widgets/custom_search_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/song_bar.dart';
 
@@ -183,10 +182,7 @@ void main() {
       await tester.pumpWidget(app('Blue hour'));
       await tester.pumpAndSettle();
       expect(
-        tester
-            .widget<CustomSearchBar>(find.byType(CustomSearchBar))
-            .controller
-            .text,
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
         'Blue hour',
       );
       expect(
@@ -199,10 +195,7 @@ void main() {
       await tester.pumpWidget(app('The Sea'));
       await tester.pumpAndSettle();
       expect(
-        tester
-            .widget<CustomSearchBar>(find.byType(CustomSearchBar))
-            .controller
-            .text,
+        tester.widget<TextField>(find.byType(TextField)).controller!.text,
         'The Sea',
       );
       expect(

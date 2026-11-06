@@ -1,24 +1,31 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/widgets/custom_search_bar.dart';
+import 'package:musify/widgets/floating_island.dart';
+
+import '../support/app_harness.dart';
 
 void main() {
+  useAppSettings();
+
   testWidgets(
     'numpad Enter submits once and Escape leaves search',
     (tester) async {
       final controller = TextEditingController(text: 'Muse');
       final focus = FocusNode();
       final submitted = <String>[];
+      // The island's page search field, which is what the search page uses.
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: CustomSearchBar(
+        localizedApp(
+          IslandScaffold(
+            title: 'Search',
+            globalSearch: false,
+            pageSearch: IslandPageSearch(
               controller: controller,
               focusNode: focus,
-              labelText: 'Search',
               onSubmitted: submitted.add,
             ),
+            body: const SizedBox.shrink(),
           ),
         ),
       );

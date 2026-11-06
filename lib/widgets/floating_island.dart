@@ -27,9 +27,32 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/screens/search_page.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/floating_surface.dart';
+import 'package:musify/widgets/spinner.dart';
 
 const double _islandHeight = 44;
 const double _islandMargin = FloatingSurface.edgeMargin;
+
+/// The search field of a page that is, above all, a search: the island shows
+/// it all the time, bound to the page's own [controller] and [focusNode], in
+/// place of the title and the search shortcut. It never closes; Back leaves
+/// the page.
+class IslandPageSearch {
+  const IslandPageSearch({
+    required this.controller,
+    required this.focusNode,
+    required this.onSubmitted,
+    this.onChanged,
+    this.loading,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final ValueChanged<String> onSubmitted;
+  final ValueChanged<String>? onChanged;
+
+  /// While true, the field's search icon turns into a spinner.
+  final ValueListenable<bool>? loading;
+}
 
 /// A page with the floating island in place of an app bar: back (when there
 /// is somewhere to go back to), the page title and optional actions.
@@ -46,11 +69,18 @@ class IslandScaffold extends StatefulWidget {
     this.onBack,
     this.onFilter,
     this.globalSearch = true,
+    this.pageSearch,
     this.background,
-  });
+  }) : assert(
+         pageSearch == null || onFilter == null,
+         'The island field is a page filter or a page search, not both',
+       );
 
   final String title;
   final Widget body;
+
+  /// Makes the island this page's search field, kept open.
+  final IslandPageSearch? pageSearch;
 
   /// Behind the body and the island, e.g. the page glow; it does not scroll.
   final Widget? background;
@@ -168,6 +198,7 @@ class _IslandScaffoldState extends State<IslandScaffold> {
               onBack: widget.onBack,
               onFilter: widget.onFilter,
               globalSearch: widget.globalSearch,
+              pageSearch: widget.pageSearch,
               maxWidth: media.size.width - left - _islandMargin * 2,
             ),
           ),
@@ -185,6 +216,7 @@ class _Island extends StatefulWidget {
     required this.onBack,
     required this.onFilter,
     required this.globalSearch,
+    required this.pageSearch,
     required this.maxWidth,
   });
 
@@ -194,6 +226,7 @@ class _Island extends StatefulWidget {
   final VoidCallback? onBack;
   final ValueChanged<String>? onFilter;
   final bool globalSearch;
+  final IslandPageSearch? pageSearch;
   final double maxWidth;
 
   @override
@@ -203,15 +236,20 @@ class _Island extends StatefulWidget {
 class _IslandState extends State<_Island> {
   static const _searchWidth = 480.0;
 
-  final _controller = TextEditingController();
-  final _focusNode = FocusNode();
+  final _ownController = TextEditingController();
+  final _ownFocusNode = FocusNode();
   bool _searching = false;
+
+  // A page search brings its own, which the page owns.
+  TextEditingController get _controller =>
+      widget.pageSearch?.controller ?? _ownController;
+  FocusNode get _focusNode => widget.pageSearch?.focusNode ?? _ownFocusNode;
 
   @override
   void dispose() {
     offlineMode.removeListener(_onOfflineChanged);
-    _controller.dispose();
-    _focusNode.dispose();
+    _ownController.dispose();
+    _ownFocusNode.dispose();
     super.dispose();
   }
 
@@ -228,8 +266,19 @@ class _IslandState extends State<_Island> {
     setState(() => _searching = false);
   }
 
+  /// The clear button of a page search: the text goes, the focus stays.
+  void _clearText() {
+    _controller.clear();
+    widget.pageSearch?.onChanged?.call('');
+    _focusNode.requestFocus();
+  }
+
   void _submit(String query) {
     _focusNode.unfocus();
+    if (widget.pageSearch case final page?) {
+      page.onSubmitted(query);
+      return;
+    }
     final trimmed = query.trim();
     if (trimmed.isEmpty || offlineMode.value) return;
     if (widget.onFilter != null && !globalSearchOnEnter.value) return;
@@ -239,9 +288,20 @@ class _IslandState extends State<_Island> {
   }
 
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.escape) {
-      _closeSearch();
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    final isPageSearch = widget.pageSearch != null;
+    if (key == LogicalKeyboardKey.escape) {
+      // A page search stays open; Escape only leaves the field.
+      if (isPageSearch) {
+        _focusNode.unfocus();
+      } else {
+        _closeSearch();
+      }
+      return KeyEventResult.handled;
+    }
+    if (isPageSearch && key == LogicalKeyboardKey.numpadEnter) {
+      _submit(_controller.text);
       return KeyEventResult.handled;
     }
     return KeyEventResult.ignored;
@@ -266,13 +326,15 @@ class _IslandState extends State<_Island> {
   Widget build(BuildContext context) {
     final showSearch =
         widget.onFilter != null || (widget.globalSearch && !offlineMode.value);
-    final width = _searching
+    final fieldShown = _searching || widget.pageSearch != null;
+    final width = fieldShown
         ? (widget.maxWidth < _searchWidth ? widget.maxWidth : _searchWidth)
         : null;
 
     // Its own layer: with blur on, resizing would repaint the page each frame.
     return PopScope(
-      // Back closes an open search before it leaves the page.
+      // Back closes an open search before it leaves the page (a page search
+      // never closes).
       canPop: !_searching,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _closeSearch();
@@ -291,7 +353,7 @@ class _IslandState extends State<_Island> {
               child: SizedBox(
                 height: _islandHeight,
                 width: width,
-                child: _searching
+                child: fieldShown
                     ? _buildSearchField(context)
                     : _buildBar(context, showSearch),
               ),
@@ -302,11 +364,20 @@ class _IslandState extends State<_Island> {
     );
   }
 
+  /// Only pages pushed over another one in their own navigator: a tab's
+  /// first page has nowhere to go back to.
+  bool _canPop(BuildContext context) =>
+      !(ModalRoute.of(context)?.isFirst ?? true);
+
+  Widget _backButton(BuildContext context) => IconButton(
+    icon: const Icon(FluentIcons.arrow_left_24_regular),
+    tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+    onPressed: widget.onBack ?? () => Navigator.of(context).maybePop(),
+  );
+
   Widget _buildBar(BuildContext context, bool showSearch) {
     final colorScheme = Theme.of(context).colorScheme;
-    // Only pages pushed over another one in their own navigator: a tab's
-    // first page has nowhere to go back to.
-    final canPop = !(ModalRoute.of(context)?.isFirst ?? true);
+    final canPop = _canPop(context);
 
     final titleText = Padding(
       padding: EdgeInsetsDirectional.only(start: canPop ? 2 : 14, end: 10),
@@ -329,13 +400,7 @@ class _IslandState extends State<_Island> {
       builder: (context, titleShown, _) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (canPop)
-            IconButton(
-              icon: const Icon(FluentIcons.arrow_left_24_regular),
-              tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-              onPressed:
-                  widget.onBack ?? () => Navigator.of(context).maybePop(),
-            ),
+          if (canPop) _backButton(context),
           // Left out while hidden, so the island stays compact.
           if (widget.title.isNotEmpty && titleShown)
             Flexible(
@@ -362,14 +427,25 @@ class _IslandState extends State<_Island> {
 
   Widget _buildSearchField(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final page = widget.pageSearch;
+    final canPop = page != null && _canPop(context);
+    final searchIcon = Icon(
+      FluentIcons.search_24_regular,
+      size: 20,
+      color: colorScheme.onSurfaceVariant,
+    );
     return Row(
       children: [
-        const SizedBox(width: 14),
-        Icon(
-          FluentIcons.search_24_regular,
-          size: 20,
-          color: colorScheme.onSurfaceVariant,
-        ),
+        if (canPop) _backButton(context),
+        SizedBox(width: canPop ? 2 : 14),
+        if (page?.loading case final notifier?)
+          ValueListenableBuilder<bool>(
+            valueListenable: notifier,
+            builder: (context, loading, _) =>
+                loading ? const Spinner(size: 20, strokeWidth: 2) : searchIcon,
+          )
+        else
+          searchIcon,
         const SizedBox(width: 8),
         Expanded(
           child: Focus(
@@ -380,7 +456,7 @@ class _IslandState extends State<_Island> {
               controller: _controller,
               focusNode: _focusNode,
               textInputAction: TextInputAction.search,
-              onChanged: widget.onFilter,
+              onChanged: page == null ? widget.onFilter : page.onChanged,
               onSubmitted: _submit,
               style: TextStyle(fontSize: 16, color: colorScheme.onSurface),
               decoration: InputDecoration(
@@ -393,11 +469,23 @@ class _IslandState extends State<_Island> {
             ),
           ),
         ),
-        IconButton(
-          icon: const Icon(FluentIcons.dismiss_24_regular),
-          tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-          onPressed: _closeSearch,
-        ),
+        if (page == null)
+          IconButton(
+            icon: const Icon(FluentIcons.dismiss_24_regular),
+            tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+            onPressed: _closeSearch,
+          )
+        else
+          ValueListenableBuilder<TextEditingValue>(
+            valueListenable: _controller,
+            builder: (context, value, _) => value.text.isEmpty
+                ? const SizedBox(width: 12)
+                : IconButton(
+                    icon: const Icon(FluentIcons.dismiss_24_regular),
+                    tooltip: context.l10n!.clear,
+                    onPressed: _clearText,
+                  ),
+          ),
         const SizedBox(width: 2),
       ],
     );
