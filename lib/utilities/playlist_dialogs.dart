@@ -32,6 +32,7 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/map_utils.dart';
 import 'package:musify/utilities/playlist_image_picker.dart';
 import 'package:musify/widgets/dialog_item.dart';
+import 'package:musify/widgets/dialog_parts.dart';
 
 void showCreatePlaylistDialog(
   BuildContext context, {
@@ -69,19 +70,7 @@ void showCreatePlaylistDialog(
           }
 
           return AlertDialog(
-            icon: Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                FluentIcons.add_24_filled,
-                color: colorScheme.primary,
-                size: 32,
-              ),
-            ),
+            icon: const DialogIconHeader(icon: FluentIcons.add_24_filled),
             title: Text(
               context.l10n!.addPlaylist,
               style: TextStyle(
@@ -295,16 +284,7 @@ void showCreatePlaylistDialog(
             ),
             actionsAlignment: MainAxisAlignment.center,
             actions: <Widget>[
-              OutlinedButton(
-                onPressed: () => Navigator.pop(context),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: colorScheme.outline),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(context.l10n!.cancel),
-              ),
+              const DialogCancel(style: DialogCancelStyle.outlined),
               FilledButton.icon(
                 onPressed: () async {
                   if (isYouTubeMode && id.isNotEmpty) {
@@ -381,18 +361,9 @@ void showAddToPlaylistDialog(
     builder: (BuildContext context) {
       final colorScheme = Theme.of(context).colorScheme;
       return AlertDialog(
-        icon: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: colorScheme.secondaryContainer,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            FluentIcons.album_add_24_filled,
-            color: colorScheme.secondary,
-            size: 28,
-          ),
+        icon: const DialogIconHeader(
+          icon: FluentIcons.album_add_24_filled,
+          secondary: true,
         ),
         title: Text(
           context.l10n!.addToPlaylist,
@@ -533,10 +504,7 @@ void showAddToPlaylistDialog(
         ),
         actionsAlignment: MainAxisAlignment.end,
         actions: [
-          TextButton(
-            child: Text(context.l10n!.cancel),
-            onPressed: () => Navigator.pop(context),
-          ),
+          const DialogCancel(),
           FilledButton.icon(
             onPressed: () {
               Navigator.pop(context);

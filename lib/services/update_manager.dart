@@ -36,6 +36,7 @@ import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/utilities/url_launcher.dart';
 import 'package:musify/widgets/auto_format_text.dart';
+import 'package:musify/widgets/dialog_parts.dart';
 
 const String releasesUrl =
     'https://api.github.com/repos/$appRepository/releases/latest';
@@ -162,16 +163,7 @@ Future<void> checkAppUpdates({bool manual = false}) async {
           ),
           actionsAlignment: MainAxisAlignment.center,
           actions: <Widget>[
-            OutlinedButton(
-              onPressed: () => Navigator.pop(context),
-              style: OutlinedButton.styleFrom(
-                side: BorderSide(color: colorScheme.outline),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: Text(context.l10n!.cancel),
-            ),
+            const DialogCancel(style: DialogCancelStyle.outlined),
             FilledButton.icon(
               onPressed: () {
                 launchURL(Uri.parse(downloadUrl));

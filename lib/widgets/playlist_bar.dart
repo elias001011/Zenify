@@ -36,6 +36,7 @@ import 'package:musify/utilities/offline_playlist_dialogs.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/widgets/dialog_item.dart';
+import 'package:musify/widgets/dialog_parts.dart';
 import 'package:musify/widgets/edit_playlist_dialog.dart';
 import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/overflow_menu_button.dart';
@@ -375,18 +376,9 @@ class PlaylistBar extends StatelessWidget {
       builder: (context) {
         final colorScheme = Theme.of(context).colorScheme;
         return AlertDialog(
-          icon: Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: colorScheme.secondaryContainer,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              FluentIcons.folder_arrow_right_24_regular,
-              color: colorScheme.secondary,
-              size: 28,
-            ),
+          icon: const DialogIconHeader(
+            icon: FluentIcons.folder_arrow_right_24_regular,
+            secondary: true,
           ),
           title: Text(
             context.l10n!.moveToFolder,
@@ -634,62 +626,19 @@ class PlaylistBar extends StatelessWidget {
   void _handleEditFolder(BuildContext context) {
     if (playlistData == null) return;
     final folderId = playlistData!['id'];
-    var folderName = playlistTitle;
-    final colorScheme = Theme.of(context).colorScheme;
 
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: Icon(
-          FluentIcons.folder_24_regular,
-          color: colorScheme.primary,
-          size: 32,
-        ),
-        title: Text(
-          context.l10n!.editFolder,
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: TextFormField(
-          decoration: InputDecoration(
-            labelText: context.l10n!.folderName,
-            prefixIcon: Icon(
-              FluentIcons.text_field_20_regular,
-              color: colorScheme.onSurfaceVariant,
-            ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            filled: true,
-            fillColor: colorScheme.surfaceContainerLow,
-          ),
-          initialValue: folderName,
-          autofocus: true,
-          onChanged: (value) => folderName = value,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              context.l10n!.cancel,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              final result = renamePlaylistFolder(
-                folderId,
-                folderName,
-                context,
-              );
-              showToast(context, result);
-            },
-            icon: const Icon(FluentIcons.save_20_regular),
-            label: Text(context.l10n!.update),
-          ),
-        ],
-      ),
+    showNameDialog(
+      context,
+      icon: FluentIcons.folder_24_regular,
+      title: context.l10n!.editFolder,
+      label: context.l10n!.folderName,
+      initialName: playlistTitle,
+      confirmIcon: FluentIcons.save_20_regular,
+      confirmLabel: context.l10n!.update,
+      onSubmit: (dialogContext, name) {
+        final result = renamePlaylistFolder(folderId, name, dialogContext);
+        showToast(dialogContext, result);
+      },
     );
   }
 }

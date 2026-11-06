@@ -45,6 +45,7 @@ import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
+import 'package:musify/widgets/dialog_parts.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/music_list_surface.dart';
@@ -883,19 +884,7 @@ class _LibraryPageState extends State<LibraryPage> {
       final colorScheme = Theme.of(context).colorScheme;
 
       return AlertDialog(
-        icon: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            FluentIcons.folder_add_24_regular,
-            color: colorScheme.primary,
-            size: 32,
-          ),
-        ),
+        icon: const DialogIconHeader(icon: FluentIcons.folder_add_24_regular),
         title: Text(
           context.l10n!.createFolder,
           style: TextStyle(
@@ -921,16 +910,7 @@ class _LibraryPageState extends State<LibraryPage> {
         ),
         actionsAlignment: MainAxisAlignment.center,
         actions: <Widget>[
-          OutlinedButton(
-            onPressed: () => Navigator.pop(context),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: colorScheme.outline),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-            ),
-            child: Text(context.l10n!.cancel),
-          ),
+          const DialogCancel(style: DialogCancelStyle.outlined),
           FilledButton.icon(
             onPressed: () {
               if (folderName.trim().isNotEmpty) {

@@ -31,6 +31,7 @@ import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/dialog_item.dart';
+import 'package:musify/widgets/dialog_parts.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/playlist_bar.dart';
@@ -286,18 +287,9 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
       builder: (context) {
         final colorScheme = Theme.of(context).colorScheme;
         return AlertDialog(
-          icon: Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: colorScheme.secondaryContainer,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              FluentIcons.text_bullet_list_add_24_filled,
-              color: colorScheme.secondary,
-              size: 28,
-            ),
+          icon: const DialogIconHeader(
+            icon: FluentIcons.text_bullet_list_add_24_filled,
+            secondary: true,
           ),
           title: Text(
             context.l10n!.addPlaylist,
@@ -329,12 +321,7 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
               },
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(context.l10n!.cancel),
-            ),
-          ],
+          actions: [const DialogCancel()],
         );
       },
     );
@@ -356,64 +343,23 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
   }
 
   void _showRenameFolderDialog() {
-    var newName = _folderName;
-    final colorScheme = Theme.of(context).colorScheme;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        icon: Icon(
-          FluentIcons.folder_24_regular,
-          color: colorScheme.primary,
-          size: 32,
-        ),
-        title: Text(
-          context.l10n!.editFolder,
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: TextFormField(
-          decoration: InputDecoration(
-            labelText: context.l10n!.folderName,
-            prefixIcon: Icon(
-              FluentIcons.text_field_20_regular,
-              color: colorScheme.onSurfaceVariant,
-            ),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-            filled: true,
-            fillColor: colorScheme.surfaceContainerLow,
-          ),
-          initialValue: newName,
-          autofocus: true,
-          onChanged: (value) => newName = value,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              context.l10n!.cancel,
-              style: TextStyle(color: colorScheme.onSurfaceVariant),
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: () {
-              Navigator.pop(context);
-              final result = renamePlaylistFolder(
-                widget.folderId,
-                newName,
-                context,
-              );
-              showToast(context, result);
-              if (newName.trim().isNotEmpty) {
-                setState(() => _folderName = newName.trim());
-              }
-            },
-            icon: const Icon(FluentIcons.save_20_filled),
-            label: Text(context.l10n!.update),
-          ),
-        ],
-      ),
+    showNameDialog(
+      context,
+      icon: FluentIcons.folder_24_regular,
+      title: context.l10n!.editFolder,
+      label: context.l10n!.folderName,
+      initialName: _folderName,
+      confirmIcon: FluentIcons.save_20_filled,
+      confirmLabel: context.l10n!.update,
+      onSubmit: (dialogContext, name) {
+        final result = renamePlaylistFolder(
+          widget.folderId,
+          name,
+          dialogContext,
+        );
+        showToast(dialogContext, result);
+        if (name.isNotEmpty) setState(() => _folderName = name);
+      },
     );
   }
 

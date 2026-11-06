@@ -22,6 +22,7 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/widgets/dialog_parts.dart';
 
 class ConfirmationDialog extends StatelessWidget {
   const ConfirmationDialog({
@@ -66,16 +67,7 @@ class ConfirmationDialog extends StatelessWidget {
           : null,
       actionsAlignment: MainAxisAlignment.center,
       actions: <Widget>[
-        OutlinedButton(
-          onPressed: onCancel,
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: colorScheme.outline),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: Text(context.l10n!.cancel),
-        ),
+        DialogCancel(onPressed: onCancel, style: DialogCancelStyle.outlined),
         FilledButton(
           onPressed: onSubmit,
           style: FilledButton.styleFrom(

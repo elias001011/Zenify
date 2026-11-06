@@ -22,6 +22,7 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/widgets/dialog_parts.dart';
 
 class RenameSongDialog extends StatefulWidget {
   const RenameSongDialog({
@@ -128,16 +129,7 @@ class _RenameSongDialogState extends State<RenameSongDialog> {
       ),
       actionsAlignment: MainAxisAlignment.center,
       actions: <Widget>[
-        OutlinedButton(
-          onPressed: () => Navigator.of(context).pop(),
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: colorScheme.outline),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: Text(context.l10n!.cancel),
-        ),
+        const DialogCancel(style: DialogCancelStyle.outlined),
         FilledButton(
           onPressed: _handleRename,
           style: FilledButton.styleFrom(
