@@ -121,7 +121,25 @@ ThemeData getAppTheme(ColorScheme colorScheme) {
     textButtonTheme: const TextButtonThemeData(style: clickableStyle),
     outlinedButtonTheme: const OutlinedButtonThemeData(style: clickableStyle),
     elevatedButtonTheme: const ElevatedButtonThemeData(style: clickableStyle),
-    segmentedButtonTheme: const SegmentedButtonThemeData(style: clickableStyle),
+    // The chosen segment is the accent, so it reads at a glance whatever is
+    // behind it (the default tint is close to a dark page).
+    segmentedButtonTheme: SegmentedButtonThemeData(
+      style: clickableStyle.copyWith(
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.selected)
+              ? effectiveColorScheme.primary
+              : Colors.transparent,
+        ),
+        foregroundColor: WidgetStateProperty.resolveWith((states) {
+          if (states.contains(WidgetState.disabled)) {
+            return effectiveColorScheme.onSurface.withValues(alpha: 0.38);
+          }
+          return states.contains(WidgetState.selected)
+              ? effectiveColorScheme.onPrimary
+              : effectiveColorScheme.onSurface;
+        }),
+      ),
+    ),
     menuButtonTheme: const MenuButtonThemeData(style: clickableStyle),
     switchTheme: const SwitchThemeData(mouseCursor: clickable),
     checkboxTheme: const CheckboxThemeData(mouseCursor: clickable),
