@@ -66,6 +66,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
   void dispose() {
     offlineMode.removeListener(_onOfflineModeChanged);
     ToastInset.bottom = 0;
+    ToastInset.dock = null;
     super.dispose();
   }
 
@@ -180,6 +181,10 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     );
 
     ToastInset.bottom = safeBottom + _margin + dockHeight;
+    // A narrow dock keeps to the left: the toast stands over it.
+    ToastInset.dock = maxDockWidth == null
+        ? null
+        : (left: _margin, width: dockWidth);
     return Stack(
       children: [
         _withInsets(context, bottom: _margin * 2 + dockHeight),
@@ -236,6 +241,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
     );
 
     ToastInset.bottom = playing ? _margin + MiniPlayer.playerHeight : 0;
+    ToastInset.dock = null;
     // The rail floats over the page like the dock on phones, so the page's
     // background reaches the window's edge behind it.
     return Stack(

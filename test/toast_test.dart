@@ -13,7 +13,10 @@ void main() {
 
   late BuildContext page;
 
-  tearDown(() => ToastInset.bottom = 0);
+  tearDown(() {
+    ToastInset.bottom = 0;
+    ToastInset.dock = null;
+  });
 
   ThemeData theme() =>
       getAppTheme(ColorScheme.fromSeed(seedColor: Colors.teal));
@@ -199,6 +202,30 @@ void main() {
         lessThanOrEqualTo(844 - 34 - FloatingSurface.edgeMargin),
       );
       expect(toastRect(tester).bottom, closeTo(844 - 34 - 12 - 8, 0.5));
+    });
+
+    testWidgets('stands over a dock that keeps to the left', (tester) async {
+      await open(tester, size: const Size(1280, 800));
+      ToastInset.bottom = 120;
+      ToastInset.dock = (left: FloatingSurface.edgeMargin, width: 420);
+      showToast(page, 'Saved');
+      await shown(tester);
+      final rect = toastRect(tester);
+      expect(rect.left, closeTo(FloatingSurface.edgeMargin, 0.5));
+      expect(rect.width, closeTo(420, 0.5));
+      expect(rect.bottom, closeTo(800 - 120 - 8, 0.5));
+    });
+
+    testWidgets('fills a dock that is narrower than the window', (
+      tester,
+    ) async {
+      await open(tester, size: const Size(300, 800));
+      ToastInset.dock = (left: FloatingSurface.edgeMargin, width: 276);
+      showToast(page, 'Saved');
+      await shown(tester);
+      final rect = toastRect(tester);
+      expect(rect.left, closeTo(FloatingSurface.edgeMargin, 0.5));
+      expect(rect.right, closeTo(300 - FloatingSurface.edgeMargin, 0.5));
     });
 
     testWidgets('is at most 480 wide and centred on a wide window', (

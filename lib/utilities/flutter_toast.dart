@@ -34,6 +34,11 @@ final toastMessengerKey = GlobalKey<ScaffoldMessengerState>();
 /// mini player), keeps it up to date.
 abstract final class ToastInset {
   static double bottom = 0;
+
+  /// Where the dock stands when it is narrower than the window and not
+  /// centred (the compact desktop player keeps it to the left): the toast
+  /// goes over it, not beside it. Null: the toast is centred.
+  static ({double left, double width})? dock;
 }
 
 const _maxToastWidth = 480.0;
@@ -42,13 +47,24 @@ ScaffoldMessengerState? _messengerFor(BuildContext context) =>
     toastMessengerKey.currentState ??
     (context.mounted ? ScaffoldMessenger.maybeOf(context) : null);
 
-/// At most [_maxToastWidth] wide and centred, above [ToastInset.bottom].
+/// At most [_maxToastWidth] wide, centred or over the dock when that keeps to
+/// one side, above [ToastInset.bottom].
 EdgeInsets _toastMargin(ScaffoldMessengerState messenger) {
   final media = MediaQuery.maybeOf(messenger.context);
-  final h = math.max(
-    FloatingSurface.edgeMargin,
-    ((media?.size.width ?? 0) - _maxToastWidth) / 2,
-  );
+  final windowWidth = media?.size.width ?? 0;
+  final dock = ToastInset.dock;
+  final double left;
+  final double right;
+  if (dock == null) {
+    left = right = math.max(
+      FloatingSurface.edgeMargin,
+      (windowWidth - _maxToastWidth) / 2,
+    );
+  } else {
+    final width = math.min(dock.width, _maxToastWidth);
+    left = dock.left;
+    right = math.max(FloatingSurface.edgeMargin, windowWidth - left - width);
+  }
   // A floating snack bar already stands above the safe area, which the
   // inset (from the window's bottom) includes.
   final safeBottom = media?.viewPadding.bottom ?? 0;
@@ -56,7 +72,7 @@ EdgeInsets _toastMargin(ScaffoldMessengerState messenger) {
     ToastInset.bottom - safeBottom,
     FloatingSurface.edgeMargin,
   );
-  return EdgeInsets.fromLTRB(h, 0, h, bottom + 8);
+  return EdgeInsets.fromLTRB(left, 0, right, bottom + 8);
 }
 
 Widget _toastContent(IconData icon, String text) => Row(
