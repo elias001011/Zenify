@@ -426,7 +426,7 @@ class _SelectionActionsState extends State<_SelectionActions> {
   @override
   Widget build(BuildContext context) {
     final actions = Listener(
-      onPointerSignal: isDesktopPlatform ? _wheel : null,
+      onPointerSignal: _wheel,
       child: ScrollConfiguration(
         behavior: ScrollConfiguration.of(context).copyWith(
           dragDevices: PointerDeviceKind.values.toSet(),
@@ -445,9 +445,16 @@ class _SelectionActionsState extends State<_SelectionActions> {
         ),
       ),
     );
-    if (!isDesktopPlatform || MediaQuery.sizeOf(context).width < 600) {
-      return actions;
-    }
+    if (MediaQuery.sizeOf(context).width < 600) return actions;
+    return ListenableBuilder(
+      listenable: mouseConnection,
+      child: actions,
+      builder: (context, child) =>
+          isDesktopPlatform || hasMouse ? _paged(child!) : child!,
+    );
+  }
+
+  Widget _paged(Widget actions) {
     return ValueListenableBuilder<(bool, bool)>(
       valueListenable: _edges,
       child: actions,

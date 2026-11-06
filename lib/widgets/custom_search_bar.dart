@@ -22,7 +22,6 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/utilities/platform_utils.dart';
 
 class CustomSearchBar extends StatefulWidget {
   const CustomSearchBar({
@@ -48,8 +47,6 @@ class CustomSearchBar extends StatefulWidget {
 class _CustomSearchBarState extends State<CustomSearchBar> {
   @override
   Widget build(BuildContext context) {
-    final bar = _buildBar(context);
-    if (!isDesktopPlatform) return bar;
     return Focus(
       canRequestFocus: false,
       skipTraversal: true,
@@ -66,7 +63,7 @@ class _CustomSearchBarState extends State<CustomSearchBar> {
         }
         return KeyEventResult.ignored;
       },
-      child: bar,
+      child: _buildBar(context),
     );
   }
 

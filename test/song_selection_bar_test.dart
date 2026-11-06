@@ -129,4 +129,70 @@ void main() {
       },
     );
   }
+
+  group('a tablet', () {
+    Future<ScrollableState> mount(WidgetTester tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      tester.view.physicalSize = const Size(1200, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      offlineMode.value = false;
+      final selection = SongSelectionController()..start({'ytid': 'one'});
+      addTearDown(selection.dispose);
+      await tester.pumpWidget(
+        localizedApp(
+          Scaffold(
+            body: Center(
+              child: SizedBox(
+                width: 480,
+                child: SongSelectionBar(
+                  controller: selection,
+                  visibleSongs: () => [
+                    {'ytid': 'one'},
+                  ],
+                  onMoveSelected: (_) async {},
+                  onRemoveSelected: (_) async {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      return tester.state<ScrollableState>(find.byType(Scrollable));
+    }
+
+    testWidgets('gets the arrows once a mouse is connected, not before', (
+      tester,
+    ) async {
+      await mount(tester);
+      expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsNothing);
+
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: const Offset(10, 10));
+      await tester.pumpAndSettle();
+      expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsOneWidget);
+      expect(find.byIcon(FluentIcons.chevron_left_24_regular), findsOneWidget);
+
+      await mouse.removePointer();
+      await tester.pumpAndSettle();
+      expect(find.byIcon(FluentIcons.chevron_right_24_regular), findsNothing);
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets('scrolls with the wheel of a mouse', (tester) async {
+      final scroll = await mount(tester);
+      await tester.sendEventToBinding(
+        PointerScrollEvent(
+          position: tester.getCenter(find.byType(SingleChildScrollView)),
+          scrollDelta: const Offset(0, 150),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(scroll.position.pixels, greaterThan(0));
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+    });
+  });
 }
