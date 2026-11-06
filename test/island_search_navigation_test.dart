@@ -117,6 +117,50 @@ void main() {
       router.dispose();
     },
   );
+  testWidgets('system Back closes the island search before leaving the page', (
+    tester,
+  ) async {
+    var filter = '';
+    await tester.pumpWidget(
+      localizedApp(
+        Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => IslandScaffold(
+                    title: 'Playlist',
+                    onFilter: (query) => filter = query,
+                    body: const Text('Pushed page'),
+                  ),
+                ),
+              ),
+              child: const Text('Home page'),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Home page'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Search'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'Blue hour');
+    expect(filter, 'Blue hour');
+
+    // The first Back only closes the search (and clears its filter).
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+    expect(filter, '');
+    expect(find.text('Pushed page'), findsOneWidget);
+
+    // The second one leaves the page.
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Pushed page'), findsNothing);
+    expect(find.text('Home page'), findsOneWidget);
+  });
   testWidgets(
     'the destination searches its term even with another cached search page',
     (tester) async {

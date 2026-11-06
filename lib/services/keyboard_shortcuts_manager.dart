@@ -336,7 +336,8 @@ class KeyboardShortcutsManager {
         final navigator = NavigationManager.parentNavigatorKey.currentState;
         if (navigator != null) {
           if (_isPlayerOnTop(navigator)) {
-            navigator.pop();
+            // Respects PopScope: an open panel closes before the player.
+            unawaited(navigator.maybePop());
             break;
           }
         }

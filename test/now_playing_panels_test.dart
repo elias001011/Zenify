@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -8,6 +10,8 @@ import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/keyboard_shortcuts_manager.dart';
+import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/now_playing/lyrics_panel.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
@@ -584,6 +588,85 @@ void main() {
     expect(find.byType(QueueWidget), findsNothing);
     expect(find.byType(NowPlayingPage), findsOneWidget);
     await tester.pumpWidget(const SizedBox());
+  });
+
+  group('Back and Esc close an open panel before the player', () {
+    final navigator = NavigationManager.parentNavigatorKey;
+
+    // The player pushed over a page, with the queue open.
+    Future<void> mountOverHome(WidgetTester tester, Size size) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      audioHandler = _Handler();
+      await audioHandler.skipToSong(0);
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            ...GlobalMaterialLocalizations.delegates,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: const Text('Home page'),
+        ),
+      );
+      unawaited(navigator.currentState!.push(buildNowPlayingRoute()));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.tap(find.byTooltip('Queue'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      expect(find.byType(QueueWidget), findsOneWidget);
+    }
+
+    // The second long pump lets a popped player finish sliding out.
+    Future<void> settle(WidgetTester tester) async {
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 600));
+      await tester.pump(const Duration(milliseconds: 600));
+    }
+
+    for (final size in [const Size(390, 844), const Size(1280, 800)]) {
+      testWidgets('system Back ($size)', (tester) async {
+        await mountOverHome(tester, size);
+        await tester.binding.handlePopRoute();
+        await settle(tester);
+        expect(find.byType(QueueWidget), findsNothing);
+        expect(find.byType(NowPlayingPage), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await settle(tester);
+        expect(find.byType(NowPlayingPage), findsNothing);
+        expect(find.text('Home page'), findsOneWidget);
+        await tester.pumpWidget(const SizedBox());
+      });
+
+      testWidgets('Esc ($size)', (tester) async {
+        await mountOverHome(tester, size);
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await settle(tester);
+        expect(find.byType(QueueWidget), findsNothing);
+        expect(find.byType(NowPlayingPage), findsOneWidget);
+        // With no panel open, Esc leaves the player alone.
+        await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+        await settle(tester);
+        expect(find.byType(NowPlayingPage), findsOneWidget);
+        await tester.pumpWidget(const SizedBox());
+      });
+
+      testWidgets('the go back shortcut ($size)', (tester) async {
+        await mountOverHome(tester, size);
+        KeyboardShortcutsManager.invoke(ShortcutAction.goBack);
+        await settle(tester);
+        expect(find.byType(QueueWidget), findsNothing);
+        expect(find.byType(NowPlayingPage), findsOneWidget);
+        KeyboardShortcutsManager.invoke(ShortcutAction.goBack);
+        await settle(tester);
+        expect(find.byType(NowPlayingPage), findsNothing);
+        expect(find.text('Home page'), findsOneWidget);
+        await tester.pumpWidget(const SizedBox());
+      });
+    }
   });
 
   testWidgets(

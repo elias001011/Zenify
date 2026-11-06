@@ -271,23 +271,30 @@ class _IslandState extends State<_Island> {
         : null;
 
     // Its own layer: with blur on, resizing would repaint the page each frame.
-    return RepaintBoundary(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: widget.maxWidth),
-        child: FloatingSurface(
-          borderRadius: const BorderRadius.all(
-            Radius.circular(_islandHeight / 2),
-          ),
-          child: AnimatedSize(
-            duration: const Duration(milliseconds: 260),
-            curve: Curves.fastOutSlowIn,
-            alignment: Alignment.centerLeft,
-            child: SizedBox(
-              height: _islandHeight,
-              width: width,
-              child: _searching
-                  ? _buildSearchField(context)
-                  : _buildBar(context, showSearch),
+    return PopScope(
+      // Back closes an open search before it leaves the page.
+      canPop: !_searching,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _closeSearch();
+      },
+      child: RepaintBoundary(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: widget.maxWidth),
+          child: FloatingSurface(
+            borderRadius: const BorderRadius.all(
+              Radius.circular(_islandHeight / 2),
+            ),
+            child: AnimatedSize(
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.fastOutSlowIn,
+              alignment: Alignment.centerLeft,
+              child: SizedBox(
+                height: _islandHeight,
+                width: width,
+                child: _searching
+                    ? _buildSearchField(context)
+                    : _buildBar(context, showSearch),
+              ),
             ),
           ),
         ),

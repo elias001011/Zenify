@@ -23,6 +23,7 @@ import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/app_utils.dart';
@@ -106,65 +107,83 @@ class _NowPlayingPageState extends State<NowPlayingPage> {
   void _onPanel(PlayerPanel panel) =>
       setState(() => _panel = _panel == panel ? null : panel);
 
+  /// Esc closes an open panel; with none open it is left for the app.
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (_panel == null ||
+        event is! KeyDownEvent ||
+        event.logicalKey != LogicalKeyboardKey.escape) {
+      return KeyEventResult.ignored;
+    }
+    setState(() => _panel = null);
+    return KeyEventResult.handled;
+  }
+
   @override
   Widget build(BuildContext context) {
     final layout = _PlayerLayout.of(MediaQuery.sizeOf(context));
     return PlayerChrome(
       style: PlayerChromeStyle.plain,
       child: PopScope(
-        canPop: layout == _PlayerLayout.wide || _panel == null,
+        // Back closes an open panel first, on every layout.
+        canPop: _panel == null,
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) setState(() => _panel = null);
         },
-        child: Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          body: StreamBuilder<MediaItem?>(
-            initialData: audioHandler.mediaItem.value,
-            stream: audioHandler.mediaItem,
-            builder: (context, snapshot) {
-              final metadata = snapshot.data;
-              if (metadata == null) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final panel = _panel;
-              final actions = PlayerActions(
-                metadata: metadata,
-                panel: panel,
-                onPanel: _onPanel,
-                // Beside the song everywhere but on a phone on its side.
-                showAddToPlaylist: layout == _PlayerLayout.sideways,
-              );
-              // Its own group: during the slide its surfaces sit over the shell's.
-              return BackdropGroup(
-                backdropKey: _backdropKey,
-                child: Stack(
-                  children: [
-                    // Expands once the player has slid up.
-                    Positioned.fill(
-                      child: PageGlow(
-                        source: mediaItemArtworkSource(metadata),
-                        waiting: !_backgroundVisible,
-                        cacheKey: 'now-playing',
+        child: Focus(
+          autofocus: true,
+          skipTraversal: true,
+          onKeyEvent: _onKey,
+          child: Scaffold(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            body: StreamBuilder<MediaItem?>(
+              initialData: audioHandler.mediaItem.value,
+              stream: audioHandler.mediaItem,
+              builder: (context, snapshot) {
+                final metadata = snapshot.data;
+                if (metadata == null) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                final panel = _panel;
+                final actions = PlayerActions(
+                  metadata: metadata,
+                  panel: panel,
+                  onPanel: _onPanel,
+                  // Beside the song everywhere but on a phone on its side.
+                  showAddToPlaylist: layout == _PlayerLayout.sideways,
+                );
+                // Its own group: during the slide its surfaces sit over the shell's.
+                return BackdropGroup(
+                  backdropKey: _backdropKey,
+                  child: Stack(
+                    children: [
+                      // Expands once the player has slid up.
+                      Positioned.fill(
+                        child: PageGlow(
+                          source: mediaItemArtworkSource(metadata),
+                          waiting: !_backgroundVisible,
+                          cacheKey: 'now-playing',
+                        ),
                       ),
-                    ),
-                    SafeArea(
-                      child: layout == _PlayerLayout.wide
-                          ? _WideLayout(
-                              metadata: metadata,
-                              actions: actions,
-                              panel: panel,
-                            )
-                          : _CompactLayout(
-                              metadata: metadata,
-                              actions: actions,
-                              panel: panel,
-                              onClosePanel: () => setState(() => _panel = null),
-                            ),
-                    ),
-                  ],
-                ),
-              );
-            },
+                      SafeArea(
+                        child: layout == _PlayerLayout.wide
+                            ? _WideLayout(
+                                metadata: metadata,
+                                actions: actions,
+                                panel: panel,
+                              )
+                            : _CompactLayout(
+                                metadata: metadata,
+                                actions: actions,
+                                panel: panel,
+                                onClosePanel: () =>
+                                    setState(() => _panel = null),
+                              ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ),
         ),
       ),
