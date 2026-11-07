@@ -300,23 +300,50 @@ class LocalSyncService {
     }
     _loadPairedDevices();
 
+    // Turned off, local sync leaves nothing running: no server, no timer and
+    // no watch on the library.
     if (localSyncEnabled.value) {
       try {
         await startServer();
       } catch (_) {
         // Logged by startServer; the settings page shows it as not visible.
       }
+      await _startBackgroundWork();
     }
+  }
 
+  /// Whether the watch on the library or a timer is running: none is while
+  /// local sync is turned off.
+  @visibleForTesting
+  bool get hasBackgroundWork =>
+      _periodicTimer != null ||
+      _startupTimer != null ||
+      _userBoxSubscription != null;
+
+  /// The watch on the library and the timers that keep devices in step. Only
+  /// while local sync is turned on.
+  Future<void> _startBackgroundWork() async {
     await rebindStorageListeners();
+    _periodicTimer?.cancel();
     _periodicTimer = Timer.periodic(
       autoSyncInterval,
       (_) => unawaited(triggerSilentSync()),
     );
+    _startupTimer?.cancel();
     _startupTimer = Timer(
       _startupSyncDelay,
       () => unawaited(triggerSilentSync()),
     );
+  }
+
+  Future<void> _stopBackgroundWork() async {
+    _periodicTimer?.cancel();
+    _periodicTimer = null;
+    _startupTimer?.cancel();
+    _startupTimer = null;
+    _localChangeTimer?.cancel();
+    await _userBoxSubscription?.cancel();
+    _userBoxSubscription = null;
   }
 
   /// Re-subscribes to the `user` box, which a backup restore silently unsubscribes.
@@ -342,8 +369,12 @@ class LocalSyncService {
   Future<void> resumeAfterStorageRestore({bool storageChanged = true}) async {
     reloadSettingsFromStorage();
     if (storageChanged) await LibraryMergeService.forgetBaseline();
-    await rebindStorageListeners();
-    if (localSyncEnabled.value) await startServer();
+    if (localSyncEnabled.value) {
+      await _startBackgroundWork();
+      await startServer();
+    } else {
+      await _stopBackgroundWork();
+    }
   }
 
   Future<void> dispose() async {
@@ -362,7 +393,7 @@ class LocalSyncService {
     localSyncEnabled.value = enabled;
 
     if (!enabled) {
-      _localChangeTimer?.cancel();
+      await _stopBackgroundWork();
       await stopServer();
       return true;
     }
@@ -373,6 +404,7 @@ class LocalSyncService {
       localSyncEnabled.value = false;
       return false;
     }
+    await _startBackgroundWork();
     unawaited(triggerSilentSync());
     return true;
   }

@@ -10,6 +10,7 @@ import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/local_sync/sync_pairing.dart';
 import 'package:musify/services/local_sync/sync_security.dart';
 import 'package:musify/services/local_sync_service.dart';
+import 'package:musify/services/settings_manager.dart' show localSyncEnabled;
 
 import 'local_sync/fixtures.dart';
 import 'support/app_harness.dart';
@@ -511,4 +512,33 @@ void main() {
       await Hive.box('userNoBackup').delete('localSyncPendingMergeV2');
     },
   );
+
+  test('turned off, local sync leaves no watch and no timer running', () async {
+    await server.dispose();
+    await Hive.box('settings').put('localSyncEnabled', false);
+    localSyncEnabled.value = false;
+    server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
+    await server.initialise();
+
+    expect(server.serverPort, isNull);
+    expect(server.hasBackgroundWork, isFalse);
+
+    expect(await server.setEnabled(true), isTrue);
+    expect(server.hasBackgroundWork, isTrue);
+
+    expect(await server.setEnabled(false), isTrue);
+    expect(server.hasBackgroundWork, isFalse);
+    expect(server.serverPort, isNull);
+  });
+
+  test('turned on at start, local sync starts its watch and timers', () async {
+    await server.dispose();
+    await Hive.box('settings').put('localSyncEnabled', true);
+    localSyncEnabled.value = true;
+    server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
+    await server.initialise();
+
+    expect(server.hasBackgroundWork, isTrue);
+    await server.setEnabled(false);
+  });
 }
