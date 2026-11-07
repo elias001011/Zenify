@@ -28,6 +28,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/audio_levels.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
 
 /// Sound waves: they follow the music's frequencies with the precise
@@ -160,12 +161,13 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _setVisibility(AppLifecycleState? state) {
-    // Out of focus (`inactive`: the notification shade, a window without
-    // focus) is still in view; only hidden, paused or detached is not.
+    // A desktop window that lost focus (the music on one screen, the user on
+    // the other) is `inactive` but still in view. On a phone, `inactive` is
+    // the notification shade or a system dialog over the app: the waves rest.
     _visible =
-        state != AppLifecycleState.hidden &&
-        state != AppLifecycleState.paused &&
-        state != AppLifecycleState.detached;
+        state == null ||
+        state == AppLifecycleState.resumed ||
+        (isDesktopPlatform && state == AppLifecycleState.inactive);
     _updateMotion();
   }
 

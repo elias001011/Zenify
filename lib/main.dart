@@ -426,16 +426,6 @@ Future<String?> initialisation() async {
       );
     }
 
-    try {
-      await LocalSyncService.instance.initialise();
-    } catch (e, stackTrace) {
-      logger.log(
-        'Local sync could not start',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    }
-
     if (isMobilePlatform) {
       audioHandler = await AudioService.init(
         builder: MusifyAudioHandler.new,
