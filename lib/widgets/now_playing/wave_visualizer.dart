@@ -55,15 +55,13 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   final _repaint = ValueNotifier<int>(0);
   late final Ticker _ticker = createTicker(_tick);
 
-  /// The bars are drawn up to 60 times a second. The music is read less often,
-  /// and the bars ease towards each reading, so the extra frames smooth the
-  /// motion.
-  static const _fps = 60;
+  /// The bars are drawn 48 times a second. The music is read less often, and
+  /// the bars ease towards each reading, so the extra frames smooth the motion.
+  static const _fps = 48;
   static const _frameMicroseconds = 1000000 ~/ _fps;
 
-  /// A frame may come this early and still count as due: at 60 Hz the frames
-  /// are 16.667 ms apart and the schedule's step is 16.666, so without it a
-  /// frame a hair early would be skipped and the waves would run at 30.
+  /// A frame may come this early and still count as due, so a frame a hair
+  /// ahead of the schedule is not skipped and the rate does not fall short.
   static const _earlyMicroseconds = 2000;
 
   /// After a pause the reader stays on this long, so a short one does not set

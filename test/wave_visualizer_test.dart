@@ -156,7 +156,7 @@ void main() {
   });
 
   for (final hertz in [60, 90, 120]) {
-    testWidgets('waves are drawn 60 times a second on a $hertz Hz screen', (
+    testWidgets('waves are drawn 48 times a second on a $hertz Hz screen', (
       tester,
     ) async {
       handler.ready();
@@ -172,9 +172,8 @@ void main() {
         if (now.toString() != before.toString()) drawn++;
         before = now;
       }
-      // Two seconds: 120 frames, give or take the schedule's rounding. A
-      // 60 Hz screen draws on every frame; faster ones are held to 60.
-      expect(drawn, inInclusiveRange(114, 124));
+      // Two seconds: 96 frames, give or take the schedule's rounding.
+      expect(drawn, inInclusiveRange(92, 100));
       await tester.pumpWidget(const SizedBox());
       debugDefaultTargetPlatformOverride = null;
     });
