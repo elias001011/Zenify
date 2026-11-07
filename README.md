@@ -31,6 +31,8 @@ a redesigned interface and syncing between your devices.
 | Windows | [`Zenify-windows-x64-setup.exe`](https://github.com/elias001011/Zenify/releases/latest/download/Zenify-windows-x64-setup.exe) | Lets you choose where data and downloads go. |
 | Windows (portable) | [`Zenify-windows-x64-portable.zip`](https://github.com/elias001011/Zenify/releases/latest/download/Zenify-windows-x64-portable.zip) | No installation. |
 
+Requirements: Android 7.0 (API 24) or newer, Linux x64 and Windows x64.
+
 Every release includes `SHA256SUMS.txt` to verify the files. iOS is not
 supported. All releases, with their notes, are on the
 [releases page](https://github.com/elias001011/Zenify/releases).
@@ -97,6 +99,10 @@ community. It keeps Musify's code, features and license,
 and goes further where Musify stops: the desktop, the look of the app and
 moving your library between devices.
 
+Local Sync, the device-to-device sync described below, also went upstream:
+[pull request #1005](https://github.com/gokadzev/Musify/pull/1005) by
+Elias Juriatti was merged into Musify on 7 November 2026.
+
 ### How it differs from Musify
 
 | | Musify | Zenify |
@@ -132,7 +138,7 @@ Everything from Musify:
 - Listening recaps
 - Radio stations
 - Synced lyrics
-- SponsorBlock support
+- SponsorBlock support (off by default)
 - Built-in equalizer with presets (Android)
 - No ads, no subscriptions
 - Material UI, accent colors and dynamic colors (Android 12+)
@@ -143,6 +149,8 @@ New in Zenify:
 - **A new look**: floating navigation and player, a floating title island with
   quick search, a neutral theme with pure black, and an optional dynamic
   background that follows album colours in the player and playlist, and the app accent elsewhere.
+  In translucent mode, the floating surfaces are a little more transparent and
+  have a light sheen and rim.
 - **A new player**: the artwork with the song and playback under it. Lyrics
   and queue open beside it in wide windows; in narrow windows they share the artwork's
   space through the same animated transition. Tapping the artwork switches
@@ -171,7 +179,8 @@ New in Zenify:
   files go through the share sheet.
 - **Add to playlist from Recents, Liked and Offline songs**: the same button
   the playlist pages have, for every song on the page, hidden in offline mode.
-- **Artist and playlist radios**: start a radio from an artist or playlist;
+- **Artist, playlist and song radios**: start a radio from an artist, a playlist
+  or a song's menu (online songs only, not local files);
   YouTube Music supplies the queue, with the automatic picker as a fallback.
   The automatic picker and the suggestions at the end of a playlist also ask
   the YouTube Music radio first, and fall back to related videos when it has
@@ -182,6 +191,12 @@ New in Zenify:
   playlist. Enable the reorder button below a custom playlist’s artwork to reveal drag
   handles; they start hidden and use the default, unfiltered order.
   On desktop, arrows and the mouse wheel scroll the batch actions.
+- **Fade between songs** (Settings, off by default, 2 to 12 seconds): a song
+  fades out as it ends and the next one fades in when the queue moves on by
+  itself.
+- **Load songs far ahead** (Android, Settings, off by default): loads up to 10
+  minutes of a song in advance, so a slow connection does not cut it off. It
+  uses more mobile data, and takes effect the next time the app opens.
 - **Pick up where you stopped**: the queue and playback position survive app
   restarts. The app opens paused and loads audio when you press play. This
   stays on the device; queues over 500 songs retain a window around the
@@ -191,7 +206,9 @@ New in Zenify:
 - **Library search and filters**: the library searches its own playlists,
   artists and songs, and the global search lists what you already have
   first. Both keep working offline.
-- **Top artists** in the listening recap, worked out from what you play.
+- **Top artists** in the listening recap, worked out from what you play. The
+  recap of the current month counts every song on the device; only the top 250
+  songs of the month go to backups and Local Sync.
 - **Download manager**: every download goes through one queue, three at a
   time, and a song is never downloaded twice at once. Follow what waits, what
   is downloading and what failed and why, retry one or all, and get a single
@@ -206,10 +223,14 @@ New in Zenify:
   similar screen, with a manual search, Copy, Cancel and Finish.
 - **Local Sync**: pair Android, Linux and Windows devices with a PIN and keep
   your liked songs, playlists, history, listening recap, searches and radio
-  stations in sync over Wi-Fi. No account or server, encrypted, off by default.
+  stations in sync over Wi-Fi, and Moods choices between Zenify devices. No
+  account or server; the data is encrypted with AES-256-GCM. The feature is off
+  by default, and with it off no sync server or discovery runs.
   An always-on computer or server on your network can take part too with the
   screenless [sync peer](tools/sync_peer/README.md), so a phone and a computer
   that are never on together keep the same library.
+- **Desktop volume**: a volume button at the end of the player's action bar
+  opens a thin, upright volume slider.
 - **Desktop settings**: interface scale that zooms the whole app, start
   maximized, a title bar in the app colors and a compact player layout.
 - **Keyboard shortcuts** for playback and navigation, all of them remappable.
@@ -218,6 +239,45 @@ New in Zenify:
   by default and can be turned off in Settings.
 
 New features are translated into English and Portuguese for now.
+
+---
+
+## Privacy: what the app contacts
+
+Zenify has no account, no sign-in and no analytics or crash reporting: its code
+and dependencies include no tracking or crash-reporting service, and nothing
+about your use is sent to the developers. Your library (likes, playlists,
+history, settings and listening stats) is kept on your device.
+
+The app contacts only the services below, and only in the cases listed.
+**Offline mode** (Settings) turns off every online feature, including the
+startup checks.
+
+| Service | When the app contacts it | How to turn it off |
+|---|---|---|
+| **YouTube and YouTube Music** (`youtube.com`, `music.youtube.com`, `googlevideo.com` for audio, `img.youtube.com` for thumbnails, `suggestqueries.google.com` for search suggestions) | Search, playback, playlists, artists, radios, Moods, recommendations, and related videos when *External recommendations* is on | Offline mode. There is no switch for YouTube alone. |
+| **SponsorBlock** (`sponsor.ajay.app`) | For songs played online, with *SponsorBlock* on, to get the video's skip segments. Downloading a song also asks for its segments (the video ID is sent) even while the switch is off; the switch only decides whether they are used. | *SponsorBlock* switch, off by default. |
+| **Lyrics** (`lrclib.net`, `api.lyrics.ovh`, `www.paroles.net`, `www.lyricsmania.com`) | When the lyrics panel shows a song, with its artist and title. Not for local files or live radios. | Offline mode. *Synced lyrics* only chooses between timed and plain lines. |
+| **Artwork** (`i.scdn.co`, `is1-ssl.mzstatic.com`, and the logo hosts of the built-in radios) | Covers of the built-in albums and playlists, and radio logos, when those pages show them | No switch. |
+| **Radio streams** | The stream server of the radio station you play | Do not play a radio, or use Offline mode (radios are hidden there). |
+| **Updates** (`api.github.com`, `raw.githubusercontent.com`) | At startup, unless Offline mode is on: the latest release and the `announcement.json` file. *Download app update* checks when you tap it. | *Automatic update checks* (on by default) stops the startup release check. Only Offline mode stops the announcement file. |
+| **Public proxies** (`spys.me`, `api.proxyscrape.com`, `proxylist.geonode.com`, and two lists on `raw.githubusercontent.com`) | With *Use proxy* on, these lists are downloaded and streams go through the proxies they list. With it off, Zenify still tries them as a last resort when YouTube refuses a stream for this device; a video that is unplayable for everyone is not retried this way. | *Use proxy* (off by default) stops routine use. No switch turns off the last-resort fallback; Offline mode avoids online streams altogether. |
+| **Local Sync** (your own network only) | Only when Local Sync is on: devices on the same Wi-Fi find each other by UDP broadcast and talk over a local HTTP server on a random port, with PIN pairing and AES-256-GCM encryption. Nothing goes to the internet. | *Local Sync* in Settings, off by default. With it off, no server or discovery runs. |
+
+Other things the app does:
+
+- **Spotify import** reads a CSV file you pick or paste and searches each song
+  on YouTube. It sends nothing to Spotify.
+- **Links** such as *Report a bug*, *Translate* and the Spotify playlist
+  exporter open in your browser when you tap them.
+- **Logs** are kept in memory and copied only when you tap *Copy logs*.
+- **Backups** are files you save where you choose. Android's automatic backup
+  leaves out the sync identity, downloaded songs, artwork, local files and the
+  cache.
+
+Stored only on the device: the library, settings, listening stats, the queue,
+downloads, local files and the image cache. What the services listed above do
+with the requests they receive: not verified.
 
 ---
 
