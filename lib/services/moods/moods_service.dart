@@ -24,7 +24,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:intl/intl.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler, logger;

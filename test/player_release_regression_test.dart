@@ -4,7 +4,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/screens/now_playing_page.dart';

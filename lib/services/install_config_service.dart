@@ -22,7 +22,7 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:musify/utilities/startup_support.dart';
 
 /// Folders chosen in the installer, from `install-config.txt` beside the exe.

@@ -24,7 +24,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/utilities/media_duration.dart';
 

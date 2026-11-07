@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/utilities/flutter_toast.dart' show toastMessengerKey;

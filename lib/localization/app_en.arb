@@ -27,8 +27,12 @@
   "artistListeningSummary": "{minutes} min · {count, plural, =1{1 song} other{{count} songs}}",
   "@artistListeningSummary": {
     "placeholders": {
-      "minutes": {"type": "int"},
-      "count": {"type": "int"}
+      "minutes": {
+        "type": "int"
+      },
+      "count": {
+        "type": "int"
+      }
     }
   },
   "audioQuality": "Audio quality",
@@ -122,7 +126,16 @@
   "downloadFailuresUnavailable": "{failed, plural, =1{1 song failed} other{{failed} songs failed}}, {unavailable} unavailable",
   "downloadsNotificationTitle": "Downloading songs",
   "downloadsNotificationProgress": "{done} of {total} downloaded",
-  "@downloadsNotificationProgress": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
+  "@downloadsNotificationProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "downloadFailuresTitle": "Some downloads failed",
   "downloadFailuresChannel": "Download failures",
   "unavailableSongsNotice": "{count, plural, =1{1 song in this playlist may be unavailable} other{{count} songs in this playlist may be unavailable}}",
@@ -342,7 +355,9 @@
   "shareRecapText": "My {period} Zenify recap",
   "@shareRecapText": {
     "placeholders": {
-      "period": {"type": "String"}
+      "period": {
+        "type": "String"
+      }
     }
   },
   "shortcutConflict": "Already used by {action}.",
@@ -474,8 +489,12 @@
   "localFilesImportResult": "{added} added, {failed} could not be added.",
   "@localFilesImportResult": {
     "placeholders": {
-      "added": {"type": "int"},
-      "failed": {"type": "int"}
+      "added": {
+        "type": "int"
+      },
+      "failed": {
+        "type": "int"
+      }
     }
   },
   "removeLocalFile": "Remove from this list",
@@ -763,7 +782,16 @@
   "zenifyChangesDaily": "Changes every day",
   "zenifyChangesEvery4Hours": "Changes every 4 hours",
   "zenifyMoment": "{day} {part}",
-  "@zenifyMoment": {"placeholders": {"day": {"type": "String"}, "part": {"type": "String"}}},
+  "@zenifyMoment": {
+    "placeholders": {
+      "day": {
+        "type": "String"
+      },
+      "part": {
+        "type": "String"
+      }
+    }
+  },
   "momentLateNight": "late night",
   "momentDawn": "dawn",
   "momentMorning": "morning",
@@ -777,7 +805,13 @@
   "zenifyMostPlayed": "Most played",
   "zenifyMostPlayedDescription": "What you played the most lately",
   "zenifyAddictions": "Your {month} addictions",
-  "@zenifyAddictions": {"placeholders": {"month": {"type": "String"}}},
+  "@zenifyAddictions": {
+    "placeholders": {
+      "month": {
+        "type": "String"
+      }
+    }
+  },
   "zenifyAddictionsDescription": "What you couldn't stop playing that month",
   "zenifyTopGlobal": "Top Global",
   "zenifyTopCountry": "Top in your country",
@@ -801,7 +835,13 @@
   "moodsTuningReading": "Reading your genres. The first time takes about a minute.",
   "startRadio": "Start radio",
   "radioOf": "{name} radio",
-  "@radioOf": {"placeholders": {"name": {"type": "String"}}},
+  "@radioOf": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
   "radioUnavailable": "Couldn't start the radio. Try again in a moment.",
   "globalSearchOnEnter": "Enter opens global search",
   "globalSearchOnEnterDescription": "Allow Enter to open global search from bars that filter the current screen. Available only while online.",
@@ -812,5 +852,11 @@
   "songFadeDescription": "A song fades out as it ends and the next one fades in.",
   "songFadeOff": "Off",
   "songFadeSeconds": "{count, plural, =1{1 second} other{{count} seconds}}",
-  "@songFadeSeconds": {"placeholders": {"count": {"type": "int"}}}
+  "@songFadeSeconds": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  }
 }

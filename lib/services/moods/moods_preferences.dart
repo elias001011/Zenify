@@ -20,7 +20,7 @@
  */
 
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:musify/services/moods/mix_engine.dart';
 
 /// What the user told the Moods in their tuning: genres left out, artists

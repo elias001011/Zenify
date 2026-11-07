@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/database/radio_stations.db.dart';
 import 'package:musify/localization/app_localizations.dart';

@@ -23,7 +23,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/download_manager.dart';

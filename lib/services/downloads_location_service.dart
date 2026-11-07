@@ -21,7 +21,7 @@
 
 import 'dart:io';
 
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';

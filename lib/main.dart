@@ -28,7 +28,7 @@ import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive_ce_flutter/hive_flutter.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
@@ -418,6 +418,16 @@ Future<String?> initialisation() async {
     unawaited(cleanupOldCacheEntries());
     // Copies older builds left pointing at the picker's cache.
     unawaited(keepLocalFileCopies().then((_) => removeUnlistedLocalCopies()));
+
+    try {
+      await LocalSyncService.instance.initialise();
+    } catch (e, stackTrace) {
+      logger.log(
+        'Local sync could not start',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
 
     try {
       await LocalSyncService.instance.initialise();

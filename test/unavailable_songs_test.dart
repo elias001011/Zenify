@@ -1,7 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/download_manager.dart';

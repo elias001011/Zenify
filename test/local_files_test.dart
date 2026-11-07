@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/local_files_service.dart';

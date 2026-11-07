@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:musify/localization/app_localizations_en.dart';
 import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/download_notifications.dart';

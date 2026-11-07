@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:musify/services/io_service.dart';
 
 /// Audio files kept on this device and played from it. They stay apart from

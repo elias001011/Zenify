@@ -21,7 +21,7 @@
 
 import 'dart:async';
 
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Songs YouTube itself reports as unplayable (removed, private, not

@@ -13,7 +13,7 @@
   "addToQueue": "Adicionar à fila",
   "addedPlaylists": "Playlists adicionadas",
   "addedSuccess": "Adicionado com sucesso",
-  "addedToLikedSongs": "Adicionado às curtidas",
+  "addedToLikedSongs": "Adicionado às músicas curtidas",
   "album": "Álbum",
   "albums": "Álbuns",
   "allSongs": "Todas as músicas",
@@ -116,7 +116,16 @@
   "downloadFailuresUnavailable": "{failed, plural, =1{1 música falhou} other{{failed} músicas falharam}}, {unavailable, plural, =1{1 indisponível} other{{unavailable} indisponíveis}}",
   "downloadsNotificationTitle": "Baixando músicas",
   "downloadsNotificationProgress": "{done} de {total} baixadas",
-  "@downloadsNotificationProgress": {"placeholders": {"done": {"type": "int"}, "total": {"type": "int"}}},
+  "@downloadsNotificationProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
   "downloadFailuresTitle": "Alguns downloads falharam",
   "downloadFailuresChannel": "Falhas nos downloads",
   "unavailableSongsNotice": "{count, plural, =1{1 música desta playlist pode estar indisponível} other{{count} músicas desta playlist podem estar indisponíveis}}",
@@ -641,5 +650,110 @@
   "songFade": "Fade entre músicas",
   "songFadeDescription": "A música some aos poucos ao terminar e a próxima entra aos poucos.",
   "songFadeOff": "Desligado",
-  "songFadeSeconds": "{count, plural, =1{1 segundo} other{{count} segundos}}"
+  "songFadeSeconds": "{count, plural, =1{1 segundo} other{{count} segundos}}",
+  "@syncAllNowDescription": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@syncOnline": {
+    "placeholders": {
+      "address": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncPairDescription": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncLastSynced": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncSyncingWith": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncSyncedWith": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncPairWith": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncPairedWith": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncForgetConfirm": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncErrorIncorrectPin": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncErrorRejected": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncErrorBusy": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncErrorUntrusted": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncErrorUnreachable": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  },
+  "@syncErrorFailed": {
+    "placeholders": {
+      "device": {
+        "type": "String"
+      }
+    }
+  }
 }

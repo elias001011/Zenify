@@ -23,7 +23,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 
-import 'package:hive/hive.dart';
+import 'package:hive_ce/hive_ce.dart';
 import 'package:http/http.dart' as http;
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/clients.dart';
