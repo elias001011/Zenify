@@ -44,48 +44,48 @@ never offers them, so install them by hand.
 
 ## Screenshots
 
-Taken from the app itself, running on Linux, with a sample library: the playlists and songs are invented, and the album covers only decorate them.
+Taken from the app itself, running on Linux (version 0.3.0), with the author's own library. The album covers belong to their artists and only decorate the screenshots.
 
-![Zenify home on a desktop](assets/screenshots/desktop-home.jpg)
+![Zenify home on a desktop](assets/screenshots/desktop-home.webp)
 
-Moods, a personal Mix and playlists made for you, on Home:
+The player is one design for the phone and the desktop. On a wide window it opens the lyrics or the queue beside the cover, and the sound waves can replace the cover with a tap:
 
-![Zenify moods, Mix and playlists made for you](assets/screenshots/desktop-moods.jpg)
-
-| Player with synced lyrics | Playlist |
+| Player | Synced lyrics and sound waves |
 |---|---|
-| ![Zenify player with synced lyrics](assets/screenshots/desktop-player-lyrics.jpg) | ![Zenify playlist](assets/screenshots/desktop-playlist.jpg) |
+| ![Zenify player on a desktop](assets/screenshots/desktop-player.webp) | ![Zenify player with synced lyrics and sound waves](assets/screenshots/desktop-player-lyrics.webp) |
 
-![Zenify library](assets/screenshots/desktop-library.jpg)
+![Zenify player with the queue beside the cover](assets/screenshots/desktop-queue.webp)
 
-Downloads with progress, failures and retry, in one queue:
+Library, with custom playlists, the Moods tuning and liked playlists:
 
-![Zenify download manager](assets/screenshots/desktop-downloads.jpg)
+![Zenify library](assets/screenshots/desktop-library.webp)
 
-Listening recap, with the minutes, top artist and top songs of the month:
+Downloads, in one queue:
 
-![Zenify listening recap](assets/screenshots/desktop-recap.jpg)
+![Zenify download manager](assets/screenshots/desktop-downloads.webp)
 
-### On a phone
+Listening recap (Time Machine), with the minutes, top artist and top songs of each month:
 
-The same app at a phone's size (390 × 844).
+![Zenify listening recap](assets/screenshots/desktop-recap.webp)
+
+Local Sync: choose what to sync and pair with your other devices on the same network, with no account:
+
+![Zenify Local Sync](assets/screenshots/desktop-local-sync.webp)
+
+### In a narrow window
+
+The same app in a narrow window, which is the layout the phone uses.
 
 <table>
   <tr>
-    <th>Home</th>
-    <th>Moods</th>
-    <th>Library</th>
     <th>Playlist</th>
     <th>Player</th>
     <th>Lyrics</th>
   </tr>
   <tr>
-    <td><img src="assets/screenshots/mobile-home.jpg" width="160" alt="Zenify home on a phone"></td>
-    <td><img src="assets/screenshots/mobile-moods.jpg" width="160" alt="Zenify moods and made-for-you playlists on a phone"></td>
-    <td><img src="assets/screenshots/mobile-library.jpg" width="160" alt="Zenify library on a phone"></td>
-    <td><img src="assets/screenshots/mobile-playlist.jpg" width="160" alt="Zenify playlist on a phone"></td>
-    <td><img src="assets/screenshots/mobile-player.jpg" width="160" alt="Zenify player on a phone"></td>
-    <td><img src="assets/screenshots/mobile-lyrics.jpg" width="160" alt="Zenify synced lyrics on a phone"></td>
+    <td><img src="assets/screenshots/narrow-playlist.webp" width="220" alt="Zenify playlist in a narrow window"></td>
+    <td><img src="assets/screenshots/narrow-player.webp" width="220" alt="Zenify player in a narrow window"></td>
+    <td><img src="assets/screenshots/narrow-lyrics.webp" width="220" alt="Zenify synced lyrics in a narrow window"></td>
   </tr>
 </table>
 
