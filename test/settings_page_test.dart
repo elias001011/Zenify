@@ -273,6 +273,8 @@ void main() {
         expect(find.byType(SettingsPage), findsOneWidget);
         expect(songFadeSeconds.value, 8);
         expect(Hive.box('settings').get('songFadeSeconds'), 8);
+        // As with the other settings, a notice says it was saved.
+        expect(find.text(l10n.settingChangedMsg), findsOneWidget);
 
         // And back to off.
         await tester.tap(barFinder(l10n.songFade));

@@ -104,15 +104,16 @@ class _SettingSwitch extends StatelessWidget {
         title,
         icon,
         description: description,
-        onTap: () => _set(!value),
-        trailing: Switch(value: value, onChanged: _set),
+        onTap: () => _set(context, !value),
+        trailing: Switch(value: value, onChanged: (v) => _set(context, v)),
       ),
     );
   }
 
-  void _set(bool value) {
+  void _set(BuildContext context, bool value) {
     setting.value = value;
     addOrUpdateData<bool>('settings', storageKey, value);
+    showToast(context, context.l10n!.settingChangedMsg);
   }
 }
 
@@ -233,6 +234,7 @@ class _InterfaceScaleBarState extends State<_InterfaceScaleBar> {
     final rounded = (value / _step).round() * _step;
     interfaceScale.value = double.parse(rounded.toStringAsFixed(2));
     addOrUpdateData<double>('settings', 'interfaceScale', interfaceScale.value);
+    showToast(context, context.l10n!.settingChangedMsg);
   }
 }
 

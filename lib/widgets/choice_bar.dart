@@ -20,6 +20,8 @@
  */
 
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/extensions/l10n.dart';
+import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/bottom_sheet_bar.dart';
 import 'package:musify/widgets/custom_bar.dart';
 
@@ -35,6 +37,7 @@ class ChoiceBar<T> extends StatelessWidget {
     required this.setting,
     required this.choices,
     required this.onChosen,
+    this.notify = true,
   });
 
   final String title;
@@ -42,6 +45,10 @@ class ChoiceBar<T> extends StatelessWidget {
   final ValueNotifier<T> setting;
   final List<Choice<T>> choices;
   final ValueChanged<T> onChosen;
+
+  /// Whether a choice shows the "settings updated" notice, as the other
+  /// settings do; off for a row whose [onChosen] answers with its own.
+  final bool notify;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +80,9 @@ class ChoiceBar<T> extends StatelessWidget {
                   Navigator.pop(dialogContext);
                   setting.value = choice.value;
                   onChosen(choice.value);
+                  if (notify && context.mounted) {
+                    showToast(context, context.l10n!.settingChangedMsg);
+                  }
                 },
                 setting.value == choice.value,
                 icon: choice.icon,

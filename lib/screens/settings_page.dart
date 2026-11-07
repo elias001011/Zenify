@@ -242,6 +242,7 @@ class SettingsPage extends StatelessWidget {
               onChanged: (value) {
                 globalSearchOnEnter.value = value;
                 addOrUpdateData<bool>('settings', 'globalSearchOnEnter', value);
+                showToast(context, context.l10n!.settingChangedMsg);
               },
             ),
           ),
@@ -399,6 +400,7 @@ class SettingsPage extends StatelessWidget {
                   // Off, nothing of theirs stays behind but the user's own
                   // choices, kept in case they come back.
                   if (!value) moodsService.clearCache();
+                  showToast(context, context.l10n!.settingChangedMsg);
                 },
               ),
             );
@@ -854,6 +856,7 @@ class SettingsPage extends StatelessWidget {
             BottomSheetBar(_songFadeLabel(context, seconds), () {
               songFadeSeconds.value = seconds;
               addOrUpdateData<int>('settings', 'songFadeSeconds', seconds);
+              showToast(context, context.l10n!.settingChangedMsg);
               Navigator.of(context, rootNavigator: true).pop();
             }, songFadeSeconds.value == seconds),
         ],

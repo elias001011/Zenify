@@ -56,6 +56,8 @@ class WaveReadingBar extends StatelessWidget {
         ),
       ],
       onChosen: (reading) => _choose(context, reading),
+      // Its own notices: the choice may be refused.
+      notify: false,
     );
   }
 
@@ -66,5 +68,6 @@ class WaveReadingBar extends StatelessWidget {
       return;
     }
     await addOrUpdateData<String>('settings', 'waveReading', reading.name);
+    if (context.mounted) showToast(context, context.l10n!.settingChangedMsg);
   }
 }
