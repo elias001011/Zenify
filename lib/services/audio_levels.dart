@@ -30,7 +30,6 @@ import 'package:flutter/widgets.dart'
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart';
-import 'package:musify/services/desktop_equalizer.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:rxdart/rxdart.dart';
@@ -82,15 +81,10 @@ class AudioLevels {
       'measure_perchannel=RMS_level,'
       'pan=stereo|c0=c0|c1=c1]';
 
-  /// Prepare the equalizer and the analysis before any desktop source is
-  /// opened, the equalizer first so the levels follow what is heard.
-  /// Opening/closing a visualizer must never add/remove filters on a playing
-  /// output device.
+  /// Prepare analysis before any desktop source is opened. Opening/closing
+  /// a visualizer must never add/remove filters on a playing output device.
   static void configureDesktop() {
-    JustAudioMediaKit.audioFilters = () => [
-      DesktopEqualizer.filter(),
-      _bandsFilter,
-    ];
+    JustAudioMediaKit.audioFilters = const [_bandsFilter];
     // Zenify uses speed, not independent pitch control. Native mpv speed
     // preserves the analysis chain; media_kit's pitch mode replaces `af`.
     JustAudioMediaKit.pitch = false;

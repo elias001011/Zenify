@@ -39,7 +39,7 @@ class MediaKitPlayer extends AudioPlayerPlatform {
       'cache-pause-wait',
       '${JustAudioMediaKit.rebufferWait.inMilliseconds / 1000}',
     );
-    for (final filter in JustAudioMediaKit.audioFilters()) {
+    for (final filter in JustAudioMediaKit.audioFilters) {
       try {
         await command(_player, ['af', 'add', filter]);
       } catch (error) {

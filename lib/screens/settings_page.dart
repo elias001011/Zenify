@@ -144,7 +144,7 @@ class SettingsPage extends StatelessWidget {
           FluentIcons.music_note_1_24_regular,
           onTap: () => _showAudioQualityPicker(context),
         ),
-        if (isAndroidPlatform || isDesktopPlatform)
+        if (isAndroidPlatform)
           CustomBar(
             context.l10n!.equalizer,
             FluentIcons.data_histogram_24_regular,
