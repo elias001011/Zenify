@@ -31,7 +31,7 @@ import 'package:musify/services/settings_manager.dart';
 double floatingOpacity(FloatingEffect effect, {required bool dark}) =>
     switch (effect) {
       FloatingEffect.solid => 1,
-      FloatingEffect.translucent => dark ? 0.9 : 0.92,
+      FloatingEffect.translucent => dark ? 0.92 : 0.94,
       FloatingEffect.blurred => dark ? 0.5 : 0.6,
     };
 
@@ -97,17 +97,13 @@ class _FloatingSurfaceState extends State<FloatingSurface> {
       clipBehavior: Clip.antiAlias,
       child: DecoratedBox(
         position: DecorationPosition.foreground,
-        // The translucent surface swaps the plain border for light on its
-        // edge; the child stays where it is, whatever the effect.
-        decoration: effect == FloatingEffect.translucent
-            ? _GlassEdge(borderRadius: borderRadius, dark: dark)
-            : BoxDecoration(
-                borderRadius: borderRadius,
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.35),
-                  width: 0.8,
-                ),
-              ),
+        decoration: BoxDecoration(
+          borderRadius: borderRadius,
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+            width: 0.8,
+          ),
+        ),
         child: Padding(padding: widget.padding, child: widget.child),
       ),
     );
@@ -138,82 +134,5 @@ class _FloatingSurfaceState extends State<FloatingSurface> {
           child: surface,
         );
     }
-  }
-}
-
-/// The light the translucent surface catches, drawn over its fill: a faint
-/// sheen fading in from the top and a one pixel rim, brightest at the
-/// top-left and dim toward the bottom-right. Plain paint, so it costs no
-/// layer and reads nothing from behind the surface.
-class _GlassEdge extends Decoration {
-  const _GlassEdge({required this.borderRadius, required this.dark});
-
-  final BorderRadius borderRadius;
-  final bool dark;
-
-  @override
-  bool hitTest(Size size, Offset position, {TextDirection? textDirection}) =>
-      borderRadius.toRRect(Offset.zero & size).contains(position);
-
-  @override
-  BoxPainter createBoxPainter([VoidCallback? onChanged]) =>
-      _GlassEdgePainter(this);
-
-  @override
-  bool operator ==(Object other) =>
-      other is _GlassEdge &&
-      other.borderRadius == borderRadius &&
-      other.dark == dark;
-
-  @override
-  int get hashCode => Object.hash(borderRadius, dark);
-}
-
-class _GlassEdgePainter extends BoxPainter {
-  _GlassEdgePainter(this._edge);
-
-  final _GlassEdge _edge;
-
-  // The shaders only change with the surface's rect, not with every frame.
-  Rect? _rect;
-  final _sheen = Paint();
-  final _rim = Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 1;
-  final _hairline = Paint()
-    ..style = PaintingStyle.stroke
-    ..strokeWidth = 0.6
-    ..color = Colors.black.withValues(alpha: 0.07);
-
-  static Color _white(double alpha) => Colors.white.withValues(alpha: alpha);
-
-  @override
-  void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
-    final rect = offset & configuration.size!;
-    final dark = _edge.dark;
-    if (rect != _rect) {
-      _rect = rect;
-      _sheen.shader = LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.center,
-        colors: [_white(dark ? 0.1 : 0.16), _white(0)],
-      ).createShader(rect);
-      _rim.shader = LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          _white(dark ? 0.55 : 0.95),
-          _white(dark ? 0.08 : 0.25),
-          _white(dark ? 0.03 : 0.15),
-          _white(dark ? 0.26 : 0.7),
-        ],
-        stops: const [0, 0.35, 0.65, 1],
-      ).createShader(rect);
-    }
-    final shape = _edge.borderRadius.toRRect(rect);
-    canvas.drawRRect(shape, _sheen);
-    // On a light page the white rim alone would vanish.
-    if (!dark) canvas.drawRRect(shape, _hairline);
-    canvas.drawRRect(shape.deflate(0.5), _rim);
   }
 }
