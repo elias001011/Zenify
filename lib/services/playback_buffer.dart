@@ -21,14 +21,31 @@
 
 import 'package:just_audio/just_audio.dart';
 
-/// How much of a song the Android player (ExoPlayer) loads ahead.
+/// How much of a song the Android player (ExoPlayer) loads ahead, by the
+/// "Load songs far ahead" setting (`bufferWholeSong`).
 ///
-/// ExoPlayer loads until the maximum is buffered, then waits until the buffer
-/// falls under the minimum. Both at ten minutes means a whole song is loaded
-/// and kept, so a slow connection that has delivered the data cannot cut the
-/// song off later. The desktop player (libmpv) already reads a whole song
-/// ahead; see `JustAudioMediaKit.rebufferWait` for its stall wait.
-const playbackLoadConfiguration = AudioLoadConfiguration(
+/// Off, the player keeps the Musify way: about a minute ahead, so a skipped
+/// song costs little data.
+///
+/// On, ExoPlayer loads until the maximum is buffered, then waits until the
+/// buffer falls under the minimum. Both at ten minutes means a whole song is
+/// loaded and kept, so a slow connection that has delivered the data cannot cut
+/// the song off later, at the price of the data of songs that are skipped. The
+/// desktop player (libmpv) already reads a whole song ahead; see
+/// `JustAudioMediaKit.rebufferWait` for its stall wait.
+AudioLoadConfiguration playbackLoadConfigurationFor({
+  required bool wholeSong,
+}) => wholeSong ? wholeSongLoadConfiguration : musifyLoadConfiguration;
+
+const musifyLoadConfiguration = AudioLoadConfiguration(
+  androidLoadControl: AndroidLoadControl(
+    maxBufferDuration: Duration(seconds: 60),
+    bufferForPlaybackDuration: Duration(milliseconds: 500),
+    bufferForPlaybackAfterRebufferDuration: Duration(seconds: 3),
+  ),
+);
+
+const wholeSongLoadConfiguration = AudioLoadConfiguration(
   androidLoadControl: AndroidLoadControl(
     minBufferDuration: Duration(minutes: 10),
     maxBufferDuration: Duration(minutes: 10),

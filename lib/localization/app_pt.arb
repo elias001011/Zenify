@@ -647,6 +647,8 @@
   "windowMinimize": "Minimizar",
   "windowMaximize": "Maximizar",
   "windowRestore": "Restaurar janela",
+  "bufferWholeSong": "Carregar músicas bem à frente",
+  "bufferWholeSongDescription": "Carrega até 10 minutos da música com antecedência, para que uma conexão lenta não a interrompa. Usa mais dados móveis ao pular músicas. Vale na próxima vez que o app abrir.",
   "songFade": "Fade entre músicas",
   "songFadeDescription": "A música some aos poucos ao terminar e a próxima entra aos poucos.",
   "songFadeOff": "Desligado",

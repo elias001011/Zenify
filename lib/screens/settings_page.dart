@@ -165,6 +165,23 @@ class SettingsPage extends StatelessWidget {
             onTap: () => _showSongFadePicker(context),
           ),
         ),
+        if (isAndroidPlatform)
+          ValueListenableBuilder<bool>(
+            valueListenable: bufferWholeSong,
+            builder: (context, value, _) => CustomBar(
+              context.l10n!.bufferWholeSong,
+              FluentIcons.arrow_download_24_regular,
+              description: context.l10n!.bufferWholeSongDescription,
+              trailing: Switch(
+                value: value,
+                onChanged: (value) {
+                  addOrUpdateData<bool>('settings', 'bufferWholeSong', value);
+                  bufferWholeSong.value = value;
+                  showToast(context, context.l10n!.settingChangedMsg);
+                },
+              ),
+            ),
+          ),
         const FloatingEffectBar(),
         const WaveReadingBar(),
         CustomBar(

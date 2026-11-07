@@ -848,6 +848,8 @@
   "windowMinimize": "Minimize",
   "windowMaximize": "Maximize",
   "windowRestore": "Restore window",
+  "bufferWholeSong": "Load songs far ahead",
+  "bufferWholeSongDescription": "Loads up to 10 minutes of a song in advance, so a slow connection does not cut it off. Uses more mobile data when you skip songs. Takes effect the next time the app opens.",
   "songFade": "Fade between songs",
   "songFadeDescription": "A song fades out as it ends and the next one fades in.",
   "songFadeOff": "Off",

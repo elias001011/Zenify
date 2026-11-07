@@ -61,7 +61,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       audioPipeline: androidEqualizer == null
           ? null
           : AudioPipeline(androidAudioEffects: [androidEqualizer]),
-      audioLoadConfiguration: playbackLoadConfiguration,
+      audioLoadConfiguration: playbackLoadConfigurationFor(
+        wholeSong: bufferWholeSong.value,
+      ),
     );
 
     _androidAutoBrowser = AndroidAutoBrowser(this);

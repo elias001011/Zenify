@@ -156,6 +156,13 @@ final songFadeSeconds = ValueNotifier<int>(
   _readSongFadeSeconds(Hive.box('settings')),
 );
 
+/// Android only: load a song far ahead (up to ten minutes) so a slow
+/// connection does not cut it off, at the cost of more data when songs are
+/// skipped. Off by default, as in Musify; the player reads it when it starts.
+final bufferWholeSong = ValueNotifier<bool>(
+  Hive.box('settings').get('bufferWholeSong', defaultValue: false) == true,
+);
+
 /// Off until turned on, except where local files already exist: they were
 /// always shown before the switch, and an update must not hide them.
 bool _readShowLocalFiles(Box settings) =>
@@ -306,6 +313,8 @@ void reloadSettingsFromStorage() {
     defaultValue: false,
   );
   songFadeSeconds.value = _readSongFadeSeconds(settings);
+  bufferWholeSong.value =
+      settings.get('bufferWholeSong', defaultValue: false) == true;
   showLocalFiles.value = _readShowLocalFiles(settings);
   interfaceScale.value = _readInterfaceScale();
   startMaximized.value = settings.get('startMaximized', defaultValue: false);
