@@ -528,7 +528,6 @@ class _ArtworkThumbnail extends StatelessWidget {
     return CachedNetworkImage(
       width: size,
       height: size,
-      memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
       imageUrl: imageUrl,
       imageBuilder: (_, imageProvider) => ClipRRect(
         borderRadius: BorderRadius.circular(radius),
