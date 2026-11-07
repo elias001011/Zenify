@@ -26,7 +26,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/screens/search_page.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/widgets/blur_snapshot.dart';
 import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/spinner.dart';
 
@@ -163,57 +162,47 @@ class _IslandScaffoldState extends State<IslandScaffold> {
     final left = media.padding.left;
 
     return Scaffold(
-      body: BlurSnapshotScope(
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // The island is not in the picture it is blurred from.
-            BlurSnapshotSource(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (widget.background case final background?)
-                    Positioned.fill(child: IgnorePointer(child: background)),
-                  NotificationListener<ScrollUpdateNotification>(
-                    onNotification: _onScroll,
-                    child: Padding(
-                      padding: EdgeInsets.only(left: left),
-                      child: MediaQuery(
-                        data: media.copyWith(
-                          padding: media.padding.copyWith(
-                            top: IslandScaffold.topSpace(context),
-                            left: 0,
-                          ),
-                        ),
-                        child: NotificationListener<ScrollMetricsNotification>(
-                          onNotification: (_) {
-                            _scheduleTitleVisibility();
-                            return false;
-                          },
-                          child: widget.body,
-                        ),
-                      ),
-                    ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (widget.background case final background?)
+            Positioned.fill(child: IgnorePointer(child: background)),
+          NotificationListener<ScrollUpdateNotification>(
+            onNotification: _onScroll,
+            child: Padding(
+              padding: EdgeInsets.only(left: left),
+              child: MediaQuery(
+                data: media.copyWith(
+                  padding: media.padding.copyWith(
+                    top: IslandScaffold.topSpace(context),
+                    left: 0,
                   ),
-                ],
+                ),
+                child: NotificationListener<ScrollMetricsNotification>(
+                  onNotification: (_) {
+                    _scheduleTitleVisibility();
+                    return false;
+                  },
+                  child: widget.body,
+                ),
               ),
             ),
-            Positioned(
-              top: media.viewPadding.top + _islandMargin,
-              left: left + _islandMargin,
-              child: _Island(
-                title: widget.title,
-                titleShown: _titleShown,
-                actions: widget.actions,
-                onBack: widget.onBack,
-                onFilter: widget.onFilter,
-                globalSearch: widget.globalSearch,
-                pageSearch: widget.pageSearch,
-                maxWidth: media.size.width - left - _islandMargin * 2,
-              ),
+          ),
+          Positioned(
+            top: media.viewPadding.top + _islandMargin,
+            left: left + _islandMargin,
+            child: _Island(
+              title: widget.title,
+              titleShown: _titleShown,
+              actions: widget.actions,
+              onBack: widget.onBack,
+              onFilter: widget.onFilter,
+              globalSearch: widget.globalSearch,
+              pageSearch: widget.pageSearch,
+              maxWidth: media.size.width - left - _islandMargin * 2,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
