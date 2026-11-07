@@ -28,7 +28,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/audio_levels.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
 
 /// Sound waves: they follow the music's frequencies with the precise
@@ -55,10 +54,16 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   final _repaint = ValueNotifier<int>(0);
   late final Ticker _ticker = createTicker(_tick);
 
-  /// The bars are drawn 48 times a second. The music is read less often, and
-  /// the bars ease towards each reading, so the extra frames smooth the motion.
-  static const _fps = 48;
+  /// The bars are drawn up to 60 times a second. The music is read less often,
+  /// and the bars ease towards each reading, so the extra frames smooth the
+  /// motion.
+  static const _fps = 60;
   static const _frameMicroseconds = 1000000 ~/ _fps;
+
+  /// A frame may come this early and still count as due: at 60 Hz the frames
+  /// are 16.667 ms apart and the schedule's step is 16.666, so without it a
+  /// frame a hair early would be skipped and the waves would run at 30.
+  static const _earlyMicroseconds = 2000;
 
   /// After a pause the reader stays on this long, so a short one does not set
   /// it up again, and start it cold, at the resume.
@@ -155,12 +160,12 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _setVisibility(AppLifecycleState? state) {
-    // A desktop window that lost focus (the music on one screen, the user on
-    // the other) is `inactive` but still in view.
+    // Out of focus (`inactive`: the notification shade, a window without
+    // focus) is still in view; only hidden, paused or detached is not.
     _visible =
-        state == null ||
-        state == AppLifecycleState.resumed ||
-        (isDesktopPlatform && state == AppLifecycleState.inactive);
+        state != AppLifecycleState.hidden &&
+        state != AppLifecycleState.paused &&
+        state != AppLifecycleState.detached;
     _updateMotion();
   }
 
@@ -251,7 +256,7 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _tick(Duration elapsed) {
-    if (elapsed.inMicroseconds < _due) return;
+    if (elapsed.inMicroseconds < _due - _earlyMicroseconds) return;
     final dt = min((elapsed - _last).inMicroseconds / 1e6, 0.1);
     _last = elapsed;
     // Back on schedule if a frame came late, rather than catching up.

@@ -227,7 +227,12 @@ class _SkipSlideState extends State<_SkipSlide> {
           },
         );
       },
-      child: KeyedSubtree(key: ValueKey(widget.trackId), child: widget.child),
+      // Its own layer: the slide moves the picture and its wide shadow as
+      // they were drawn, instead of drawing them again on every frame.
+      child: KeyedSubtree(
+        key: ValueKey(widget.trackId),
+        child: RepaintBoundary(child: widget.child),
+      ),
     );
   }
 }

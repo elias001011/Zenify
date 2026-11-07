@@ -6,7 +6,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/models/position_data.dart';
 import 'package:musify/services/audio_service.dart';
-import 'package:musify/widgets/app_motion.dart';
 import 'package:musify/widgets/mini_player.dart';
 import 'package:musify/widgets/position_slider.dart';
 
@@ -32,43 +31,33 @@ void main() {
     final handler = _Handler();
     audioHandler = handler;
     addTearDown(handler.positions.close);
-    final binding = tester.binding
-      ..handleAppLifecycleStateChanged(AppLifecycleState.resumed);
-    addTearDown(
-      () => binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed),
-    );
-    await tester.pumpWidget(
-      localizedApp(Scaffold(body: AppMotion(child: child))),
-    );
+    await tester.pumpWidget(localizedApp(Scaffold(body: child)));
     await tester.pump(const Duration(milliseconds: 400));
     return handler;
   }
 
-  /// The screen goes off, the song moves on and the player stops without
-  /// sending anything, and then the screen comes back.
-  Future<void> sleepAndWake(WidgetTester tester, _Handler handler) async {
-    final binding = tester.binding
-      ..handleAppLifecycleStateChanged(AppLifecycleState.inactive)
-      ..handleAppLifecycleStateChanged(AppLifecycleState.hidden)
-      ..handleAppLifecycleStateChanged(AppLifecycleState.paused);
+  /// A screen opens over the widget, which stops its tickers; the song moves
+  /// on and the player stops without sending anything; the screen closes.
+  Future<void> coverAndUncover(WidgetTester tester, _Handler handler) async {
+    final navigator = Navigator.of(tester.element(find.byType(Scaffold).first));
+    unawaited(
+      navigator.push(MaterialPageRoute<void>(builder: (_) => const Scaffold())),
+    );
     await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
     handler.at = const Duration(hours: 1);
-    await tester.pump(const Duration(seconds: 5));
-    binding
-      ..handleAppLifecycleStateChanged(AppLifecycleState.hidden)
-      ..handleAppLifecycleStateChanged(AppLifecycleState.inactive)
-      ..handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    navigator.pop();
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pump(const Duration(milliseconds: 600));
   }
 
-  testWidgets('the bar shows the real position when the screen comes back', (
+  testWidgets('the bar shows the real position when a screen over it closes', (
     tester,
   ) async {
     final handler = await pumpApp(tester, const PositionSlider());
     expect(find.text('00:04'), findsOneWidget);
 
-    await sleepAndWake(tester, handler);
+    await coverAndUncover(tester, handler);
 
     expect(find.text('01:00:00'), findsOneWidget);
     expect(find.text('00:04'), findsNothing);
@@ -95,18 +84,6 @@ void main() {
     expect(ringProgress(tester), lessThan(0.01));
     return handler;
   }
-
-  testWidgets('the ring shows the real position when the screen comes back', (
-    tester,
-  ) async {
-    final handler = await pumpMini(tester);
-
-    await sleepAndWake(tester, handler);
-
-    expect(ringProgress(tester), closeTo(0.5, 0.01));
-    await tester.pumpWidget(const SizedBox());
-    await tester.pump(const Duration(seconds: 30));
-  });
 
   testWidgets('the ring shows the real position when the full player closes', (
     tester,

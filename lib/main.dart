@@ -67,7 +67,6 @@ import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/shared_playlist_dialog.dart';
 import 'package:musify/utilities/sharing_intent.dart';
 import 'package:musify/utilities/startup_support.dart';
-import 'package:musify/widgets/app_motion.dart';
 import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/spotify_import_intro.dart';
 import 'package:path_provider/path_provider.dart';
@@ -335,15 +334,13 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
                 key: toastMessengerKey,
                 child: MusicSurfaceTheme(child: child!),
               );
-              return AppMotion(
-                child: isDesktopPlatform
-                    ? DesktopTitleBarTheme(
-                        child: DesktopInterfaceScale(
-                          child: GlobalShortcuts(child: app),
-                        ),
-                      )
-                    : app,
-              );
+              return isDesktopPlatform
+                  ? DesktopTitleBarTheme(
+                      child: DesktopInterfaceScale(
+                        child: GlobalShortcuts(child: app),
+                      ),
+                    )
+                  : app;
             },
           ),
         );
