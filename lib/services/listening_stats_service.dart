@@ -434,6 +434,11 @@ class ListeningStatsService {
     if (songs == null || stored['month'] != stats['currentMonthKey']) {
       return stats;
     }
+    // The extra only exists beside a full month. A shorter one was cleared on
+    // another device, and the leftovers must not come back.
+    if (_songCount(stats['currentMonth']) < wrappedCurrentMonthSongsLimit) {
+      return stats;
+    }
     return withExtraSongs(stats, songs);
   }
 
