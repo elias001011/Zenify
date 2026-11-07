@@ -161,6 +161,9 @@ const pinnedPlaylistsLimit = 5;
 var _playlistLikeUpdateToken = 0;
 final _latestPlaylistLikeUpdateTokens = <String, int>{};
 
+/// The title of a playlist of the user's that could not be fetched.
+const failedPlaylistTitle = 'Failed playlist';
+
 Future<List<dynamic>> getUserPlaylists() async {
   final futures = userPlaylists.value.map((playlistID) async {
     try {
@@ -182,7 +185,7 @@ Future<List<dynamic>> getUserPlaylists() async {
       );
       return {
         'ytid': playlistID,
-        'title': 'Failed playlist',
+        'title': failedPlaylistTitle,
         'image': null,
         'source': 'user-youtube',
         'list': [],

@@ -122,6 +122,17 @@ class _LibraryPageState extends State<LibraryPage> {
     _addedPlaylists = null;
   }
 
+  /// The added playlists, kept so a rebuild does not ask the network again,
+  /// unless one failed to load: that answer must not stay once the network is
+  /// back, so the next rebuild asks again.
+  Future<List<dynamic>> _loadAddedPlaylists() async {
+    final playlists = await getUserPlaylistsNotInFolders();
+    if (playlists.any((p) => p is Map && p['title'] == failedPlaylistTitle)) {
+      _addedPlaylists = null;
+    }
+    return playlists;
+  }
+
   @override
   void dispose() {
     offlineMode.removeListener(_onOfflineModeChanged);
@@ -570,7 +581,7 @@ class _LibraryPageState extends State<LibraryPage> {
                 ),
               ),
               AsyncLoader<List<dynamic>>(
-                future: _addedPlaylists ??= getUserPlaylistsNotInFolders(),
+                future: _addedPlaylists ??= _loadAddedPlaylists(),
                 emptyWidget: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 20),
                   child: Text(
