@@ -38,6 +38,7 @@ import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/utilities/youtube_url.dart';
 import 'package:musify/widgets/artist_bar.dart';
 import 'package:musify/widgets/artwork_glow.dart';
@@ -113,10 +114,14 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void initState() {
     super.initState();
-    searchFocusRequest.addListener(_focusOnRequest);
+    // Only the desktop shortcut asks for focus; phones keep no listener.
+    if (isDesktopPlatform) {
+      searchFocusRequest.addListener(_focusOnRequest);
+    }
     _runInitialQuery();
     // A request made from another tab arrives before this page mounts.
-    if (searchFocusRequest.value != _handledSearchFocusRequest) {
+    if (isDesktopPlatform &&
+        searchFocusRequest.value != _handledSearchFocusRequest) {
       _focusOnRequest();
     }
   }

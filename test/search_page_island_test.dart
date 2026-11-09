@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/screens/search_page.dart';
@@ -116,27 +117,51 @@ void main() {
   });
 
   testWidgets(
+    'a phone keeps no focus listener and ignores the search request',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      try {
+        await openPage(tester, initialQuery: 'Blue hour');
+        final focus = tester.widget<TextField>(field).focusNode!;
+
+        requestSearchFocus();
+        tester.binding.scheduleFrame();
+        await tester.pump();
+        await tester.pump();
+        expect(focus.hasFocus, isFalse);
+        await tester.pumpWidget(const SizedBox());
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
+
+  testWidgets(
     'the initial query and the focus request reach the island field',
     (tester) async {
-      await openPage(tester, initialQuery: 'Blue hour');
-      expect(tester.widget<TextField>(field).controller!.text, 'Blue hour');
-      final focus = tester.widget<TextField>(field).focusNode!;
-      expect(focus.hasFocus, isFalse);
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      try {
+        await openPage(tester, initialQuery: 'Blue hour');
+        expect(tester.widget<TextField>(field).controller!.text, 'Blue hour');
+        final focus = tester.widget<TextField>(field).focusNode!;
+        expect(focus.hasFocus, isFalse);
 
-      // The search shortcut, while the page is already there.
-      requestSearchFocus();
-      tester.binding.scheduleFrame(); // the app always has a frame coming
-      await tester.pump();
-      await tester.pump();
-      expect(focus.hasFocus, isTrue);
-      await tester.pumpWidget(const SizedBox());
+        // The search shortcut, while the page is already there.
+        requestSearchFocus();
+        tester.binding.scheduleFrame(); // the app always has a frame coming
+        await tester.pump();
+        await tester.pump();
+        expect(focus.hasFocus, isTrue);
+        await tester.pumpWidget(const SizedBox());
 
-      // The same request, made from another tab before the page exists.
-      requestSearchFocus();
-      await openPage(tester);
-      expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
-
-      await tester.pumpWidget(const SizedBox());
+        // The same request, made from another tab before the page exists.
+        requestSearchFocus();
+        await openPage(tester);
+        expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+        await tester.pumpWidget(const SizedBox());
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
     },
   );
 }
