@@ -113,7 +113,10 @@ static void window_method_call_cb(FlMethodChannel* channel,
       // With the window's own frame hidden, GTK still draws its decoration: a
       // 1px outline on an 8px corner, which sticks out around the 12px corner
       // the app clips itself to. Keep the soft shadow and drop the outline, on
-      // the same 12px corner (maximized and tiled windows keep the theme's own).
+      // the same 12px corner (maximized and tiled windows keep the theme's
+      // own). The unfocused shadow differs only in colour: another size would
+      // change the frame GTK reserves for it and the window would jump when
+      // it loses or gains focus.
       gtk_css_provider_load_from_data(self->frame_css,
           transparent
               ? "window#zenify-window { background-color: transparent; }"
@@ -124,7 +127,7 @@ static void window_method_call_cb(FlMethodChannel* channel,
                 "}"
                 "window#zenify-window:not(.maximized):not(.fullscreen):not(.tiled)"
                 " decoration:backdrop {"
-                "  box-shadow: 0 2px 3px 2px alpha(black, 0.2);"
+                "  box-shadow: 0 3px 9px 1px alpha(black, 0.2);"
                 "}"
               : "",
           -1, nullptr);
