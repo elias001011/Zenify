@@ -301,14 +301,60 @@ class LocalSyncService {
     _loadPairedDevices();
 
     // Turned off, local sync leaves nothing running: no server, no timer and
-    // no watch on the library.
-    if (localSyncEnabled.value) {
+    // no watch on the library. With automatic sync off it runs a server only
+    // while the Local Sync page is open.
+    if (_serverWanted) {
       try {
         await startServer();
       } catch (_) {
         // Logged by startServer; the settings page shows it as not visible.
       }
-      await _startBackgroundWork();
+    }
+    if (_backgroundWanted) await _startBackgroundWork();
+  }
+
+  int _pageHolds = 0;
+  Timer? _settleTimer;
+
+  bool get _backgroundWanted =>
+      localSyncEnabled.value && localSyncAutomatic.value;
+
+  bool get _serverWanted =>
+      localSyncEnabled.value && (localSyncAutomatic.value || _pageHolds > 0);
+
+  bool get _busy =>
+      _activeTransfers > 0 ||
+      _silentSyncRunning ||
+      state.value.status == LocalSyncStatus.syncing ||
+      state.value.status == LocalSyncStatus.waitingForPin;
+
+  /// The Local Sync page is open: its server runs even with automatic sync off.
+  Future<void> pageOpened() async {
+    _pageHolds++;
+    await _settleServer();
+  }
+
+  Future<void> pageClosed() async {
+    if (_pageHolds > 0) _pageHolds--;
+    await _settleServer();
+  }
+
+  /// Starts or stops the server to match what is wanted, never mid-transfer.
+  Future<void> _settleServer() async {
+    _settleTimer?.cancel();
+    if (_serverWanted) {
+      if (_httpServer != null) return;
+      try {
+        await startServer();
+      } catch (_) {
+        // Logged by startServer; the page shows it as not visible.
+      }
+    } else if (_httpServer != null) {
+      if (_busy) {
+        _settleTimer = Timer(const Duration(seconds: 2), _settleServer);
+      } else {
+        await stopServer();
+      }
     }
   }
 
@@ -369,15 +415,16 @@ class LocalSyncService {
   Future<void> resumeAfterStorageRestore({bool storageChanged = true}) async {
     reloadSettingsFromStorage();
     if (storageChanged) await LibraryMergeService.forgetBaseline();
-    if (localSyncEnabled.value) {
+    if (_backgroundWanted) {
       await _startBackgroundWork();
-      await startServer();
     } else {
       await _stopBackgroundWork();
     }
+    if (_serverWanted) await startServer();
   }
 
   Future<void> dispose() async {
+    _settleTimer?.cancel();
     _periodicTimer?.cancel();
     _startupTimer?.cancel();
     _localChangeTimer?.cancel();
@@ -397,25 +444,33 @@ class LocalSyncService {
       await stopServer();
       return true;
     }
-    try {
-      await startServer();
-    } catch (_) {
-      await Hive.box('settings').put(_enabledKey, false);
-      localSyncEnabled.value = false;
-      return false;
+    if (_serverWanted) {
+      try {
+        await startServer();
+      } catch (_) {
+        await Hive.box('settings').put(_enabledKey, false);
+        localSyncEnabled.value = false;
+        return false;
+      }
     }
-    await _startBackgroundWork();
-    unawaited(triggerSilentSync());
+    if (_backgroundWanted) {
+      await _startBackgroundWork();
+      unawaited(triggerSilentSync());
+    }
     return true;
   }
 
   Future<void> setAutomatic(bool enabled) async {
     await Hive.box('settings').put(_automaticKey, enabled);
     localSyncAutomatic.value = enabled;
+    if (!localSyncEnabled.value) return;
     if (enabled) {
+      await _settleServer();
+      await _startBackgroundWork();
       unawaited(triggerSilentSync());
     } else {
-      _localChangeTimer?.cancel();
+      await _stopBackgroundWork();
+      await _settleServer();
     }
   }
 
@@ -1336,6 +1391,9 @@ class LocalSyncService {
       return;
     }
 
+    // Away from any local network there is nobody to find.
+    if (!await _onLocalNetwork()) return;
+
     _silentSyncRunning = true;
     try {
       final now = DateTime.now();
@@ -1655,6 +1713,33 @@ class LocalSyncService {
       _localChangeDebounce,
       () => unawaited(triggerSilentSync()),
     );
+  }
+
+  static final _mobileInterface = RegExp(
+    '^(rmnet|v4-rmnet|ccmni|pdp|ppp|wwan|tun|tap)',
+    caseSensitive: false,
+  );
+
+  /// Whether any of [names] can be a local network: only mobile data and
+  /// tunnels do not count.
+  @visibleForTesting
+  static bool hasLocalNetwork(Iterable<String> names) =>
+      names.any((name) => !_mobileInterface.hasMatch(name));
+
+  /// False when the device has only mobile data or no network at all.
+  Future<bool> _onLocalNetwork() async {
+    try {
+      final interfaces = await NetworkInterface.list(
+        type: InternetAddressType.IPv4,
+      );
+      return hasLocalNetwork([
+        for (final interface in interfaces)
+          if (interface.addresses.any((address) => !address.isLoopback))
+            interface.name,
+      ]);
+    } catch (_) {
+      return true;
+    }
   }
 
   /// The limited broadcast plus each interface's /24 broadcast.

@@ -10,7 +10,8 @@ import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/local_sync/sync_pairing.dart';
 import 'package:musify/services/local_sync/sync_security.dart';
 import 'package:musify/services/local_sync_service.dart';
-import 'package:musify/services/settings_manager.dart' show localSyncEnabled;
+import 'package:musify/services/settings_manager.dart'
+    show localSyncEnabled, reloadSettingsFromStorage;
 
 import 'local_sync/fixtures.dart';
 import 'support/app_harness.dart';
@@ -540,5 +541,64 @@ void main() {
 
     expect(server.hasBackgroundWork, isTrue);
     await server.setEnabled(false);
+  });
+
+  test(
+    'with automatic sync off a server runs only while the page is open',
+    () async {
+      await server.dispose();
+      await Hive.box('settings')
+          .putAll({'localSyncEnabled': true, 'localSyncAutomatic': false});
+      reloadSettingsFromStorage();
+      server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
+      await server.initialise();
+
+      expect(server.serverPort, isNull);
+      expect(server.hasBackgroundWork, isFalse);
+
+      await server.pageOpened();
+      expect(server.serverPort, isNotNull);
+      expect(server.hasBackgroundWork, isFalse);
+
+      await server.pageClosed();
+      expect(server.serverPort, isNull);
+
+      await server.setAutomatic(true);
+      expect(server.serverPort, isNotNull);
+      expect(server.hasBackgroundWork, isTrue);
+
+      await server.setAutomatic(false);
+      expect(server.hasBackgroundWork, isFalse);
+      // The search the switch started is not cut off; the server closes after.
+      for (var i = 0; i < 60 && server.serverPort != null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+      expect(server.serverPort, isNull);
+      await server.setEnabled(false);
+    },
+  );
+
+  test(
+    'turning automatic off keeps the server while the page is open',
+    () async {
+      await Hive.box('settings').put('localSyncEnabled', true);
+      localSyncEnabled.value = true;
+      await server.pageOpened();
+      await server.setAutomatic(false);
+      expect(server.serverPort, isNotNull);
+      expect(server.hasBackgroundWork, isFalse);
+      await server.pageClosed();
+      expect(server.serverPort, isNull);
+      await server.setAutomatic(true);
+      await server.setEnabled(false);
+    },
+  );
+
+  test('only mobile data and tunnels are not a local network', () {
+    expect(LocalSyncService.hasLocalNetwork(['wlan0']), isTrue);
+    expect(LocalSyncService.hasLocalNetwork(['rmnet_data0', 'eth0']), isTrue);
+    expect(LocalSyncService.hasLocalNetwork(['rmnet_data0', 'tun0']), isFalse);
+    expect(LocalSyncService.hasLocalNetwork(const []), isFalse);
+    expect(LocalSyncService.hasLocalNetwork(['wlp3s0']), isTrue);
   });
 }

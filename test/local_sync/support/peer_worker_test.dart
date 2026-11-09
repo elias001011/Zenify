@@ -44,6 +44,8 @@ void main() {
         },
       );
       await service.initialise();
+      // As if the Local Sync page were open: automatic sync is off here.
+      await service.pageOpened();
       await service.startServer();
       addTearDown(() async {
         LibraryMergeService.fault = null;
