@@ -1301,11 +1301,13 @@ class LocalSyncService {
     }
   }
 
-  /// Resuming fires on every desktop window focus, so it syncs at most every 2 minutes.
+  /// Resuming fires on every desktop window focus, so it syncs at most every
+  /// 10 minutes, and not at all while local sync is off.
   Future<void> syncOnResume() async {
+    if (!localSyncEnabled.value) return;
     final last = _lastResumeSync;
     if (last != null &&
-        DateTime.now().difference(last) < const Duration(minutes: 2)) {
+        DateTime.now().difference(last) < const Duration(minutes: 10)) {
       return;
     }
     _lastResumeSync = DateTime.now();
@@ -1635,7 +1637,10 @@ class LocalSyncService {
       _observedRecapReset = reset;
       if (isMerge || !resetChanged) return;
     }
+    // Every song that starts is written here: it rides along with the next
+    // sync instead of starting one of its own.
     if (isMerge ||
+        key == 'recentlyPlayedSongs' ||
         pairedDevices.value.isEmpty ||
         !selectedCategories.any((c) => syncCategoryKeys[c]!.contains(key))) {
       return;
