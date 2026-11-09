@@ -547,7 +547,6 @@ class LocalSyncService {
       }
 
       serverRunning.value = true;
-      logger.log('Local sync server listening on port ${server.port}');
     } catch (e, stackTrace) {
       logger.log(
         'Local sync server failed to start',
