@@ -601,4 +601,53 @@ void main() {
     expect(LocalSyncService.hasLocalNetwork(const []), isFalse);
     expect(LocalSyncService.hasLocalNetwork(['wlp3s0']), isTrue);
   });
+
+  test('turning sync on starts one sync, not two', () async {
+    await server.dispose();
+    await Hive.box('settings').put('localSyncEnabled', false);
+    localSyncEnabled.value = false;
+    final durations = <Duration>[];
+    await runZoned(
+      () async {
+        server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
+        await server.initialise();
+        expect(await server.setEnabled(true), isTrue);
+        await server.setAutomatic(false);
+        await server.setAutomatic(true);
+      },
+      zoneSpecification: ZoneSpecification(
+        createTimer: (self, parent, zone, duration, f) {
+          durations.add(duration);
+          return parent.createTimer(zone, duration, f);
+        },
+      ),
+    );
+    // The start-up sync (6 s) is only for the start of the app.
+    expect(durations, isNot(contains(const Duration(seconds: 6))));
+    await server.setEnabled(false);
+  });
+
+  test(
+    'a sync enabled at the start of the app also syncs shortly after',
+    () async {
+      await server.dispose();
+      await Hive.box('settings').put('localSyncEnabled', true);
+      localSyncEnabled.value = true;
+      final durations = <Duration>[];
+      await runZoned(
+        () async {
+          server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
+          await server.initialise();
+        },
+        zoneSpecification: ZoneSpecification(
+          createTimer: (self, parent, zone, duration, f) {
+            durations.add(duration);
+            return parent.createTimer(zone, duration, f);
+          },
+        ),
+      );
+      expect(durations, contains(const Duration(seconds: 6)));
+      await server.setEnabled(false);
+    },
+  );
 }

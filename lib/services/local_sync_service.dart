@@ -310,7 +310,7 @@ class LocalSyncService {
         // Logged by startServer; the settings page shows it as not visible.
       }
     }
-    if (_backgroundWanted) await _startBackgroundWork();
+    if (_backgroundWanted) await _startBackgroundWork(startupSync: true);
   }
 
   int _pageHolds = 0;
@@ -367,8 +367,9 @@ class LocalSyncService {
       _userBoxSubscription != null;
 
   /// The watch on the library and the timers that keep devices in step. Only
-  /// while local sync is turned on.
-  Future<void> _startBackgroundWork() async {
+  /// while local sync is turned on. [startupSync] adds the sync after the start,
+  /// for callers that do not sync themselves.
+  Future<void> _startBackgroundWork({bool startupSync = false}) async {
     await rebindStorageListeners();
     _periodicTimer?.cancel();
     _periodicTimer = Timer.periodic(
@@ -376,6 +377,8 @@ class LocalSyncService {
       (_) => unawaited(triggerSilentSync()),
     );
     _startupTimer?.cancel();
+    _startupTimer = null;
+    if (!startupSync) return;
     _startupTimer = Timer(
       _startupSyncDelay,
       () => unawaited(triggerSilentSync()),
