@@ -416,6 +416,9 @@ Future<String?> initialisation() async {
     // Copies older builds left pointing at the picker's cache.
     unawaited(keepLocalFileCopies().then((_) => removeUnlistedLocalCopies()));
 
+    // Nothing else removes cache entries nobody asks for again.
+    unawaited(cleanupOldCacheEntries());
+
     try {
       await LocalSyncService.instance.initialise();
     } catch (e, stackTrace) {
