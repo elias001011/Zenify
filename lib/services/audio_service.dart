@@ -213,7 +213,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           (position, bufferedPosition, duration) => PositionData(
             _resumePosition ?? position,
             bufferedPosition,
-            duration ?? mediaItem.valueOrNull?.duration ?? Duration.zero,
+            _knownDuration(duration),
           ),
         ),
         // A seek in a restored song that has not loaded moves no player stream.
@@ -277,8 +277,14 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   PositionData get currentPositionData => PositionData(
     _position,
     audioPlayer.bufferedPosition,
-    audioPlayer.duration ?? mediaItem.valueOrNull?.duration ?? Duration.zero,
+    _knownDuration(audioPlayer.duration),
   );
+
+  // libmpv reports zero while a song opens, which put a restored position past the end.
+  Duration _knownDuration(Duration? player) =>
+      player != null && player > Duration.zero
+      ? player
+      : mediaItem.valueOrNull?.duration ?? Duration.zero;
 
   Stream<List<Map>> get queueAsMapStream => _queueMapStream.stream;
   int get currentQueueIndex => _currentQueueIndex;

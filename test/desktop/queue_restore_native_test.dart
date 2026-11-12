@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive_ce.dart';
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:musify/models/position_data.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/settings_manager.dart';
 
@@ -61,9 +62,18 @@ void main() {
       expect(restored.audioPlayer.audioSource, isNull);
       expect(restored.audioPlayer.playing, isFalse);
       expect(restored.currentPositionData.position.inSeconds, 5);
+      final bar = <PositionData>[];
+      final watching = restored.positionDataStream.listen(bar.add);
       await restored.play();
       expect(restored.currentQueueIndex, 1);
       expect(restored.audioPlayer.position.inMilliseconds, closeTo(5000, 500));
+      await Future<void>.delayed(const Duration(milliseconds: 500));
+      await watching.cancel();
+      // While the song opens, the bar must never sit past its end.
+      expect(bar, isNotEmpty);
+      for (final data in bar) {
+        expect(data.duration, greaterThanOrEqualTo(data.position));
+      }
       await restored.stop();
       await restored.audioPlayer.dispose();
     },
