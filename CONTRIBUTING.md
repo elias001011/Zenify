@@ -10,6 +10,19 @@ Thank you for considering contributing to this project! We welcome and appreciat
 4. Commit your changes and push them to your fork.
 5. Open a pull request and describe your changes.
 
+## Before you open a pull request
+
+- **Stay close to Musify.** Zenify follows Musify's code and merges it often.
+  A fix for code that comes from Musify belongs in
+  [Musify](https://github.com/gokadzev/Musify) first, and reaches Zenify with
+  the next merge. In files that come from Musify, change only what you need:
+  no re-indenting, renaming or reordering that changes nothing for the user.
+- **Test it.** Use the Flutter version set in `pubspec.yaml`. Run
+  `flutter analyze` and `flutter test`; both must pass. A fix comes with a test
+  that fails without it.
+- **Short comments.** One line, only when the reason is not obvious from the
+  code.
+
 ## Code of Conduct
 
 All contributors are expected to abide by our code of conduct. Please make sure to read and understand the [code of conduct](CODE_OF_CONDUCT.md) before making a contribution.
@@ -24,7 +37,8 @@ By contributing to this project, you agree to allow your contributions to be use
 
 ## Questions
 
-If you have any questions about contributing, please contact the project maintainers.
+If you have any questions about contributing, open an
+[issue](https://github.com/elias001011/Zenify/issues).
 
 ## Translations
 

@@ -193,7 +193,8 @@ New in Zenify:
   On desktop, arrows and the mouse wheel scroll the batch actions.
 - **Fade between songs** (Settings, off by default, 2 to 12 seconds): a song
   fades out as it ends and the next one fades in when the queue moves on by
-  itself.
+  itself. The two songs do not play over each other (that is a crossfade, on
+  the roadmap).
 - **Load songs far ahead** (Android, Settings, off by default): loads up to 10
   minutes of a song in advance, so a slow connection does not cut it off. It
   uses more mobile data, and takes effect the next time the app opens.
@@ -208,12 +209,15 @@ New in Zenify:
   first. Both keep working offline.
 - **Top artists** in the listening recap, worked out from what you play. The
   recap of the current month counts every song on the device; only the top 250
-  songs of the month go to backups and Local Sync.
+  songs of the month go to backups and Local Sync, in Musify's own format, so a
+  Zenify backup still opens in Musify.
 - **Download manager**: every download goes through one queue, three at a
   time, and a song is never downloaded twice at once. Follow what waits, what
   is downloading and what failed and why, retry one or all, and get a single
   message at the end with what failed. A download is only cut when no data
-  arrives for a minute, so very long videos can finish.
+  arrives for a minute, so very long videos can finish. A song downloaded from
+  its own row shows its progress on its cover; the songs of a playlist download
+  are followed in the Downloads tab.
 - **Unavailable songs and replacing them**: songs YouTube reports as
   unavailable get their own section in the Downloads tab and a notice in the
   playlists you made. Replace searches for another upload (YouTube Music, then
@@ -225,7 +229,10 @@ New in Zenify:
   your liked songs, playlists, history, listening recap, searches and radio
   stations in sync over Wi-Fi, and Moods choices between Zenify devices. No
   account or server; the data is encrypted with AES-256-GCM. The feature is off
-  by default, and with it off no sync server or discovery runs.
+  by default, and with it off no sync server or discovery runs. With automatic
+  sync off, the sync server runs only while the Local Sync page is open. On
+  mobile data alone the app does not look for devices; on another Wi-Fi it
+  looks, but only devices you paired with a PIN can sync.
   An always-on computer or server on your network can take part too with the
   screenless [sync peer](tools/sync_peer/README.md), so a phone and a computer
   that are never on together keep the same library.
@@ -234,6 +241,9 @@ New in Zenify:
 - **Desktop settings**: interface scale that zooms the whole app, start
   maximized, a title bar in the app colors and a compact player layout.
 - **Keyboard shortcuts** for playback and navigation, all of them remappable.
+- **Reduced motion**: Zenify's own animations (player, lyrics, sound waves,
+  mini player, navigation, scrolling titles and the background glow) follow
+  the system's *Remove animations*: they change at once or stay still.
 - **Downloads folder** of your choice on desktop.
 - **Built-in updater** for Android, Linux and Windows. Update checks are on
   by default and can be turned off in Settings.
@@ -262,7 +272,7 @@ startup checks.
 | **Radio streams** | The stream server of the radio station you play | Do not play a radio, or use Offline mode (radios are hidden there). |
 | **Updates** (`api.github.com`, `raw.githubusercontent.com`) | At startup, unless Offline mode is on: the latest release and the `announcement.json` file. *Download app update* checks when you tap it. | *Automatic update checks* (on by default) stops the startup release check. Only Offline mode stops the announcement file. |
 | **Public proxies** (`spys.me`, `api.proxyscrape.com`, `proxylist.geonode.com`, and two lists on `raw.githubusercontent.com`) | With *Use proxy* on, these lists are downloaded and streams go through the proxies they list. With it off, Zenify still tries them as a last resort when YouTube refuses a stream for this device; a video that is unplayable for everyone is not retried this way. | *Use proxy* (off by default) stops routine use. No switch turns off the last-resort fallback; Offline mode avoids online streams altogether. |
-| **Local Sync** (your own network only) | Only when Local Sync is on: devices on the same Wi-Fi find each other by UDP broadcast and talk over a local HTTP server on a random port, with PIN pairing and AES-256-GCM encryption. Nothing goes to the internet. | *Local Sync* in Settings, off by default. With it off, no server or discovery runs. |
+| **Local Sync** (your own network only) | Only when Local Sync is on: devices on the same Wi-Fi find each other by UDP broadcast and talk over a local HTTP server on a random port, with PIN pairing and AES-256-GCM encryption. With automatic sync off, the server runs only while the Local Sync page is open. On mobile data alone there is no search. Nothing goes to the internet. | *Local Sync* in Settings, off by default. With it off, no server or discovery runs. |
 
 Other things the app does:
 
@@ -310,6 +320,8 @@ What is here besides the app itself, and what it is for.
 
 - More community translations through [translation files and pull requests](CONTRIBUTING.md#translations)
 - More of the interface following the dynamic background
+- Crossfade: the next song starting while the last one fades out
+- Translated lyrics
 
 ---
 
