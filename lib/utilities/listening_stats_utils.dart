@@ -213,9 +213,7 @@ Map<String, dynamic> _monthStatsForDelta(
       : _normalizeMonth(_normalizeMap(stats['history'])[listenedMonthKey]);
 }
 
-/// [keep] is the song being written: it is never the one a full month drops,
-/// or a newcomer (a few seconds against the ones already there) would be cut
-/// the moment it qualifies, and everything listened to it after that with it.
+/// [keep] is the song being written; a full month never drops it.
 Map<String, dynamic> _storeDeltaMonth(
   Map<String, dynamic> stats,
   DateTime listenedAt,
@@ -638,11 +636,14 @@ void _trimSongs(Map<String, dynamic> songs, int limit, {String? keep}) {
       final bMap = _normalizeMap(b.value);
       return _compareSongStats(aMap, bMap);
     });
+
   final kept = entries.take(limit).toList();
-  if (keep != null &&
-      songs.containsKey(keep) &&
-      !kept.any((entry) => entry.key == keep)) {
-    kept[kept.length - 1] = MapEntry(keep, songs[keep]);
+  final protected = keep == null ? null : songs[keep];
+  if (protected != null && !kept.any((entry) => entry.key == keep)) {
+    // The least listened of the others makes room.
+    kept
+      ..removeLast()
+      ..add(MapEntry(keep!, protected));
   }
 
   songs

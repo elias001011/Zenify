@@ -434,6 +434,13 @@ class ListeningStatsService {
     if (songs == null || stored['month'] != stats['currentMonthKey']) {
       return stats;
     }
+    // Saved beside another month (a restored backup, a synced device): the
+    // extra is not that month's.
+    final savedTotal = stored['totalSeconds'];
+    if (savedTotal != null &&
+        savedTotal != monthTotalSeconds(_asMap(stats['currentMonth']))) {
+      return stats;
+    }
     // The extra only exists beside a full month. A shorter one was cleared on
     // another device, and the leftovers must not come back.
     if (_songCount(stats['currentMonth']) < wrappedCurrentMonthSongsLimit) {
@@ -442,7 +449,10 @@ class ListeningStatsService {
     return withExtraSongs(stats, songs);
   }
 
-  Future<void> _saveExtra(String monthKey, Map<String, dynamic> extra) async {
+  Future<void> _saveExtra(
+    Map<String, dynamic> stats,
+    Map<String, dynamic> extra,
+  ) async {
     final stored = Hive.isBoxOpen('userNoBackup')
         ? Hive.box('userNoBackup').get(_extraKey)
         : null;
@@ -451,7 +461,8 @@ class ListeningStatsService {
       return;
     }
     await addOrUpdateData('userNoBackup', _extraKey, {
-      'month': monthKey,
+      'month': stats['currentMonthKey'],
+      'totalSeconds': monthTotalSeconds(_asMap(stats['currentMonth'])),
       'songs': extra,
     });
   }
@@ -466,7 +477,7 @@ class ListeningStatsService {
     try {
       final (stats: stored, :extra) = splitCurrentMonthSongs(stats);
       await addOrUpdateData('user', storageKey, stored);
-      await _saveExtra(stats['currentMonthKey'].toString(), extra);
+      await _saveExtra(stats, extra);
       // Clear the dirty flag only if no newer recording replaced _stats while
       // this write was in flight, otherwise those changes would be lost.
       if (identical(_stats, stats)) {

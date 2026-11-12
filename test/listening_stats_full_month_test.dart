@@ -126,6 +126,50 @@ void main() {
     expect(Hive.box('userNoBackup').get('wrappedMonthExtra'), isNull);
   });
 
+  test('a restored backup does not take what the device kept', () async {
+    await seed(wrappedCurrentMonthSongsLimit + 50);
+    songs();
+    await stats.flush();
+
+    // A full month from another device, as a restore or a sync writes it.
+    final restored = createEmptyListeningStats(
+      2026,
+      currentMonthKey: '2026-11',
+    );
+    restored['currentMonth'] = {
+      'totalSeconds': 99000,
+      'songs': {
+        for (var i = 0; i < wrappedCurrentMonthSongsLimit; i++)
+          'other$i': {
+            'ytid': 'other$i',
+            'title': 'Other $i',
+            'seconds': 300,
+            'playCount': 1,
+            'listeningCount': 1,
+            'lastPlayed': now.toIso8601String(),
+          },
+      },
+    };
+    await Hive.box('user').put(ListeningStatsService.storageKey, restored);
+    stats.reload();
+
+    expect(songs(), hasLength(wrappedCurrentMonthSongsLimit));
+    expect(songs().keys, everyElement(startsWith('other')));
+  });
+
+  test('songs kept by an older version still come back', () async {
+    await seed(wrappedCurrentMonthSongsLimit + 50);
+    songs();
+    await stats.flush();
+    final extra = Map.of(Hive.box('userNoBackup').get('wrappedMonthExtra'))
+      ..remove('totalSeconds');
+    await Hive.box('userNoBackup').put('wrappedMonthExtra', extra);
+
+    stats.reload();
+
+    expect(songs(), hasLength(wrappedCurrentMonthSongsLimit + 50));
+  });
+
   test('clearing the recap clears what the device kept too', () async {
     await seed(wrappedCurrentMonthSongsLimit + 50);
     songs();
