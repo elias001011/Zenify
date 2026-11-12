@@ -53,6 +53,7 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
   required ColorScheme colorScheme,
   required ValueListenable<bool> songLikeStatus,
   required ValueListenable<bool> songOfflineStatus,
+  required ValueNotifier<bool> songDownloadStatus,
   bool isRecentSong = false,
   bool canRename = false,
   bool canRemove = false,
@@ -181,6 +182,7 @@ Future<void> _handleSongMenuAction({
   required String ytid,
   required ValueNotifier<bool> songLikeStatus,
   required ValueNotifier<bool> songOfflineStatus,
+  required ValueNotifier<bool> songDownloadStatus,
   VoidCallback? onRemove,
   FutureOr<void> Function()? onRename,
 }) async {
@@ -252,7 +254,13 @@ Future<void> _handleSongMenuAction({
       ], name: song['title']?.toString() ?? '');
       break;
     case 'offline':
-      await _toggleSongOfflineStatus(context, song, ytid, songOfflineStatus);
+      await _toggleSongOfflineStatus(
+        context,
+        song,
+        ytid,
+        songOfflineStatus,
+        songDownloadStatus,
+      );
       break;
   }
 }
@@ -262,6 +270,7 @@ Future<void> _toggleSongOfflineStatus(
   dynamic song,
   String ytid,
   ValueNotifier<bool> songOfflineStatus,
+  ValueNotifier<bool> songDownloadStatus,
 ) async {
   final originalValue = songOfflineStatus.value;
 
@@ -275,16 +284,19 @@ Future<void> _toggleSongOfflineStatus(
         showToast(context, context.l10n!.songRemovedFromOffline);
       }
     } else {
+      songDownloadStatus.value = true;
       success = await makeSongOffline(song);
       if (success && context.mounted) {
         showToast(context, context.l10n!.songAddedToOffline);
       }
+      songDownloadStatus.value = false;
     }
 
     if (!success) {
       songOfflineStatus.value = originalValue;
     }
   } catch (e) {
+    songDownloadStatus.value = false;
     songOfflineStatus.value = originalValue;
     logger.log('Error toggling offline status', error: e);
     if (context.mounted) {
@@ -355,6 +367,7 @@ class SongBar extends StatefulWidget {
 class _SongBarState extends State<SongBar> {
   late ValueNotifier<bool> _songLikeStatus;
   late ValueNotifier<bool> _songOfflineStatus;
+  late ValueNotifier<bool> _songDownloadStatus;
   late String _songTitle;
   late String _songArtist;
   late String? _artworkPath;
@@ -387,6 +400,7 @@ class _SongBarState extends State<SongBar> {
     _songLikeStatus = ValueNotifier(isSongAlreadyLiked(_ytid));
     final isOffline = isSongAlreadyOffline(_ytid);
     _songOfflineStatus = ValueNotifier(isOffline);
+    _songDownloadStatus = ValueNotifier(false);
     userLikedSongsList.addListener(_syncLikeStatus);
     userOfflineSongs.addListener(_syncOfflineStatus);
   }
@@ -417,6 +431,7 @@ class _SongBarState extends State<SongBar> {
       // disposed: that write would fail.
       _songLikeStatus = ValueNotifier(isSongAlreadyLiked(_ytid));
       _songOfflineStatus = ValueNotifier(isSongAlreadyOffline(_ytid));
+      _songDownloadStatus = ValueNotifier(false);
     }
     _songLikeStatus.value = isSongAlreadyLiked(_ytid);
     _songOfflineStatus.value = isSongAlreadyOffline(_ytid);
@@ -428,6 +443,7 @@ class _SongBarState extends State<SongBar> {
     userOfflineSongs.removeListener(_syncOfflineStatus);
     _songLikeStatus.dispose();
     _songOfflineStatus.dispose();
+    _songDownloadStatus.dispose();
     super.dispose();
   }
 
@@ -510,6 +526,7 @@ class _SongBarState extends State<SongBar> {
                     ytid: _ytid,
                     songLikeStatus: _songLikeStatus,
                     songOfflineStatus: _songOfflineStatus,
+                    songDownloadStatus: _songDownloadStatus,
                     onRemove: widget.onRemove,
                     onRename: () => _handleRenameSong(context),
                   ),
@@ -549,49 +566,55 @@ class _SongBarState extends State<SongBar> {
     final isDurationAvailable =
         widget.showMusicDuration && widget.song['duration'] != null;
 
-    // The download of this song from the download manager, wherever it was
-    // started: the one the Downloads tab and the player show too.
-    return ValueListenableBuilder<List<DownloadEntry>>(
-      valueListenable: DownloadManager.instance.entries,
-      builder: (context, _, _) {
-        final download = DownloadManager.instance.activeFor(_ytid);
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            _ArtworkDisplay(
-              ytid: _ytid,
-              lowResImageUrl: _lowResImageUrl,
-              artworkPath: _artworkPath,
-              size: size,
-              isDurationAvailable: isDurationAvailable,
-              colorScheme: colorScheme,
-              offlineStatus: _songOfflineStatus,
-              likeStatus: _songLikeStatus,
-              duration: widget.song['duration'],
-            ),
-            if (download != null)
-              Positioned.fill(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: ColoredBox(
-                    color: colorScheme.scrim.withValues(alpha: 0.42),
-                    child: Center(
-                      child: Material(
-                        color: colorScheme.surface,
-                        elevation: 2,
-                        shape: const CircleBorder(),
-                        child: Padding(
-                          padding: const EdgeInsets.all(6),
-                          child: DownloadProgressIcon(download),
+    return ValueListenableBuilder<bool>(
+      valueListenable: _songDownloadStatus,
+      builder: (context, isDownloading, _) => Stack(
+        alignment: Alignment.center,
+        children: [
+          _ArtworkDisplay(
+            ytid: _ytid,
+            lowResImageUrl: _lowResImageUrl,
+            artworkPath: _artworkPath,
+            size: size,
+            isDurationAvailable: isDurationAvailable,
+            colorScheme: colorScheme,
+            offlineStatus: _songOfflineStatus,
+            likeStatus: _songLikeStatus,
+            duration: widget.song['duration'],
+          ),
+          if (isDownloading)
+            Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: ColoredBox(
+                  color: colorScheme.scrim.withValues(alpha: 0.42),
+                  child: Center(
+                    child: Material(
+                      color: colorScheme.surface,
+                      elevation: 2,
+                      shape: const CircleBorder(),
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        // The manager's progress, as the Downloads tab shows it.
+                        child: ValueListenableBuilder<List<DownloadEntry>>(
+                          valueListenable: DownloadManager.instance.entries,
+                          builder: (context, _, _) {
+                            final download = DownloadManager.instance.activeFor(
+                              _ytid,
+                            );
+                            return download == null
+                                ? const SizedBox.square(dimension: 24)
+                                : DownloadProgressIcon(download);
+                          },
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-          ],
-        );
-      },
+            ),
+        ],
+      ),
     );
   }
 
@@ -662,6 +685,7 @@ class _SongBarState extends State<SongBar> {
       colorScheme: colorScheme,
       songLikeStatus: _songLikeStatus,
       songOfflineStatus: _songOfflineStatus,
+      songDownloadStatus: _songDownloadStatus,
       isRecentSong: widget.isRecentSong == true,
       canRename: canRename,
       canRemove: widget.onRemove != null,
