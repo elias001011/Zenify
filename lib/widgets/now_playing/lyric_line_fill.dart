@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/constants/motion.dart';
 
 /// Fills wrapped verses in reading order, one visual line at a time.
 class LyricLineFill extends ImplicitlyAnimatedWidget {
@@ -13,7 +12,7 @@ class LyricLineFill extends ImplicitlyAnimatedWidget {
     this.emphasis = 1,
     this.baseOpacity = 0.38,
     this.textAlign = TextAlign.start,
-    super.duration = Motion.short,
+    super.duration = const Duration(milliseconds: 180),
   });
 
   final String text;

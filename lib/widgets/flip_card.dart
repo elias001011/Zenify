@@ -22,7 +22,6 @@
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/constants/motion.dart';
 
 /// Shows [frontWidget] or, when [flipped], [backWidget], turning round like
 /// a card between them (the player's artwork flip from the original Musify).
@@ -45,7 +44,8 @@ class FlipCard extends StatefulWidget {
 class _FlipCardState extends State<FlipCard>
     with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
-    duration: Motion.long,
+    // Slower than the rest of the app on purpose: the flip is a show.
+    duration: const Duration(milliseconds: 640),
     vsync: this,
     value: widget.flipped ? 1 : 0,
   );

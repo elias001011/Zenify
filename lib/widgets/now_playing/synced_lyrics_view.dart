@@ -46,7 +46,7 @@ class SyncedLyricsView extends StatefulWidget {
 class _SyncedLyricsViewState extends State<SyncedLyricsView> {
   static const Duration _offsetStep = Duration(milliseconds: 500);
   static const Duration _manualScrollPause = Duration(seconds: 4);
-  static const Duration _scrollDuration = Motion.long;
+  static const Duration _scrollDuration = Duration(milliseconds: 650);
 
   StreamSubscription<PositionData>? _positionSubscription;
   List<GlobalKey> _lineKeys = const [];
@@ -368,7 +368,9 @@ class _LyricRowState extends State<_LyricRow> {
         onTap: widget.onTap,
         child: TweenAnimationBuilder<double>(
           tween: Tween(end: lean),
-          duration: reduceMotion ? Duration.zero : Motion.long,
+          duration: reduceMotion
+              ? Duration.zero
+              : const Duration(milliseconds: 500),
           curve: Motion.curve,
           builder: (context, lean, child) => Transform.translate(
             offset: Offset(0, 3 * lean),
