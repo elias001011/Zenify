@@ -31,7 +31,7 @@ import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart' show ToastInset;
 import 'package:musify/widgets/app_logo.dart';
-import 'package:musify/widgets/click_region.dart';
+import 'package:musify/widgets/click_detector.dart';
 import 'package:musify/widgets/floating_surface.dart';
 import 'package:musify/widgets/mini_player.dart';
 
@@ -356,38 +356,36 @@ class _NavigationButton extends StatelessWidget {
         label: item.label,
         onTap: onTap,
         excludeSemantics: true,
-        child: ClickRegion(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: onTap,
-            child: Center(
-              child: Material(
-                color: selected
-                    ? colorScheme.secondaryContainer
-                    : Colors.transparent,
+        child: ClickDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Center(
+            child: Material(
+              color: selected
+                  ? colorScheme.secondaryContainer
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(17),
+              child: InkWell(
+                mouseCursor: WidgetStateMouseCursor.clickable,
+                onTap: onTap,
                 borderRadius: BorderRadius.circular(17),
-                child: InkWell(
-                  mouseCursor: WidgetStateMouseCursor.clickable,
-                  onTap: onTap,
-                  borderRadius: BorderRadius.circular(17),
-                  child: AnimatedContainer(
-                    duration: MediaQuery.disableAnimationsOf(context)
-                        ? Duration.zero
-                        : Motion.short,
-                    curve: Motion.curve,
-                    width: vertical
-                        ? 48
-                        : selected
-                        ? 60
-                        : 44,
-                    height: vertical ? 48 : 34,
-                    child: Icon(
-                      selected ? item.selectedIcon : item.icon,
-                      size: 22,
-                      color: selected
-                          ? colorScheme.onSecondaryContainer
-                          : colorScheme.onSurfaceVariant,
-                    ),
+                child: AnimatedContainer(
+                  duration: MediaQuery.disableAnimationsOf(context)
+                      ? Duration.zero
+                      : Motion.short,
+                  curve: Motion.curve,
+                  width: vertical
+                      ? 48
+                      : selected
+                      ? 60
+                      : 44,
+                  height: vertical ? 48 : 34,
+                  child: Icon(
+                    selected ? item.selectedIcon : item.icon,
+                    size: 22,
+                    color: selected
+                        ? colorScheme.onSecondaryContainer
+                        : colorScheme.onSurfaceVariant,
                   ),
                 ),
               ),

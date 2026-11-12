@@ -65,7 +65,7 @@ void main() {
   Finder row(int index) => find
       .ancestor(
         of: find.text('V$index'),
-        matching: find.byType(GestureDetector),
+        matching: find.byWidgetPredicate((w) => w is GestureDetector),
       )
       .first;
 

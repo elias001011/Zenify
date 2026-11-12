@@ -45,67 +45,65 @@ class BottomSheetBar extends StatelessWidget {
         ? colorScheme.onSecondaryContainer
         : colorScheme.onSurface;
 
-    return Padding(
+    final bar = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      // The colour and the check alone do not tell a screen reader which is
-      // chosen.
-      child: Semantics(
-        selected: isSelected,
-        child: Material(
-          color: bgColor,
-          borderRadius: BorderRadius.circular(16),
-          clipBehavior: Clip.antiAlias,
-          child: InkWell(
-            mouseCursor: WidgetStateMouseCursor.clickable,
-            onTap: onTap,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: [
-                  if (icon != null) ...[
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? colorScheme.onSecondaryContainer.withValues(
-                                alpha: 0.12,
-                              )
-                            : colorScheme.onSurfaceVariant.withValues(
-                                alpha: 0.08,
-                              ),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(icon, size: 20, color: fgColor),
+      child: Material(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          mouseCursor: WidgetStateMouseCursor.clickable,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                if (icon != null) ...[
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? colorScheme.onSecondaryContainer.withValues(
+                              alpha: 0.12,
+                            )
+                          : colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.08,
+                            ),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    const SizedBox(width: 14),
-                  ],
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        color: fgColor,
-                        fontSize: 15,
-                        fontWeight: isSelected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
-                      ),
+                    child: Icon(icon, size: 20, color: fgColor),
+                  ),
+                  const SizedBox(width: 14),
+                ],
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: fgColor,
+                      fontSize: 15,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
                     ),
                   ),
-                  if (isSelected) ...[
-                    const SizedBox(width: 8),
-                    Icon(
-                      FluentIcons.checkmark_circle_24_regular,
-                      color: colorScheme.onSecondaryContainer,
-                      size: 22,
-                    ),
-                  ],
+                ),
+                if (isSelected) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    FluentIcons.checkmark_circle_24_regular,
+                    color: colorScheme.onSecondaryContainer,
+                    size: 22,
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         ),
       ),
     );
+    // The colour and the check alone do not tell a screen reader which is
+    // chosen.
+    return Semantics(selected: isSelected, child: bar);
   }
 }

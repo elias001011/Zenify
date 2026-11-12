@@ -279,23 +279,29 @@ class _LocalSyncPageState extends State<LocalSyncPage> {
     return IslandScaffold(
       title: context.l10n!.syncTitle,
       body: SingleChildScrollView(
-        padding: readableInset(context, commonSingleChildScrollViewPadding),
-        child: ValueListenableBuilder<bool>(
-          valueListenable: localSyncEnabled,
-          builder: (context, enabled, _) => Column(
-            children: [
-              _buildThisDevice(context, enabled),
-              if (enabled) ...[
-                _buildCategories(context),
-                ValueListenableBuilder<LocalSyncState>(
-                  valueListenable: _service.state,
-                  builder: (context, state, _) => _buildDevices(context, state),
-                ),
-              ] else
-                _buildOffHint(context),
-              const SizedBox(height: 20),
-              const MiniPlayerBottomSpace(),
-            ],
+        padding: withIslandInset(context, commonSingleChildScrollViewPadding),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 880),
+            child: ValueListenableBuilder<bool>(
+              valueListenable: localSyncEnabled,
+              builder: (context, enabled, _) => Column(
+                children: [
+                  _buildThisDevice(context, enabled),
+                  if (enabled) ...[
+                    _buildCategories(context),
+                    ValueListenableBuilder<LocalSyncState>(
+                      valueListenable: _service.state,
+                      builder: (context, state, _) =>
+                          _buildDevices(context, state),
+                    ),
+                  ] else
+                    _buildOffHint(context),
+                  const SizedBox(height: 20),
+                  const MiniPlayerBottomSpace(),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -810,22 +816,20 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // A live region, so screen readers announce scanning, syncing, success and
-    // errors as they appear.
-    return Semantics(
-      liveRegion: true,
-      child: Material(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: commonCustomBarRadius,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-          child: SizedBox(
-            width: double.infinity,
-            child: Column(children: children),
-          ),
+    final card = Material(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      borderRadius: commonCustomBarRadius,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+        child: SizedBox(
+          width: double.infinity,
+          child: Column(children: children),
         ),
       ),
     );
+    // A live region, so screen readers announce scanning, syncing, success and
+    // errors as they appear.
+    return Semantics(liveRegion: true, child: card);
   }
 }
 

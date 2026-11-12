@@ -76,7 +76,7 @@ void main() {
           find
               .ancestor(
                 of: find.text(lyrics.synced![16].text),
-                matching: find.byType(GestureDetector),
+                matching: find.byWidgetPredicate((w) => w is GestureDetector),
               )
               .first,
         );

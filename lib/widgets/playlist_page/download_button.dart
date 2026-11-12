@@ -172,30 +172,31 @@ class _PlaylistDownloadButtonState extends State<PlaylistDownloadButton> {
     );
   }
 
-  Future<void> _download(BuildContext context) async {
+  // Open from the tap: loading the playlist is part of the run, so what
+  // failed in the one before is not told in between.
+  Future<void> _download(BuildContext context) =>
+      DownloadManager.instance.inRun(() => _downloadNow(context));
+
+  Future<void> _downloadNow(BuildContext context) async {
     if (_isResolving) return;
 
-    // Open from the tap: loading the playlist is part of the run, so what
-    // failed in the one before is not told in between.
-    await DownloadManager.instance.inRun(() async {
-      setState(() => _isResolving = true);
-      Map? playlist;
-      try {
-        playlist = await widget.resolvePlaylist();
-      } catch (_) {
-        if (context.mounted) showToast(context, context.l10n!.error);
-        return;
-      } finally {
-        if (mounted) setState(() => _isResolving = false);
-      }
-      if (!context.mounted) return;
+    setState(() => _isResolving = true);
+    Map? playlist;
+    try {
+      playlist = await widget.resolvePlaylist();
+    } catch (_) {
+      if (context.mounted) showToast(context, context.l10n!.error);
+      return;
+    } finally {
+      if (mounted) setState(() => _isResolving = false);
+    }
+    if (!context.mounted) return;
 
-      if (playlist == null) {
-        showToast(context, context.l10n!.error);
-        return;
-      }
+    if (playlist == null) {
+      showToast(context, context.l10n!.error);
+      return;
+    }
 
-      await offlinePlaylistService.downloadPlaylist(context, playlist);
-    });
+    await offlinePlaylistService.downloadPlaylist(context, playlist);
   }
 }

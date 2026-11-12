@@ -348,7 +348,8 @@ class _IslandState extends State<_Island> {
               Radius.circular(_islandHeight / 2),
             ),
             child: AnimatedSize(
-              duration: Motion.medium,
+              // Quick, so what it reveals does not trail behind its edge.
+              duration: Motion.short,
               curve: Motion.curve,
               alignment: Alignment.centerLeft,
               child: SizedBox(
@@ -407,7 +408,8 @@ class _IslandState extends State<_Island> {
             Flexible(
               child: TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0, end: 1),
-                duration: Motion.medium,
+                duration: Motion.short,
+                curve: Motion.curve,
                 builder: (context, opacity, child) =>
                     Opacity(opacity: opacity, child: child),
                 child: titleText,

@@ -45,40 +45,41 @@ class PlaylistActionButtons extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Padding(
+    final buttons = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      // Phone-sized on wide screens too.
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 480),
-          child: Row(
-            children: [
-              Expanded(
-                child: FilledButton.icon(
-                  icon: isLoading
-                      ? const _Spinner()
-                      : const Icon(FluentIcons.play_24_filled),
-                  label: Text(context.l10n!.play),
-                  onPressed: isLoading ? null : onPlay,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colorScheme.secondaryContainer,
-                    foregroundColor: colorScheme.onSecondaryContainer,
-                  ),
-                  icon: isLoading
-                      ? const _Spinner()
-                      : const Icon(FluentIcons.arrow_shuffle_24_filled),
-                  label: Text(context.l10n!.shuffle),
-                  onPressed: isLoading ? null : onShuffle,
-                ),
-              ),
-            ],
+      child: Row(
+        children: [
+          Expanded(
+            child: FilledButton.icon(
+              icon: isLoading
+                  ? const _Spinner()
+                  : const Icon(FluentIcons.play_24_filled),
+              label: Text(context.l10n!.play),
+              onPressed: isLoading ? null : onPlay,
+            ),
           ),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.secondaryContainer,
+                foregroundColor: colorScheme.onSecondaryContainer,
+              ),
+              icon: isLoading
+                  ? const _Spinner()
+                  : const Icon(FluentIcons.arrow_shuffle_24_filled),
+              label: Text(context.l10n!.shuffle),
+              onPressed: isLoading ? null : onShuffle,
+            ),
+          ),
+        ],
+      ),
+    );
+    // Phone-sized on wide screens too.
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 528),
+        child: buttons,
       ),
     );
   }

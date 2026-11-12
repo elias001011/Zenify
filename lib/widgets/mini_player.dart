@@ -29,7 +29,7 @@ import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/widgets/click_region.dart';
+import 'package:musify/widgets/click_detector.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/marquee.dart';
 import 'package:musify/widgets/now_playing/now_playing_controls.dart';
@@ -184,36 +184,34 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
       scale: _pressed ? 0.98 : 1,
       duration: Motion.short,
       curve: Motion.curve,
-      child: ClickRegion(
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTapDown: (_) => setState(() => _pressed = true),
-          onTapUp: (_) => setState(() => _pressed = false),
-          onTapCancel: () => setState(() => _pressed = false),
-          onVerticalDragUpdate: _handleVerticalDrag,
-          onTap: _navigateToNowPlaying,
-          child: SizedBox(
-            height: MiniPlayer.playerHeight,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                child: widget.wide
-                    ? _wideBody(context)
-                    : Row(
-                        children: [
-                          _ArtworkWidget(metadata: metadata),
-                          Expanded(child: _metadata(context)),
-                          _ControlsWidget(
-                            colorScheme: colorScheme,
-                            playbackState: widget.playbackState,
-                            hasNext: widget.hasNext,
-                            duration: metadata.duration,
-                            live: metadata.extras?['isLive'] == true,
-                          ),
-                        ],
-                      ),
-              ),
+      child: ClickDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        onVerticalDragUpdate: _handleVerticalDrag,
+        onTap: _navigateToNowPlaying,
+        child: SizedBox(
+          height: MiniPlayer.playerHeight,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(MiniPlayer._borderRadius),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: widget.wide
+                  ? _wideBody(context)
+                  : Row(
+                      children: [
+                        _ArtworkWidget(metadata: metadata),
+                        Expanded(child: _metadata(context)),
+                        _ControlsWidget(
+                          colorScheme: colorScheme,
+                          playbackState: widget.playbackState,
+                          hasNext: widget.hasNext,
+                          duration: metadata.duration,
+                          live: metadata.extras?['isLive'] == true,
+                        ),
+                      ],
+                    ),
             ),
           ),
         ),

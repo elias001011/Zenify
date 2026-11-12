@@ -4,7 +4,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/theme/app_themes.dart';
-import 'package:musify/widgets/click_region.dart';
+import 'package:musify/widgets/click_detector.dart';
 import 'package:musify/widgets/dialog_item.dart';
 
 import 'support/app_harness.dart';
@@ -85,12 +85,10 @@ void main() {
                 label: 'Item',
                 onTap: () {},
               ),
-              ClickRegion(
-                child: GestureDetector(
-                  key: const Key('region'),
-                  onTap: () {},
-                  child: const SizedBox(width: 60, height: 30),
-                ),
+              ClickDetector(
+                key: const Key('region'),
+                onTap: () {},
+                child: const SizedBox(width: 60, height: 30),
               ),
               const SizedBox(key: Key('nothing'), width: 60, height: 30),
             ],

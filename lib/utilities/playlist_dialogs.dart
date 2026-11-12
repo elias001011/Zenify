@@ -32,7 +32,7 @@ import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/utilities/map_utils.dart';
 import 'package:musify/utilities/playlist_image_picker.dart';
-import 'package:musify/widgets/click_region.dart';
+import 'package:musify/widgets/click_detector.dart';
 import 'package:musify/widgets/dialog_item.dart';
 import 'package:musify/widgets/dialog_parts.dart';
 
@@ -101,111 +101,107 @@ void showCreatePlaylistDialog(
                       child: Row(
                         children: [
                           Expanded(
-                            child: ClickRegion(
-                              child: GestureDetector(
-                                onTap: () {
-                                  dialogSetState(() {
-                                    isYouTubeMode = true;
-                                    id = '';
-                                    customPlaylistName = '';
-                                    imageUrl = null;
-                                    imageBase64 = null;
-                                  });
-                                },
-                                child: AnimatedContainer(
-                                  duration: Motion.short,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: isYouTubeMode
-                                        ? colorScheme.primaryContainer
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        FluentIcons.globe_20_filled,
-                                        size: 20,
-                                        color: isYouTubeMode
-                                            ? colorScheme.onPrimaryContainer
-                                            : colorScheme.onSurfaceVariant,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          'YouTube',
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: isYouTubeMode
-                                                ? colorScheme.onPrimaryContainer
-                                                : colorScheme.onSurfaceVariant,
-                                            fontWeight: isYouTubeMode
-                                                ? FontWeight.w600
-                                                : FontWeight.w500,
-                                          ),
+                            child: ClickDetector(
+                              onTap: () {
+                                dialogSetState(() {
+                                  isYouTubeMode = true;
+                                  id = '';
+                                  customPlaylistName = '';
+                                  imageUrl = null;
+                                  imageBase64 = null;
+                                });
+                              },
+                              child: AnimatedContainer(
+                                duration: Motion.short,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isYouTubeMode
+                                      ? colorScheme.primaryContainer
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      FluentIcons.globe_20_filled,
+                                      size: 20,
+                                      color: isYouTubeMode
+                                          ? colorScheme.onPrimaryContainer
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        'YouTube',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: isYouTubeMode
+                                              ? colorScheme.onPrimaryContainer
+                                              : colorScheme.onSurfaceVariant,
+                                          fontWeight: isYouTubeMode
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
                           ),
                           Expanded(
-                            child: ClickRegion(
-                              child: GestureDetector(
-                                onTap: () {
-                                  dialogSetState(() {
-                                    isYouTubeMode = false;
-                                    id = '';
-                                    customPlaylistName = '';
-                                    imageUrl = null;
-                                    imageBase64 = null;
-                                  });
-                                },
-                                child: AnimatedContainer(
-                                  duration: Motion.short,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: !isYouTubeMode
-                                        ? colorScheme.primaryContainer
-                                        : Colors.transparent,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        FluentIcons.person_20_filled,
-                                        size: 20,
-                                        color: !isYouTubeMode
-                                            ? colorScheme.onPrimaryContainer
-                                            : colorScheme.onSurfaceVariant,
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Flexible(
-                                        child: Text(
-                                          context.l10n!.custom,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: !isYouTubeMode
-                                                ? colorScheme.onPrimaryContainer
-                                                : colorScheme.onSurfaceVariant,
-                                            fontWeight: !isYouTubeMode
-                                                ? FontWeight.w600
-                                                : FontWeight.w500,
-                                          ),
+                            child: ClickDetector(
+                              onTap: () {
+                                dialogSetState(() {
+                                  isYouTubeMode = false;
+                                  id = '';
+                                  customPlaylistName = '';
+                                  imageUrl = null;
+                                  imageBase64 = null;
+                                });
+                              },
+                              child: AnimatedContainer(
+                                duration: Motion.short,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: !isYouTubeMode
+                                      ? colorScheme.primaryContainer
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      FluentIcons.person_20_filled,
+                                      size: 20,
+                                      color: !isYouTubeMode
+                                          ? colorScheme.onPrimaryContainer
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Flexible(
+                                      child: Text(
+                                        context.l10n!.custom,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: !isYouTubeMode
+                                              ? colorScheme.onPrimaryContainer
+                                              : colorScheme.onSurfaceVariant,
+                                          fontWeight: !isYouTubeMode
+                                              ? FontWeight.w600
+                                              : FontWeight.w500,
                                         ),
                                       ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
