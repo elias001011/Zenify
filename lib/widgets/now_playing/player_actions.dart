@@ -178,13 +178,17 @@ class _PlayerActionsState extends State<PlayerActions> {
               return PlayerActionButton(
                 icon: FluentIcons.cloud_arrow_down_24_regular,
                 activeIcon: FluentIcons.cloud_off_24_filled,
-                tooltip: _songOfflineStatus.value
+                tooltip: download != null
+                    ? l10n.cancelDownload
+                    : _songOfflineStatus.value
                     ? l10n.removeOffline
                     : l10n.makeOffline,
                 active: _songOfflineStatus.value,
                 busy: download == null ? null : DownloadProgressIcon(download),
-                onPressed: audioId == null || download != null
+                onPressed: audioId == null
                     ? null
+                    : download != null
+                    ? () => DownloadManager.instance.cancel(audioId)
                     : () => _toggleOffline(
                         _songOfflineStatus,
                         audioId,

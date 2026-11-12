@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
@@ -57,8 +59,8 @@ void main() {
     final entry = manager.queued({'ytid': 'a', 'title': 'A'});
     await tester.pump();
     expect(find.byType(DownloadProgressIcon), findsOneWidget);
-    // Not pressable meanwhile: it is already on its way.
-    expect(tester.widget<IconButton>(button()).onPressed, isNull);
+    // Meanwhile it cancels the download.
+    expect(find.byTooltip('Cancel download'), findsOneWidget);
 
     // The song changes under the same bar, and back: the button follows the
     // manager, not what it showed before.
@@ -96,6 +98,35 @@ void main() {
     expect(find.byTooltip('Make available offline'), findsNothing);
 
     userOfflineSongs.value = [];
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('pressed while its song downloads, it cancels the download', (
+    tester,
+  ) async {
+    final manager = DownloadManager.instance;
+    final gate = Completer<void>();
+    var saved = false;
+    final result = manager.download({'ytid': 'a', 'title': 'A'}, (
+      song,
+      onProgress,
+    ) async {
+      await gate.future;
+      onProgress(0.5);
+      saved = true;
+    });
+    await tester.pumpWidget(actions('a'));
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Cancel download'));
+    gate.complete();
+    expect(await tester.runAsync(() => result), isFalse);
+    await tester.pump();
+    expect(saved, isFalse);
+    expect(find.byType(DownloadProgressIcon), findsNothing);
+    expect(find.byTooltip('Make available offline'), findsOneWidget);
+
     await tester.pumpWidget(const SizedBox());
     await tester.pump(const Duration(seconds: 3));
   });

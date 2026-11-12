@@ -58,6 +58,7 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
   bool canRename = false,
   bool canRemove = false,
   bool showGoToArtist = false,
+  bool downloading = false,
   // Local files are only played: no like, offline copy or playlist for them.
   bool isLocal = false,
 }) {
@@ -148,7 +149,14 @@ List<PopupMenuEntry<String>> _buildSongMenuItems({
         label: removeFromRecentlyPlayedText,
         colorScheme: colorScheme,
       ),
-    if ((!offlineMode.value || songOfflineStatus.value) && !isLocal)
+    if (downloading)
+      buildPopupMenuItem<String>(
+        value: 'cancel_download',
+        icon: FluentIcons.dismiss_circle_24_regular,
+        label: l10n.cancelDownload,
+        colorScheme: colorScheme,
+      )
+    else if ((!offlineMode.value || songOfflineStatus.value) && !isLocal)
       PopupMenuItem<String>(
         value: 'offline',
         child: ValueListenableBuilder<bool>(
@@ -252,6 +260,11 @@ Future<void> _handleSongMenuAction({
       await startRadio(context, [
         Map.from(song as Map),
       ], name: song['title']?.toString() ?? '');
+      break;
+    case 'cancel_download':
+      if (DownloadManager.instance.cancel(ytid)) {
+        showToast(context, context.l10n!.downloadCancelled);
+      }
       break;
     case 'offline':
       await _toggleSongOfflineStatus(
@@ -584,33 +597,31 @@ class _SongBarState extends State<SongBar> {
           ),
           if (isDownloading)
             Positioned.fill(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: ColoredBox(
-                  color: colorScheme.scrim.withValues(alpha: 0.42),
-                  child: Center(
-                    child: Material(
-                      color: colorScheme.surface,
-                      elevation: 2,
-                      shape: const CircleBorder(),
-                      child: Padding(
-                        padding: const EdgeInsets.all(6),
-                        // The manager's progress, as the Downloads tab shows it.
-                        child: ValueListenableBuilder<List<DownloadEntry>>(
-                          valueListenable: DownloadManager.instance.entries,
-                          builder: (context, _, _) {
-                            final download = DownloadManager.instance.activeFor(
-                              _ytid,
-                            );
-                            return download == null
-                                ? const SizedBox.square(dimension: 24)
-                                : DownloadProgressIcon(download);
-                          },
+              // The manager's progress, as the Downloads tab shows it; gone
+              // with the download, even before the row hears it ended.
+              child: ValueListenableBuilder<List<DownloadEntry>>(
+                valueListenable: DownloadManager.instance.entries,
+                builder: (context, _, _) {
+                  final download = DownloadManager.instance.activeFor(_ytid);
+                  if (download == null) return const SizedBox.shrink();
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: ColoredBox(
+                      color: colorScheme.scrim.withValues(alpha: 0.42),
+                      child: Center(
+                        child: Material(
+                          color: colorScheme.surface,
+                          elevation: 2,
+                          shape: const CircleBorder(),
+                          child: Padding(
+                            padding: const EdgeInsets.all(6),
+                            child: DownloadProgressIcon(download),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
             ),
         ],
@@ -690,6 +701,7 @@ class _SongBarState extends State<SongBar> {
       canRename: canRename,
       canRemove: widget.onRemove != null,
       showGoToArtist: !offlineMode.value && _songArtist.isNotEmpty,
+      downloading: DownloadManager.instance.activeFor(_ytid) != null,
       isLocal: isLocalSongId(_ytid),
     );
   }

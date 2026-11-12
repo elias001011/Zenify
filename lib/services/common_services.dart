@@ -950,13 +950,15 @@ Future<void> saveSongFiles(
   // so a stop from here on is one this transfer must honour, even one that
   // arrives while the folder is being created.
   final stopEpoch = DownloadManager.instance.stopEpoch;
-  bool stopped() => DownloadManager.instance.stopEpoch != stopEpoch;
-
   final ytid = song['ytid'].toString();
+  bool stopped() =>
+      DownloadManager.instance.stopEpoch != stopEpoch ||
+      DownloadManager.instance.isCancelled(ytid);
+
   final audioFile = File(FilePaths.getAudioPath(ytid));
   await audioFile.parent.create(recursive: true);
-  // Offline mode or deleting every download stops this transfer, even before
-  // the first byte: the manifest lookup comes first and can take a while.
+  // Offline mode, deleting every download or a cancel stops this transfer,
+  // even before the first byte: the manifest lookup can take a while.
   if (stopped()) throw const DownloadStopped();
 
   final audio = await resolveBestAudioStream(ytid).timeout(_resolveLimit);

@@ -191,6 +191,46 @@ void main() {
       expect(manager.entries.value.where((e) => e.ytid == 's'), hasLength(1));
     });
 
+    test('cancelling a song stops it while it runs', () async {
+      final result = manager.download(song('c'), save);
+      final other = manager.download(song('d'), save);
+      await Future<void>.delayed(Duration.zero);
+      expect(manager.cancel('c'), isTrue);
+      open('c');
+      open('d');
+      expect(await result, isFalse);
+      expect(await other, isTrue);
+      expect(saved, ['d']);
+      expect(manager.activeFor('c'), isNull);
+      expect(manager.entries.value.where((e) => e.ytid == 'c'), isEmpty);
+    });
+
+    test(
+      'a cancelled song waiting in the queue leaves the list at once',
+      () async {
+        final running = [
+          for (var i = 0; i < DownloadManager.maxConcurrent; i++)
+            manager.download(song('r$i'), save),
+        ];
+        final waiting = manager.download(song('w'), save);
+        await Future<void>.delayed(Duration.zero);
+        expect(manager.activeFor('w')?.status, DownloadStatus.queued);
+
+        expect(manager.cancel('w'), isTrue);
+        expect(manager.activeFor('w'), isNull);
+        // Asked again while it winds down, it is not downloaded either.
+        expect(await manager.download(song('w'), save), isFalse);
+
+        for (var i = 0; i < DownloadManager.maxConcurrent; i++) {
+          open('r$i');
+        }
+        expect(await Future.wait(running), everyElement(isTrue));
+        expect(await waiting, isFalse);
+        expect(saved, isNot(contains('w')));
+        expect(manager.cancel('w'), isFalse);
+      },
+    );
+
     test('stopping lets go of what runs and what waits', () async {
       final all = [
         for (var i = 0; i < 5; i++) manager.download(song('t$i'), save),

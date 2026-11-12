@@ -44,6 +44,7 @@
   "cacheMsg": "Cache limpo",
   "cancel": "Cancelar",
   "cancellingDownload": "Cancelando download...",
+  "cancelDownload": "Cancelar download",
   "chooseBackupDir": "Escolher pasta de backup",
   "chooseBackupFiles": "Selecionar arquivos para o backup",
   "chooseCsvFile": "Escolha o arquivo CSV",

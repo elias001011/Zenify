@@ -188,7 +188,8 @@ class DownloadManager {
   /// downloading shares that download. Returns whether the song was saved.
   ///
   /// [cancelled] is asked when its turn comes, to leave the queue; a shared
-  /// download leaves it only when everyone who asked for it says so.
+  /// download leaves it only when everyone who asked for it says so. [cancel]
+  /// stops it for everyone, queued or running.
   Future<bool> download(
     Map song,
     SongSaver save, {
@@ -198,6 +199,10 @@ class DownloadManager {
     _watchOffline();
     if (offlineMode.value) return Future.value(false);
     final asker = cancelled ?? _never;
+    // A cancelled one still winding down holds the file.
+    if (_inFlight[ytid] case final request? when request.cancelled) {
+      return Future.value(false);
+    }
     // One that was stopped meanwhile (offline mode) is still winding down: a
     // new ask must not join it, it would end as stopped too.
     if (_inFlight[ytid] case final request? when request.epoch == _stopEpoch) {
@@ -215,6 +220,24 @@ class DownloadManager {
 
   static bool _never() => false;
 
+  /// Cancels the download of [ytid], queued or running, for everyone who
+  /// asked for it. Returns whether there was one.
+  bool cancel(Object? ytid) {
+    final request = _inFlight[ytid];
+    if (request == null || request.cancelled) return false;
+    request.cancelled = true;
+    // A queued one leaves the list now, and the queue when its turn comes.
+    final entry = activeFor(ytid);
+    if (entry != null && entry.status == DownloadStatus.queued) {
+      entries.value = entries.value.where((e) => e != entry).toList();
+      _dropFromBatch(entry.ytid);
+    }
+    return true;
+  }
+
+  /// Whether the download of [ytid] was cancelled, so its saver stops.
+  bool isCancelled(Object? ytid) => _inFlight[ytid]?.cancelled ?? false;
+
   Future<bool> _run(Map song, SongSaver save, _Request request) async {
     final earlier = entries.value
         .where((e) => e.ytid == song['ytid'].toString() && !_isActive(e))
@@ -225,6 +248,7 @@ class DownloadManager {
     await _acquire();
     try {
       if (stopEpoch != _stopEpoch ||
+          request.cancelled ||
           request.askers.every((cancelled) => cancelled())) {
         // The history it came from may have been cleared meanwhile.
         entries.value = [
@@ -237,7 +261,9 @@ class DownloadManager {
       }
       _track(entry..status = DownloadStatus.downloading);
       await save(entry.song, (value) {
-        if (stopEpoch != _stopEpoch) throw const DownloadStopped();
+        if (stopEpoch != _stopEpoch || request.cancelled) {
+          throw const DownloadStopped();
+        }
         entry.progress.value = value;
       });
       finished(entry);
@@ -506,4 +532,5 @@ class _Request {
   final int epoch;
   late final Future<bool> result;
   final askers = <bool Function()>[];
+  bool cancelled = false;
 }

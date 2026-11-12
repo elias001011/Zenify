@@ -126,4 +126,32 @@ void main() {
     await tester.pump();
     expect(ring(tester).value, 0.8);
   });
+
+  testWidgets('the menu of a downloading song cancels its download', (
+    tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 0.5;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final scrim = find.byWidgetPredicate(
+      (w) => w is ColoredBox && (w.color.a - 0.42).abs() < 0.01,
+    );
+    final running = fillSlots();
+    await tester.pumpWidget(row('a'));
+    Future<void> menu(String item) async {
+      await tester.tap(find.byWidgetPredicate((w) => w is OverflowMenuButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(item));
+      await tester.pumpAndSettle();
+    }
+
+    await menu('Make available offline');
+    expect(scrim, findsOneWidget);
+
+    await menu('Cancel download');
+    expect(manager.activeFor('a'), isNull);
+    // Still waiting for its turn to leave the queue, it no longer shows.
+    expect(scrim, findsNothing);
+
+    await drain(tester, running);
+  });
 }
