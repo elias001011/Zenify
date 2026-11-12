@@ -433,7 +433,9 @@ Future<void> updateSongLikeStatus(
       return;
 
     userLikedSongsList.value = updatedLikedSongs;
-    _saveUserLikedSongs();
+    unawaited(
+      addOrUpdateData<List>('user', 'likedSongs', userLikedSongsList.value),
+    );
   } catch (e, stackTrace) {
     logger.log(
       'Error updating song like status',
@@ -514,7 +516,9 @@ Future<void> renameSongInLikedSongs(
         ..['artist'] = newArtist;
       userLikedSongsList.value = updatedList;
 
-      _saveUserLikedSongs();
+      unawaited(
+        addOrUpdateData<List>('user', 'likedSongs', userLikedSongsList.value),
+      );
     }
   } catch (e, stackTrace) {
     logger.log(
@@ -1292,7 +1296,13 @@ Future<void> updateRecentlyPlayed(dynamic songId, {Map? songFallback}) async {
       existing['lastPlayed'] = now;
       updatedList[0] = existing;
       userRecentlyPlayed.value = updatedList;
-      _saveUserRecentlyPlayed();
+      unawaited(
+        addOrUpdateData<List>(
+          'user',
+          'recentlyPlayedSongs',
+          userRecentlyPlayed.value,
+        ),
+      );
       return;
     }
 
@@ -1329,7 +1339,13 @@ Future<void> updateRecentlyPlayed(dynamic songId, {Map? songFallback}) async {
     }
 
     userRecentlyPlayed.value = updatedList;
-    _saveUserRecentlyPlayed();
+    unawaited(
+      addOrUpdateData<List>(
+        'user',
+        'recentlyPlayedSongs',
+        userRecentlyPlayed.value,
+      ),
+    );
   } catch (e, stackTrace) {
     logger.log(
       'Error updating recently played',
@@ -1343,18 +1359,12 @@ Future<void> removeFromRecentlyPlayed(dynamic songId) async {
   if (userRecentlyPlayed.value.any((song) => song['ytid'] == songId)) {
     userRecentlyPlayed.value = List.from(userRecentlyPlayed.value)
       ..removeWhere((song) => song['ytid'] == songId);
-    _saveUserRecentlyPlayed();
+    unawaited(
+      addOrUpdateData<List>(
+        'user',
+        'recentlyPlayedSongs',
+        userRecentlyPlayed.value,
+      ),
+    );
   }
 }
-
-void _saveUserLikedSongs() => unawaited(
-  addOrUpdateData<List>('user', 'likedSongs', userLikedSongsList.value),
-);
-
-void _saveUserRecentlyPlayed() => unawaited(
-  addOrUpdateData<List>(
-    'user',
-    'recentlyPlayedSongs',
-    userRecentlyPlayed.value,
-  ),
-);
