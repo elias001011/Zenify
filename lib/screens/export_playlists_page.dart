@@ -172,104 +172,102 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
       ),
       title: context.l10n!.exportPlaylistsCsv,
       onFilter: (value) => setState(() => _query = value.trim().toLowerCase()),
-      body: ReadablePadding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-        builder: (context, padding) => CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: padding,
-              sliver: SliverMainAxisGroup(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Text(context.l10n!.exportPlaylistsInstructions),
-                        const SizedBox(height: 16),
-                        if (entries == null)
-                          const Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Center(child: Spinner()),
-                          )
-                        else if (entries.isEmpty)
-                          Text(context.l10n!.exportPlaylistsEmpty)
-                        else if (shown.isEmpty)
-                          Text(context.l10n!.noLibraryMatches)
-                        else ...[
-                          CustomBar(
-                            context.l10n!.selectAll,
-                            FluentIcons.checkmark_circle_24_regular,
-                            borderRadius: commonCustomBarRadius,
-                            trailing: Checkbox(
-                              value: allSelected,
-                              onChanged: _exporting
-                                  ? null
-                                  : (_) => _toggleAll(shown),
-                            ),
-                            onTap: _exporting ? null : () => _toggleAll(shown),
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: readableInset(
+              context,
+              const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            ),
+            sliver: SliverMainAxisGroup(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(context.l10n!.exportPlaylistsInstructions),
+                      const SizedBox(height: 16),
+                      if (entries == null)
+                        const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Center(child: Spinner()),
+                        )
+                      else if (entries.isEmpty)
+                        Text(context.l10n!.exportPlaylistsEmpty)
+                      else if (shown.isEmpty)
+                        Text(context.l10n!.noLibraryMatches)
+                      else ...[
+                        CustomBar(
+                          context.l10n!.selectAll,
+                          FluentIcons.checkmark_circle_24_regular,
+                          borderRadius: commonCustomBarRadius,
+                          trailing: Checkbox(
+                            value: allSelected,
+                            onChanged: _exporting
+                                ? null
+                                : (_) => _toggleAll(shown),
                           ),
-                          const SizedBox(height: 12),
-                        ],
+                          onTap: _exporting ? null : () => _toggleAll(shown),
+                        ),
+                        const SizedBox(height: 12),
                       ],
+                    ],
+                  ),
+                ),
+                if (shown.isNotEmpty)
+                  MusicSliverSurface(
+                    sliver: SliverList.builder(
+                      itemCount: shown.length,
+                      itemBuilder: (context, index) {
+                        final entry = shown[index];
+                        return PlaylistBar(
+                          key: ValueKey(entry.id),
+                          entry.title,
+                          playlistArtwork: entry.artwork,
+                          cubeIcon: _icon(entry.source),
+                          borderRadius: getItemBorderRadius(
+                            index,
+                            shown.length,
+                          ),
+                          trailing: Checkbox(
+                            value: _selected.contains(entry.id),
+                            onChanged: _exporting
+                                ? null
+                                : (_) => _toggle(entry),
+                          ),
+                          onPressed: () {
+                            if (!_exporting) _toggle(entry);
+                          },
+                        );
+                      },
                     ),
                   ),
-                  if (shown.isNotEmpty)
-                    MusicSliverSurface(
-                      sliver: SliverList.builder(
-                        itemCount: shown.length,
-                        itemBuilder: (context, index) {
-                          final entry = shown[index];
-                          return PlaylistBar(
-                            key: ValueKey(entry.id),
-                            entry.title,
-                            playlistArtwork: entry.artwork,
-                            cubeIcon: _icon(entry.source),
-                            borderRadius: getItemBorderRadius(
-                              index,
-                              shown.length,
-                            ),
-                            trailing: Checkbox(
-                              value: _selected.contains(entry.id),
-                              onChanged: _exporting
-                                  ? null
-                                  : (_) => _toggle(entry),
-                            ),
-                            onPressed: () {
-                              if (!_exporting) _toggle(entry);
-                            },
-                          );
-                        },
-                      ),
-                    ),
-                  if (entries != null && entries.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: FilledButton.icon(
-                          onPressed: _exporting || _selected.isEmpty
-                              ? null
-                              : _export,
-                          icon: _exporting
-                              ? const SizedBox(
-                                  width: 18,
-                                  height: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(
-                                  FluentIcons.arrow_download_24_regular,
+                if (entries != null && entries.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: FilledButton.icon(
+                        onPressed: _exporting || _selected.isEmpty
+                            ? null
+                            : _export,
+                        icon: _exporting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
                                 ),
-                          label: Text(context.l10n!.exportPlaylists),
-                        ),
+                              )
+                            : const Icon(FluentIcons.arrow_download_24_regular),
+                        label: Text(context.l10n!.exportPlaylists),
                       ),
                     ),
-                  const SliverToBoxAdapter(child: MiniPlayerBottomSpace()),
-                ],
-              ),
+                  ),
+                const SliverToBoxAdapter(child: MiniPlayerBottomSpace()),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

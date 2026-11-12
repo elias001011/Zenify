@@ -90,10 +90,9 @@ class SettingsPage extends StatelessWidget {
 
     return IslandScaffold(
       title: context.l10n!.settings,
-      body: ReadablePadding(
-        padding: commonSingleChildScrollViewPadding,
-        builder: (context, padding) =>
-            SingleChildScrollView(padding: padding, child: content),
+      body: SingleChildScrollView(
+        padding: readableInset(context, commonSingleChildScrollViewPadding),
+        child: content,
       ),
     );
   }

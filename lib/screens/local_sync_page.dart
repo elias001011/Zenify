@@ -278,28 +278,24 @@ class _LocalSyncPageState extends State<LocalSyncPage> {
   Widget build(BuildContext context) {
     return IslandScaffold(
       title: context.l10n!.syncTitle,
-      body: ReadablePadding(
-        padding: commonSingleChildScrollViewPadding,
-        builder: (context, padding) => SingleChildScrollView(
-          padding: padding,
-          child: ValueListenableBuilder<bool>(
-            valueListenable: localSyncEnabled,
-            builder: (context, enabled, _) => Column(
-              children: [
-                _buildThisDevice(context, enabled),
-                if (enabled) ...[
-                  _buildCategories(context),
-                  ValueListenableBuilder<LocalSyncState>(
-                    valueListenable: _service.state,
-                    builder: (context, state, _) =>
-                        _buildDevices(context, state),
-                  ),
-                ] else
-                  _buildOffHint(context),
-                const SizedBox(height: 20),
-                const MiniPlayerBottomSpace(),
-              ],
-            ),
+      body: SingleChildScrollView(
+        padding: readableInset(context, commonSingleChildScrollViewPadding),
+        child: ValueListenableBuilder<bool>(
+          valueListenable: localSyncEnabled,
+          builder: (context, enabled, _) => Column(
+            children: [
+              _buildThisDevice(context, enabled),
+              if (enabled) ...[
+                _buildCategories(context),
+                ValueListenableBuilder<LocalSyncState>(
+                  valueListenable: _service.state,
+                  builder: (context, state, _) => _buildDevices(context, state),
+                ),
+              ] else
+                _buildOffHint(context),
+              const SizedBox(height: 20),
+              const MiniPlayerBottomSpace(),
+            ],
           ),
         ),
       ),

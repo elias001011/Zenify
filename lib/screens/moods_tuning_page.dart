@@ -76,22 +76,19 @@ class _MoodsTuningPageState extends State<MoodsTuningPage> {
           ),
         ),
       ],
-      body: ReadablePadding(
-        padding: commonSingleChildScrollViewPadding,
-        builder: (context, padding) => SingleChildScrollView(
-          padding: padding,
-          child: ValueListenableBuilder<MoodsTuning>(
-            valueListenable: moodsTuning,
-            builder: (context, tuning, _) => Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _buildDiscovery(context, tuning),
-                _buildGenres(context, tuning),
-                _buildArtists(context, tuning),
-                const SizedBox(height: 20),
-                const MiniPlayerBottomSpace(),
-              ],
-            ),
+      body: SingleChildScrollView(
+        padding: readableInset(context, commonSingleChildScrollViewPadding),
+        child: ValueListenableBuilder<MoodsTuning>(
+          valueListenable: moodsTuning,
+          builder: (context, tuning, _) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildDiscovery(context, tuning),
+              _buildGenres(context, tuning),
+              _buildArtists(context, tuning),
+              const SizedBox(height: 20),
+              const MiniPlayerBottomSpace(),
+            ],
           ),
         ),
       ),

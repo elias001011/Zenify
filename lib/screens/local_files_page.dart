@@ -46,6 +46,7 @@ class _LocalFilesPageState extends State<LocalFilesPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n!;
+    final padding = readableInset(context, commonSingleChildScrollViewPadding);
     return IslandScaffold(
       title: l10n.localFiles,
       onFilter: (value) => setState(() => _query = value.trim().toLowerCase()),
@@ -56,63 +57,60 @@ class _LocalFilesPageState extends State<LocalFilesPage> {
           onPressed: () => _addFiles(context),
         ),
       ],
-      body: ReadablePadding(
-        padding: commonSingleChildScrollViewPadding,
-        builder: (context, padding) => ValueListenableBuilder<List<Map>>(
-          valueListenable: localFiles,
-          builder: (context, files, _) {
-            final shown = [
-              for (final file in files)
-                if (_matches(file)) file,
-            ];
-            return CustomScrollView(
-              slivers: [
-                SliverPadding(
-                  padding: padding,
-                  sliver: shown.isEmpty
-                      ? SliverToBoxAdapter(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Text(
-                              files.isEmpty
-                                  ? l10n.localFilesEmpty
-                                  : l10n.noLibraryMatches,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        )
-                      : SliverList.builder(
-                          itemCount: shown.length,
-                          itemBuilder: (context, i) => CustomBar(
-                            key: ValueKey(shown[i]['ytid']),
-                            shown[i]['title']?.toString() ?? '',
-                            FluentIcons.music_note_2_24_regular,
-                            borderRadius: getItemBorderRadius(i, shown.length),
-                            // The whole list keeps playing, from the song
-                            // picked, whatever the filter hides.
-                            onTap: () => audioHandler.playPlaylistSong(
-                              playlist: {'list': List<Map>.of(files)},
-                              songIndex: files.indexOf(shown[i]),
-                            ),
-                            trailing: IconButton(
-                              icon: const Icon(FluentIcons.delete_24_regular),
-                              tooltip: l10n.removeLocalFile,
-                              onPressed: () =>
-                                  removeLocalFile(shown[i]['ytid'].toString()),
+      body: ValueListenableBuilder<List<Map>>(
+        valueListenable: localFiles,
+        builder: (context, files, _) {
+          final shown = [
+            for (final file in files)
+              if (_matches(file)) file,
+          ];
+          return CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: padding,
+                sliver: shown.isEmpty
+                    ? SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Text(
+                            files.isEmpty
+                                ? l10n.localFilesEmpty
+                                : l10n.noLibraryMatches,
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
                             ),
                           ),
                         ),
-                ),
-                const SliverMiniPlayerBottomSpace(),
-              ],
-            );
-          },
-        ),
+                      )
+                    : SliverList.builder(
+                        itemCount: shown.length,
+                        itemBuilder: (context, i) => CustomBar(
+                          key: ValueKey(shown[i]['ytid']),
+                          shown[i]['title']?.toString() ?? '',
+                          FluentIcons.music_note_2_24_regular,
+                          borderRadius: getItemBorderRadius(i, shown.length),
+                          // The whole list keeps playing, from the song
+                          // picked, whatever the filter hides.
+                          onTap: () => audioHandler.playPlaylistSong(
+                            playlist: {'list': List<Map>.of(files)},
+                            songIndex: files.indexOf(shown[i]),
+                          ),
+                          trailing: IconButton(
+                            icon: const Icon(FluentIcons.delete_24_regular),
+                            tooltip: l10n.removeLocalFile,
+                            onPressed: () =>
+                                removeLocalFile(shown[i]['ytid'].toString()),
+                          ),
+                        ),
+                      ),
+              ),
+              const SliverMiniPlayerBottomSpace(),
+            ],
+          );
+        },
       ),
     );
   }

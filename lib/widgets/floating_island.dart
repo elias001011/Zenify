@@ -23,6 +23,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/screens/search_page.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -347,8 +348,8 @@ class _IslandState extends State<_Island> {
               Radius.circular(_islandHeight / 2),
             ),
             child: AnimatedSize(
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.fastOutSlowIn,
+              duration: Motion.medium,
+              curve: Motion.curve,
               alignment: Alignment.centerLeft,
               child: SizedBox(
                 height: _islandHeight,
@@ -406,7 +407,7 @@ class _IslandState extends State<_Island> {
             Flexible(
               child: TweenAnimationBuilder<double>(
                 tween: Tween(begin: 0, end: 1),
-                duration: const Duration(milliseconds: 220),
+                duration: Motion.medium,
                 builder: (context, opacity, child) =>
                     Opacity(opacity: opacity, child: child),
                 child: titleText,
@@ -501,38 +502,19 @@ EdgeInsets withIslandInset(BuildContext context, EdgeInsets padding) =>
 /// windows, centred, as desktop players do; music lists use the whole window.
 const double readableWidth = 860;
 
-/// Builds a page's scroll view with [padding], the island's space on top and
-/// whatever room either side centres the content within [readableWidth]. The
-/// margins stay part of the scroll view, so it scrolls from anywhere and its
-/// scrollbar keeps to the window's edge.
-class ReadablePadding extends StatelessWidget {
-  const ReadablePadding({
-    super.key,
-    required this.padding,
-    required this.builder,
-  });
-
-  final EdgeInsets padding;
-  final Widget Function(BuildContext context, EdgeInsets padding) builder;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final side = (constraints.maxWidth - readableWidth) / 2;
-        final inset = withIslandInset(context, padding);
-        return builder(
-          context,
-          side <= 0
-              ? inset
-              : inset.copyWith(
-                  left: inset.left + side,
-                  right: inset.right + side,
-                ),
-        );
-      },
-    );
-  }
+/// [padding] with the island's space on top and whatever room either side
+/// centres the content within [readableWidth]. The margins stay part of the
+/// scroll view, so it scrolls from anywhere and its scrollbar keeps to the
+/// window's edge. Read it with the page's own context, outside the
+/// [IslandScaffold], where the window's width less the rail is the page's.
+EdgeInsets readableInset(BuildContext context, EdgeInsets padding) {
+  final inset = withIslandInset(context, padding);
+  final width =
+      MediaQuery.sizeOf(context).width - MediaQuery.paddingOf(context).left;
+  final side = (width - readableWidth) / 2;
+  return side <= 0
+      ? inset
+      : inset.copyWith(left: inset.left + side, right: inset.right + side);
 }
 
 /// The island's space as the first sliver of a [CustomScrollView].

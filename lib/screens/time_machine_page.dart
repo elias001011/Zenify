@@ -132,28 +132,28 @@ class _TimeMachinePageState extends State<TimeMachinePage> {
     return IslandScaffold(
       background: const PageGlow(source: null, cacheKey: 'time_machine_page'),
       title: context.l10n!.timeMachine,
-      body: ReadablePadding(
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
-        builder: (context, padding) => ListView.builder(
-          padding: padding,
-          scrollCacheExtent: const ScrollCacheExtent.pixels(500),
-          itemCount: sections.length,
-          itemBuilder: (context, index) {
-            final section = sections[index];
-            return switch (section.kind) {
-              _TimeMachineSectionKind.annual => KeyedSubtree(
-                key: const ValueKey('annual-recap'),
-                child: _buildAnnualSection(context),
-              ),
-              _TimeMachineSectionKind.month => KeyedSubtree(
-                key: ValueKey('month-${section.monthKey}'),
-                child: _buildMonthSection(context, section.monthKey!),
-              ),
-              _TimeMachineSectionKind.bottomSpace =>
-                const MiniPlayerBottomSpace(),
-            };
-          },
+      body: ListView.builder(
+        padding: readableInset(
+          context,
+          const EdgeInsets.fromLTRB(10, 0, 10, 24),
         ),
+        scrollCacheExtent: const ScrollCacheExtent.pixels(500),
+        itemCount: sections.length,
+        itemBuilder: (context, index) {
+          final section = sections[index];
+          return switch (section.kind) {
+            _TimeMachineSectionKind.annual => KeyedSubtree(
+              key: const ValueKey('annual-recap'),
+              child: _buildAnnualSection(context),
+            ),
+            _TimeMachineSectionKind.month => KeyedSubtree(
+              key: ValueKey('month-${section.monthKey}'),
+              child: _buildMonthSection(context, section.monthKey!),
+            ),
+            _TimeMachineSectionKind.bottomSpace =>
+              const MiniPlayerBottomSpace(),
+          };
+        },
       ),
     );
   }
@@ -484,26 +484,26 @@ class TopArtistsPage extends StatelessWidget {
     return IslandScaffold(
       background: const PageGlow(source: null, cacheKey: 'time_machine_page'),
       title: context.l10n!.topArtists,
-      body: ReadablePadding(
-        padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
-        builder: (context, padding) => ListView.builder(
-          padding: padding,
-          itemCount: months.length + 1,
-          itemBuilder: (context, index) {
-            if (index == months.length) return const MiniPlayerBottomSpace();
-            final (monthKey, artists) = months[index];
-            final period = formatMonthPeriodLabel(
-              Localizations.localeOf(context),
-              monthKey,
-            );
-            return _PeriodSection(
-              title: period,
-              shareText: context.l10n!.shareRecapText(period),
-              fileName: 'zenify-$monthKey-top-artists.png',
-              cards: TopArtistsCard(artists: artists, periodLabel: period),
-            );
-          },
+      body: ListView.builder(
+        padding: readableInset(
+          context,
+          const EdgeInsets.fromLTRB(10, 0, 10, 24),
         ),
+        itemCount: months.length + 1,
+        itemBuilder: (context, index) {
+          if (index == months.length) return const MiniPlayerBottomSpace();
+          final (monthKey, artists) = months[index];
+          final period = formatMonthPeriodLabel(
+            Localizations.localeOf(context),
+            monthKey,
+          );
+          return _PeriodSection(
+            title: period,
+            shareText: context.l10n!.shareRecapText(period),
+            fileName: 'zenify-$monthKey-top-artists.png',
+            cards: TopArtistsCard(artists: artists, periodLabel: period),
+          );
+        },
       ),
     );
   }
