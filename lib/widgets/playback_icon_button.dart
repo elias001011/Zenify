@@ -33,7 +33,7 @@ bool isPlaybackLoading(PlaybackState state) =>
     state.processingState == AudioProcessingState.buffering;
 
 /// How long playback must stay loading before the controls show it.
-const _loadingShownAfter = Duration(milliseconds: 250);
+const _loadingShownAfter = Duration(milliseconds: 500);
 
 /// The playback state as the controls show it. Every skip goes through
 /// loading for a moment, even to an offline or already prepared song, and the

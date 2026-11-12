@@ -36,12 +36,12 @@ void main() {
     final pause = find.byIcon(FluentIcons.pause_24_filled);
     expect(pause, findsOneWidget);
 
-    // A skip to a song that is offline or already prepared: the optimistic
-    // loading state (not playing) is over in a moment.
+    // A skip to a song that is offline, already prepared or quick to load:
+    // the optimistic loading state (not playing) is over in a moment.
     handler.playbackState.add(
       PlaybackState(processingState: AudioProcessingState.loading),
     );
-    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pump(const Duration(milliseconds: 450));
     expect(find.byType(CircularProgressIndicator), findsNothing);
     expect(pause, findsOneWidget);
     handler.ready();
@@ -53,9 +53,9 @@ void main() {
     handler.playbackState.add(
       PlaybackState(processingState: AudioProcessingState.loading),
     );
-    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pump(const Duration(milliseconds: 450));
     expect(find.byType(CircularProgressIndicator), findsNothing);
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
     handler.ready();
