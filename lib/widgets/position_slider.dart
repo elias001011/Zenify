@@ -51,15 +51,8 @@ class _PositionSliderState extends State<PositionSlider> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final listening = TickerMode.valuesOf(context).enabled;
     return StreamBuilder<PositionData>(
-      // A new state when the screen comes back, which reads the position the
-      // player has now: the stream only sends the next change, and a stopped
-      // player sends none.
-      key: ValueKey(listening),
-      stream: listening
-          ? audioHandler.positionDataStream
-          : const Stream.empty(),
+      stream: audioHandler.positionDataStream,
       initialData: audioHandler.currentPositionData,
       builder: (context, snapshot) {
         final mediaId = audioHandler.mediaItem.valueOrNull?.id;

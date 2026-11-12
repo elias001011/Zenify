@@ -23,7 +23,8 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/widgets/marquee.dart';
 
 class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.title, {super.key, this.icon});
+  const SectionTitle(this.title, this.primaryColor, {super.key, this.icon});
+  final Color primaryColor;
   final String title;
   final IconData? icon;
 

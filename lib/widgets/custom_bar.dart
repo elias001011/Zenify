@@ -20,7 +20,6 @@
  */
 
 import 'package:material_ui/material_ui.dart';
-import 'package:musify/constants/app_constants.dart';
 import 'package:musify/widgets/shapes/four_sided_cookie_shape.dart';
 
 class CustomBar extends StatelessWidget {
@@ -31,7 +30,9 @@ class CustomBar extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.trailing,
+    this.backgroundColor,
     this.iconColor,
+    this.textColor,
     this.borderRadius = BorderRadius.zero,
     super.key,
   });
@@ -42,7 +43,9 @@ class CustomBar extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onLongPress;
   final Widget? trailing;
+  final Color? backgroundColor;
   final Color? iconColor;
+  final Color? textColor;
   final BorderRadius borderRadius;
 
   @override
@@ -51,7 +54,7 @@ class CustomBar extends StatelessWidget {
     final effectiveIconColor = iconColor ?? colorScheme.onSecondaryContainer;
 
     return Material(
-      color: colorScheme.surfaceContainerLow,
+      color: backgroundColor ?? colorScheme.surfaceContainerLow,
       borderRadius: borderRadius,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -59,11 +62,11 @@ class CustomBar extends StatelessWidget {
         onTap: onTap,
         onLongPress: onLongPress,
         child: Padding(
-          padding: commonBarPadding,
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           child: Row(
             children: [
               FourSidedCookieShape(
-                size: commonBarArtworkSize,
+                size: 52,
                 color: colorScheme.secondaryContainer,
                 child: Icon(tileIcon, size: 26, color: effectiveIconColor),
               ),
@@ -78,15 +81,18 @@ class CustomBar extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
-                        color: colorScheme.onSurface,
+                        color: textColor ?? colorScheme.onSurface,
                       ),
                     ),
                     if (description != null) ...[
                       const SizedBox(height: 2),
                       Text(
                         description!,
-                        style: Theme.of(context).textTheme.bodySmall
-                            ?.copyWith(color: colorScheme.onSurfaceVariant),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color:
+                              textColor?.withValues(alpha: 0.75) ??
+                              colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ],

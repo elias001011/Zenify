@@ -66,7 +66,6 @@ enum _LibraryFilter { all, custom, youtube, albums, artists, offline, local }
 class _LibraryPageState extends State<LibraryPage> {
   var _filter = _LibraryFilter.all;
   var _query = '';
-  Widget? _shownBody;
   Timer? _filterDebounce;
 
   void _onFilter(String value) {
@@ -96,14 +95,12 @@ class _LibraryPageState extends State<LibraryPage> {
     if (!showLocalFiles.value && _filter == _LibraryFilter.local) {
       setState(() {
         _filter = _LibraryFilter.all;
-        _shownBody = null;
       });
     }
   }
 
   void _onOfflineModeChanged() {
     setState(() {
-      _shownBody = null;
       if (offlineMode.value &&
           (_filter == _LibraryFilter.youtube ||
               _filter == _LibraryFilter.albums)) {
@@ -262,13 +259,6 @@ class _LibraryPageState extends State<LibraryPage> {
           localFiles,
         ]),
         builder: (context, _) {
-          // In another tab (built early, see the router), a like or a
-          // finished download doesn't rebuild the whole library; it is
-          // brought up to date when the tab is shown again.
-          if (_shownBody case final body?
-              when !TickerMode.valuesOf(context).enabled) {
-            return body;
-          }
           final sections = [
             ..._buildSongSlivers(),
             ..._buildPinnedSlivers(),
@@ -277,7 +267,7 @@ class _LibraryPageState extends State<LibraryPage> {
             if (!offlineMode.value) ..._buildLikedPlaylistsSlivers(),
             ..._buildLikedArtistsSlivers(),
           ];
-          return _shownBody = Padding(
+          return Padding(
             padding: commonSingleChildScrollViewPadding,
             child: CustomScrollView(
               slivers: [
