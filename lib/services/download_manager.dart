@@ -226,9 +226,11 @@ class DownloadManager {
     final request = _inFlight[ytid];
     if (request == null || request.cancelled) return false;
     request.cancelled = true;
-    // A queued one leaves the list now, and the queue when its turn comes.
+    // A queued one holds no file: it leaves the list now, so it can be asked
+    // for again, and the queue when its turn comes.
     final entry = activeFor(ytid);
     if (entry != null && entry.status == DownloadStatus.queued) {
+      _inFlight.remove(ytid);
       entries.value = entries.value.where((e) => e != entry).toList();
       _dropFromBatch(entry.ytid);
     }
@@ -245,38 +247,37 @@ class DownloadManager {
     final epoch = _historyEpoch;
     final stopEpoch = _stopEpoch;
     final entry = queued(song);
-    await _acquire();
-    try {
-      if (stopEpoch != _stopEpoch ||
-          request.cancelled ||
-          request.askers.every((cancelled) => cancelled())) {
+    bool stopped() => stopEpoch != _stopEpoch || request.cancelled;
+    bool leave() {
+      // Asked for again since it was cancelled: the new one keeps its place.
+      final current = activeFor(entry.ytid);
+      if (current == null || current == entry) {
         // The history it came from may have been cleared meanwhile.
         entries.value = [
           if (epoch == _historyEpoch) ?earlier,
           ...entries.value.where((e) => e != entry),
         ];
         _dropFromBatch(entry.ytid);
-        _checkIdle();
-        return false;
+      }
+      _checkIdle();
+      return false;
+    }
+
+    await _acquire();
+    try {
+      if (stopped() || request.askers.every((cancelled) => cancelled())) {
+        return leave();
       }
       _track(entry..status = DownloadStatus.downloading);
       await save(entry.song, (value) {
-        if (stopEpoch != _stopEpoch || request.cancelled) {
-          throw const DownloadStopped();
-        }
+        if (stopped()) throw const DownloadStopped();
         entry.progress.value = value;
       });
       finished(entry);
       return true;
-    } on DownloadStopped {
-      entries.value = [
-        if (epoch == _historyEpoch) ?earlier,
-        ...entries.value.where((e) => e != entry),
-      ];
-      _dropFromBatch(entry.ytid);
-      _checkIdle();
-      return false;
     } catch (error) {
+      // A stalled transfer stopped meanwhile was not tried to the end either.
+      if (error is DownloadStopped || stopped()) return leave();
       failed(entry, error);
       return false;
     } finally {

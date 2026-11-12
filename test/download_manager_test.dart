@@ -144,6 +144,7 @@ void main() {
       peak = running > peak ? running : peak;
       try {
         await (gates[id] ??= Completer<void>()).future;
+        if (id.startsWith('stall')) throw TimeoutException('stalled');
         onProgress(0.5);
         if (id.startsWith('bad')) throw StateError('no');
         if (id.startsWith('gone')) throw VideoUnavailableException('gone');
@@ -218,18 +219,30 @@ void main() {
 
         expect(manager.cancel('w'), isTrue);
         expect(manager.activeFor('w'), isNull);
-        // Asked again while it winds down, it is not downloaded either.
-        expect(await manager.download(song('w'), save), isFalse);
+        // It held no file, so it can be asked for again at once.
+        final again = manager.download(song('w'), save);
+        expect(manager.activeFor('w')?.status, DownloadStatus.queued);
 
         for (var i = 0; i < DownloadManager.maxConcurrent; i++) {
           open('r$i');
         }
+        open('w');
         expect(await Future.wait(running), everyElement(isTrue));
         expect(await waiting, isFalse);
-        expect(saved, isNot(contains('w')));
-        expect(manager.cancel('w'), isFalse);
+        expect(await again, isTrue);
+        expect(saved.where((id) => id == 'w'), hasLength(1));
+        expect(manager.entries.value.where((e) => e.ytid == 'w'), hasLength(1));
       },
     );
+
+    test('a cancelled song that then errors is stopped, not failed', () async {
+      final result = manager.download(song('stall'), save);
+      await Future<void>.delayed(Duration.zero);
+      expect(manager.cancel('stall'), isTrue);
+      open('stall');
+      expect(await result, isFalse);
+      expect(manager.entries.value.where((e) => e.ytid == 'stall'), isEmpty);
+    });
 
     test('stopping lets go of what runs and what waits', () async {
       final all = [
