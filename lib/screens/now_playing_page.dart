@@ -27,6 +27,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/motion.dart';
 import 'package:musify/main.dart';
+import 'package:musify/services/desktop_window_service.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/artwork_glow.dart';
@@ -57,7 +58,18 @@ Route<void> buildNowPlayingRoute() {
         begin: const Offset(0, 1),
         end: Offset.zero,
       ).chain(CurveTween(curve: Motion.both));
-      return SlideTransition(position: animation.drive(tween), child: child);
+      final slide = SlideTransition(
+        position: animation.drive(tween),
+        child: child,
+      );
+      // Impeller drops the window's rounded clip after the shell's blur (flutter#190602).
+      final radius = WindowCorners.of(context);
+      return radius == 0
+          ? slide
+          : ClipRRect(
+              borderRadius: BorderRadius.circular(radius),
+              child: slide,
+            );
     },
   );
 }

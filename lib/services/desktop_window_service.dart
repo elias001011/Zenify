@@ -257,17 +257,15 @@ class _DesktopTitleBarThemeState extends State<DesktopTitleBarTheme>
           if (!integrated) return child!;
           final media = MediaQuery.of(context);
           final height = _fullScreen ? 0.0 : _height;
+          final radius =
+              DesktopWindow.roundedFrameSupported && !_maximized && !_fullScreen
+              ? 12.0
+              : 0.0;
           return DragToResizeArea(
             resizeEdgeSize: 4,
             enableResizeEdges: _maximized || _fullScreen ? const [] : null,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(
-                DesktopWindow.roundedFrameSupported &&
-                        !_maximized &&
-                        !_fullScreen
-                    ? 12
-                    : 0,
-              ),
+              borderRadius: BorderRadius.circular(radius),
               child: Stack(
                 fit: StackFit.expand,
                 children: [
@@ -280,7 +278,7 @@ class _DesktopTitleBarThemeState extends State<DesktopTitleBarTheme>
                         top: media.viewPadding.top + height,
                       ),
                     ),
-                    child: child!,
+                    child: WindowCorners(radius: radius, child: child!),
                   ),
                   if (!_fullScreen) ...[
                     Positioned(
@@ -375,6 +373,24 @@ class DesktopCaptionControls extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The window's corner radius in the app's own (zoomed) pixels.
+class WindowCorners extends InheritedWidget {
+  const WindowCorners({super.key, required this.radius, required super.child});
+
+  final double radius;
+
+  static double of(BuildContext context) {
+    final radius =
+        context.dependOnInheritedWidgetOfExactType<WindowCorners>()?.radius ??
+        0;
+    return radius == 0 ? 0 : radius / interfaceScale.value;
+  }
+
+  @override
+  bool updateShouldNotify(WindowCorners oldWidget) =>
+      radius != oldWidget.radius;
 }
 
 /// Zooms the whole interface by [interfaceScale], like a browser zoom: the app
