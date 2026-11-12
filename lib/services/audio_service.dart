@@ -156,6 +156,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   final _queueMemory = QueuePersistenceService();
   Duration? _resumePosition;
   String? _resumeEntryId;
+  final _resumeSeeks = PublishSubject<void>();
 
   Future<void> persistPlaybackState() async {
     if (_currentLoadingIndex < 0 &&
@@ -204,18 +205,20 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   // Derived player streams.
   late final Stream<PositionData> _positionDataStream =
-      Rx.combineLatest3<Duration, Duration, Duration?, PositionData>(
-        audioPlayer.positionStream,
-        audioPlayer.bufferedPositionStream,
-        audioPlayer.durationStream,
-        (position, bufferedPosition, duration) => PositionData(
-          audioPlayer.audioSource == null
-              ? (_resumePosition ?? position)
-              : position,
-          bufferedPosition,
-          duration ?? mediaItem.valueOrNull?.duration ?? Duration.zero,
+      Rx.merge([
+        Rx.combineLatest3<Duration, Duration, Duration?, PositionData>(
+          audioPlayer.positionStream,
+          audioPlayer.bufferedPositionStream,
+          audioPlayer.durationStream,
+          (position, bufferedPosition, duration) => PositionData(
+            _resumePosition ?? position,
+            bufferedPosition,
+            duration ?? mediaItem.valueOrNull?.duration ?? Duration.zero,
+          ),
         ),
-      ).distinct((prev, curr) {
+        // A seek in a restored song that has not loaded moves no player stream.
+        _resumeSeeks.map((_) => currentPositionData),
+      ]).distinct((prev, curr) {
         return (prev.position - curr.position).abs() < _positionDataThreshold &&
             prev.duration == curr.duration &&
             (prev.bufferedPosition - curr.bufferedPosition).abs() <
@@ -265,11 +268,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         audioPlayer.processingState == ProcessingState.ready,
   );
 
-  /// Where the song is: the saved spot while a restored queue has no source
-  /// loaded yet, the player's position otherwise.
-  Duration get _position => audioPlayer.audioSource == null
-      ? (_resumePosition ?? audioPlayer.position)
-      : audioPlayer.position;
+  /// Where the song is: the saved spot until a restored song has loaded, the
+  /// player's position otherwise.
+  Duration get _position => _resumePosition ?? audioPlayer.position;
 
   /// Current snapshot, for listeners that subscribe while paused and would
   /// otherwise see nothing until the next position event.
@@ -2077,6 +2078,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       if (audioPlayer.audioSource == null && _resumeEntryId != null) {
         _resumePosition = position < Duration.zero ? Duration.zero : position;
         _queueMemory.savePosition(_resumeEntryId!, _resumePosition!);
+        _resumeSeeks.add(null);
         _updatePlaybackState(force: true);
       } else {
         await audioPlayer.seek(position);

@@ -9,6 +9,7 @@ import 'package:just_audio_platform_interface/just_audio_platform_interface.dart
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/queue_persistence_service.dart';
 import 'package:musify/services/settings_manager.dart';
 
 import 'support/app_harness.dart';
@@ -576,4 +577,40 @@ void main() {
       },
     );
   });
+
+  test(
+    'a restored song keeps its saved spot, moved or not, while it loads',
+    () async {
+      await handler.stop();
+      await handler.audioPlayer.dispose();
+      final memory = QueuePersistenceService()
+        ..saveQueue(
+          [
+            for (final (i, song) in _songs.indexed)
+              {...song, 'queueEntryId': '$i'},
+          ],
+          [],
+          1,
+        )
+        ..savePosition('1', _s(30));
+      await memory.flush();
+      audioHandler = handler = MusifyAudioHandler();
+      await settle();
+
+      final positions = <Duration>[];
+      final subscription = handler.positionDataStream.listen(
+        (data) => positions.add(data.position),
+      );
+      await settle();
+      expect(positions, [_s(30)]);
+      await handler.seek(_s(45));
+      await settle();
+      expect(positions, [_s(30), _s(45)]);
+      await handler.play();
+      await settle();
+      await subscription.cancel();
+
+      expect(positions.skip(1), everyElement(_s(45)));
+    },
+  );
 }
