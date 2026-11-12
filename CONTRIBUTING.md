@@ -128,7 +128,7 @@ Then run `flutter gen-l10n`, `flutter analyze` and the language test below.
 ### Test it locally
 
 1. Run the app with `flutter run`, on Linux or on an Android device. Use the
-   Flutter version set in `pubspec.yaml` (`flutter: ^3.47.9`).
+   Flutter version set in `pubspec.yaml` (`flutter: ^3.50.0`).
 2. In Settings, open **Language** under Preferences and pick your language.
    Go through the screens you changed, and check that the longer strings fit
    in buttons, dialogs and the player.
