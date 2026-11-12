@@ -18,7 +18,10 @@ void main() {
   });
 
   test('the precise reading reads only once access is granted', () async {
-    expect(await AudioLevels.available, isFalse);
+    final reading = AudioLevels.listen().listen((_) {});
+    await Future<void>.delayed(const Duration(milliseconds: 30));
+    expect(h.listens, 0);
+    await reading.cancel();
     expect(await AudioLevels.requestAccess(), isTrue);
     expect(await AudioLevels.available, isTrue);
   });
@@ -26,6 +29,7 @@ void main() {
   test(
     'native reader serializes release and is shared across listeners',
     () async {
+      h.permission = true;
       final first = AudioLevels.listen().listen((_) {});
       await Future<void>.delayed(const Duration(milliseconds: 30));
       expect(h.listens, 1);

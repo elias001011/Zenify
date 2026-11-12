@@ -131,9 +131,8 @@ class AudioLevels {
     _normalizedTrack = null;
   }
 
-  /// Levels while listened to; check [available] first. Every listener shares
-  /// one reader, which stops with the last one and while the app is out of
-  /// view.
+  /// Levels while listened to and [available]. Every listener shares one
+  /// reader, which stops with the last one and while the app is out of view.
   static Stream<AudioLevel> listen() {
     StreamSubscription<_Frame>? source;
     AppLifecycleListener? lifecycle;
@@ -142,13 +141,19 @@ class AudioLevels {
     var visible = true;
     var transition = Future<void>.value();
 
+    // Flutter draws nothing out of view, but the native reader would go on.
+    bool inView(AppLifecycleState? state) =>
+        state != AppLifecycleState.hidden &&
+        state != AppLifecycleState.paused &&
+        state != AppLifecycleState.detached;
+
     // EventChannel cancellation is asynchronous. Finish releasing the old
     // reader before attaching another, including after a surface remount.
     void update() {
       // A failed release must not break the chain: later changes still run.
       transition = transition
           .then((_) async {
-            if (!listening || !visible) {
+            if (!listening || !visible || !await available) {
               await source?.cancel();
               source = null;
             } else {
@@ -171,17 +176,10 @@ class AudioLevels {
     return (_levels ??= StreamController.broadcast(
       onListen: () {
         listening = true;
-        final state = WidgetsBinding.instance.lifecycleState;
-        visible =
-            state != AppLifecycleState.hidden &&
-            state != AppLifecycleState.paused &&
-            state != AppLifecycleState.detached;
+        visible = inView(WidgetsBinding.instance.lifecycleState);
         lifecycle = AppLifecycleListener(
           onStateChange: (state) {
-            visible =
-                state != AppLifecycleState.hidden &&
-                state != AppLifecycleState.paused &&
-                state != AppLifecycleState.detached;
+            visible = inView(state);
             update();
           },
         );

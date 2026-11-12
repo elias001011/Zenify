@@ -28,14 +28,13 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/audio_levels.dart';
 import 'package:musify/services/settings_manager.dart';
-import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/playback_icon_button.dart';
 
 /// Sound waves: they follow the music's frequencies with the precise
 /// [waveReading] and keep a motion of their own otherwise. While nothing plays
-/// (paused, buffering, loading) they stop listening to the audio, go down to a
-/// row of dots, the picture of silence, and rest there without drawing a
-/// frame.
+/// (paused, buffering, loading) they go down to a row of dots and rest there
+/// without drawing a frame. With the app out of view Flutter draws no frames,
+/// so they stop by themselves; [AudioLevels] lets its reader go.
 class WaveVisualizer extends StatefulWidget {
   const WaveVisualizer({super.key, required this.size});
 
@@ -47,18 +46,9 @@ class WaveVisualizer extends StatefulWidget {
 
 class _WaveVisualizerState extends State<WaveVisualizer>
     with SingleTickerProviderStateMixin {
-  static const _bars = 9;
-
-  /// Where the bars start and come to rest: no height at all, only the dots
-  /// the painter keeps them from shrinking below.
-  final _heights = List<double>.filled(_bars, 0);
-  final _repaint = ValueNotifier<int>(0);
-  late final Ticker _ticker = createTicker(_tick);
-
   /// The bars are drawn 48 times a second. The music is read less often, and
   /// the bars ease towards each reading, so the extra frames smooth the motion.
-  static const _fps = 48;
-  static const _frameMicroseconds = 1000000 ~/ _fps;
+  static const _frameMicroseconds = 1000000 ~/ 48;
 
   /// A frame may come this early and still count as due, so a frame a hair
   /// ahead of the schedule is not skipped and the rate does not fall short.
@@ -76,49 +66,37 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   /// A reading that is all zeros this soon after play is the reader warming up,
   /// not silence: the bars keep their own motion instead of falling to dots.
   static const _warmUp = Duration(milliseconds: 400);
+
+  /// A reading older than this is no longer the music.
+  static const _staleAfter = Duration(milliseconds: 600);
+
+  final _motion = _WaveMotion();
+  final _repaint = ValueNotifier<int>(0);
+  late final Ticker _ticker = createTicker(_tick);
   late final StreamSubscription<PlaybackState> _playingSubscription;
   late final StreamSubscription<String?> _trackSubscription;
-  late final AppLifecycleListener _lifecycle;
   StreamSubscription<AudioLevel>? _levels;
-  Timer? _stale;
+  Timer? _releaseReader;
   AudioLevel? _level;
+  final _sinceLevel = Stopwatch();
+  final _sincePlay = Stopwatch();
   bool _ready = false;
-  bool _visible = true;
-  bool _tickerEnabled = true;
-  bool _connecting = false;
+  bool _animating = true;
 
   /// The precise reading can be read: readings are on their way.
   bool _expectLevels = false;
-  int _connectionGeneration = 0;
   Duration _last = Duration.zero;
 
   /// When the next frame is due, in microseconds of the ticker's clock: kept as
   /// a schedule, so a screen that is not a multiple of 48 Hz still averages 48.
   int _due = 0;
-  Timer? _releaseReader;
-  final _sincePlay = Stopwatch();
-  double _time = 0;
-  double _beat = 0;
 
-  /// 0 in silence, 1 playing: the bars rise and fall with it over a moment,
-  /// so a pause, a resume or a new song never jumps them.
-  double _energy = 0;
-
-  /// 0 for the bars' own motion, 1 for the music: they cross over, so the
-  /// reading arriving does not shake the bars.
-  double _blend = 0;
-  final _music = List<double>.filled(_bars, 0);
-
-  /// In view and allowed to animate.
-  bool get _active => _visible && _tickerEnabled;
-  bool get _moving => _ready && _active;
-  bool get _isQuiet => _heights.every((height) => height < 0.004);
+  bool get _moving => _ready && _animating;
+  bool get _precise => waveReading.value == WaveReading.precise;
 
   @override
   void initState() {
     super.initState();
-    _setVisibility(WidgetsBinding.instance.lifecycleState);
-    _lifecycle = AppLifecycleListener(onStateChange: _setVisibility);
     // The same state as the play button shows: a skip's moment of loading
     // does not send the bars down and up again.
     _playingSubscription = settledPlaybackState().listen((state) {
@@ -128,114 +106,79 @@ class _WaveVisualizerState extends State<WaveVisualizer>
       if (_ready && !wasReady) _sincePlay.reset();
       if (_ready) _sincePlay.start();
       if (!_ready) _clearLevel();
-      _updateMotion();
+      _update();
     });
     _trackSubscription = audioHandler.mediaItem
         .map((item) => item?.id)
         .distinct()
         .listen((_) {
           _clearLevel();
-          _updateMotion();
+          _update();
         });
     waveReading.addListener(_onReadingChanged);
   }
 
   void _onReadingChanged() {
-    _releaseReader?.cancel();
-    _releaseReader = null;
-    _expectLevels = false;
     _stopReader();
-    _clearLevel();
-    _updateMotion();
+    _update();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _tickerEnabled =
+    _animating =
         TickerMode.valuesOf(context).enabled &&
         !MediaQuery.disableAnimationsOf(context);
-    _updateMotion();
-  }
-
-  void _setVisibility(AppLifecycleState? state) {
-    // A desktop window that lost focus (the music on one screen, the user on
-    // the other) is `inactive` but still in view. On a phone, `inactive` is
-    // the notification shade or a system dialog over the app: the waves rest.
-    _visible =
-        state == null ||
-        state == AppLifecycleState.resumed ||
-        (isDesktopPlatform && state == AppLifecycleState.inactive);
-    _updateMotion();
+    _update();
   }
 
   void _clearLevel() {
-    _stale?.cancel();
     _level = null;
-    _beat = 0;
+    _motion.beat = 0;
   }
 
-  Future<void> _connect() async {
-    if (!_moving ||
-        waveReading.value != WaveReading.precise ||
-        _levels != null ||
-        _connecting)
+  void _onLevel(AudioLevel level) {
+    if (!_moving) return;
+    if (_sincePlay.elapsed < _warmUp &&
+        level.loud == 0 &&
+        level.bands.every((band) => band == 0)) {
       return;
-    final generation = _connectionGeneration;
-    _connecting = true;
-    try {
-      final available = await AudioLevels.available;
-      if (mounted) _expectLevels = available;
-      if (available &&
-          mounted &&
-          _moving &&
-          generation == _connectionGeneration) {
-        _levels = AudioLevels.listen().listen((level) {
-          if (!_moving) return;
-          if (_sincePlay.elapsed < _warmUp &&
-              level.loud == 0 &&
-              level.bands.every((band) => band == 0)) {
-            return;
-          }
-          _level = level;
-          _stale?.cancel();
-          _stale = Timer(const Duration(milliseconds: 600), () {
-            _level = null;
-            _updateMotion();
-          });
-          _updateMotion();
-        });
-      }
-    } finally {
-      _connecting = false;
-      if (mounted && _moving && generation != _connectionGeneration)
-        unawaited(_connect());
     }
+    _level = level;
+    _sinceLevel
+      ..reset()
+      ..start();
   }
 
-  void _updateMotion() {
+  void _update() {
     if (_moving) {
       _releaseReader?.cancel();
       _releaseReader = null;
-      unawaited(_connect());
+      if (_precise && _levels == null) {
+        _expectLevels = true;
+        _levels = AudioLevels.listen().listen(_onLevel);
+        unawaited(
+          AudioLevels.available.then((available) {
+            if (mounted) _expectLevels = available;
+          }),
+        );
+      }
       if (!_ticker.isActive) _ticker.start();
       return;
     }
-    // Nothing to follow: stop listening to the audio. Out of view at once;
-    // paused but in view, after a moment, so a short pause does not make the
-    // resume start the reader afresh.
     _clearLevel();
+    // Paused but in view, the reader stays a moment, so a short pause does not
+    // make the resume start it afresh; covered, it goes at once.
     if (_levels != null) {
-      if (_active) {
+      if (_animating) {
         _releaseReader ??= Timer(_readerGrace, _stopReader);
       } else {
-        _releaseReader?.cancel();
         _stopReader();
       }
     }
     // Paused but in view, the bars go down rather than stay frozen mid-beat;
-    // out of view they simply stop where they are.
-    if (_active && !_isQuiet) {
+    // covered they simply stop where they are.
+    if (_animating && !_motion.isQuiet) {
       if (!_ticker.isActive) _ticker.start();
     } else {
       _rest();
@@ -243,8 +186,10 @@ class _WaveVisualizerState extends State<WaveVisualizer>
   }
 
   void _stopReader() {
+    _releaseReader?.cancel();
     _releaseReader = null;
-    _connectionGeneration++;
+    _expectLevels = false;
+    _clearLevel();
     unawaited(_levels?.cancel());
     _levels = null;
   }
@@ -261,55 +206,23 @@ class _WaveVisualizerState extends State<WaveVisualizer>
     _last = elapsed;
     // Back on schedule if a frame came late, rather than catching up.
     _due = max(_due + _frameMicroseconds, elapsed.inMicroseconds);
-    _advance(dt);
-    if (!_ready && _isQuiet) {
-      _heights.fillRange(0, _bars, 0);
-      _repaint.value++;
-      _rest();
-    }
-  }
-
-  void _advance(double dt) {
-    _time += dt;
-    final level = _level;
-    _beat = max(level?.onset ?? 0, _beat * pow(0.02, dt).toDouble());
-    final rising =
-        _ready &&
-        !(level == null && _expectLevels && _sincePlay.elapsed < _musicWait);
-    _energy +=
-        ((rising ? 1 : 0) - _energy) * (1 - exp(-(rising ? 9 : 12) * dt));
-    _blend += ((level == null ? 0 : 1) - _blend) * (1 - exp(-8 * dt));
-    for (var i = 0; i < _bars; i++) {
-      final reach = (i - (_bars - 1) / 2).abs() / ((_bars - 1) / 2);
-      if (level != null) {
-        final index = (reach * (AudioLevels.bandCount - 1)).round();
-        final band = index < level.bands.length
-            ? level.bands[index]
-            : level.loud;
-        _music[i] =
-            0.08 +
-            band * 0.62 * (1 - 0.2 * reach) +
-            _beat * 0.3 * pow(1 - reach, 2) +
-            level.loud * 0.03 * sin(_time * 6 + i * 1.7);
-      }
-      final own =
-          (0.3 +
-              0.14 * sin(_time * 2.1 + i * 0.8) +
-              0.08 * sin(_time * 3.3 - i * 1.2)) *
-          (1 - 0.3 * reach);
-      final target = _energy * (own + (_music[i] - own) * _blend);
-      final rate = target > _heights[i] ? 30.0 : 7.0;
-      _heights[i] += (target - _heights[i]) * (1 - exp(-rate * dt));
-    }
+    if (_level != null && _sinceLevel.elapsed > _staleAfter) _level = null;
+    _motion.advance(
+      dt,
+      level: _level,
+      rising:
+          _ready &&
+          !(_level == null && _expectLevels && _sincePlay.elapsed < _musicWait),
+    );
+    if (!_ready && _motion.isQuiet) _motion.settle();
     _repaint.value++;
+    if (!_ready && _motion.isQuiet) _rest();
   }
 
   @override
   void dispose() {
     waveReading.removeListener(_onReadingChanged);
-    _lifecycle.dispose();
     _releaseReader?.cancel();
-    _stale?.cancel();
     unawaited(_playingSubscription.cancel());
     unawaited(_trackSubscription.cancel());
     unawaited(_levels?.cancel());
@@ -325,13 +238,68 @@ class _WaveVisualizerState extends State<WaveVisualizer>
       child: CustomPaint(
         size: Size.square(widget.size),
         painter: _WavePainter(
-          heights: _heights,
+          heights: _motion.heights,
           repaint: _repaint,
           color: Theme.of(context).colorScheme.primary,
         ),
       ),
     ),
   );
+}
+
+/// The bars' motion, from 0 to 1 each: their own sway, crossed over to the
+/// music when readings come, all eased so nothing jumps.
+class _WaveMotion {
+  static const bars = 9;
+
+  /// Where the bars start and come to rest: no height at all, only the dots
+  /// the painter keeps them from shrinking below.
+  final heights = List<double>.filled(bars, 0);
+  final _music = List<double>.filled(bars, 0);
+  double _time = 0;
+  double beat = 0;
+
+  /// 0 in silence, 1 playing: the bars rise and fall with it over a moment,
+  /// so a pause, a resume or a new song never jumps them.
+  double _energy = 0;
+
+  /// 0 for the bars' own motion, 1 for the music: they cross over, so the
+  /// reading arriving does not shake the bars.
+  double _blend = 0;
+
+  bool get isQuiet => heights.every((height) => height < 0.004);
+
+  void settle() => heights.fillRange(0, bars, 0);
+
+  void advance(double dt, {required AudioLevel? level, required bool rising}) {
+    _time += dt;
+    beat = max(level?.onset ?? 0, beat * pow(0.02, dt).toDouble());
+    _energy +=
+        ((rising ? 1 : 0) - _energy) * (1 - exp(-(rising ? 9 : 12) * dt));
+    _blend += ((level == null ? 0 : 1) - _blend) * (1 - exp(-8 * dt));
+    for (var i = 0; i < bars; i++) {
+      final reach = (i - (bars - 1) / 2).abs() / ((bars - 1) / 2);
+      if (level != null) {
+        final index = (reach * (AudioLevels.bandCount - 1)).round();
+        final band = index < level.bands.length
+            ? level.bands[index]
+            : level.loud;
+        _music[i] =
+            0.08 +
+            band * 0.62 * (1 - 0.2 * reach) +
+            beat * 0.3 * pow(1 - reach, 2) +
+            level.loud * 0.03 * sin(_time * 6 + i * 1.7);
+      }
+      final own =
+          (0.3 +
+              0.14 * sin(_time * 2.1 + i * 0.8) +
+              0.08 * sin(_time * 3.3 - i * 1.2)) *
+          (1 - 0.3 * reach);
+      final target = _energy * (own + (_music[i] - own) * _blend);
+      final rate = target > heights[i] ? 30.0 : 7.0;
+      heights[i] += (target - heights[i]) * (1 - exp(-rate * dt));
+    }
+  }
 }
 
 class _WavePainter extends CustomPainter {

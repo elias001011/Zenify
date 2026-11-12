@@ -30,8 +30,13 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
       expect(heights(tester), enabled ? isNot(before) : before);
     }
+    // The notification shade over the app: still in view, still moving.
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    final shade = heights(tester);
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(heights(tester), isNot(shade));
     binding
-      ..handleAppLifecycleStateChanged(AppLifecycleState.inactive)
       ..handleAppLifecycleStateChanged(AppLifecycleState.hidden)
       ..handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pump();
