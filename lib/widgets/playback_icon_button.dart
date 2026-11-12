@@ -22,6 +22,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:rxdart/rxdart.dart';
@@ -68,9 +69,9 @@ class PlaybackIconSwitcher extends StatelessWidget {
     return AnimatedSwitcher(
       duration: MediaQuery.disableAnimationsOf(context)
           ? Duration.zero
-          : const Duration(milliseconds: 120),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeOutCubic,
+          : Motion.short,
+      switchInCurve: Motion.curve,
+      switchOutCurve: Motion.curve,
       transitionBuilder: (child, animation) => FadeTransition(
         opacity: animation,
         child: ScaleTransition(

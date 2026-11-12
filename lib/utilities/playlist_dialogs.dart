@@ -24,6 +24,7 @@ import 'dart:math' as math;
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/local_files_service.dart';
@@ -112,7 +113,7 @@ void showCreatePlaylistDialog(
                                   });
                                 },
                                 child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
+                                  duration: Motion.short,
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
                                   ),
@@ -167,7 +168,7 @@ void showCreatePlaylistDialog(
                                   });
                                 },
                                 child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
+                                  duration: Motion.short,
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 12,
                                   ),

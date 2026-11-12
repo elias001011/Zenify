@@ -22,6 +22,7 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/utilities/platform_utils.dart';
 
 /// Horizontal artwork browsing with desktop arrows and mouse dragging.
@@ -72,11 +73,7 @@ class _GlowRowState extends State<GlowRow> {
           position.minScrollExtent,
           position.maxScrollExtent,
         );
-    _controller.animateTo(
-      target,
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOutCubic,
-    );
+    _controller.animateTo(target, duration: Motion.medium, curve: Motion.curve);
   }
 
   @override

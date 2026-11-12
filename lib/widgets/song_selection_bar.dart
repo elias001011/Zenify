@@ -25,6 +25,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
@@ -394,8 +395,8 @@ class _SelectionActionsState extends State<_SelectionActions> {
           position.minScrollExtent,
           position.maxScrollExtent,
         ),
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeOutCubic,
+        duration: Motion.medium,
+        curve: Motion.curve,
       ),
     );
   }

@@ -22,6 +22,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/flip_card.dart';
@@ -131,8 +132,8 @@ class _NowPlayingArtworkState extends State<NowPlayingArtwork> {
         child: RepaintBoundary(child: content),
         builder: (context, target, child) => TweenAnimationBuilder<Offset>(
           tween: Tween(end: target),
-          duration: const Duration(milliseconds: 450),
-          curve: Curves.easeOut,
+          duration: Motion.long,
+          curve: Motion.curve,
           builder: (context, tilt, child) => Transform(
             alignment: Alignment.center,
             transform: Matrix4.identity()
@@ -204,9 +205,7 @@ class _SkipSlideState extends State<_SkipSlide> {
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
       // No time to move: the new cover simply takes the place.
-      duration: widget.enabled
-          ? const Duration(milliseconds: 300)
-          : Duration.zero,
+      duration: widget.enabled ? Motion.medium : Duration.zero,
       transitionBuilder: (child, animation) {
         if (!widget.enabled) return child;
         final incoming = child.key == ValueKey(widget.trackId);

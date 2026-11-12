@@ -24,6 +24,7 @@ import 'dart:math' as math;
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
@@ -97,8 +98,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
       style: PlayerChromeStyle.dock,
       child: LayoutBuilder(
         builder: (context, constraints) => AnimatedSize(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
+          duration: Motion.medium,
+          curve: Motion.curve,
           child: StreamBuilder<MediaItem?>(
             initialData: audioHandler.mediaItem.value,
             stream: audioHandler.mediaItem,
@@ -181,8 +182,8 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
 
     return AnimatedScale(
       scale: _pressed ? 0.98 : 1,
-      duration: const Duration(milliseconds: 100),
-      curve: Curves.easeInOut,
+      duration: Motion.short,
+      curve: Motion.curve,
       child: ClickRegion(
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -223,9 +224,9 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
   Widget _metadata(BuildContext context) => AnimatedSwitcher(
     duration: MediaQuery.disableAnimationsOf(context)
         ? Duration.zero
-        : const Duration(milliseconds: 300),
-    switchInCurve: Curves.easeIn,
-    switchOutCurve: Curves.easeOut,
+        : Motion.medium,
+    switchInCurve: Motion.curve,
+    switchOutCurve: Motion.curve,
     layoutBuilder: (currentChild, previousChildren) => Stack(
       alignment: AlignmentDirectional.centerStart,
       children: [...previousChildren, if (currentChild != null) currentChild],
@@ -508,13 +509,8 @@ class _CircularPlayButton extends StatelessWidget {
           if (!live)
             RepaintBoundary(
               child: StreamBuilder<PositionData>(
-                // A new state when the screen comes back, as in the position
-                // slider.
-                key: ValueKey(TickerMode.valuesOf(context).enabled),
                 initialData: audioHandler.currentPositionData,
-                stream: TickerMode.valuesOf(context).enabled
-                    ? audioHandler.positionDataStream
-                    : const Stream.empty(),
+                stream: audioHandler.positionDataStream,
                 builder: (context, snapshot) {
                   final position = snapshot.data;
                   final total =

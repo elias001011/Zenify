@@ -37,6 +37,9 @@ class _Handler extends BaseAudioHandler implements MusifyAudioHandler {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+/// Just past the icon's change.
+const _settled = Duration(milliseconds: 155);
+
 void main() {
   for (final reducedMotion in [false, true]) {
     testWidgets(
@@ -73,13 +76,17 @@ void main() {
         expect(handler.pauseAcknowledged.isCompleted, isFalse);
         await tester.pump();
         expect(find.byTooltip('Play'), findsOneWidget);
-        await tester.pump(Duration(milliseconds: reducedMotion ? 1 : 125));
+        await tester.pump(
+          reducedMotion ? const Duration(milliseconds: 1) : _settled,
+        );
         expect(find.byIcon(FluentIcons.pause_24_filled), findsNothing);
         expect(find.byIcon(FluentIcons.play_24_filled), findsOneWidget);
         await tester.tap(find.byTooltip('Play'));
         await tester.pump();
         expect(find.byTooltip('Pause'), findsOneWidget);
-        await tester.pump(Duration(milliseconds: reducedMotion ? 1 : 125));
+        await tester.pump(
+          reducedMotion ? const Duration(milliseconds: 1) : _settled,
+        );
         expect(find.byIcon(FluentIcons.play_24_filled), findsNothing);
         expect(find.byIcon(FluentIcons.pause_24_filled), findsOneWidget);
         handler.pauseAcknowledged.complete();

@@ -25,6 +25,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
@@ -51,12 +52,11 @@ Route<void> buildNowPlayingRoute() {
   return PageRouteBuilder<void>(
     settings: const RouteSettings(name: nowPlayingRouteName),
     pageBuilder: (context, animation, _) => const NowPlayingPage(),
-    reverseTransitionDuration: const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       final tween = Tween(
         begin: const Offset(0, 1),
         end: Offset.zero,
-      ).chain(CurveTween(curve: Curves.easeInOut));
+      ).chain(CurveTween(curve: Motion.both));
       return SlideTransition(position: animation.drive(tween), child: child);
     },
   );
@@ -279,7 +279,7 @@ class _CompactLayout extends StatelessWidget {
             children: [
               Expanded(
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 300),
+                  duration: Motion.medium,
                   child: switch (panel) {
                     PlayerPanel.queue => const QueueWidget(embedded: true),
                     PlayerPanel.lyrics => LyricsPanel(metadata: metadata),
@@ -360,12 +360,12 @@ class _PlaybackStageState extends State<_PlaybackStage>
 
   late final _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 500),
+    duration: Motion.long,
     value: widget.panel != null ? 1 : 0,
   );
   late final _progress = CurvedAnimation(
     parent: _controller,
-    curve: Curves.easeInOutCubic,
+    curve: Motion.both,
   );
   late final _panelFade = CurvedAnimation(
     parent: _controller,
@@ -506,7 +506,7 @@ class _PlaybackStageState extends State<_PlaybackStage>
                       child: IgnorePointer(
                         ignoring: t < 1,
                         child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
+                          duration: Motion.medium,
                           child: KeyedSubtree(
                             key: ValueKey(_builtPanel),
                             child: panel,
@@ -590,13 +590,13 @@ class _WideLayoutState extends State<_WideLayout>
     with SingleTickerProviderStateMixin {
   late final _controller = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 420),
-    reverseDuration: const Duration(milliseconds: 320),
+    duration: Motion.long,
+    reverseDuration: Motion.medium,
     value: widget.panel == null ? 0 : 1,
   );
   late final _progress = CurvedAnimation(
     parent: _controller,
-    curve: Curves.easeInOutCubic,
+    curve: Motion.both,
   );
   late final _slide = Tween(
     begin: const Offset(0.035, 0),
@@ -686,7 +686,7 @@ class _WideLayoutState extends State<_WideLayout>
                       child: AnimatedSwitcher(
                         duration: MediaQuery.disableAnimationsOf(context)
                             ? Duration.zero
-                            : const Duration(milliseconds: 260),
+                            : Motion.medium,
                         transitionBuilder: (child, animation) => FadeTransition(
                           opacity: animation,
                           child: SlideTransition(

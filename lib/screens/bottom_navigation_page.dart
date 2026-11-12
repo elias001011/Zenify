@@ -25,6 +25,7 @@ import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -372,8 +373,8 @@ class _NavigationButton extends StatelessWidget {
                   child: AnimatedContainer(
                     duration: MediaQuery.disableAnimationsOf(context)
                         ? Duration.zero
-                        : const Duration(milliseconds: 200),
-                    curve: Curves.easeOut,
+                        : Motion.short,
+                    curve: Motion.curve,
                     width: vertical
                         ? 48
                         : selected

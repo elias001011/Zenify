@@ -24,6 +24,7 @@ import 'dart:async';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/services/lyrics/lyrics_models.dart';
@@ -45,7 +46,7 @@ class SyncedLyricsView extends StatefulWidget {
 class _SyncedLyricsViewState extends State<SyncedLyricsView> {
   static const Duration _offsetStep = Duration(milliseconds: 500);
   static const Duration _manualScrollPause = Duration(seconds: 4);
-  static const Duration _scrollDuration = Duration(milliseconds: 650);
+  static const Duration _scrollDuration = Motion.long;
 
   StreamSubscription<PositionData>? _positionSubscription;
   List<GlobalKey> _lineKeys = const [];
@@ -72,25 +73,12 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
     _position = audioHandler.currentPositionData.position;
     _activeIndex = _computeActiveIndex();
     _updateProgress();
-    _scheduleScrollToActive(animate: false);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (TickerMode.valuesOf(context).enabled) {
-      _position = audioHandler.currentPositionData.position;
+    _positionSubscription = audioHandler.positionDataStream.listen((data) {
+      _position = data.position;
       _refreshActiveLine();
       _updateProgress();
-      _positionSubscription ??= audioHandler.positionDataStream.listen((data) {
-        _position = data.position;
-        _refreshActiveLine();
-        _updateProgress();
-      });
-    } else {
-      unawaited(_positionSubscription?.cancel());
-      _positionSubscription = null;
-    }
+    });
+    _scheduleScrollToActive(animate: false);
   }
 
   @override
@@ -380,10 +368,8 @@ class _LyricRowState extends State<_LyricRow> {
         onTap: widget.onTap,
         child: TweenAnimationBuilder<double>(
           tween: Tween(end: lean),
-          duration: reduceMotion
-              ? Duration.zero
-              : const Duration(milliseconds: 500),
-          curve: Curves.easeOutCubic,
+          duration: reduceMotion ? Duration.zero : Motion.long,
+          curve: Motion.curve,
           builder: (context, lean, child) => Transform.translate(
             offset: Offset(0, 3 * lean),
             child: Transform.scale(
@@ -412,9 +398,7 @@ class _LyricRowState extends State<_LyricRow> {
                     : _place == _Place.before
                     ? 0.28
                     : 0.45,
-                duration: reduceMotion
-                    ? Duration.zero
-                    : const Duration(milliseconds: 300),
+                duration: reduceMotion ? Duration.zero : Motion.medium,
               ),
             ),
           ),

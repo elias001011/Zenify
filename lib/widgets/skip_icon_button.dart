@@ -22,6 +22,7 @@
 import 'dart:math';
 
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/constants/motion.dart';
 import 'package:musify/widgets/now_playing/now_playing_artwork.dart';
 
 /// A skip button. Tapped, its icon leans a few pixels towards the skip and
@@ -61,10 +62,7 @@ class SkipIconButton extends StatefulWidget {
 
 class _SkipIconButtonState extends State<SkipIconButton>
     with SingleTickerProviderStateMixin {
-  late final _nudge = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 360),
-  );
+  late final _nudge = AnimationController(vsync: this, duration: Motion.medium);
 
   @override
   void dispose() {
