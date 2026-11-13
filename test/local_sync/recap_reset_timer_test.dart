@@ -30,8 +30,7 @@ void main() {
     final scheduled = <CapturedTimer>[];
     await runZoned(
       () async {
-        // Turned on before the start: only then does local sync watch the
-        // library at all.
+        // Sync only watches the library when it is on at start.
         await Hive.box('settings').putAll({
           'localSyncEnabled': true,
           'localSyncAutomatic': true,

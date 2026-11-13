@@ -613,6 +613,8 @@ Future<bool> _copyLegacyDesktopDataIfNeeded(
   final report = await migrateLegacyDesktopData(
     target: Directory(targetPath),
     sources: [
+      // Musify 10.7 keeps its boxes here; older ones left them in documents.
+      Directory('${documents.path}/Musify'),
       ...legacyMusifyDirectories(
         defaultSupportPath,
         windows: Platform.isWindows,
