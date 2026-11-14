@@ -278,6 +278,8 @@ void main() {
         expect(await stopping, isFalse);
         expect(await again, isTrue);
         expect(saved, ['r']);
+        // The stopped one let go of its file before the new one began.
+        expect(peak, 1);
       },
     );
 

@@ -183,4 +183,17 @@ void main() {
       expect(QueuePersistenceService().read()!.keepGoing, isFalse);
     },
   );
+
+  test('a duration found after the first save is saved too', () async {
+    final local = {...song(0), 'ytid': 'local:a', 'audioPath': '/a.wav'}
+      ..remove('duration');
+    memory.saveQueue([local], [local], 0);
+    await memory.flush();
+
+    local['duration'] = 20;
+    memory.saveQueue([local], [local], 0);
+    await memory.flush();
+
+    expect(QueuePersistenceService().read()!.songs.single['duration'], 20);
+  });
 }

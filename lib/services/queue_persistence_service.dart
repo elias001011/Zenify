@@ -89,8 +89,12 @@ class QueuePersistenceService {
     ];
     // Unshuffled, the original order is the queue itself: not saved twice.
     final shuffled = !listEquals(ids, originalIds);
+    // A duration found after the first save must be saved too.
+    final durations = [
+      for (final song in window) readMediaDuration(song['duration'])?.inSeconds,
+    ];
     final shape =
-        '$start|$keepGoing|${ids.join(',')}|${shuffled ? originalIds.join(',') : ''}';
+        '$start|$keepGoing|${ids.join(',')}|${shuffled ? originalIds.join(',') : ''}|${durations.join(',')}';
 
     if (shape == _savedShape && _pending == null) {
       // Same queue, another song: remember which, cheaply.

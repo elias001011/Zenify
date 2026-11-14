@@ -210,9 +210,11 @@ class DownloadManager {
       return request.result;
     }
     final request = _Request(_stopEpoch)..askers.add(asker);
+    // A stopped one still winding down holds the file: this one waits for it.
+    final winding = _inFlight[ytid]?.result;
     // A block body: `remove` returns this very request, whose future
     // whenComplete would then wait for for ever.
-    request.result = _run(song, save, request).whenComplete(() {
+    request.result = _run(song, save, request, after: winding).whenComplete(() {
       if (identical(_inFlight[ytid], request)) _inFlight.remove(ytid);
     });
     return (_inFlight[ytid] = request).result;
@@ -240,7 +242,12 @@ class DownloadManager {
   /// Whether the download of [ytid] was cancelled, so its saver stops.
   bool isCancelled(Object? ytid) => _inFlight[ytid]?.cancelled ?? false;
 
-  Future<bool> _run(Map song, SongSaver save, _Request request) async {
+  Future<bool> _run(
+    Map song,
+    SongSaver save,
+    _Request request, {
+    Future<bool>? after,
+  }) async {
     final earlier = entries.value
         .where((e) => e.ytid == song['ytid'].toString() && !_isActive(e))
         .firstOrNull;
@@ -263,6 +270,7 @@ class DownloadManager {
       return false;
     }
 
+    if (after != null) await after.catchError((_) => false);
     await _acquire();
     try {
       if (stopped() || request.askers.every((cancelled) => cancelled())) {
