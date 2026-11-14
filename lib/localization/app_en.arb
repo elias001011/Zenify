@@ -904,6 +904,8 @@
   "mixBothFilters": "Both filters",
   "mixOverlap": "Overlap",
   "mixRiseUnder": "Rise under ending",
+  "mixCutIn": "Cut in on the beat",
+  "mixEchoOut": "Echo out",
   "mixAutoReason": "Auto uses beat confidence, tempo, energy and estimated key.",
   "mixKeyEstimated": "Estimated key",
   "mixAnalyzed": "Analyzed",

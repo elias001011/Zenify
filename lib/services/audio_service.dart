@@ -64,14 +64,23 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       plan: _mixPlan,
       cue: _mixCue,
       resolve: _mixSource,
-      prepared: (player) async {
+      prepared: (player, song) async {
         _mixEffects.loaded(player);
         await _configureEqualizer(_equalizers[player]);
+        // Silent now: the echo can be set to the beat this song ends on.
+        final tail = _mixAnalyzer.edge(song, tail: true);
+        if (tail != null && tail.rhythmic) {
+          await _mixEffects.tuneEcho(player, tail.bpm);
+        }
       },
       advance: _advanceIntoMix,
       userVolume: () => volume,
       applyVolume: _applyVolume,
       setBands: _mixEffects.write,
+      // Measured with libmpv: its filters run this far ahead of the output.
+      bandsLead: isDesktopPlatform
+          ? const Duration(milliseconds: 350)
+          : Duration.zero,
     );
 
     _mixAnalyzer.changes.addListener(_mix.refresh);
@@ -858,7 +867,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   Future<void> setEqualizerEnabled(bool enabled) async {
     if (isDesktopPlatform) {
       equalizerEnabled.value = enabled;
-      await addOrUpdateData<bool>('settings','equalizerEnabled',enabled);
+      await addOrUpdateData<bool>('settings', 'equalizerEnabled', enabled);
       await _mixEffects.updateDesktopEq();
       return;
     }
@@ -884,8 +893,12 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     if (isDesktopPlatform) {
       if (index < 0 || index >= 5) return;
       final gains = MixEffects.desktopGains;
-      gains[index] = gain.clamp(-12.0,12.0);
-      await addOrUpdateData<List<double>>('settings','desktopEqualizerGains',gains);
+      gains[index] = gain.clamp(-12.0, 12.0);
+      await addOrUpdateData<List<double>>(
+        'settings',
+        'desktopEqualizerGains',
+        gains,
+      );
       await _mixEffects.updateDesktopEq();
       return;
     }
@@ -920,7 +933,11 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   Future<void> resetEqualizerBands() async {
     if (isDesktopPlatform) {
-      await addOrUpdateData<List<double>>('settings','desktopEqualizerGains',List.filled(5,0));
+      await addOrUpdateData<List<double>>(
+        'settings',
+        'desktopEqualizerGains',
+        List.filled(5, 0),
+      );
       await _mixEffects.updateDesktopEq();
       return;
     }
@@ -1182,6 +1199,12 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   String? _queuePlaylistId;
 
   /// Whether the queue plays with the Mix: its playlist has it on.
+  /// The playlist whose transitions the queue plays, while the Mix is on.
+  String? get mixPlaylistId => mixActive ? _queuePlaylistId : null;
+
+  /// The song the current one will mix into, if any.
+  Map? get mixNextSong => _mixPlan()?.song;
+
   bool get mixActive =>
       mixTransitions.value && mixPlaylists.value.contains(_queuePlaylistId);
 
@@ -1205,7 +1228,12 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     return task;
   }
 
-  Future<bool> _runMixPreview(Map song, Map next, MixCue cue, {Duration? startAt}) async {
+  Future<bool> _runMixPreview(
+    Map song,
+    Map next,
+    MixCue cue, {
+    Duration? startAt,
+  }) async {
     final source = audioPlayer.audioSource;
     final sourceIndex = audioPlayer.currentIndex;
     final position = audioPlayer.position;
@@ -1331,6 +1359,17 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     _mixAnalyzer
       ..want(current, tail: true, duration: duration)
       ..want(next.song, tail: false);
+    // A few songs ahead too, so their transitions are not plain crossfades.
+    for (var ahead = 1; ahead <= 3 && ahead < _queueList.length; ahead++) {
+      final song = _queueList[(_currentQueueIndex + ahead) % _queueList.length];
+      final length = readMediaDuration(song['duration']);
+      _mixAnalyzer
+        ..want(song, tail: true, duration: length)
+        ..want(
+          _queueList[(_currentQueueIndex + ahead + 1) % _queueList.length],
+          tail: false,
+        );
+    }
     final seconds = next.song['duration'];
     final coming = seconds is num ? Duration(seconds: seconds.toInt()) : null;
     final edit = mixEdits.get(
@@ -1339,12 +1378,14 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       next.song['ytid']?.toString(),
     );
     if (edit != null) return edit.cue(duration, coming);
+    final tail = _mixAnalyzer.edge(current, tail: true);
     return chooseCue(
       duration: duration,
       coming: coming,
-      tail: _mixAnalyzer.edge(current, tail: true),
+      tail: tail,
       head: _mixAnalyzer.edge(next.song, tail: false),
       pair: '${current['ytid']}>${next.song['ytid']}',
+      echo: tail != null && _mixEffects.echoFits(audioPlayer, tail.bpm),
     );
   }
 

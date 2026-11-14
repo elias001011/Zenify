@@ -27,6 +27,7 @@ import 'package:musify/services/mix_analysis.dart';
 import 'package:musify/services/mix_edits.dart';
 import 'package:musify/services/mix_transition.dart';
 import 'package:musify/utilities/media_duration.dart';
+import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/mix_editor.dart';
 
 /// Between two songs of a playlist with the Mix on: the transition they get.
@@ -130,6 +131,7 @@ String mixChipLabel(
         tail: tail,
         head: head,
         pair: '${song['ytid']}>${next['ytid']}',
+        echo: isDesktopPlatform,
       ).style;
   final name =
       edit != null &&
@@ -145,6 +147,8 @@ String mixChipLabel(
           MixStyle.melt => 'Melt',
           MixStyle.under => 'Under',
           MixStyle.slam => 'Slam',
+          MixStyle.echo => 'Echo',
+          MixStyle.sweep => 'Sweep',
         };
   final tempos = [
     if (tail?.rhythmic == true) tail!.bpm.round(),

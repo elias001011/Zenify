@@ -38,6 +38,10 @@ enum MixVolume {
 
   /// A hard swap in the middle.
   centerCut,
+
+  /// The new song comes in whole a quarter of the way, on a beat; the old one
+  /// is cut there and only its echo fades away.
+  cutIn,
 }
 
 /// How the bass, mids and treble of the two songs trade places.
@@ -66,6 +70,9 @@ enum MixFilter {
 
   /// Both of the above.
   both,
+
+  /// The old song is cut on a beat and leaves only its echo.
+  echoOut,
 }
 
 /// One way of going from a song to the next.
@@ -94,8 +101,14 @@ enum MixStyle {
   /// The new song rises under the recorded ending of the old one.
   under(MixVolume.riseUnder, MixEq.none, MixFilter.lowPassIn),
 
-  /// A hard swap.
-  slam(MixVolume.centerCut, MixEq.none, MixFilter.none);
+  /// The old song thins out, then a hard swap on the beat.
+  slam(MixVolume.centerCut, MixEq.none, MixFilter.highPassOut),
+
+  /// The old song is cut on a beat and echoes away under the new one.
+  echo(MixVolume.cutIn, MixEq.none, MixFilter.echoOut),
+
+  /// One filter closes the old song while another opens the new one.
+  sweep(MixVolume.crossfade, MixEq.none, MixFilter.both);
 
   const MixStyle(this.volume, this.eq, this.filter);
 
@@ -104,10 +117,55 @@ enum MixStyle {
   final MixFilter filter;
 }
 
-/// The level of a song's three bands, in decibels: 0 is untouched.
-typedef MixBands = ({double low, double mid, double high});
+/// What the Mix does to one song: its three bands in decibels (0 is
+/// untouched), the cutoffs of a high-pass and a low-pass filter in hertz, and
+/// the level (0 to 1) of the song itself and of its echo.
+typedef MixBands = ({
+  double low,
+  double mid,
+  double high,
+  double highPass,
+  double lowPass,
+  double dry,
+  double echo,
+});
 
-const MixBands mixFlat = (low: 0, mid: 0, high: 0);
+/// A high-pass at or under this lets everything through.
+const double mixOpenLow = 20;
+
+/// A low-pass at or over this lets everything through.
+const double mixOpenHigh = 20000;
+
+const MixBands mixFlat = (
+  low: 0,
+  mid: 0,
+  high: 0,
+  highPass: mixOpenLow,
+  lowPass: mixOpenHigh,
+  dry: 1,
+  echo: 0,
+);
+
+/// [bands] with its filters turned into band cuts, for an equalizer that
+/// has nothing else; the echo is left out.
+MixBands mixShelves(MixBands bands) {
+  double part(double from, double to, double value) =>
+      (log(value / from) / log(to / from)).clamp(0.0, 1.0);
+  final hp = max(bands.highPass, mixOpenLow);
+  final lp = min(bands.lowPass, mixOpenHigh);
+  return (
+    low: min(bands.low, mixKill * part(mixOpenLow, 250, hp)),
+    mid: min(
+      bands.mid,
+      min(mixKill / 2 * part(250, 1500, hp), mixKill / 3 * part(4000, 300, lp)),
+    ),
+    high: min(bands.high, mixKill * part(mixOpenHigh, 4000, lp)),
+    highPass: mixOpenLow,
+    lowPass: mixOpenHigh,
+    dry: 1,
+    echo: 0,
+  );
+}
 
 /// A band this far down is as good as gone.
 const double mixKill = -24;
@@ -187,6 +245,9 @@ MixFrame mixFrame(
     case MixVolume.centerCut:
       outGain = 1 - _ramp(t, 0.48, 0.52);
       inGain = _ramp(t, 0.48, 0.52);
+    case MixVolume.cutIn:
+      outGain = cos(_ramp(t, 0.25, 1) * pi / 2);
+      inGain = _ramp(t, 0.22, 0.25);
   }
 
   var outLow = 0.0, outMid = 0.0, outHigh = 0.0;
@@ -208,20 +269,41 @@ MixFrame mixFrame(
       outLow = _leaving(_ramp(t, 0.65, 0.85));
       inLow = _leaving(1 - _ramp(t, 0.65, 0.85));
   }
-  if ((filter ?? style.filter) == MixFilter.highPassOut ||
-      (filter ?? style.filter) == MixFilter.both) {
-    outLow = min(outLow, mixKill * _ramp(t, 0.1, 0.5));
-    outMid = min(outMid, mixKill / 2 * _ramp(t, 0.5, 0.95));
+  final chosen = filter ?? style.filter;
+  var outHighPass = mixOpenLow, inLowPass = mixOpenHigh;
+  var outDry = 1.0, outEcho = 0.0;
+  if (chosen == MixFilter.highPassOut || chosen == MixFilter.both) {
+    outHighPass = mixOpenLow * pow(75, _ramp(t, 0.05, 0.85));
   }
-  if ((filter ?? style.filter) == MixFilter.lowPassIn ||
-      (filter ?? style.filter) == MixFilter.both) {
-    inHigh = min(inHigh, mixKill * (1 - _ramp(t, 0.15, 0.7)));
-    inMid = min(inMid, mixKill / 3 * (1 - _ramp(t, 0, 0.4)));
+  if (chosen == MixFilter.lowPassIn || chosen == MixFilter.both) {
+    final open = _ramp(t, 0, 0.7);
+    inLowPass = open >= 1 ? mixOpenHigh : 300.0 * pow(mixOpenHigh / 300, open);
+  }
+  if (chosen == MixFilter.echoOut) {
+    // The echo starts just before the cut, so it repeats the last beat.
+    outEcho = 0.7 * _ramp(t, 0.18, 0.24);
+    outDry = 1 - _ramp(t, 0.24, 0.25);
   }
   return (
     outGain: outGain,
     inGain: inGain,
-    outBands: (low: outLow, mid: outMid, high: outHigh),
-    inBands: (low: inLow, mid: inMid, high: inHigh),
+    outBands: (
+      low: outLow,
+      mid: outMid,
+      high: outHigh,
+      highPass: outHighPass,
+      lowPass: mixOpenHigh,
+      dry: outDry,
+      echo: outEcho,
+    ),
+    inBands: (
+      low: inLow,
+      mid: inMid,
+      high: inHigh,
+      highPass: mixOpenLow,
+      lowPass: inLowPass,
+      dry: 1,
+      echo: 0,
+    ),
   );
 }

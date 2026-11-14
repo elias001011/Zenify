@@ -34,6 +34,7 @@ import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/widgets/desktop_volume_control.dart';
 import 'package:musify/widgets/download_progress_icon.dart';
+import 'package:musify/widgets/mix_editor.dart';
 
 /// Side panels of the player: shown beside it on wide screens, as sheets on
 /// phones.
@@ -153,6 +154,27 @@ class _PlayerActionsState extends State<PlayerActions> {
             tooltip: l10n.queue,
             active: widget.panel == PlayerPanel.queue,
             onPressed: () => widget.onPanel?.call(PlayerPanel.queue),
+          ),
+        if (!widget.miniPlayer && !isRadioStation)
+          // With the Mix on, the coming transition can be edited from here.
+          ValueListenableBuilder<Duration?>(
+            valueListenable: audioHandler.mixOutStart,
+            builder: (context, outStart, _) {
+              final playlist = audioHandler.mixPlaylistId;
+              final song = audioHandler.currentSong;
+              final next = audioHandler.mixNextSong;
+              if (outStart == null ||
+                  playlist == null ||
+                  song == null ||
+                  next == null) {
+                return const SizedBox.shrink();
+              }
+              return PlayerActionButton(
+                icon: FluentIcons.merge_24_regular,
+                tooltip: l10n.mixEditTransition,
+                onPressed: () => showPairEditor(context, playlist, song, next),
+              );
+            },
           ),
         ValueListenableBuilder<Duration?>(
           valueListenable: sleepTimerNotifier,

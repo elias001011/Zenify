@@ -59,6 +59,7 @@ class MixEngine {
     required this.userVolume,
     required this.applyVolume,
     required this.setBands,
+    this.bandsLead = Duration.zero,
   }) : _active = first,
        _activeSubject = BehaviorSubject.seeded(first);
 
@@ -95,7 +96,7 @@ class MixEngine {
   final Future<MixSource?> Function(Map song) resolve;
 
   /// Called with the second player once the next song is loaded in it.
-  final Future<void> Function(AudioPlayer player) prepared;
+  final Future<void> Function(AudioPlayer player, Map song) prepared;
 
   /// Moves the queue on to the song that just came in.
   final Future<void> Function() advance;
@@ -108,6 +109,15 @@ class MixEngine {
 
   /// Puts the level of its bass, mids and treble to a player.
   final void Function(AudioPlayer player, MixBands bands) setBands;
+
+  /// How much later than the volume the bands are heard: they are sent
+  /// that much ahead.
+  final Duration bandsLead;
+
+  /// The bands [cue] has at [t], sent [bandsLead] ahead.
+  MixFrame _bandsAt(MixCue cue, double t) => cue.frame(
+    min(1, t + bandsLead.inMicroseconds / max(1, cue.length.inMicroseconds)),
+  );
 
   AudioPlayer _active;
   AudioPlayer? _other;
@@ -205,7 +215,7 @@ class MixEngine {
         await _active.stop();
         return;
       }
-      await prepared(_active);
+      await prepared(_active, song);
       await Future.any([_prepare(_previewPlan!, cue), done.future]);
       if (done.isCompleted) return;
       if (_prepared == null)
@@ -420,7 +430,7 @@ class MixEngine {
         _stop(player);
         return;
       }
-      await prepared(player);
+      await prepared(player, next.song);
       if (generation != _generation) return;
       _prepared = (entryId: next.entryId, source: source, cue: cue);
     } catch (e, stackTrace) {
@@ -473,8 +483,12 @@ class MixEngine {
         elapsed.inMicroseconds / cue.length.inMicroseconds,
       );
       gain = frame.inGain;
-      setBands(coming, frame.inBands);
-      setBands(tail, frame.outBands);
+      final bands = _bandsAt(
+        cue,
+        elapsed.inMicroseconds / cue.length.inMicroseconds,
+      );
+      setBands(coming, bands.inBands);
+      setBands(tail, bands.outBands);
       _activeSubject.add(coming);
       _ticks = 0;
       _late = 0;
@@ -517,8 +531,9 @@ class MixEngine {
     _learnLatency(tail);
     final frame = _cue!.frame(t);
     gain = frame.inGain;
-    setBands(_active, frame.inBands);
-    setBands(tail, frame.outBands);
+    final bands = _bandsAt(_cue!, t);
+    setBands(_active, bands.inBands);
+    setBands(tail, bands.outBands);
     if (_writing) return;
     _writing = true;
     Future.wait([

@@ -20,6 +20,7 @@
  */
 
 import 'dart:async';
+import 'dart:math';
 
 import 'package:hive_ce/hive_ce.dart';
 import 'package:just_audio/just_audio.dart';
@@ -38,11 +39,38 @@ class MixEffects {
 
   /// The filters every desktop player gets while the Mix is on. At 0 dB each
   /// passes the sound as it is.
-  static const desktopFilters = [
+  static final desktopFilters = [
     '@zmixl:lavfi=[bass=g=0:f=200]',
     '@zmixm:lavfi=[equalizer=f=1000:t=o:w=2:g=0]',
     '@zmixh:lavfi=[treble=g=0:f=4000]',
+    // Open at these cutoffs. Their mix option is never sent: mpv crashed.
+    '@zmixhp:lavfi=[highpass=f=20]',
+    '@zmixlp:lavfi=[lowpass=f=20000]',
+    // Silent until used: the echo is tuned to each song's beat.
+    '@zmixe:${_echoGraph(echoDefault)}',
   ];
+
+  static const echoDefault = 500;
+
+  /// One beat of [bpm], halved or doubled into a delay that sounds like an
+  /// echo.
+  static int echoDelay(double bpm) {
+    var beat = 60000 / bpm;
+    while (beat < 300) {
+      beat *= 2;
+    }
+    while (beat > 800) {
+      beat /= 2;
+    }
+    return beat.round();
+  }
+
+  /// The song, then three repeats of it, each quieter. The volume comes
+  /// first: once the song is cut, only what came before it repeats.
+  static String _echoGraph(int delay) =>
+      'lavfi=[volume=1,asplit[d][w];'
+      '[w]aecho=0:1:$delay|${delay * 2}|${delay * 3}:0.55|0.3|0.16[x];'
+      '[d][x]amix=inputs=2:normalize=0:weights=1 0]';
 
   static const desktopFrequencies = [60.0, 230.0, 910.0, 3600.0, 14000.0];
   static List<double> get desktopGains {
@@ -85,6 +113,37 @@ class MixEffects {
   final _sent = <AudioPlayer, MixBands>{};
   final _wanted = <AudioPlayer, MixBands>{};
   final _writing = <AudioPlayer>{};
+  final _echo = <AudioPlayer, int>{};
+
+  /// Writes left in which every value is sent: mpv gives no error back for
+  /// a command it could not apply, as while a song is being started.
+  final _fresh = <AudioPlayer, int>{};
+
+  /// Whether [player]'s echo repeats on the beat of a song at [bpm].
+  bool echoFits(AudioPlayer player, double bpm) =>
+      isDesktopPlatform && _echo[player] == echoDelay(bpm);
+
+  /// Tunes the echo of [player] to [bpm]. Only for a player that is silent:
+  /// changing the filter interrupts the sound for a moment.
+  Future<void> tuneEcho(AudioPlayer player, double? bpm) async {
+    final mpv = _mpv[player];
+    if (!isDesktopPlatform || mpv == null || bpm == null || bpm <= 0) return;
+    final delay = echoDelay(bpm);
+    if (_echo[player] == delay) return;
+    try {
+      await mpv.mpvCommand(['af', 'remove', '@zmixe']);
+      await mpv.mpvCommand(['af', 'add', '@zmixe:${_echoGraph(delay)}']);
+      _echo[player] = delay;
+      _sent.remove(player);
+    } catch (e, stackTrace) {
+      _echo.remove(player);
+      logger.log(
+        'Mix: tuning the echo failed',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
+  }
 
   /// [player] just loaded a song: on desktop that may be a new libmpv, which
   /// starts with its bands untouched.
@@ -94,6 +153,7 @@ class MixEffects {
     if (_mpv[player] != mpv) {
       _mpv[player] = mpv;
       _sent.remove(player);
+      _echo[player] = echoDefault;
       unawaited(
         updateDesktopEq().catchError((Object e, StackTrace stack) {
           logger.log(
@@ -110,14 +170,41 @@ class MixEffects {
   /// them: the newest wins.
   void write(AudioPlayer player, MixBands bands) {
     _wanted[player] = bands;
+    if (!player.playing) {
+      _fresh[player] = 10;
+    } else if ((_fresh[player] ?? 0) > 0 || bands == mixFlat) {
+      // Sent whole, even if nothing changed, until surely heard.
+      _fresh[player] = (_fresh[player] ?? 1) - 1;
+      _sent.remove(player);
+      if (bands == mixFlat) {
+        _sent[player] = _unknown;
+        // Once more a moment later: a stuck echo or filter would last a song.
+        Timer(const Duration(milliseconds: 500), () {
+          if (_wanted[player] != mixFlat) return;
+          _sent[player] = _unknown;
+          if (_writing.add(player)) unawaited(_drain(player));
+        });
+      }
+    }
     if (_writing.add(player)) unawaited(_drain(player));
   }
+
+  /// Differs from any bands: everything is sent again.
+  static const MixBands _unknown = (
+    low: double.nan,
+    mid: double.nan,
+    high: double.nan,
+    highPass: double.nan,
+    lowPass: double.nan,
+    dry: double.nan,
+    echo: double.nan,
+  );
 
   Future<void> _drain(AudioPlayer player) async {
     try {
       while (_wanted[player] != _sent[player]) {
         final bands = _wanted[player]!;
-        final before = _sent[player] ?? mixFlat;
+        final before = _sent[player] ?? _unknown;
         _sent[player] = bands;
         if (isDesktopPlatform) {
           await _writeDesktop(player, before, bands);
@@ -139,20 +226,26 @@ class MixEffects {
   ) async {
     final mpv = _mpv[player];
     if (mpv == null) return;
-    for (final (label, target, was, now) in [
-      ('zmixl', 'bass', before.low, bands.low),
-      ('zmixm', 'equalizer', before.mid, bands.mid),
-      ('zmixh', 'treble', before.high, bands.high),
-    ]) {
-      if (was == now) continue;
+    final commands = [
+      if (before.low != bands.low) ('zmixl', 'gain', bands.low, 'bass'),
+      if (before.mid != bands.mid) ('zmixm', 'gain', bands.mid, 'equalizer'),
+      if (before.high != bands.high) ('zmixh', 'gain', bands.high, 'treble'),
+      if (before.highPass != bands.highPass)
+        ('zmixhp', 'f', max(bands.highPass, mixOpenLow), 'highpass'),
+      if (before.lowPass != bands.lowPass)
+        ('zmixlp', 'f', min(bands.lowPass, mixOpenHigh), 'lowpass'),
+    ];
+    final args = [
+      for (final (label, command, value, target) in commands)
+        [label, command, value.toStringAsFixed(command == 'f' ? 0 : 1), target],
+      if (before.dry != bands.dry)
+        ['zmixe', 'volume', bands.dry.toStringAsFixed(3), 'volume'],
+      if (before.echo != bands.echo)
+        ['zmixe', 'weights', '1 ${bands.echo.toStringAsFixed(3)}', 'amix'],
+    ];
+    for (final arg in args) {
       try {
-        await mpv.mpvCommand([
-          'af-command',
-          label,
-          'gain',
-          now.toStringAsFixed(1),
-          target,
-        ]);
+        await mpv.mpvCommand(['af-command', ...arg]);
       } catch (_) {
         // A player created before the Mix was turned on has no such filter.
       }
@@ -165,16 +258,17 @@ class MixEffects {
     final parameters = _parameters[equalizer] ??= await equalizer.parameters
         .timeout(const Duration(seconds: 3));
     final flat = bands == mixFlat;
+    final shelves = mixShelves(bands);
     final saved = equalizerBandGains.value;
     final userOn = equalizerEnabled.value;
     for (var i = 0; i < parameters.bands.length; i++) {
       final band = parameters.bands[i];
       final hertz = band.centerFrequency;
       final move = hertz < 300
-          ? bands.low
+          ? shelves.low
           : hertz < 4000
-          ? bands.mid
-          : bands.high;
+          ? shelves.mid
+          : shelves.high;
       // The user's own band when their equalizer is on, or when the Mix is
       // done and hands the equalizer back as it was.
       final own = (userOn || flat) && i < saved.length ? saved[i] : 0.0;

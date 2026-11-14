@@ -294,14 +294,17 @@ double tempoGap(double a, double b) {
 
 /// The Automatic transition: where and how a song of [duration] gives way
 /// to the next, from the [tail] of the one and the [head] of the other.
-/// Decisions follow the audio rather than the identity of [pair]. With an
-/// end missing, a plain crossfade is used until analysis becomes available.
+/// The audio decides which styles fit; [pair] picks among them, so a
+/// playlist gets variety and the same pair always the same transition.
+/// [echo] says whether the outgoing player can echo on its beat. With an
+/// end missing it is a plain crossfade until the analysis is done.
 MixCue chooseCue({
   required Duration duration,
   required Duration? coming,
   required MixEdge? tail,
   required MixEdge? head,
   required String pair,
+  bool echo = false,
 }) {
   final total = duration.inMilliseconds;
   // Never more than a third of either song.
@@ -322,6 +325,11 @@ MixCue chooseCue({
     style: style,
     tempoRatio: ratio,
   );
+  final seed = pair.codeUnits.fold(
+    7,
+    (hash, unit) => (hash * 31 + unit) & 0xffffff,
+  );
+  MixStyle pick(List<MixStyle> styles) => styles[seed % styles.length];
 
   if (tail == null || head == null) {
     final length = min(8000, longest);
@@ -330,54 +338,94 @@ MixCue chooseCue({
 
   final end = tail.sound.clamp(0, total);
   final start = head.sound;
+  // A recorded fade out is mostly left out: the beat is weak in it, and a
+  // DJ leaves where the energy goes, not where the sound ends.
+  final last = end - tail.soft ~/ 2;
 
   if (tail.rhythmic && head.rhythmic) {
-    final gap = tempoGap(tail.bpm, head.bpm);
     final beatMs = 60000 / tail.bpm;
+    final inBeat = 60000 / head.bpm;
+    // The new song's first beat after its silence.
+    final firstBeat =
+        (head.beatAt + ((start - head.beatAt) / inBeat).ceil() * inBeat)
+            .round();
+    int onBeat(int before) =>
+        (tail.beatAt + ((before - tail.beatAt) / beatMs).floor() * beatMs)
+            .round();
+    final clash = harmonicDistance(tail.key, head.key) > 1;
+    final gap = tempoGap(tail.bpm, head.bpm);
     if (gap <= 0.06 && tail.beat >= 0.25 && head.beat >= 0.25) {
-      // Nearby tempos: align and stretch, with a shorter overlap for a
-      // harmonic conflict. Never stretch a weak/ambiguous beat grid.
-      var beats = beatMs * 16 <= min(16000, longest) ? 16 : 8;
-      if (beatMs * beats > longest) beats = 4;
-      if (harmonicDistance(tail.key, head.key) > 1) beats = min(beats, 4);
+      // Tempos that meet: the beats are laid on each other and the new song
+      // is brought to the old one's tempo.
+      final quieter = head.level < tail.level * 0.7;
+      final louder = head.level > tail.level * 1.4;
+      final steady = tail.beat > 0.5 && head.beat > 0.5;
+      final style = clash
+          ? pick([MixStyle.melt, if (echo) MixStyle.echo, MixStyle.slam])
+          : quieter
+          ? pick([MixStyle.rise, MixStyle.sweep])
+          : louder
+          ? pick([MixStyle.wave, MixStyle.slam, MixStyle.sweep])
+          : steady
+          ? pick([MixStyle.blend, MixStyle.fade, MixStyle.sweep, MixStyle.wave])
+          : pick([MixStyle.fade, MixStyle.sweep, MixStyle.rise]);
+      var beats = switch (style) {
+        MixStyle.blend => 32,
+        MixStyle.melt || MixStyle.echo || MixStyle.slam => 8,
+        _ => 16,
+      };
+      while (beats > 4 && beatMs * beats > min(32000, longest)) {
+        beats ~/= 2;
+      }
       final length = (beatMs * beats).round();
-      // The old song leaves on one of its beats, the new one comes in on one
-      // of its own.
-      // A recorded fade out is mostly left out: the beat is weak in it.
-      final last = end - tail.soft ~/ 2;
-      final outBeats = ((last - length - tail.beatAt) / beatMs).floor();
-      final out = (tail.beatAt + outBeats * beatMs).round();
-      final inBeat = 60000 / head.bpm;
-      final inBeats = ((start - head.beatAt) / inBeat).ceil();
-      final into = (head.beatAt + inBeats * inBeat).round();
+      // A cut lands on a beat of both songs.
+      final lead = switch (style.volume) {
+        MixVolume.cutIn => length ~/ 4,
+        MixVolume.centerCut => length ~/ 2,
+        _ => 0,
+      };
       return cue(
-        out,
-        into,
+        onBeat(last - length),
+        lead == 0
+            ? firstBeat
+            : firstBeat - (lead * head.bpm / tail.bpm).round(),
         length,
-        harmonicDistance(tail.key, head.key) > 1
-            ? MixStyle.melt
-            : head.level < tail.level * 0.7
-            ? MixStyle.rise
-            : head.level > tail.level * 1.4
-            ? MixStyle.wave
-            : tail.beat > 0.5 && head.beat > 0.5
-            ? MixStyle.blend
-            : MixStyle.fade,
+        style,
         ratio: tempoRatio(tail.bpm, head.bpm),
       );
     }
-    if (tail.soft < 4000) {
-      // Two beats that do not match: short, and the old one thins out so
-      // the two do not clash.
-      final length = min((beatMs * 8).round().clamp(3000, 6000), longest);
-      return cue(end - length, start, length, MixStyle.melt);
-    }
+    // Beats that do not meet: the old song gets out of the way on its own
+    // beat, by an echo, a cut after a sweep, or by thinning out.
+    final style = pick([
+      if (echo) ...[MixStyle.echo, MixStyle.echo],
+      MixStyle.slam,
+      MixStyle.melt,
+    ]);
+    final length = min((beatMs * 8).round().clamp(3000, 8000), longest);
+    final lead = switch (style.volume) {
+      MixVolume.cutIn => length ~/ 4,
+      MixVolume.centerCut => length ~/ 2,
+      _ => 0,
+    };
+    return cue(
+      onBeat(last - length),
+      lead == 0 ? start : firstBeat - lead,
+      length,
+      style,
+    );
   }
 
   if (tail.soft >= 4000) {
-    // The old song fades out on the record: the new one rises under it.
+    // The old song fades out on the record: the new one rises under it, or
+    // a filter takes the old one away as its fade starts.
+    final style = pick([MixStyle.under, MixStyle.sweep]);
     final length = min(tail.soft.clamp(4000, 10000), longest);
-    return cue(end - length, start, length, MixStyle.under);
+    return cue(
+      style == MixStyle.under ? end - length : end - tail.soft,
+      start,
+      length,
+      style,
+    );
   }
 
   if (tail.soft < 700 && tail.level > 0.02) {
@@ -386,9 +434,10 @@ MixCue chooseCue({
     return cue(end - length ~/ 2, start, length, MixStyle.under);
   }
 
-  // Quiet or free songs: a calm crossfade.
-  final length = min(6000, longest);
-  return cue(end - length, start, length, MixStyle.smooth);
+  // Quiet or free songs: calm, or a filter.
+  final style = pick([MixStyle.smooth, MixStyle.sweep, MixStyle.smooth]);
+  final length = min(style == MixStyle.sweep ? 8000 : 6000, longest);
+  return cue(end - length, start, length, style);
 }
 
 /// Where a song can be read from: a file path or an address, with the
@@ -455,28 +504,35 @@ class MixAnalyzer {
           result.complete(null);
           return;
         }
-        final length = duration < stretch ? duration : stretch;
+        // The whole song, so the transition can be put anywhere in it.
         final decoded = await decode(
           where,
-          start: tail ? -length : Duration.zero,
-          length: length,
+          start: Duration.zero,
+          length: duration + const Duration(seconds: 1),
         );
         if (decoded == null || decoded.samples.isEmpty) {
           result.complete(null);
           return;
         }
         final ms = (decoded.samples.length * 1000 / decoded.rate).round();
-        final offset = tail ? max(0, duration.inMilliseconds - ms) : 0;
         final samples = decoded.samples;
         final rate = decoded.rate;
-        final inspection = await Isolate.run(
-          () => (
-            edge: analyzeEdge(samples, rate, offset: offset, tail: tail),
-            wave: mixEnvelope(samples),
-            offset: offset,
+        final inspection = await Isolate.run(() {
+          // The edge is read from the same forty seconds as in playback.
+          final edgeLength = min(samples.length, stretch.inSeconds * rate);
+          final from = tail ? samples.length - edgeLength : 0;
+          return (
+            edge: analyzeEdge(
+              Int16List.sublistView(samples, from, from + edgeLength),
+              rate,
+              offset: tail ? (from * 1000 / rate).round() : 0,
+              tail: tail,
+            ),
+            wave: mixEnvelope(samples, bins: max(400, ms ~/ 100)),
+            offset: 0,
             length: ms,
-          ),
-        );
+          );
+        });
         final id = song['ytid']?.toString();
         if (id != null) {
           _edges[_key(id, tail)] = inspection.edge;
@@ -670,7 +726,7 @@ class MixAnalyzer {
       );
       await player.open(Media(where.source));
       final result = await Future.any<Object>([done, failed])
-          .timeout(const Duration(seconds: 45));
+          .timeout(const Duration(seconds: 90));
       return result == true ? rate : 0;
     } on TimeoutException {
       return 0;

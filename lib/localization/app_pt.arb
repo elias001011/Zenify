@@ -801,6 +801,8 @@
   "mixBothFilters": "Ambos os filtros",
   "mixOverlap": "Sobreposição",
   "mixRiseUnder": "Subir sob o final",
+  "mixCutIn": "Entrar no tempo",
+  "mixEchoOut": "Eco na saída",
   "mixAutoReason": "O Auto considera firmeza da batida, andamento, energia e tom estimado.",
   "mixKeyEstimated": "Tom estimado",
   "mixAnalyzed": "Analisadas",

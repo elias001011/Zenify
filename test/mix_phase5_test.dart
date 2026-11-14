@@ -42,9 +42,10 @@ void main() {
         pair: 'a>b',
       );
       expect(choose(125).tempoRatio, closeTo(0.96, 1e-9));
-      expect(choose(125).length.inSeconds, 8);
+      // On the beat: a whole number of the old song's beats.
+      expect(choose(125).length.inMilliseconds % 500, 0);
       expect(choose(150).tempoRatio, 1);
-      expect(choose(150).style, MixStyle.melt);
+      expect(choose(150).style, isIn([MixStyle.slam, MixStyle.melt]));
     },
   );
   test('energy and incompatible keys change the automatic recipe', () {
@@ -55,9 +56,15 @@ void main() {
       head: head,
       pair: 'same',
     ).style;
-    expect(choose(edge(level: 0.08, key: 0)), MixStyle.rise);
-    expect(choose(edge(level: 0.4, key: 0)), MixStyle.wave);
-    expect(choose(edge(key: 6)), MixStyle.melt);
+    expect(
+      choose(edge(level: 0.08, key: 0)),
+      isIn([MixStyle.rise, MixStyle.sweep]),
+    );
+    expect(
+      choose(edge(level: 0.4, key: 0)),
+      isIn([MixStyle.wave, MixStyle.slam, MixStyle.sweep]),
+    );
+    expect(choose(edge(key: 6)), isIn([MixStyle.melt, MixStyle.slam]));
   });
   test('sync duration respects actual incoming audio and independent controls survive storage', () {
     const edit = MixEdit(

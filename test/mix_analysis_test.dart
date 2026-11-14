@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:musify/services/mix_analysis.dart';
+import 'package:musify/services/mix_effects.dart';
 import 'package:musify/services/mix_transition.dart';
 import 'package:musify/widgets/mix_chip.dart';
 
@@ -145,14 +146,15 @@ void main() {
           level: 0.2,
           soft: soft,
         );
-    MixEdge head({double bpm = 120, double beat = 0.8}) => MixEdge(
-      sound: 300,
-      bpm: bpm,
-      beat: beat,
-      beatAt: 420,
-      level: 0.2,
-      soft: 200,
-    );
+    MixEdge head({double bpm = 120, double beat = 0.8, int sound = 300}) =>
+        MixEdge(
+          sound: sound,
+          bpm: bpm,
+          beat: beat,
+          beatAt: 420,
+          level: 0.2,
+          soft: 200,
+        );
     MixCue choose(MixEdge? tail, MixEdge? head, {String pair = 'a>b'}) =>
         chooseCue(
           duration: duration,
@@ -170,51 +172,107 @@ void main() {
       expect(cue.inStart, Duration.zero);
     });
 
-    test('the same tempo mixes sixteen beats, on the beat of both', () {
-      final cue = choose(tail(), head());
-      expect(cue.length, const Duration(seconds: 8));
-      // The old song leaves on its grid (beats every 500 ms from 160 s) and
-      // is done before its sound ends.
-      expect((cue.outStart.inMilliseconds - 160000) % 500, 0);
-      expect(cue.outStart + cue.length, lessThanOrEqualTo(_ms(198000)));
-      // The new one comes in on its first beat after the silence.
-      expect(cue.inStart, _ms(420));
-      expect(cue.style.eq, isNot(MixEq.none), reason: 'the basses swap');
+    test('the same tempo mixes on the beat of both, with more than a fade', () {
+      for (var i = 0; i < 20; i++) {
+        final cue = choose(tail(), head(), pair: 'p$i>q');
+        // The old song leaves on its grid (beats every 500 ms from 160 s)
+        // and is done before its sound ends.
+        expect((cue.outStart.inMilliseconds - 160000) % 500, 0);
+        expect(cue.length.inMilliseconds % 500, 0);
+        expect(cue.outStart + cue.length, lessThanOrEqualTo(_ms(198000)));
+        expect(cue.style, isNot(MixStyle.smooth));
+        if (cue.style.volume != MixVolume.centerCut) {
+          // The new one comes in on its first beat after the silence.
+          expect(cue.inStart, _ms(420));
+        }
+      }
     });
 
     test('half and double tempo count as the same', () {
-      expect(choose(tail(bpm: 70), head(bpm: 140)).style.eq, isNot(MixEq.none));
+      expect(
+        choose(tail(bpm: 70), head(bpm: 140)).tempoRatio,
+        closeTo(1, 1e-9),
+      );
       expect(tempoGap(70, 140), 0);
     });
 
-    test('identical audio chooses the same style regardless of pair id', () {
+    test('pairs that sound alike still get different styles', () {
       final styles = {
         for (var i = 0; i < 40; i++)
           choose(tail(), head(), pair: 'x$i>y').style,
       };
-      expect(styles.length, 1);
+      expect(styles.length, greaterThanOrEqualTo(3));
       expect(
         choose(tail(), head(), pair: 'x1>y').style,
         choose(tail(), head(), pair: 'x1>y').style,
       );
     });
 
-    test(
-      'tempos that do not match get a short mix that thins the old song',
-      () {
-        final cue = choose(tail(), head(bpm: 97));
-        expect(cue.style, MixStyle.melt);
-        expect(cue.length.inMilliseconds, inInclusiveRange(3000, 6000));
-        expect(cue.outStart + cue.length, _ms(198000));
-        expect(cue.inStart, _ms(300));
-      },
-    );
+    test('tempos that do not match leave on a beat of the old song', () {
+      final styles = <MixStyle>{};
+      for (var i = 0; i < 30; i++) {
+        final cue = chooseCue(
+          duration: duration,
+          coming: const Duration(seconds: 180),
+          tail: tail(),
+          head: head(bpm: 97),
+          pair: 'm$i>n',
+          echo: true,
+        );
+        styles.add(cue.style);
+        expect(cue.tempoRatio, 1);
+        expect((cue.outStart.inMilliseconds - 160000) % 500, 0);
+        expect(cue.length.inMilliseconds, inInclusiveRange(3000, 8000));
+        expect(cue.outStart + cue.length, lessThanOrEqualTo(_ms(198000)));
+      }
+      expect(styles, containsAll([MixStyle.echo, MixStyle.slam]));
+      expect(
+        styles,
+        everyElement(isIn([MixStyle.echo, MixStyle.slam, MixStyle.melt])),
+      );
+      // Without an echo on the beat, never the echo.
+      for (var i = 0; i < 30; i++) {
+        expect(
+          choose(tail(), head(bpm: 97), pair: 'm$i>n').style,
+          isNot(MixStyle.echo),
+        );
+      }
+    });
 
-    test('a recorded fade out lets the new song rise under it', () {
-      final cue = choose(tail(beat: 0.1, soft: 7000), head(beat: 0.1));
-      expect(cue.style, MixStyle.under);
-      expect(cue.length, const Duration(seconds: 7));
-      expect(cue.outStart, _ms(191000));
+    test('an echo cuts on a beat, where the new song has its first beat', () {
+      final cue = List.generate(
+        30,
+        (i) => chooseCue(
+          duration: duration,
+          coming: const Duration(seconds: 180),
+          tail: tail(),
+          head: head(bpm: 97, sound: 5000),
+          pair: 'e$i>f',
+          echo: true,
+        ),
+      ).firstWhere((cue) => cue.style == MixStyle.echo);
+      final cut = cue.outStart + cue.length ~/ 4;
+      expect((cut.inMilliseconds - 160000) % 500, 0);
+      // Its first beat after the silence: 420 ms plus whole beats of 97 BPM.
+      expect(
+        (cue.inStart + cue.length ~/ 4).inMilliseconds,
+        closeTo(420 + 8 * 60000 / 97, 2),
+      );
+    });
+
+    test('a recorded fade out: the new song rises under it or a filter takes the old away', () {
+      final cues = [
+        for (var i = 0; i < 20; i++)
+          choose(tail(beat: 0.1, soft: 7000), head(beat: 0.1), pair: 'f$i>g'),
+      ];
+      expect(cues.map((c) => c.style).toSet(), {
+        MixStyle.under,
+        MixStyle.sweep,
+      });
+      for (final cue in cues) {
+        expect(cue.length, const Duration(seconds: 7));
+        expect(cue.outStart, _ms(191000));
+      }
     });
 
     test('a sudden ending is kept: the new song comes in right on it', () {
@@ -256,11 +314,11 @@ void main() {
     test('names the style and the tempos', () {
       expect(
         mixChipLabel(a, b, tail: edge(120, tail: true), head: edge(97)),
-        'Melt · 120 → 97 BPM',
+        matches(r'^(Melt|Slam|Echo) · 120 → 97 BPM$'),
       );
       expect(
         mixChipLabel(a, b, tail: edge(120, tail: true), head: edge(120)),
-        matches(r'^(Fade|Wave|Blend|Rise) · 120 BPM$'),
+        matches(r'^(Fade|Wave|Blend|Rise|Sweep|Slam) · 120 BPM$'),
       );
       expect(
         mixChipLabel(
@@ -293,7 +351,7 @@ void main() {
 
     test('no style jumps: gains and bands move in small steps', () {
       for (final style in MixStyle.values) {
-        if (style == MixStyle.slam) continue;
+        if (style == MixStyle.slam || style == MixStyle.echo) continue;
         var before = mixFrame(style, 0);
         for (var i = 1; i <= 160; i++) {
           final now = mixFrame(style, i / 160);
@@ -316,6 +374,56 @@ void main() {
           expect(power, inInclusiveRange(0.95, 1.01), reason: '$style $i');
         }
       }
+    });
+  });
+  group('effects', () {
+    test('the echo cuts the old song on the quarter and keeps its repeats', () {
+      final before = mixFrame(MixStyle.echo, 0.2);
+      final after = mixFrame(MixStyle.echo, 0.26);
+      expect(before.outBands.dry, 1);
+      expect(before.outBands.echo, greaterThan(0));
+      expect(after.outBands.dry, 0);
+      expect(after.outBands.echo, closeTo(0.7, 1e-9));
+      expect(after.inGain, 1);
+      expect(mixFrame(MixStyle.echo, 0.21).inGain, 0);
+    });
+
+    test('a sweep closes the old song and opens the new one', () {
+      var high = 0.0;
+      var low = 0.0;
+      for (var i = 0; i <= 100; i++) {
+        final frame = mixFrame(MixStyle.sweep, i / 100);
+        expect(frame.outBands.highPass, greaterThanOrEqualTo(high));
+        expect(frame.inBands.lowPass, greaterThanOrEqualTo(low));
+        high = frame.outBands.highPass;
+        low = frame.inBands.lowPass;
+      }
+      expect(high, closeTo(1500, 1));
+      expect(mixFrame(MixStyle.sweep, 0.7).inBands.lowPass, mixOpenHigh);
+      expect(mixFrame(MixStyle.sweep, 0).inBands.lowPass, closeTo(300, 1));
+    });
+
+    test('without filters the bands do the work', () {
+      final thin = mixShelves((
+        low: 0,
+        mid: 0,
+        high: 0,
+        highPass: 1500,
+        lowPass: 300,
+        dry: 1,
+        echo: 0,
+      ));
+      expect(thin.low, mixKill);
+      expect(thin.high, mixKill);
+      expect(thin.mid, lessThan(-7));
+      expect(mixShelves(mixFlat), mixFlat);
+    });
+
+    test('the echo repeats on the beat, within a range that sounds as one', () {
+      expect(MixEffects.echoDelay(120), 500);
+      expect(MixEffects.echoDelay(160), 375);
+      expect(MixEffects.echoDelay(70), 429);
+      expect(MixEffects.echoDelay(200), 300);
     });
   });
 }

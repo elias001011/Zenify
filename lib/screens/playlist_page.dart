@@ -292,9 +292,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
                                   sourceList,
                                   reorderIndex: reorderable ? index : null,
                                 );
+                                // Sorted, the rows are not the order played.
                                 if (!custom ||
                                     reorderable ||
                                     searchQuery.trim().isNotEmpty ||
+                                    _sortType != PlaylistSortType.default_ ||
                                     index >= sourceList.length - 1) {
                                   return bar;
                                 }

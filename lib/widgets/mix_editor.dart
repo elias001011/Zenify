@@ -10,6 +10,7 @@ import 'package:musify/services/mix_edits.dart';
 import 'package:musify/services/mix_harmony.dart';
 import 'package:musify/services/mix_transition.dart';
 import 'package:musify/utilities/media_duration.dart';
+import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/mix_timeline.dart';
 import 'package:musify/widgets/song_bar.dart';
 
@@ -21,6 +22,21 @@ Future<void> showMixEditor(
 ) => Navigator.of(context, rootNavigator: true).push<void>(
   MaterialPageRoute(
     builder: (_) => MixPage(playlist: playlist, song: song, next: next),
+  ),
+);
+
+/// The transition of two songs on their own, as the queue plays them.
+Future<void> showPairEditor(
+  BuildContext context,
+  String playlist,
+  Map song,
+  Map next,
+) => Navigator.of(context, rootNavigator: true).push<void>(
+  MaterialPageRoute(
+    builder: (_) => Scaffold(
+      appBar: AppBar(),
+      body: MixEditor(playlist: playlist, song: song, next: next),
+    ),
   ),
 );
 
@@ -98,6 +114,7 @@ class _MixEditorState extends State<MixEditor> {
     tail: _tail?.edge ?? _analyzer.edge(widget.song, tail: true),
     head: _head?.edge ?? _analyzer.edge(widget.next, tail: false),
     pair: '${widget.song['ytid']}>${widget.next['ytid']}',
+    echo: isDesktopPlatform,
   );
 
   Future<void> _load() async {
@@ -162,10 +179,7 @@ class _MixEditorState extends State<MixEditor> {
           1,
           min(
             40000,
-            min(
-              end - max(0, total - 40000),
-              ((coming - inMs) / (ratio ?? _cue.tempoRatio)).floor(),
-            ),
+            min(end, ((coming - inMs) / (ratio ?? _cue.tempoRatio)).floor()),
           ),
         ),
       );
@@ -174,12 +188,8 @@ class _MixEditorState extends State<MixEditor> {
     setState(() {
       _automatic = false;
       _cue = MixEdit(
-        outStart: Duration(
-          milliseconds: outMs.clamp(max(0, total - 40000), total - 500),
-        ),
-        inStart: Duration(
-          milliseconds: inMs.clamp(0, min(40000, coming - 500)),
-        ),
+        outStart: Duration(milliseconds: outMs.clamp(0, max(0, total - 500))),
+        inStart: Duration(milliseconds: inMs.clamp(0, max(0, coming - 500))),
         length: Duration(milliseconds: nextLength),
         style: style ?? _cue.style,
         volume: style != null ? null : volume ?? _cue.volume,
@@ -414,23 +424,24 @@ class _MixEditorState extends State<MixEditor> {
                         if (!_automatic && _cue.customized)
                           ChoiceChip(label: Text(l.mixCustom), selected: true),
                         for (final style in MixStyle.values)
-                          ChoiceChip(
-                            label: Text(switch (style) {
-                              MixStyle.smooth => 'Crossfade',
-                              MixStyle.fadeOut => l.mixSequentialFade,
-                              MixStyle.slam => l.mixCut,
-                              _ =>
-                                style.name[0].toUpperCase() +
-                                    style.name.substring(1),
-                            }),
-                            selected:
-                                !_automatic &&
-                                !_cue.customized &&
-                                _cue.style == style,
-                            onSelected: _canEdit && !_busy
-                                ? (_) => _change(style: style)
-                                : null,
-                          ),
+                          if (style != MixStyle.echo || isDesktopPlatform)
+                            ChoiceChip(
+                              label: Text(switch (style) {
+                                MixStyle.smooth => 'Crossfade',
+                                MixStyle.fadeOut => l.mixSequentialFade,
+                                MixStyle.slam => l.mixCut,
+                                _ =>
+                                  style.name[0].toUpperCase() +
+                                      style.name.substring(1),
+                              }),
+                              selected:
+                                  !_automatic &&
+                                  !_cue.customized &&
+                                  _cue.style == style,
+                              onSelected: _canEdit && !_busy
+                                  ? (_) => _change(style: style)
+                                  : null,
+                            ),
                       ],
                     ),
                   ),
@@ -451,6 +462,7 @@ class _MixEditorState extends State<MixEditor> {
                             MixVolume.fadeOutIn: l.mixSequentialFade,
                             MixVolume.riseUnder: l.mixRiseUnder,
                             MixVolume.centerCut: l.mixCut,
+                            MixVolume.cutIn: l.mixCutIn,
                           },
                           (v) => _change(volume: v),
                         ),
@@ -473,6 +485,8 @@ class _MixEditorState extends State<MixEditor> {
                             MixFilter.highPassOut: l.mixHighPass,
                             MixFilter.lowPassIn: l.mixLowPass,
                             MixFilter.both: l.mixBothFilters,
+                            if (isDesktopPlatform)
+                              MixFilter.echoOut: l.mixEchoOut,
                           },
                           (v) => _change(filter: v),
                         ),
@@ -521,8 +535,8 @@ class _MixEditorState extends State<MixEditor> {
                     _slider(
                       l.mixOutPoint,
                       _cue.outStart.inMilliseconds / 1000,
-                      max(0, _duration!.inMilliseconds / 1000 - 40),
-                      _duration.inMilliseconds / 1000 - 0.5,
+                      0,
+                      _duration!.inMilliseconds / 1000 - 0.5,
                       (v) => _change(out: v),
                       time: true,
                     ),
@@ -530,7 +544,7 @@ class _MixEditorState extends State<MixEditor> {
                       l.mixInPoint,
                       _cue.inStart.inMilliseconds / 1000,
                       0,
-                      min(40, _coming!.inMilliseconds / 1000 - 0.5),
+                      _coming!.inMilliseconds / 1000 - 0.5,
                       (v) => _change(into: v),
                       time: true,
                     ),
@@ -542,11 +556,9 @@ class _MixEditorState extends State<MixEditor> {
                         40,
                         min(
                               min(
-                                    _duration.inMilliseconds,
-                                    (_cue.outStart + _cue.length)
-                                        .inMilliseconds,
-                                  ) -
-                                  max(0, _duration.inMilliseconds - 40000),
+                                _duration.inMilliseconds,
+                                (_cue.outStart + _cue.length).inMilliseconds,
+                              ),
                               ((_coming - _cue.inStart).inMilliseconds /
                                       _cue.tempoRatio)
                                   .floor(),
