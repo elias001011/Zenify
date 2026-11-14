@@ -328,6 +328,12 @@ class KeyboardShortcutsManager {
         if (song == null || ytid == null || ytid.isEmpty) break;
         // Local files are never downloaded.
         if (isLocalSongId(ytid)) break;
+        // A station plays, not this queue song.
+        final playing = audioHandler.mediaItem.value?.extras;
+        if (playing?['isLive'] == true &&
+            playing?['ytid']?.toString() != ytid) {
+          break;
+        }
         unawaited(_toggleCurrentSongOffline(song, ytid));
       case ShortcutAction.focusSearch:
         NavigationManager.router.go(NavigationManager.searchPath);

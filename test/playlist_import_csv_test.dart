@@ -304,4 +304,13 @@ void main() {
       ]);
     });
   });
+
+  test('a quote inside an unquoted field is kept as text', () {
+    final rows = parseCsv('name,artist\n12" Remix,Band\nOther,Band2\n');
+    expect(rows, [
+      ['name', 'artist'],
+      ['12" Remix', 'Band'],
+      ['Other', 'Band2'],
+    ]);
+  });
 }

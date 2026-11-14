@@ -283,6 +283,28 @@ void main() {
       },
     );
 
+    test(
+      'a stopped transfer is waited for even after a retry is cancelled',
+      () async {
+        final first = manager.download(song('x'), save);
+        await Future<void>.delayed(Duration.zero);
+        final stopped = manager.stopAll();
+        final retry = manager.download(song('x'), save);
+        await Future<void>.delayed(Duration.zero);
+        expect(manager.cancel('x'), isTrue);
+        final again = manager.download(song('x'), save);
+        await Future<void>.delayed(Duration.zero);
+        expect(running, 1);
+
+        open('x');
+        await stopped;
+        expect(await first, isFalse);
+        expect(await retry, isFalse);
+        expect(await again, isTrue);
+        expect(peak, 1);
+      },
+    );
+
     test('a download stopped while saving keeps the earlier failure', () async {
       manager.failed(manager.started(song('e')), StateError('x'));
       final retry = manager.download(song('e'), save);
