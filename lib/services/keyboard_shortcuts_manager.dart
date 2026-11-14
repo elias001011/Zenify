@@ -444,11 +444,34 @@ class GlobalShortcuts extends StatelessWidget {
     for (final matcher in matchers) {
       if (isRepeat && !_repeatableActions.contains(matcher.action)) continue;
       if (matcher.activator.accepts(event, keyboard)) {
+        // A focused button or switch keeps Space and Enter, as in any app.
+        if (_activatesFocusedControl(event, keyboard)) {
+          return KeyEventResult.ignored;
+        }
         KeyboardShortcutsManager.invoke(matcher.action);
         return KeyEventResult.handled;
       }
     }
     return KeyEventResult.ignored;
+  }
+
+  static final _activationKeys = {
+    LogicalKeyboardKey.space,
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+  };
+
+  bool _activatesFocusedControl(KeyEvent event, HardwareKeyboard keyboard) {
+    if (!_activationKeys.contains(event.logicalKey) ||
+        keyboard.isControlPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isMetaPressed ||
+        keyboard.isShiftPressed) {
+      return false;
+    }
+    final context = FocusManager.instance.primaryFocus?.context;
+    return context != null &&
+        Actions.maybeFind<ActivateIntent>(context) != null;
   }
 
   bool _isEditingText() {
