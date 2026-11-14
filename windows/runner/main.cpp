@@ -13,6 +13,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   HANDLE data_mutex = CreateMutexW(nullptr, FALSE, L"ZenifyDataInUse");
   if (data_mutex && GetLastError() == ERROR_ALREADY_EXISTS) {
     CloseHandle(data_mutex);
+    // Opened again while it runs: bring the open window forward, as on Linux.
+    HWND open = FindWindowW(L"FLUTTER_RUNNER_WIN32_WINDOW", L"Zenify");
+    if (open) {
+      if (IsIconic(open)) ShowWindow(open, SW_RESTORE);
+      SetForegroundWindow(open);
+    }
     return EXIT_FAILURE;
   }
 
