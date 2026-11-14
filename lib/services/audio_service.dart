@@ -63,6 +63,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         wholeSong: bufferWholeSong.value,
       ),
     );
+    if (volume < 1) unawaited(audioPlayer.setVolume(volume));
 
     _androidAutoBrowser = AndroidAutoBrowser(this);
     _setupEventSubscriptions();
@@ -106,7 +107,10 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   // Volume. The user's choice is kept here (the sleep timer's fade moves it
   // too); the player gets it times the fade between songs.
-  final BehaviorSubject<double> _volumeSubject = BehaviorSubject.seeded(1);
+  final BehaviorSubject<double> _volumeSubject = BehaviorSubject.seeded(
+    _savedVolume(),
+  );
+  Timer? _volumeSaveTimer;
   late final _songFade = SongFade(
     read: _songFadeState,
     write: () => _applyVolume().catchError((Object e, StackTrace stackTrace) {
@@ -2025,9 +2029,26 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   Future<void> setVolume(double value) async {
     try {
       await _setUserVolume(value);
+      _saveVolume();
     } catch (e, stackTrace) {
       logger.log('Error in setVolume()', error: e, stackTrace: stackTrace);
     }
+  }
+
+  static double _savedVolume() {
+    final saved = Hive.isBoxOpen('settings')
+        ? Hive.box('settings').get('volume')
+        : null;
+    return saved is double && saved > 0 && saved <= 1 ? saved : 1;
+  }
+
+  // Once a drag settles; a mute is not kept, so the app never opens silent.
+  void _saveVolume() {
+    _volumeSaveTimer?.cancel();
+    if (volume <= 0 || !Hive.isBoxOpen('settings')) return;
+    _volumeSaveTimer = Timer(const Duration(milliseconds: 500), () {
+      unawaited(Hive.box('settings').put('volume', volume));
+    });
   }
 
   @override
