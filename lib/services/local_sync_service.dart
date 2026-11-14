@@ -364,14 +364,19 @@ class LocalSyncService {
         await startServer();
       } catch (_) {
         // Logged by startServer; the page shows it as not visible.
+        return;
       }
     } else if (_httpServer != null) {
       if (_busy) {
         _settleTimer = Timer(const Duration(seconds: 2), _settleServer);
-      } else {
-        await stopServer();
+        return;
       }
+      await stopServer();
+    } else {
+      return;
     }
+    // The page may have opened or closed while the server was changing.
+    if (_serverWanted != (_httpServer != null)) await _settleServer();
   }
 
   /// Whether the watch on the library or a timer is running: none is while
