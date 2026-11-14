@@ -185,10 +185,11 @@ class QueuePersistenceService {
     }
     final ids = songs.map((song) => song['queueEntryId']).toSet();
     final original = songsOf(data['original']);
+    // Songs added while shuffled are in the queue only, as in the live queue.
     final validOriginal =
-        original.length == songs.length &&
+        original.isNotEmpty &&
         original.map((song) => song['queueEntryId']).toSet().length ==
-            ids.length &&
+            original.length &&
         original.every((song) => ids.contains(song['queueEntryId']));
     var position = Duration.zero;
     if (saved is Map &&
