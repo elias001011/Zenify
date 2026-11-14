@@ -124,6 +124,15 @@ class AboutPage extends StatelessWidget {
               onTap: () =>
                   launchURL(Uri.parse('https://github.com/$appRepository')),
             ),
+            CustomBar(
+              context.l10n!.aboutDiscussions,
+              FluentIcons.chat_24_regular,
+              description: 'github.com/$appRepository/discussions',
+              borderRadius: commonCustomBarRadius,
+              onTap: () => launchURL(
+                Uri.parse('https://github.com/$appRepository/discussions'),
+              ),
+            ),
             const MiniPlayerBottomSpace(),
           ],
         ),
