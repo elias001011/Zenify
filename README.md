@@ -40,6 +40,10 @@ supported. All releases, with their notes, are on the
 Releases marked as pre-release are for trying new things: the app's updater
 never offers them, so install them by hand.
 
+Questions and ideas go to the
+[discussions](https://github.com/elias001011/Zenify/discussions); bugs to the
+[issues](https://github.com/elias001011/Zenify/issues).
+
 ---
 
 ## Screenshots

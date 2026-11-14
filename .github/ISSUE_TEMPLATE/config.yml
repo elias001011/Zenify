@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/elias001011/Zenify/discussions
+    about: Ask a question or share an idea in the discussions.

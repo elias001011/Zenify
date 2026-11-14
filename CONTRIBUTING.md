@@ -37,7 +37,8 @@ By contributing to this project, you agree to allow your contributions to be use
 
 ## Questions
 
-If you have any questions about contributing, open an
+If you have any questions about contributing, start a
+[discussion](https://github.com/elias001011/Zenify/discussions) or open an
 [issue](https://github.com/elias001011/Zenify/issues).
 
 ## Translations
