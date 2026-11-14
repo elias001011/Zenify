@@ -95,6 +95,62 @@ void main() {
     },
   );
 
+  testWidgets('moving keeps what changed in the source meanwhile', (
+    tester,
+  ) async {
+    late BuildContext context;
+    await tester.pumpWidget(
+      localizedApp(
+        Builder(
+          builder: (built) {
+            context = built;
+            return const SizedBox();
+          },
+        ),
+      ),
+    );
+    // Lists read from storage hold any map, as here.
+    Map editable(Map p) => {...p, 'list': List<dynamic>.of(p['list'] as List)};
+    userCustomPlaylists.value = [
+      editable(playlist('source', ids: ['a', 'b'])),
+      editable(playlist('other', ids: [])),
+    ];
+    List<String> ids(Map playlist) => [
+      for (final song in playlist['list'] as List) song['ytid'] as String,
+    ];
+    List<String> stored(String id) => ids(
+      (Hive.box('user').get('customPlaylists') as List).firstWhere(
+        (playlist) => playlist['ytid'] == id,
+      ),
+    );
+
+    await tester.runAsync(() async {
+      // An undo puts a removed song back while the move is being saved.
+      final moving = moveSongsToCustomPlaylist('source', 'target', [
+        {'ytid': 'a'},
+      ]);
+      addSongInCustomPlaylist(context, 'source', {
+        'ytid': 'restored',
+        'title': 'Track restored',
+      }, indexToInsert: 1);
+      await moving;
+    });
+    expect(stored('source'), ['restored', 'b']);
+
+    await tester.runAsync(
+      () => Future.wait([
+        moveSongsToCustomPlaylist('source', 'target', [
+          {'ytid': 'restored'},
+        ]),
+        moveSongsToCustomPlaylist('source', 'other', [
+          {'ytid': 'b'},
+        ]),
+      ]),
+    );
+    expect(stored('source'), isEmpty);
+    expect(stored('other'), ['b']);
+  });
+
   Future<void> mount(WidgetTester tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;

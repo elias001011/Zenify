@@ -401,18 +401,23 @@ Future<int> moveSongsToCustomPlaylist(
   }
   target.playlist['list'] = destination;
   await _saveCustomPlaylist(target.isFromFolder);
-  source.playlist['list'] = original
-      .where((song) => !wanted.contains(song['ytid']))
-      .toList();
-  try {
-    await _saveCustomPlaylist(source.isFromFolder);
-  } catch (_) {
-    source.playlist['list'] = original;
-    rethrow;
+  // Read the source again: an undo or another move may have changed it.
+  final current = _findCustomPlaylist(from);
+  if (current != null) {
+    final moved = moving.map((song) => song['ytid']).toSet();
+    final before = List<dynamic>.of(current.playlist['list'] as List);
+    current.playlist['list'] = before
+        .where((song) => !moved.contains(song['ytid']))
+        .toList();
+    try {
+      await _saveCustomPlaylist(current.isFromFolder);
+    } catch (_) {
+      current.playlist['list'] = before;
+      rethrow;
+    }
+    offlinePlaylistService.checkAndAutoMarkOffline(current.playlist);
   }
-  offlinePlaylistService
-    ..checkAndAutoMarkOffline(target.playlist)
-    ..checkAndAutoMarkOffline(source.playlist);
+  offlinePlaylistService.checkAndAutoMarkOffline(target.playlist);
   return moving.length;
 }
 
