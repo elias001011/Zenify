@@ -167,7 +167,8 @@ class LocalSyncService {
     : _testDiscovery = null,
       _pairingNow = DateTime.now,
       _replyTimeout = _shortTimeout,
-      _bodyTimeout = _mergeTimeout;
+      _bodyTimeout = _mergeTimeout,
+      _allowLoopbackPeers = false;
 
   /// A throwaway instance for tests that talk to each other over loopback.
   @visibleForTesting
@@ -176,6 +177,7 @@ class LocalSyncService {
     DateTime Function()? pairingNow,
     Duration? replyTimeout,
     Duration? bodyTimeout,
+    this._allowLoopbackPeers = true,
   }) : _testDiscovery = discovery,
        _pairingNow = pairingNow ?? DateTime.now,
        _replyTimeout = replyTimeout ?? _shortTimeout,
@@ -193,6 +195,12 @@ class LocalSyncService {
   static const Duration _mergeTimeout = Duration(seconds: 45);
   static const int _smallMessageBytes = 64 * 1024;
   static const String _deviceHeader = 'x-musify-device';
+
+  static const int _maxDiscoveredDevices = 32;
+  static const int _maxDevicesPerAddress = 2;
+  static const int _maxDiscoveryDatagramBytes = 512;
+  static const int _maxDiscoveryNameRunes = 60;
+  static const int _minPeerPort = 1024;
 
   static const String _discoveryRequest = 'MUSIFY_DISCOVERY_REQUEST';
   static const String _discoveryResponse = 'MUSIFY_DISCOVERY_RESPONSE';
@@ -214,6 +222,14 @@ class LocalSyncService {
 
   final Future<List<DiscoveredSyncDevice>> Function()? _testDiscovery;
   final DateTime Function() _pairingNow;
+
+  /// Peers are on the local network; only tests talk to each other over loopback.
+  final bool _allowLoopbackPeers;
+
+  /// The address each paired device last answered an authenticated request
+  /// from. A discovery answer cannot prove who sent it, so when two addresses
+  /// claim the same paired id, only this one may replace the first.
+  final Map<String, String> _verifiedAddress = {};
 
   /// How long a reply that must be known to arrive may take to be written.
   final Duration _replyTimeout;
@@ -1073,29 +1089,63 @@ class LocalSyncService {
         final datagram = socket?.receive();
         if (datagram == null) return;
 
+        // Cheap checks first: size, then where it came from. Only a device on
+        // the local network is a peer, never a public or special address.
+        if (datagram.data.length > _maxDiscoveryDatagramBytes) return;
+        if (!_isPeerAddress(
+          datagram.address,
+          allowLoopback: _allowLoopbackPeers,
+        )) {
+          return;
+        }
+
         String message;
         try {
           message = utf8.decode(datagram.data);
         } on FormatException {
           return;
         }
-        if (!message.startsWith(_discoveryResponse)) return;
 
         final parts = message.split(';');
-        if (parts.length < 4) return;
+        if (parts.length != 4 || parts[0] != _discoveryResponse) return;
         final port = int.tryParse(parts[2]);
-        if (port == null) return;
-
-        final device = DiscoveredSyncDevice(
-          ip: datagram.address.address,
-          port: port,
-          name: parts[1],
-          deviceId: parts[3],
-        );
+        if (port == null || port < _minPeerPort || port > 65535) return;
+        final deviceId = parts[3];
+        if (!_isValidDeviceId(deviceId)) return;
 
         // Our own server answers the broadcast too.
-        if (device.deviceId == ownDeviceId) return;
-        if (discovered.any((d) => d.deviceId == device.deviceId)) return;
+        if (deviceId == ownDeviceId) return;
+
+        final ip = datagram.address.address;
+        final device = DiscoveredSyncDevice(
+          ip: ip,
+          port: port,
+          name: _sanitizeName(parts[1]),
+          deviceId: deviceId,
+        );
+
+        final index = discovered.indexWhere((d) => d.deviceId == deviceId);
+        if (index != -1) {
+          // The id is already claimed. The claim from the address that last
+          // proved itself with the pairing secret wins; any other is ignored.
+          if (discovered[index].ip != ip && _verifiedAddress[deviceId] == ip) {
+            discovered[index] = device;
+            onFound?.call(List.unmodifiable(discovered));
+          }
+          return;
+        }
+
+        // Fake answers must not use up the room that paired devices need.
+        if (!isDevicePaired(deviceId)) {
+          final strangers = discovered
+              .where((d) => !isDevicePaired(d.deviceId))
+              .length;
+          if (strangers >= _maxDiscoveredDevices) return;
+          if (discovered.where((d) => d.ip == ip).length >=
+              _maxDevicesPerAddress) {
+            return;
+          }
+        }
 
         discovered.add(device);
         onFound?.call(List.unmodifiable(discovered));
@@ -1494,6 +1544,8 @@ class LocalSyncService {
       '/api/sync/capabilities',
       {},
     );
+    // Only the holder of the pairing secret can have answered.
+    _verifiedAddress[target.deviceId] = target.ip;
     if (capabilities['schemaVersion'] != syncSchemaVersion) {
       throw const _LocalSyncException(LocalSyncError.updateRequired);
     }
@@ -1553,6 +1605,14 @@ class LocalSyncService {
     required Duration timeout,
     Map<String, String> headers = const {},
   }) async {
+    // The address and port come from an unauthenticated discovery answer.
+    final address = InternetAddress.tryParse(target.ip);
+    if (address == null ||
+        !_isPeerAddress(address, allowLoopback: _allowLoopbackPeers) ||
+        target.port < _minPeerPort ||
+        target.port > 65535) {
+      throw const _LocalSyncException(LocalSyncError.unreachable);
+    }
     final encoded = utf8.encode(json.encode(body));
     if (encoded.length > maxSyncMessageBytes) {
       throw const _LocalSyncException(LocalSyncError.tooLarge);
@@ -1562,6 +1622,9 @@ class LocalSyncService {
             'POST',
             Uri(scheme: 'http', host: target.ip, port: target.port, path: path),
           )
+          // A peer must not be able to send this request on to another host.
+          ..followRedirects = false
+          ..maxRedirects = 0
           ..headers.addAll({'Content-Type': 'application/json', ...headers})
           ..bodyBytes = encoded;
     final response = await _client.send(outgoing).timeout(timeout);
@@ -1634,6 +1697,47 @@ class LocalSyncService {
       _localChangeDebounce,
       () => unawaited(triggerSilentSync()),
     );
+  }
+
+  /// Peers are other devices on the local network: private or link-local IPv4.
+  static bool _isPeerAddress(
+    InternetAddress address, {
+    required bool allowLoopback,
+  }) {
+    if (address.type != InternetAddressType.IPv4) return false;
+    if (address.isLoopback) return allowLoopback;
+    final b = address.rawAddress;
+    return b[0] == 10 ||
+        (b[0] == 172 && b[1] >= 16 && b[1] <= 31) ||
+        (b[0] == 192 && b[1] == 168) ||
+        (b[0] == 169 && b[1] == 254);
+  }
+
+  // Device ids end up in Hive keys and in `a|b|c` encryption contexts, so an
+  // id from the network must not contain the separators used there.
+  static final RegExp _deviceIdPattern = RegExp(
+    r'^[^\x00-\x20:|;\x7f]{1,128}$',
+  );
+
+  static bool _isValidDeviceId(String id) => _deviceIdPattern.hasMatch(id);
+
+  /// A name from the network, made safe to show: no control or direction
+  /// characters, and cut by characters rather than UTF-16 units.
+  static String _sanitizeName(String raw) {
+    final kept = raw.runes
+        .where(
+          (r) =>
+              !(r < 0x20 ||
+                  r == 0x7f ||
+                  (r >= 0x80 && r <= 0x9f) ||
+                  (r >= 0x200b && r <= 0x200f) ||
+                  (r >= 0x202a && r <= 0x202e) ||
+                  (r >= 0x2066 && r <= 0x2069) ||
+                  r == 0xfeff),
+        )
+        .take(_maxDiscoveryNameRunes);
+    final cleaned = String.fromCharCodes(kept).trim();
+    return cleaned.isEmpty ? 'Musify' : cleaned;
   }
 
   /// The limited broadcast plus each interface's /24 broadcast.
