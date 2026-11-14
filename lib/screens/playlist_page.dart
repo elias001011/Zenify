@@ -27,6 +27,7 @@ import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/artist_service.dart';
+import 'package:musify/services/mix_playlists.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/music_radio.dart';
 import 'package:musify/services/playlist_download_service.dart';
@@ -44,6 +45,7 @@ import 'package:musify/widgets/dialog_parts.dart';
 import 'package:musify/widgets/edit_playlist_dialog.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/mix_chip.dart';
 import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
 import 'package:musify/widgets/playlist_page/download_button.dart';
@@ -282,14 +284,47 @@ class _PlaylistPageState extends State<PlaylistPage> {
                                   _reorderEnabled &&
                                   searchQuery.trim().isEmpty &&
                                   _sortType == PlaylistSortType.default_;
-                              Widget item(BuildContext context, int index) =>
-                                  _buildSongListItem(
-                                    sourceList[index],
-                                    index,
-                                    custom,
-                                    sourceList,
-                                    reorderIndex: reorderable ? index : null,
-                                  );
+                              Widget item(BuildContext context, int index) {
+                                final bar = _buildSongListItem(
+                                  sourceList[index],
+                                  index,
+                                  custom,
+                                  sourceList,
+                                  reorderIndex: reorderable ? index : null,
+                                );
+                                if (!custom ||
+                                    reorderable ||
+                                    searchQuery.trim().isNotEmpty ||
+                                    index >= sourceList.length - 1) {
+                                  return bar;
+                                }
+                                // With the Mix on, the transition to the
+                                // next song shows under each one.
+                                return Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    bar,
+                                    ListenableBuilder(
+                                      listenable: Listenable.merge([
+                                        mixTransitions,
+                                        mixPlaylists,
+                                      ]),
+                                      builder: (context, _) =>
+                                          mixTransitions.value &&
+                                              mixPlaylists.value.contains(
+                                                _resolvedPlaylistId,
+                                              )
+                                          ? MixChip(
+                                              sourceList[index],
+                                              sourceList[index + 1],
+                                              playlistId: _resolvedPlaylistId,
+                                            )
+                                          : const SizedBox.shrink(),
+                                    ),
+                                  ],
+                                );
+                              }
+
                               return SliverPadding(
                                 padding: commonListViewBottomPadding,
                                 sliver: reorderable
@@ -410,6 +445,32 @@ class _PlaylistPageState extends State<PlaylistPage> {
     );
   }
 
+  /// Turns the Mix of this playlist on and off: its songs then blend into
+  /// each other. Hidden when the Mix is off in the settings.
+  Widget _buildMixButton() {
+    final colorScheme = Theme.of(context).colorScheme;
+    final id = _resolvedPlaylistId;
+    if (id == null) return const SizedBox.shrink();
+    return ListenableBuilder(
+      listenable: Listenable.merge([mixTransitions, mixPlaylists]),
+      builder: (context, _) {
+        if (!mixTransitions.value) return const SizedBox.shrink();
+        final on = mixPlaylists.value.contains(id);
+        return IconButton.filledTonal(
+          icon: const Icon(FluentIcons.merge_24_regular),
+          iconSize: 24,
+          tooltip: context.l10n!.mix,
+          isSelected: on,
+          color: on ? colorScheme.primary : colorScheme.onSecondaryContainer,
+          style: IconButton.styleFrom(
+            backgroundColor: colorScheme.secondaryContainer,
+          ),
+          onPressed: () => setPlaylistMix(id, on: !on),
+        );
+      },
+    );
+  }
+
   /// Shows the songs as stored, after some were swapped for others, wherever
   /// the swap was asked: a page left open would save its old list back.
   void _reloadStoredSongs() {
@@ -461,6 +522,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
                 List<Map>.from(songs.whereType<Map>()),
                 replace: true,
                 shuffle: true,
+                playlistId: isUserCreated ? _resolvedPlaylistId : null,
               );
             },
           ),
@@ -495,7 +557,11 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   )..shuffle()),
                   name: _playlistTitle,
                 ),
-              if (isUserCreated) ...[_buildEditButton(), _buildReorderButton()],
+              if (isUserCreated) ...[
+                _buildEditButton(),
+                _buildReorderButton(),
+                _buildMixButton(),
+              ],
             ],
           ),
         ],

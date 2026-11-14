@@ -29,6 +29,8 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/mix_edits.dart';
+import 'package:musify/services/mix_playlists.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/proxy_manager.dart';
@@ -557,6 +559,14 @@ bool _storePlaylistSongs(Map playlist, List<dynamic> playlistSongs) {
   try {
     if (playlist['source'] == 'user-created') {
       final playlistId = playlist['ytid']?.toString();
+      if (playlistId != null) {
+        unawaited(
+          mixEdits.retainSongs(playlistId, {
+            for (final song in playlistSongs)
+              if (song is Map && song['ytid'] != null) song['ytid'].toString(),
+          }),
+        );
+      }
       final storedPlaylist = playlistId == null
           ? null
           : _findCustomPlaylist(playlistId)?.playlist;
@@ -698,6 +708,8 @@ void removeUserCustomPlaylist(dynamic playlist) {
     final updatedPlaylists = List<Map>.from(userCustomPlaylists.value)
       ..removeWhere((p) => p['ytid']?.toString() == playlistId);
     userCustomPlaylists.value = updatedPlaylists;
+    setPlaylistMix(playlistId, on: false);
+    unawaited(mixEdits.retainSongs(playlistId, {}));
 
     final foldersChanged = _removePlaylistFromFolders(playlistId);
     final likedChanged = _removePlaylistFromLikedPlaylists(playlistId);

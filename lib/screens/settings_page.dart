@@ -143,7 +143,7 @@ class SettingsPage extends StatelessWidget {
           FluentIcons.music_note_1_24_regular,
           onTap: () => _showAudioQualityPicker(context),
         ),
-        if (isAndroidPlatform)
+        if (isAndroidPlatform || isDesktopPlatform)
           CustomBar(
             context.l10n!.equalizer,
             FluentIcons.data_histogram_24_regular,
@@ -162,6 +162,21 @@ class SettingsPage extends StatelessWidget {
               ),
             ),
             onTap: () => _showSongFadePicker(context),
+          ),
+        ),
+        ValueListenableBuilder<bool>(
+          valueListenable: mixTransitions,
+          builder: (context, value, _) => CustomBar(
+            context.l10n!.mix,
+            FluentIcons.merge_24_regular,
+            description: context.l10n!.mixDescription,
+            trailing: Switch(
+              value: value,
+              onChanged: (value) {
+                mixTransitions.value = value;
+                addOrUpdateData<bool>('settings', 'mixTransitions', value);
+              },
+            ),
           ),
         ),
         if (isAndroidPlatform)

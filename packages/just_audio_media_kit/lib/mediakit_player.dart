@@ -72,13 +72,18 @@ class MediaKitPlayer extends AudioPlayerPlatform {
 
   Media? get _currentMedia {
     var medias = _player.state.playlist.medias;
-    if (medias.isEmpty) return null;
-    return medias[_player.state.playlist.index];
+    final index = _player.state.playlist.index;
+    if (index < 0 || index >= medias.length) return null;
+    return medias[index];
   }
 
-  /// The newest player, so the app can read and set mpv properties that
-  /// just_audio has no API for (audio filters for a visualizer).
+  /// The player that last started playing (the first one until then), so the
+  /// app can read and set mpv properties that just_audio has no API for
+  /// (audio filters for a visualizer).
   static MediaKitPlayer? latest;
+
+  /// The player that last loaded a song.
+  static MediaKitPlayer? lastLoaded;
 
   /// Sets an mpv property on this player.
   Future<void> setMpvProperty(String key, String value) =>
@@ -91,7 +96,7 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   Future<void> mpvCommand(List<String> args) => command(_player, args);
 
   MediaKitPlayer(super.id) {
-    latest = this;
+    latest ??= this;
     _player = Player(
       configuration: PlayerConfiguration(
         pitch: JustAudioMediaKit.pitch,
@@ -194,6 +199,10 @@ class MediaKitPlayer extends AudioPlayerPlatform {
         _logger.severe('ERROR OCCURRED: $error');
       }),
       _player.stream.playlist.listen((playlist) {
+        // libmpv briefly reports -1 while a source is being replaced. The
+        // just_audio contract accepts only valid sequence indices or null.
+        if (playlist.index < 0 || playlist.index >= playlist.medias.length)
+          return;
         if (_currentIndex != playlist.index) {
           _bufferedPosition = _position = Duration.zero;
           _currentIndex = playlist.index;
@@ -272,6 +281,7 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   @override
   Future<LoadResponse> load(LoadRequest request) async {
     _logger.finest('load(${request.toMap()})');
+    lastLoaded = this;
     _mediaOpened = false;
     _loadCompleter = Completer();
     _currentIndex = request.initialIndex ?? 0;
@@ -303,6 +313,7 @@ class MediaKitPlayer extends AudioPlayerPlatform {
 
   @override
   Future<PlayResponse> play(PlayRequest request) async {
+    latest = this;
     _playing = true;
     if (_mediaOpened) {
       await _player.play();

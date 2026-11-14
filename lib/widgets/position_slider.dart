@@ -77,11 +77,20 @@ class _PositionSliderState extends State<PositionSlider> {
             ? _dragValue
             : _positionData.position.inSeconds.toDouble();
 
+        // With the Mix, the end of the bar from where the next song comes in.
+        final mixFrom = audioHandler.mixOutStart.value;
+        final mixZone =
+            mixFrom != null && _positionData.duration > Duration.zero
+            ? mixFrom.inMilliseconds / _positionData.duration.inMilliseconds
+            : null;
+
         final slider = SliderTheme(
           data: SliderTheme.of(context).copyWith(
             padding: EdgeInsets.zero,
             trackHeight: widget.inline ? 4 : 5,
-            trackShape: const RoundedRectSliderTrackShape(),
+            trackShape: mixZone != null && mixZone < 1
+                ? _MixTrackShape(mixZone, colorScheme.primary)
+                : const RoundedRectSliderTrackShape(),
             // The thumb makes the bar easy to find and to grab; the short bar
             // of the mini player has none.
             thumbShape: RoundSliderThumbShape(
@@ -173,6 +182,69 @@ class _PositionSliderState extends State<PositionSlider> {
         ),
         AudioQualityBadge(style: textStyle),
       ],
+    );
+  }
+}
+
+/// The usual track, with the stretch where the Mix brings the next song in
+/// painted in the accent colour.
+class _MixTrackShape extends RoundedRectSliderTrackShape {
+  const _MixTrackShape(this.from, this.color);
+
+  /// Where the stretch starts, from 0 to 1 of the track.
+  final double from;
+  final Color color;
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset offset, {
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required Animation<double> enableAnimation,
+    required TextDirection textDirection,
+    required Offset thumbCenter,
+    Offset? secondaryOffset,
+    bool isDiscrete = false,
+    bool isEnabled = false,
+    double additionalActiveTrackHeight = 0,
+  }) {
+    super.paint(
+      context,
+      offset,
+      parentBox: parentBox,
+      sliderTheme: sliderTheme,
+      enableAnimation: enableAnimation,
+      textDirection: textDirection,
+      thumbCenter: thumbCenter,
+      secondaryOffset: secondaryOffset,
+      isDiscrete: isDiscrete,
+      isEnabled: isEnabled,
+      additionalActiveTrackHeight: additionalActiveTrackHeight,
+    );
+    final track = getPreferredRect(
+      parentBox: parentBox,
+      offset: offset,
+      sliderTheme: sliderTheme,
+      isEnabled: isEnabled,
+      isDiscrete: isDiscrete,
+    );
+    // Only what is still to play: the played part keeps its colour.
+    final left = (track.left + track.width * from).clamp(
+      thumbCenter.dx,
+      track.right,
+    );
+    if (track.right - left < 1) return;
+    context.canvas.drawRRect(
+      RRect.fromLTRBAndCorners(
+        left,
+        track.top,
+        track.right,
+        track.bottom,
+        topRight: Radius.circular(track.height / 2),
+        bottomRight: Radius.circular(track.height / 2),
+      ),
+      Paint()..color = color,
     );
   }
 }

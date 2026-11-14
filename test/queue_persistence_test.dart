@@ -163,6 +163,19 @@ void main() {
   );
 
   test(
+    'remembers Mix playlist origin and drops it for a replacement queue',
+    () async {
+      final songs = [song(1), song(2)];
+      memory.saveQueue(songs, songs, 0, playlistId: 'mixed');
+      await memory.flush();
+      expect(QueuePersistenceService().read()!.playlistId, 'mixed');
+      memory.saveQueue(songs, songs, 0);
+      await memory.flush();
+      expect(QueuePersistenceService().read()!.playlistId, isNull);
+    },
+  );
+
+  test(
     'restores radio continuation and resets it for an ordinary playlist',
     () async {
       final songs = [song(1), song(2)];

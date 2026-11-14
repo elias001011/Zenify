@@ -47,6 +47,28 @@ class MainActivity : AudioServiceActivity() {
     super.configureFlutterEngine(flutterEngine)
     val messenger = flutterEngine.dartExecutor.binaryMessenger
 
+    // The Mix's analysis decodes the ends of songs here.
+    MethodChannel(messenger, "zenify/audio_decode").setMethodCallHandler { call, result ->
+      if (call.method != "decode") {
+        result.notImplemented()
+        return@setMethodCallHandler
+      }
+      Thread {
+        try {
+          val rate = AudioDecode.decode(
+            call.argument<String>("source")!!,
+            call.argument<Map<String, String>>("headers"),
+            call.argument<Number>("startMs")!!.toLong(),
+            call.argument<Number>("lengthMs")!!.toLong(),
+            call.argument<String>("out")!!,
+          )
+          runOnUiThread { result.success(rate) }
+        } catch (e: Exception) {
+          runOnUiThread { result.error("decode", e.toString(), null) }
+        }
+      }.start()
+    }
+
     MethodChannel(messenger, "zenify/display").setMethodCallHandler { call, result ->
       if (call.method == "keepScreenAwake") {
         if (call.arguments == true) {

@@ -111,6 +111,11 @@ void main() {
             await player.pause(PauseRequest());
           }
           expect(events.where((event) => event.errorCode != null), isEmpty);
+          expect(
+            events.where((event) => (event.currentIndex ?? 0) < 0),
+            isEmpty,
+            reason: 'empty mpv playlists must not leak index -1 to just_audio',
+          );
           expect(events.map((event) => event.currentIndex), contains(1));
         },
         zoneSpecification: ZoneSpecification(

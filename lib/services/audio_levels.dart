@@ -30,6 +30,7 @@ import 'package:flutter/widgets.dart'
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart';
+import 'package:musify/services/mix_effects.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:rxdart/rxdart.dart';
@@ -84,7 +85,15 @@ class AudioLevels {
   /// Prepare analysis before any desktop source is opened. Opening/closing
   /// a visualizer must never add/remove filters on a playing output device.
   static void configureDesktop() {
-    JustAudioMediaKit.audioFilters = const [_bandsFilter];
+    // The Mix's bands come before the readings, which then follow them.
+    void filters() => JustAudioMediaKit.audioFilters = [
+      ...MixEffects.desktopFilters,
+      ...MixEffects.userFilters,
+      _bandsFilter,
+    ];
+    filters();
+    mixTransitions.addListener(filters);
+    equalizerEnabled.addListener(filters);
     // Zenify uses speed, not independent pitch control. Native mpv speed
     // preserves the analysis chain; media_kit's pitch mode replaces `af`.
     JustAudioMediaKit.pitch = false;
@@ -199,7 +208,8 @@ class AudioLevels {
   /// (session 0, the whole output, needs another permission) and a new one
   /// when the player recreates it.
   static Stream<_Frame> _androidFrames() {
-    return audioHandler.audioPlayer.androidAudioSessionIdStream
+    return audioHandler.activePlayerStream
+        .switchMap((player) => player.androidAudioSessionIdStream)
         .whereType<int>()
         .distinct()
         .where((session) => session > 0)

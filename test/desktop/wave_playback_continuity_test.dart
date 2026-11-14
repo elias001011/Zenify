@@ -26,12 +26,12 @@ void main() {
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       NativePlayer.test = true;
       JustAudioMediaKit.ensureInitialized(libmpv: library);
-      AudioLevels.configureDesktop();
       final dir = await Directory.systemTemp.createTemp('zenify_wave_playback');
       Hive.init(dir.path);
       for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
         await Hive.openBox(box);
       }
+      AudioLevels.configureDesktop();
       addTearDown(() async {
         await audioHandler.stop();
         await audioHandler.audioPlayer.dispose();

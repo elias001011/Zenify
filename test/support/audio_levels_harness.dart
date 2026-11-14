@@ -29,6 +29,8 @@ class _Handler implements MusifyAudioHandler {
   final _player = _SessionPlayer();
   @override
   AudioPlayer get audioPlayer => _player;
+  @override
+  Stream<AudioPlayer> get activePlayerStream => Stream.value(_player);
 }
 
 class AudioLevelsHarness {

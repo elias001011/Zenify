@@ -40,6 +40,7 @@ dependencies:
   just_audio_media_kit:
     path: ./packages/just_audio_media_kit
   material_ui: ^1.11.0
+  media_kit: ^1.2.6
   media_kit_libs_linux: ^1.2.1
   media_kit_libs_windows_audio: ^1.0.9
   path_provider: ^2.1.6
@@ -58,7 +59,6 @@ dev_dependencies:
     sdk: flutter
 
   just_audio_platform_interface: ^4.6.0
-  media_kit: ^1.2.6
 
   # flutter_lints: ^2.0.0
 

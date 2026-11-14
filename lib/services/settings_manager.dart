@@ -25,6 +25,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/screens/user_songs_page.dart';
 import 'package:musify/services/keyboard_shortcuts_manager.dart';
 import 'package:musify/services/local_files_service.dart';
+import 'package:musify/services/mix_playlists.dart';
 import 'package:musify/services/song_fade.dart';
 import 'package:musify/utilities/language_utils.dart';
 import 'package:musify/utilities/platform_utils.dart';
@@ -154,6 +155,12 @@ int _readSongFadeSeconds(Box settings) {
 
 final songFadeSeconds = ValueNotifier<int>(
   _readSongFadeSeconds(Hive.box('settings')),
+);
+
+/// The Mix: the next song comes in over the end of the one playing. Zenify
+/// only, off unless chosen.
+final mixTransitions = ValueNotifier<bool>(
+  Hive.box('settings').get('mixTransitions', defaultValue: true) == true,
 );
 
 /// Android only: load a song far ahead (up to ten minutes) so a slow
@@ -313,6 +320,9 @@ void reloadSettingsFromStorage() {
     defaultValue: false,
   );
   songFadeSeconds.value = _readSongFadeSeconds(settings);
+  mixTransitions.value =
+      settings.get('mixTransitions', defaultValue: true) == true;
+  reloadMixPlaylists();
   bufferWholeSong.value =
       settings.get('bufferWholeSong', defaultValue: false) == true;
   showLocalFiles.value = _readShowLocalFiles(settings);
