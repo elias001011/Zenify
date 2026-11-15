@@ -386,7 +386,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
               audioPlayer.playing &&
               _playerSourceMatchesCurrentSong(),
         )
-        .throttleTime(const Duration(seconds: 10))
+        .throttleTime(const Duration(seconds: 30))
         .listen(
           (position) {
             final song = currentSong;
