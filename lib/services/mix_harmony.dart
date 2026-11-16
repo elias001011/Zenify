@@ -7,11 +7,12 @@ import 'dart:typed_data';
   const n = 2048;
   if (samples.length < n || rate <= 0) return (key: null, confidence: 0);
   final chroma = List<double>.filled(12, 0);
-  final frames = min(48, samples.length ~/ n);
+  final frames = min(96, samples.length ~/ n);
   final window = List.generate(n, (i) => 0.5 - 0.5 * cos(2 * pi * i / (n - 1)));
   for (var frame = 0; frame < frames; frame++) {
     final start = frame * (samples.length - n) ~/ max(1, frames - 1);
-    for (var midi = 48; midi <= 83; midi++) {
+    // Wider than the middle octaves: bass notes carry the key.
+    for (var midi = 36; midi <= 95; midi++) {
       final frequency = 440 * pow(2, (midi - 69) / 12);
       if (frequency >= rate / 2) continue;
       final coefficient = 2 * cos(2 * pi * frequency / rate);

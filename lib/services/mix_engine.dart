@@ -92,8 +92,9 @@ class MixEngine {
   /// Where and how the playing song gives way to the next.
   final MixCue Function(MixPlan next, Duration duration) cue;
 
-  /// Finds where a song plays from; null when it cannot play now.
-  final Future<MixSource?> Function(Map song) resolve;
+  /// Finds where a song plays from; null when it cannot play now. `whole`
+  /// asks for the song with nothing skipped, as the editor shows it.
+  final Future<MixSource?> Function(Map song, {bool whole}) resolve;
 
   /// Called with the second player once the next song is loaded in it.
   final Future<void> Function(AudioPlayer player, Map song) prepared;
@@ -186,7 +187,7 @@ class MixEngine {
       await Future.any([_stopped, done.future]);
       if (done.isCompleted) return;
       final source = await Future.any<MixSource?>([
-        resolve(song).timeout(const Duration(seconds: 30)),
+        resolve(song, whole: true).timeout(const Duration(seconds: 30)),
         done.future.then((_) => null),
       ]);
       if (done.isCompleted) return;
@@ -406,8 +407,10 @@ class MixEngine {
   Future<void> _load(MixPlan next, MixCue cue, int generation) async {
     try {
       if (generation != _generation) return;
-      final source = await resolve(next.song)
-          .timeout(const Duration(seconds: 30));
+      final source = await resolve(
+        next.song,
+        whole: _previewDone != null,
+      ).timeout(const Duration(seconds: 30));
       if (generation != _generation) return;
       // SponsorBlock's clips have positions of their own: no transition.
       if (source == null ||

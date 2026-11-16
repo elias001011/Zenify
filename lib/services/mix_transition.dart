@@ -26,8 +26,8 @@ enum MixVolume {
   /// Equal power: one falls as the other rises, together as loud as one.
   crossfade,
 
-  /// Both play in full for a while: the new one is up early, the old one
-  /// leaves late. Meant to go with an [MixEq] that keeps them apart.
+  /// Both play in full across the window, with short fade edges.
+  /// Meant to go with an [MixEq] that keeps them apart.
   overlap,
 
   /// The old one is gone by the middle, where the new one starts to rise.
@@ -129,6 +129,9 @@ typedef MixBands = ({
   double dry,
   double echo,
 });
+
+/// The longest a transition can be.
+const Duration mixLongestTransition = Duration(minutes: 2);
 
 /// A high-pass at or under this lets everything through.
 const double mixOpenLow = 20;
@@ -234,8 +237,8 @@ MixFrame mixFrame(
       outGain = cos(t * pi / 2);
       inGain = sin(t * pi / 2);
     case MixVolume.overlap:
-      outGain = cos(_ramp(t, 0.6, 1) * pi / 2);
-      inGain = sin(_ramp(t, 0, 0.4) * pi / 2);
+      outGain = cos(_ramp(t, 0.99, 1) * pi / 2);
+      inGain = sin(_ramp(t, 0, 0.01) * pi / 2);
     case MixVolume.fadeOutIn:
       outGain = cos(_ramp(t, 0, 0.55) * pi / 2);
       inGain = sin(_ramp(t, 0.45, 1) * pi / 2);

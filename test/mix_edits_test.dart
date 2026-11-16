@@ -70,6 +70,24 @@ void main() {
     },
   );
 
+  test('a transition longer than 40 s is saved and kept whole', () async {
+    const long = MixEdit(
+      outStart: Duration(minutes: 3),
+      inStart: Duration(seconds: 20),
+      length: Duration(seconds: 90),
+      style: MixStyle.smooth,
+    );
+    await MixEditStore().set('one', 'a', 'b', long);
+    final stored = MixEditStore().get('one', 'a', 'b');
+    expect(stored, isNotNull);
+    final cue = stored!.cue(
+      const Duration(minutes: 6),
+      const Duration(minutes: 5),
+    );
+    expect(cue.length, const Duration(seconds: 90));
+    expect(cue.outStart, const Duration(minutes: 3));
+  });
+
   test('invalid backup entries fall back to Auto', () async {
     for (final value in [
       null,
@@ -79,7 +97,7 @@ void main() {
       [-1, 0, 8000, 'wave'],
       [0, 0, double.nan, 'wave'],
       [0, 0, 0, 'wave'],
-      [0, 0, 40001, 'wave'],
+      [0, 0, mixLongestTransition.inMilliseconds + 1, 'wave'],
       [0, 0, 8000, 'future-style'],
       ['x', 0, 8000, 'wave'],
     ]) {

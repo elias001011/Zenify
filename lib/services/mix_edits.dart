@@ -50,14 +50,19 @@ class MixEdit {
         .toInt();
     final available = min(
       total - out,
-      (((incoming ?? (into + 40000)) - into) / tempoRatio).floor(),
+      (((incoming ?? (into + mixLongestTransition.inMilliseconds)) - into) /
+              tempoRatio)
+          .floor(),
     );
     return MixCue(
       outStart: Duration(milliseconds: out),
       inStart: Duration(milliseconds: into),
       length: Duration(
         milliseconds: length.inMilliseconds
-            .clamp(1, max(1, min(40000, available)))
+            .clamp(
+              1,
+              max(1, min(mixLongestTransition.inMilliseconds, available)),
+            )
             .toInt(),
       ),
       style: style,
@@ -82,7 +87,9 @@ class MixEdit {
   static MixEdit? parse(dynamic value) {
     if (value is! List || (value.length != 4 && value.length != 8)) return null;
     if (value.take(3).any((v) => v is! int || v < 0)) return null;
-    if (value[2] < 1 || value[2] > 40000) return null;
+    if (value[2] < 1 || value[2] > mixLongestTransition.inMilliseconds) {
+      return null;
+    }
     final styles = MixStyle.values.where((s) => s.name == value[3]);
     if (styles.isEmpty) return null;
     T? option<T extends Enum>(List<T> options, dynamic name) =>

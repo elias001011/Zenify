@@ -133,11 +133,15 @@ class _PlaylistPageState extends State<PlaylistPage> {
     super.initState();
     _initializePlaylist();
     replacedSongs.addListener(_reloadStoredSongs);
+    userCustomPlaylists.addListener(_reloadStoredSongs);
+    userPlaylistFolders.addListener(_reloadStoredSongs);
   }
 
   @override
   void dispose() {
     replacedSongs.removeListener(_reloadStoredSongs);
+    userCustomPlaylists.removeListener(_reloadStoredSongs);
+    userPlaylistFolders.removeListener(_reloadStoredSongs);
     _searchQueryNotifier.dispose();
     _selection.dispose();
     _songsRevision.dispose();
@@ -473,8 +477,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
     );
   }
 
-  /// Shows the songs as stored, after some were swapped for others, wherever
-  /// the swap was asked: a page left open would save its old list back.
+  /// Reflect replacements and order edits from other pages in canonical order.
   void _reloadStoredSongs() {
     final stored = getUserCustomPlaylists()
         .where(

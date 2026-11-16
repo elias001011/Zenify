@@ -688,6 +688,7 @@ class SettingsPage extends StatelessWidget {
           crossAxisSpacing: 12,
         ),
         shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
         itemCount: availableColors.length,
         itemBuilder: (context, index) {
           final color = availableColors[index];
@@ -754,6 +755,7 @@ class SettingsPage extends StatelessWidget {
       title: context.l10n!.themeMode,
       content: ListView(
         shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
         children: [
           for (var index = 0; index < availableModes.length; index++)
             BottomSheetBar(
@@ -833,6 +835,7 @@ class SettingsPage extends StatelessWidget {
       title: context.l10n!.audioQuality,
       content: ListView(
         shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
         children: [
           for (var index = 0; index < availableQualities.length; index++)
             BottomSheetBar(
@@ -865,6 +868,10 @@ class SettingsPage extends StatelessWidget {
       title: context.l10n!.songFade,
       content: ListView(
         shrinkWrap: true,
+        // The 7 options need ~540 px; on shorter screens the list must scroll.
+        physics: MediaQuery.sizeOf(context).height >= 700
+            ? const NeverScrollableScrollPhysics()
+            : null,
         children: [
           for (final seconds in songFadeChoices)
             BottomSheetBar(_songFadeLabel(context, seconds), () {

@@ -524,6 +524,39 @@ void main() {
     },
   );
 
+  test(
+    'playback bounds a saved mix to a string-formatted incoming duration',
+    () async {
+      await handler.addPlaylistToQueue(
+        [
+          _songs[0],
+          {..._songs[1], 'duration': '0:05'},
+          _songs[2],
+        ],
+        replace: true,
+        playlistId: 'mixed',
+      );
+      await mixEdits.set(
+        'mixed',
+        'aaa',
+        'bbb',
+        const MixEdit(
+          outStart: Duration(seconds: 48),
+          inStart: Duration(seconds: 3),
+          length: Duration(seconds: 8),
+          style: MixStyle.smooth,
+        ),
+      );
+      await startSong(0);
+      await at('aaa', 40);
+      await at('aaa', 48.5);
+      await at('bbb', 5);
+      await ticks();
+      expect(platform.lastVolume('bbb'), 1);
+      expect(platform.of('aaa').log.last, 'dispose');
+    },
+  );
+
   test('an early manual transition does not wait six seconds', () async {
     platform.songLength = _s(30);
     await mixEdits.set(

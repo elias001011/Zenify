@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/mix_edits.dart';
 import 'package:musify/services/mix_playlist_analysis.dart';
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/utilities/app_utils.dart';
 import 'package:musify/utilities/media_duration.dart';
 import 'package:musify/widgets/mix_editor.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -30,9 +32,11 @@ class _MixPageState extends State<MixPage> {
   Map? _playlist;
   int _index = 0, _done = 0, _failed = 0;
   bool _analyzing = false, _cancel = false, _orderChanged = false;
+  bool _savingOrder = false;
   String? _error;
   final _drafts = <String, MixEdit?>{};
   final _scaffold = GlobalKey<ScaffoldState>();
+  bool get _canReorder => _playlist?['source'] == 'user-created';
   @override
   void initState() {
     super.initState();
@@ -81,8 +85,8 @@ class _MixPageState extends State<MixPage> {
     for (final song in List<Map>.of(_songs)) {
       if (_cancel || !mounted) break;
       final duration = readMediaDuration(song['duration']);
-      var failed = duration == null;
-      if (duration != null) {
+      var failed = false;
+      {
         for (final tail in [false, true]) {
           if (_cancel || !mounted) break;
           if (analyzer.edge(song, tail: tail) == null) {
@@ -106,49 +110,99 @@ class _MixPageState extends State<MixPage> {
   }
 
   Future<void> _saveOrder() async {
-    if (_playlist == null) return;
+    if (!_canReorder || _savingOrder) return;
+    setState(() {
+      _savingOrder = true;
+      _error = null;
+    });
     try {
+      await audioHandler.stopMixPreview();
       // Read again so a title or playlist update made elsewhere is preserved.
       final current = await getPlaylistInfoForWidget(widget.playlist);
-      if (current == null) return;
+      if (!mounted) return;
+      if (current == null) throw StateError('Playlist unavailable');
       final currentIds = (current['list'] as List)
           .map((s) => s['ytid'])
           .toList();
+      final originalIds = (_playlist!['list'] as List)
+          .map((s) => s['ytid'])
+          .toList();
       final ids = _songs.map((s) => s['ytid']).toList();
-      if (currentIds.length != ids.length || !currentIds.every(ids.contains)) {
+      if (!listEquals(currentIds, originalIds) ||
+          currentIds.length != ids.length ||
+          ids.toSet().length != ids.length ||
+          !currentIds.every(ids.contains)) {
         await _load();
+        if (mounted) {
+          setState(() {
+            _orderChanged = false;
+            _error = context.l10n!.mixSaveFailed;
+          });
+        }
         return;
       }
       final latest = {
         for (final song in current['list'] as List) song['ytid']: song,
       };
-      final reordered = [for (final id in ids) latest[id]];
+      final reordered = [for (final id in ids) latest[id] as Map];
       if (!await replaceCustomPlaylist(widget.playlist, {
         ...current,
         'list': reordered,
-      }))
-        return;
+      })) {
+        throw StateError('Playlist unavailable');
+      }
       if (mounted)
         setState(() {
           _orderChanged = false;
-          _playlist = {...current, 'list': _songs};
+          _songs = reordered;
+          _playlist = {...current, 'list': reordered};
         });
     } catch (_) {
       if (mounted) setState(() => _error = context.l10n!.mixSaveFailed);
+    } finally {
+      if (mounted) setState(() => _savingOrder = false);
     }
+  }
+
+  void _reorder(int from, int to) {
+    if (!_canReorder || _savingOrder || from == to) return;
+    final selected = _songs[_index];
+    final reordered = [..._songs];
+    reordered.insert(to, reordered.removeAt(from));
+    setState(() {
+      _songs = reordered;
+      _index = _songs.indexOf(selected).clamp(0, _songs.length - 2);
+      _orderChanged = true;
+    });
+    unawaited(_saveOrder());
+  }
+
+  Future<void> _smartOrder() async {
+    if (!_canReorder || _savingOrder) return;
+    await audioHandler.stopMixPreview();
+    if (!mounted) return;
+    setState(() {
+      _songs = orderMixSongs(_songs, audioHandler.mixAnalyzer);
+      _index = 0;
+      _orderChanged = true;
+    });
   }
 
   Widget _tracks() => ListenableBuilder(
     listenable: audioHandler.mixAnalyzer.changes,
-    builder: (context, _) => ListView.builder(
+    builder: (context, _) => ReorderableListView.builder(
+      buildDefaultDragHandles: false,
+      onReorderItem: _reorder,
       itemCount: _songs.length,
       itemBuilder: (context, i) {
         final edge = audioHandler.mixAnalyzer.edge(_songs[i], tail: false);
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          key: ValueKey('mix-track-${_songs[i]['ytid']}'),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           child: SongBar(
             _songs[i],
             false,
+            borderRadius: getItemBorderRadius(i, _songs.length),
             backgroundColor: i == _index || i == _index + 1
                 ? Theme.of(context).colorScheme.secondaryContainer
                 : null,
@@ -156,9 +210,12 @@ class _MixPageState extends State<MixPage> {
               _scaffold.currentState?.closeDrawer();
               unawaited(_select(i));
             },
-            trailing: edge == null
-                ? null
-                : Column(
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              spacing: 8,
+              children: [
+                if (edge != null)
+                  Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (edge.rhythmic)
@@ -173,6 +230,20 @@ class _MixPageState extends State<MixPage> {
                         ),
                     ],
                   ),
+                if (_canReorder)
+                  ReorderableDragStartListener(
+                    index: i,
+                    enabled: !_savingOrder,
+                    child: Tooltip(
+                      message: context.l10n!.reorderSongs,
+                      child: const Padding(
+                        padding: EdgeInsets.all(8),
+                        child: Icon(Icons.drag_handle),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -194,60 +265,52 @@ class _MixPageState extends State<MixPage> {
               onPressed: () => _scaffold.currentState?.openDrawer(),
               icon: const Icon(Icons.queue_music),
             ),
+          PopupMenuButton<VoidCallback>(
+            onSelected: (run) => run(),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: _analyze, child: Text(l.mixAnalyze)),
+              PopupMenuItem(
+                enabled: !_analyzing && _canReorder && !_savingOrder,
+                value: _smartOrder,
+                child: Text(l.mixSmartOrder),
+              ),
+            ],
+          ),
         ],
       ),
       drawer: wide ? null : Drawer(child: SafeArea(child: _tracks())),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
+          if (_analyzing || _orderChanged || _done > 0 || _savingOrder)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 spacing: 8,
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: _analyze,
-                    icon: Icon(_analyzing ? Icons.stop : Icons.graphic_eq),
-                    label: Text(
+                  Expanded(
+                    child: Text(
                       _analyzing
-                          ? '${l.mixAnalyzeStop} · $_done/${_songs.length}'
-                          : l.mixAnalyze,
+                          ? '${l.mixAnalyze} · $_done/${_songs.length}'
+                          : _orderChanged
+                          ? l.mixOrderPreview
+                          : '${l.mixAnalyzed}: $_done · ${l.mixAnalysisFailedCount}: $_failed',
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: _analyzing
-                        ? null
-                        : () async {
-                            await audioHandler.stopMixPreview();
-                            if (!mounted) return;
-                            setState(() {
-                              _songs = orderMixSongs(
-                                _songs,
-                                audioHandler.mixAnalyzer,
-                              );
-                              _index = 0;
-                              _orderChanged = true;
-                            });
-                          },
-                    icon: const Icon(Icons.sort),
-                    label: Text(l.mixSmartOrder),
-                  ),
-                  if (_orderChanged)
-                    FilledButton(
-                      onPressed: _saveOrder,
+                  if (_analyzing)
+                    TextButton(
+                      onPressed: _analyze,
+                      child: Text(l.mixAnalyzeStop),
+                    )
+                  else if (_orderChanged)
+                    FilledButton.tonal(
+                      onPressed: _savingOrder ? null : _saveOrder,
                       child: Text(l.mixApplyOrder),
-                    ),
-                  if (_done > 0 && !_analyzing)
-                    Text(
-                      '${l.mixAnalyzed}: $_done · ${l.mixAnalysisFailedCount}: $_failed',
                     ),
                 ],
               ),
             ),
-          ),
           if (_analyzing) LinearProgressIndicator(value: _done / _songs.length),
-          if (_orderChanged) Text(l.mixOrderPreview),
           if (_error != null) Text(_error!),
           Expanded(
             child: Row(

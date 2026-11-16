@@ -423,9 +423,12 @@ Future<int> moveSongsToCustomPlaylist(
 Future<bool> replaceCustomPlaylist(String playlistId, Map updated) async {
   final found = _findCustomPlaylist(playlistId);
   if (found == null) return false;
-  found.playlist
+  // Snapshot before clearing: updated may be the same map. The cast view
+  // writes entries individually even when the stored map has narrower types.
+  final replacement = Map.of(updated);
+  found.playlist.cast<dynamic, dynamic>()
     ..clear()
-    ..addAll(updated);
+    ..addAll(replacement);
   await _saveCustomPlaylist(found.isFromFolder);
   return true;
 }

@@ -48,6 +48,7 @@ class MixEdge {
     required this.soft,
     this.key,
     this.keyConfidence = 0,
+    this.bar = 0,
   });
 
   factory MixEdge.fromList(List<dynamic> values) => MixEdge(
@@ -59,6 +60,7 @@ class MixEdge {
     soft: (values[5] as num).toInt(),
     key: values.length > 6 && values[6] != -1 ? values[6].toInt() : null,
     keyConfidence: values.length > 7 ? values[7].toDouble() : 0,
+    bar: values.length > 8 ? (values[8] as num).toInt() : 0,
   );
 
   /// Where the sound starts (head) or ends (tail).
@@ -80,6 +82,10 @@ class MixEdge {
   final int soft;
   final int? key;
   final double keyConfidence;
+
+  /// Which beat of four (counted from [beatAt]) starts a bar: a guess from
+  /// where the loudness rises most.
+  final int bar;
   String? get camelot => key == null ? null : camelotKey(key!);
 
   /// Whether the song has a beat a transition can follow.
@@ -94,6 +100,7 @@ class MixEdge {
     soft,
     key ?? -1,
     keyConfidence,
+    bar,
   ];
 }
 
@@ -224,17 +231,21 @@ MixEdge analyzeEdge(
   var bpm = 0.0;
   var beat = 0.0;
   var beatAt = offset;
+  var bar = 0;
   if (bestLag > 0 && power > 0) {
     beat = (best / power).clamp(0.0, 1.0);
     // A held note ripples evenly too: hits must stand out of the loudness.
     final hits = sqrt(power / (last - first + 1)) / usual;
     beat *= (hits / 0.08).clamp(0.0, 1.0);
-    // Four beats apart the same lag is four times as precise.
+    // Many beats apart the same lag is that many times as precise.
     var period = bestLag.toDouble();
-    if (last - first > bestLag * 12) {
+    for (final beats in [4, 16, 64]) {
+      if (last - first < period * beats * 3) break;
+      final centre = (period * beats).round();
+      final reach = beats ~/ 2 + 2;
       var fine = 0.0;
-      var fineLag = bestLag * 4;
-      for (var lag = bestLag * 4 - 4; lag <= bestLag * 4 + 4; lag++) {
+      var fineLag = centre;
+      for (var lag = centre - reach; lag <= centre + reach; lag++) {
         final value = repeat(lag);
         if (value > fine) {
           fine = value;
@@ -245,7 +256,7 @@ MixEdge analyzeEdge(
       final after = repeat(fineLag + 1);
       final bend = before - 2 * fine + after;
       final shift = bend == 0 ? 0.0 : 0.5 * (before - after) / bend;
-      period = (fineLag + shift.clamp(-0.5, 0.5)) / 4;
+      period = (fineLag + shift.clamp(-0.5, 0.5)) / beats;
     }
     bpm = 60000 / (period * frameMs);
 
@@ -263,6 +274,21 @@ MixEdge analyzeEdge(
       }
     }
     beatAt = time(first + bestShift);
+    var barScore = -1.0;
+    for (var k = 0; k < 4; k++) {
+      var score = 0.0;
+      for (
+        var at = first + bestShift + k * period;
+        at <= last;
+        at += 4 * period
+      ) {
+        score += rise[at.round().clamp(0, frames - 1)];
+      }
+      if (score > barScore) {
+        barScore = score;
+        bar = k;
+      }
+    }
   }
 
   final harmony = detectMixKey(samples, rate);
@@ -275,6 +301,7 @@ MixEdge analyzeEdge(
     beatAt: beatAt,
     level: level,
     soft: soft,
+    bar: bar,
   );
 }
 
@@ -292,12 +319,36 @@ double tempoGap(double a, double b) {
   return (ratio - 1).abs();
 }
 
+/// A stretch of a song that is skipped, in milliseconds.
+typedef MixSkip = ({int start, int end});
+
+/// What the skipped stretches leave of a song at its two ends: where it
+/// really starts, and where it really ends (null: at its end).
+({int start, int? end}) mixBounds(List<MixSkip> skips, Duration? duration) {
+  final sorted = [...skips]..sort((a, b) => a.start.compareTo(b.start));
+  var start = 0;
+  for (final skip in sorted) {
+    if (skip.start <= start + 2000 && skip.end > start) start = skip.end;
+  }
+  int? end;
+  if (duration != null) {
+    var last = duration.inMilliseconds;
+    for (final skip in sorted.reversed) {
+      if (skip.end >= last - 3000 && skip.start < last && skip.start > start) {
+        end = last = skip.start;
+      }
+    }
+  }
+  return (start: start, end: end);
+}
+
 /// The Automatic transition: where and how a song of [duration] gives way
 /// to the next, from the [tail] of the one and the [head] of the other.
 /// The audio decides which styles fit; [pair] picks among them, so a
 /// playlist gets variety and the same pair always the same transition.
 /// [echo] says whether the outgoing player can echo on its beat. With an
 /// end missing it is a plain crossfade until the analysis is done.
+/// [endAt] and [startAt] keep it out of the skipped ends of the two songs.
 MixCue chooseCue({
   required Duration duration,
   required Duration? coming,
@@ -305,8 +356,10 @@ MixCue chooseCue({
   required MixEdge? head,
   required String pair,
   bool echo = false,
+  int? endAt,
+  int startAt = 0,
 }) {
-  final total = duration.inMilliseconds;
+  final total = min(duration.inMilliseconds, endAt ?? duration.inMilliseconds);
   // Never more than a third of either song.
   var longest = total ~/ 3;
   if (coming != null && coming > Duration.zero) {
@@ -333,11 +386,11 @@ MixCue chooseCue({
 
   if (tail == null || head == null) {
     final length = min(8000, longest);
-    return cue(total - length, 0, length, MixStyle.smooth);
+    return cue(total - length, startAt, length, MixStyle.smooth);
   }
 
   final end = tail.sound.clamp(0, total);
-  final start = head.sound;
+  final start = max(head.sound, startAt);
   // A recorded fade out is mostly left out: the beat is weak in it, and a
   // DJ leaves where the energy goes, not where the sound ends.
   final last = end - tail.soft ~/ 2;
@@ -466,6 +519,84 @@ List<double> mixEnvelope(Int16List samples, {int bins = 400}) {
   });
 }
 
+typedef _WholeSong = ({
+  MixEdge head,
+  MixEdge tail,
+  List<double> wave,
+  int length,
+});
+
+/// Reads a whole decoded song from the file at [path]: both its ends and its
+/// waveform, a tenth of a second each bar, scaled to its loudest.
+({MixEdge head, MixEdge tail, List<double> wave, int length})? inspectPcm(
+  String path,
+  int rate,
+) {
+  final bytes = File(path).readAsBytesSync();
+  final samples = bytes.buffer.asInt16List(0, bytes.length ~/ 2);
+  if (samples.isEmpty || rate <= 0) return null;
+  final ms = (samples.length * 1000 / rate).round();
+  final edge = min(samples.length, MixAnalyzer.stretch.inSeconds * rate);
+  final from = samples.length - edge;
+  final wave = mixEnvelope(samples, bins: (ms ~/ 100).clamp(400, 3000));
+  final peak = max(0.0001, wave.reduce(max));
+  // Tempo and key read over the whole song: an end with no beat, or that is
+  // short on notes, takes them from the song as a whole.
+  final song = analyzeEdge(samples, rate, offset: 0, tail: false);
+  MixEdge ofSong(MixEdge edge) {
+    final key = song.key ?? edge.key;
+    final keyConfidence = song.key == null
+        ? edge.keyConfidence
+        : song.keyConfidence;
+    if (!song.rhythmic ||
+        (edge.rhythmic && tempoGap(edge.bpm, song.bpm) > 0.03)) {
+      return MixEdge(
+        sound: edge.sound,
+        bpm: edge.bpm,
+        beat: edge.beat,
+        beatAt: edge.beatAt,
+        level: edge.level,
+        soft: edge.soft,
+        key: key,
+        keyConfidence: keyConfidence,
+        bar: edge.bar,
+      );
+    }
+    return MixEdge(
+      sound: edge.sound,
+      bpm: song.bpm,
+      beat: max(edge.beat, song.beat),
+      beatAt: song.beatAt,
+      level: edge.level,
+      soft: edge.soft,
+      key: key,
+      keyConfidence: keyConfidence,
+      bar: song.bar,
+    );
+  }
+
+  return (
+    head: ofSong(
+      analyzeEdge(
+        Int16List.sublistView(samples, 0, edge),
+        rate,
+        offset: 0,
+        tail: false,
+      ),
+    ),
+    tail: ofSong(
+      analyzeEdge(
+        Int16List.sublistView(samples, from),
+        rate,
+        offset: (from * 1000 / rate).round(),
+        tail: true,
+      ),
+    ),
+    wave: [for (final value in wave) value / peak],
+    length: ms,
+  );
+}
+
 /// Analyses the ends of songs in the background, one at a time, and keeps
 /// what it found: in memory, and for a month in the cache.
 class MixAnalyzer {
@@ -490,71 +621,137 @@ class MixAnalyzer {
   final changes = ValueNotifier<int>(0);
   Future<void> _queue = Future.value();
 
-  /// Inspect only the pair opened in the editor, in the background queue.
+  /// The longest song the editor reads whole.
+  static const longest = Duration(minutes: 20);
+
+  final _songs = <String, _WholeSong>{};
+  final _reading = <String, Future<_WholeSong?>>{};
+  Future<void> _editorQueue = Future.value();
+
+  /// The whole waveform of [song] and one of its ends, for the editor. One
+  /// decoding serves both ends, on a queue of its own: playback's analyses
+  /// do not hold the editor.
   Future<MixInspection?> inspect(
     Map song, {
     required bool tail,
-    required Duration duration,
-  }) {
-    final result = Completer<MixInspection?>();
-    _queue = _queue.then((_) async {
+    required Duration? duration,
+  }) async {
+    final id = song['ytid']?.toString();
+    if (id == null || id.isEmpty) return null;
+    final whole =
+        _songs[id] ??
+        _stored(song, id) ??
+        await (_reading[id] ??= _read(
+          Map<dynamic, dynamic>.of(song),
+          id,
+          duration,
+        ).whenComplete(() => _reading.remove(id)));
+    if (whole == null) return null;
+    return (
+      edge: tail ? whole.tail : whole.head,
+      wave: whole.wave,
+      offset: 0,
+      length: whole.length,
+    );
+  }
+
+  static String _waveKey(String id) => 'mix_v3_wave_$id';
+
+  void _remember(String id, _WholeSong whole) {
+    _songs.remove(id);
+    _songs[id] = whole;
+    if (_songs.length > 8) _songs.remove(_songs.keys.first);
+  }
+
+  /// A song read before: its waveform is kept with its ends.
+  _WholeSong? _stored(Map song, String id) {
+    final head = edge(song, tail: false);
+    final tail = edge(song, tail: true);
+    final stored = Hive.box('cache').get(_waveKey(id));
+    if (head == null || tail == null || stored is! Uint8List) return null;
+    if (stored.length < 5) return null;
+    final whole = (
+      head: head,
+      tail: tail,
+      wave: [for (final value in stored.skip(4)) value / 255],
+      length: ByteData.sublistView(stored).getUint32(0),
+    );
+    _remember(id, whole);
+    return whole;
+  }
+
+  Future<_WholeSong?> _read(Map song, String id, Duration? duration) {
+    final result = Completer<_WholeSong?>();
+    _editorQueue = _editorQueue.then((_) async {
+      File? scratch;
       try {
         final where = await locate(song);
-        if (where == null || duration <= Duration.zero) {
+        if (where == null || (duration != null && duration > longest)) {
           result.complete(null);
           return;
         }
-        // The whole song, so the transition can be put anywhere in it.
-        final decoded = await decode(
-          where,
-          start: Duration.zero,
-          length: duration + const Duration(seconds: 1),
+        final dir = await getTemporaryDirectory();
+        scratch = File(
+          '${dir.path}/mix_whole_${DateTime.now().microsecondsSinceEpoch}.pcm',
         );
-        if (decoded == null || decoded.samples.isEmpty) {
+        final rate = await _decodeTo(
+          where,
+          Duration.zero,
+          // A song of unknown length is read to its end.
+          duration == null ? longest : duration + const Duration(seconds: 1),
+          scratch.path,
+        );
+        if (rate <= 0 || !scratch.existsSync()) {
           result.complete(null);
           return;
         }
-        final ms = (decoded.samples.length * 1000 / decoded.rate).round();
-        final samples = decoded.samples;
-        final rate = decoded.rate;
-        final inspection = await Isolate.run(() {
-          // The edge is read from the same forty seconds as in playback.
-          final edgeLength = min(samples.length, stretch.inSeconds * rate);
-          final from = tail ? samples.length - edgeLength : 0;
-          return (
-            edge: analyzeEdge(
-              Int16List.sublistView(samples, from, from + edgeLength),
-              rate,
-              offset: tail ? (from * 1000 / rate).round() : 0,
-              tail: tail,
-            ),
-            wave: mixEnvelope(samples, bins: max(400, ms ~/ 100)),
-            offset: 0,
-            length: ms,
-          );
-        });
-        final id = song['ytid']?.toString();
-        if (id != null) {
-          _edges[_key(id, tail)] = inspection.edge;
-          await addOrUpdateData<List<num>>(
-            'cache',
-            _key(id, tail),
-            inspection.edge.toList(),
-          );
-          changes.value++;
+        final whole = await _wholeInIsolate(scratch.path, rate);
+        // Cut short at the limit: its end would not be the song's.
+        if (whole == null ||
+            (duration == null &&
+                whole.length > longest.inMilliseconds - 2000)) {
+          result.complete(null);
+          return;
         }
-        result.complete(inspection);
+        _remember(id, whole);
+        _edges[_key(id, false)] = whole.head;
+        _edges[_key(id, true)] = whole.tail;
+        final packed = Uint8List(4 + whole.wave.length);
+        ByteData.sublistView(packed).setUint32(0, whole.length);
+        for (var i = 0; i < whole.wave.length; i++) {
+          packed[4 + i] = (whole.wave[i] * 255).round().clamp(0, 255);
+        }
+        await addOrUpdateData<List<num>>(
+          'cache',
+          _key(id, false),
+          whole.head.toList(),
+        );
+        await addOrUpdateData<List<num>>(
+          'cache',
+          _key(id, true),
+          whole.tail.toList(),
+        );
+        await addOrUpdateData<Uint8List>('cache', _waveKey(id), packed);
+        changes.value++;
+        result.complete(whole);
       } catch (e, stackTrace) {
         logger.log(
           'Mix: editor analysis failed',
           error: e,
           stackTrace: stackTrace,
         );
-        result.complete(null);
+        if (!result.isCompleted) result.complete(null);
+      } finally {
+        if (scratch != null && scratch.existsSync())
+          unawaited(scratch.delete());
       }
     });
     return result.future;
   }
+
+  // Static: the isolate reads the file itself, so no samples are copied.
+  static Future<_WholeSong?> _wholeInIsolate(String path, int rate) =>
+      Isolate.run(() => inspectPcm(path, rate));
 
   static String _key(String id, bool tail) =>
       'mix_v2_edge_${id}_${tail ? 'tail' : 'head'}';
@@ -654,22 +851,7 @@ class MixAnalyzer {
       '${dir.path}/mix_decode_${DateTime.now().microsecondsSinceEpoch}.pcm',
     );
     try {
-      final int rate;
-      if (isAndroidPlatform) {
-        rate =
-            await _channel.invokeMethod<int>('decode', {
-              'source': where.source,
-              'headers': where.headers,
-              'startMs': start.inMilliseconds,
-              'lengthMs': length.inMilliseconds,
-              'out': scratch.path,
-            }) ??
-            0;
-      } else if (isDesktopPlatform) {
-        rate = await _decodeWithMpv(where, start, length, scratch.path);
-      } else {
-        return null;
-      }
+      final rate = await _decodeTo(where, start, length, scratch.path);
       if (rate <= 0 || !scratch.existsSync()) return null;
       final bytes = await scratch.readAsBytes();
       return (
@@ -679,6 +861,27 @@ class MixAnalyzer {
     } finally {
       if (scratch.existsSync()) unawaited(scratch.delete());
     }
+  }
+
+  /// Writes the samples to the file [out]; returns their rate, 0 on failure.
+  static Future<int> _decodeTo(
+    MixLocation where,
+    Duration start,
+    Duration length,
+    String out,
+  ) async {
+    if (isAndroidPlatform) {
+      return await _channel.invokeMethod<int>('decode', {
+            'source': where.source,
+            'headers': where.headers,
+            'startMs': start.inMilliseconds,
+            'lengthMs': length.inMilliseconds,
+            'out': out,
+          }) ??
+          0;
+    }
+    if (isDesktopPlatform) return _decodeWithMpv(where, start, length, out);
+    return 0;
   }
 
   /// An mpv of its own writes the stretch to a file as fast as it decodes.

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -44,6 +45,107 @@ MixEdge _edge(String name, MixEdge edge) {
 }
 
 void main() {
+  test('overlap holds both tracks across the window with short edges', () {
+    for (final t in [0.01, 0.1, 0.25, 0.5, 0.75, 0.9, 0.99]) {
+      final frame = mixFrame(MixStyle.smooth, t, volume: MixVolume.overlap);
+      expect(frame.inGain, closeTo(1, 0.000001));
+      expect(frame.outGain, closeTo(1, 0.000001));
+      expect(frame.inBands, mixFlat);
+      expect(frame.outBands, mixFlat);
+    }
+    expect(mixFrame(MixStyle.blend, 0).inGain, 0);
+    expect(mixFrame(MixStyle.blend, 1).outGain, closeTo(0, 0.000001));
+  });
+
+  test('skipped ends bound a song; a skip in the middle does not', () {
+    const length = Duration(seconds: 200);
+    expect(mixBounds(const [], length), (start: 0, end: null));
+    expect(
+      mixBounds(const [
+        (start: 0, end: 12000),
+        (start: 90000, end: 95000),
+        (start: 185000, end: 200000),
+      ], length),
+      (start: 12000, end: 185000),
+    );
+    expect(mixBounds(const [(start: 0, end: 12000)], null).end, isNull);
+  });
+
+  test('the Automatic transition keeps out of the skipped ends', () {
+    final cue = chooseCue(
+      duration: const Duration(seconds: 200),
+      coming: const Duration(seconds: 200),
+      tail: null,
+      head: null,
+      pair: 'a>b',
+      endAt: 185000,
+      startAt: 12000,
+    );
+    expect(cue.outStart + cue.length, const Duration(seconds: 185));
+    expect(cue.inStart, const Duration(seconds: 12));
+  });
+
+  test('a whole song gives both ends and a waveform scaled to its loudest', () {
+    const rate = 11025;
+    final samples = Int16List(rate * 60);
+    // A click every half second: 120 beats a minute.
+    for (var beat = 0; beat * rate ~/ 2 < samples.length; beat++) {
+      for (var i = 0; i < 300; i++) {
+        final at = beat * rate ~/ 2 + i;
+        if (at < samples.length) samples[at] = (12000 * (1 - i / 300)).round();
+      }
+    }
+    final file = File('${Directory.systemTemp.createTempSync().path}/song.pcm')
+      ..writeAsBytesSync(samples.buffer.asUint8List());
+    final whole = inspectPcm(file.path, rate)!;
+    file.parent.deleteSync(recursive: true);
+    expect(whole.length, 60000);
+    expect(whole.wave.length, 600);
+    expect(whole.wave.reduce(max), 1);
+    expect(whole.head.bpm, closeTo(120, 1));
+    expect(whole.tail.bpm, closeTo(120, 1));
+    expect(whole.tail.sound, greaterThan(55000));
+  });
+
+  test(
+    'a song with no beat at its ends takes tempo and bars from its body',
+    () {
+      const rate = 11025;
+      const bpm = 111.0;
+      const period = 60 / bpm;
+      final samples = Int16List(rate * 150);
+      final random = Random(3);
+      for (var i = 0; i < samples.length; i++) {
+        samples[i] =
+            (4000 * sin(2 * pi * 220 * i / rate) + 300 * random.nextDouble())
+                .round();
+      }
+      // Drums only from 45 s to 105 s; every fourth beat, the third, is loud.
+      for (var beat = 0; beat * period < 150; beat++) {
+        final start = (beat * period * rate).round();
+        if (start < 45 * rate || start > 105 * rate) continue;
+        final loud = beat % 4 == 2 ? 14000 : 8000;
+        for (var i = 0; i < 400 && start + i < samples.length; i++) {
+          samples[start + i] += (loud * (1 - i / 400)).round();
+        }
+      }
+      final file = File(
+        '${Directory.systemTemp.createTempSync().path}/song.pcm',
+      )..writeAsBytesSync(samples.buffer.asUint8List());
+      final whole = inspectPcm(file.path, rate)!;
+      file.parent.deleteSync(recursive: true);
+      for (final edge in [whole.head, whole.tail]) {
+        expect(edge.rhythmic, isTrue);
+        expect(edge.bpm, closeTo(bpm, 0.15));
+        // The accented beat is where the bar starts, to within a few frames.
+        const bar = 4 * period * 1000;
+        final barAt = edge.beatAt + edge.bar * period * 1000;
+        final off = (barAt - 2 * period * 1000) % bar;
+        expect(min(off, bar - off), lessThan(40));
+      }
+    },
+  );
+
   group('analyzeEdge', () {
     for (final bpm in [92.0, 120.0, 128.0, 174.0]) {
       test('finds a tempo of $bpm', () {
@@ -353,8 +455,10 @@ void main() {
       for (final style in MixStyle.values) {
         if (style == MixStyle.slam || style == MixStyle.echo) continue;
         var before = mixFrame(style, 0);
-        for (var i = 1; i <= 160; i++) {
-          final now = mixFrame(style, i / 160);
+        // Sample the short overlap edges as well as the longer crossfades.
+        final steps = style.volume == MixVolume.overlap ? 4000 : 160;
+        for (var i = 1; i <= steps; i++) {
+          final now = mixFrame(style, i / steps);
           expect((now.outGain - before.outGain).abs(), lessThan(0.1));
           expect((now.inGain - before.inGain).abs(), lessThan(0.1));
           expect((now.outBands.low - before.outBands.low).abs(), lessThan(7));

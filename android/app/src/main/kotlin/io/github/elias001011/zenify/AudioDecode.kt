@@ -20,7 +20,8 @@ object AudioDecode {
     lengthMs: Long,
     out: String,
   ): Int {
-    require(lengthMs in 1..40_000) { "Invalid analysis length" }
+    // A whole song for the editor's waveform: up to twenty minutes.
+    require(lengthMs in 1..1_200_000) { "Invalid analysis length" }
     val extractor = MediaExtractor()
     var codec: MediaCodec? = null
     try {
@@ -47,7 +48,7 @@ object AudioDecode {
       val info = MediaCodec.BufferInfo()
       var inputDone = false
       var outputDone = false
-      val deadline = SystemClock.elapsedRealtime() + 45_000
+      val deadline = SystemClock.elapsedRealtime() + 45_000 + lengthMs / 4
       var groupSum = 0L
       var groupFrames = 0
 
