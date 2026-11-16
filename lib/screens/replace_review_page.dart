@@ -76,7 +76,7 @@ class _ReplaceReviewPageState extends State<ReplaceReviewPage> {
       builder: (context) =>
           _ManualSearch(song: song, search: widget.search, exclude: exclude),
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     setState(() {
       _chosen[id] = picked;
       _byYou.add(id);
