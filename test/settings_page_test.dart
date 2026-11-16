@@ -113,6 +113,17 @@ void main() {
     });
   });
 
+  test('the pure black choice is saved under Musify\'s key too', () async {
+    final before = usePureBlackColor.value;
+    addTearDown(() => usePureBlackColor.value = before);
+    await setPureBlack(!before);
+
+    final settings = Hive.box('settings');
+    expect(usePureBlackColor.value, !before);
+    expect(settings.get('pureBlackTheme'), !before);
+    expect(settings.get('usePureBlackColor'), !before);
+  });
+
   group('accent colour row', () {
     Finder dot(String name) => find.descendant(
       of: barFinder(name),

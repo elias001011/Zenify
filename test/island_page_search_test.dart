@@ -90,6 +90,33 @@ void main() {
     page.dispose();
   });
 
+  testWidgets('a page search arriving on a shown island opens its field', (
+    tester,
+  ) async {
+    final page = _PageSearch();
+    Widget island(IslandPageSearch? search) => localizedApp(
+      IslandScaffold(
+        title: 'Search',
+        globalSearch: false,
+        pageSearch: search,
+        body: const Text('Page body'),
+      ),
+    );
+    await tester.pumpWidget(island(null));
+    expect(find.byType(TextField), findsNothing);
+
+    await tester.pumpWidget(island(page.value));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsOneWidget);
+
+    await tester.pumpWidget(island(null));
+    await tester.pumpAndSettle();
+    expect(find.byType(TextField), findsNothing);
+
+    await tester.pumpWidget(const SizedBox());
+    page.dispose();
+  });
+
   testWidgets('the search icon turns into the spinner while it loads', (
     tester,
   ) async {

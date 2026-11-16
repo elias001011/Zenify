@@ -254,6 +254,19 @@ class _IslandState extends State<_Island> with SingleTickerProviderStateMixin {
     reverseCurve: Motion.curve.flipped,
   );
 
+  @override
+  void didUpdateWidget(_Island oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // A page search arriving or leaving shows or hides the field.
+    final had = oldWidget.pageSearch != null;
+    final has = widget.pageSearch != null;
+    if (has && !had) {
+      _field.forward();
+    } else if (!has && had && !_searching) {
+      _field.reverse();
+    }
+  }
+
   // A page search brings its own, which the page owns.
   TextEditingController get _controller =>
       widget.pageSearch?.controller ?? _ownController;

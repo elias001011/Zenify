@@ -110,6 +110,14 @@ FloatingEffect _readFloatingEffect() {
 /// How the floating island, dock and rail let the content behind show.
 final floatingEffect = ValueNotifier<FloatingEffect>(_readFloatingEffect());
 
+/// Saves the choice under both keys, so a backup opened in Musify keeps it.
+Future<void> setPureBlack(bool value) async {
+  usePureBlackColor.value = value;
+  final settings = Hive.box('settings');
+  await settings.put('pureBlackTheme', value);
+  await settings.put('usePureBlackColor', value);
+}
+
 bool get isPureBlackTheme => usePureBlackColor.value;
 
 final offlineMode = ValueNotifier<bool>(

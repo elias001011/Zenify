@@ -19,6 +19,8 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:go_router/go_router.dart';
@@ -881,8 +883,7 @@ class SettingsPage extends StatelessWidget {
   }
 
   void _togglePureBlack(BuildContext context, bool value) {
-    addOrUpdateData<bool>('settings', 'pureBlackTheme', value);
-    usePureBlackColor.value = value;
+    unawaited(setPureBlack(value));
     Musify.updateAppState(context);
     showToast(context, context.l10n!.settingChangedMsg);
   }
