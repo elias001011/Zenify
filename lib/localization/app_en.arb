@@ -514,7 +514,6 @@
   "youtubePlaylistLinkOrId": "YouTube playlist link or ID",
   "imageSaved": "Image saved",
   "selectAll": "Select all",
-  "selectSongs": "Select songs",
   "moveToPlaylist": "Move to playlist",
   "songsMoved": "{count, plural, =1{1 song moved} other{{count} songs moved}}",
   "songsSelected": "{count, plural, =1{1 song selected} other{{count} songs selected}}",
