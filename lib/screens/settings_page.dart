@@ -54,6 +54,7 @@ import 'package:musify/widgets/desktop_settings_section.dart';
 import 'package:musify/widgets/floating_effect_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/picker.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/wave_reading_bar.dart';
 
@@ -662,7 +663,7 @@ class SettingsPage extends StatelessWidget {
   void _showAccentColorPicker(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    _showPickerDialog(
+    showPicker(
       context,
       title: context.l10n!.accentColor,
       content: GridView.builder(
@@ -733,7 +734,7 @@ class SettingsPage extends StatelessWidget {
       context.l10n!.themeModeDark,
     ];
 
-    _showPickerDialog(
+    showPicker(
       context,
       title: context.l10n!.themeMode,
       content: ListView(
@@ -770,11 +771,12 @@ class SettingsPage extends StatelessWidget {
         ? '$activeLanguageCode-$activeScriptCode'
         : activeLanguageCode;
 
-    _showPickerDialog(
+    showPicker(
       context,
       title: context.l10n!.language,
       height: 460,
       content: ListView.builder(
+        shrinkWrap: true,
         padding: commonListViewBottomPadding,
         itemCount: availableLanguages.length,
         itemBuilder: (context, index) {
@@ -812,7 +814,7 @@ class SettingsPage extends StatelessWidget {
       FluentIcons.speaker_2_24_filled,
     ];
 
-    _showPickerDialog(
+    showPicker(
       context,
       title: context.l10n!.audioQuality,
       content: ListView(
@@ -844,7 +846,7 @@ class SettingsPage extends StatelessWidget {
       : context.l10n!.songFadeSeconds(seconds);
 
   void _showSongFadePicker(BuildContext context) {
-    _showPickerDialog(
+    showPicker(
       context,
       title: context.l10n!.songFade,
       content: ListView(
@@ -859,33 +861,6 @@ class SettingsPage extends StatelessWidget {
             }, songFadeSeconds.value == seconds),
         ],
       ),
-    );
-  }
-
-  /// The one container of every Settings choice, a dialog on every platform.
-  void _showPickerDialog(
-    BuildContext context, {
-    required String title,
-    required Widget content,
-    double? height,
-  }) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(title),
-          contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          content: SizedBox(width: 420, height: height, child: content),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(
-                MaterialLocalizations.of(dialogContext).cancelButtonLabel,
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 

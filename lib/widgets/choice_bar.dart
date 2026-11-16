@@ -24,6 +24,7 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/utilities/flutter_toast.dart';
 import 'package:musify/widgets/bottom_sheet_bar.dart';
 import 'package:musify/widgets/custom_bar.dart';
+import 'package:musify/widgets/picker.dart';
 
 typedef Choice<T> = ({T value, String label, IconData icon});
 
@@ -64,31 +65,28 @@ class ChoiceBar<T> extends StatelessWidget {
   }
 
   void _choose(BuildContext context) {
-    // The dialog sits on the root navigator: pop it with its own context,
-    // or the settings page closes instead (see gokadzev/Musify#1010).
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(title),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final choice in choices)
-              BottomSheetBar(
-                choice.label,
-                () {
-                  Navigator.pop(dialogContext);
-                  setting.value = choice.value;
-                  onChosen(choice.value);
-                  if (notify && context.mounted) {
-                    showToast(context, context.l10n!.settingChangedMsg);
-                  }
-                },
-                setting.value == choice.value,
-                icon: choice.icon,
-              ),
-          ],
-        ),
+    showPicker(
+      context,
+      title: title,
+      content: ListView(
+        shrinkWrap: true,
+        children: [
+          for (final choice in choices)
+            BottomSheetBar(
+              choice.label,
+              () {
+                // The picker sits on the root navigator (see Musify#1010).
+                Navigator.of(context, rootNavigator: true).pop();
+                setting.value = choice.value;
+                onChosen(choice.value);
+                if (notify && context.mounted) {
+                  showToast(context, context.l10n!.settingChangedMsg);
+                }
+              },
+              setting.value == choice.value,
+              icon: choice.icon,
+            ),
+        ],
       ),
     );
   }
