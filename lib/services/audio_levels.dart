@@ -31,6 +31,7 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/mix_effects.dart';
+import 'package:musify/services/mix_playlists.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:rxdart/rxdart.dart';
@@ -85,15 +86,16 @@ class AudioLevels {
   /// Prepare analysis before any desktop source is opened. Opening/closing
   /// a visualizer must never add/remove filters on a playing output device.
   static void configureDesktop() {
-    // The Mix's bands come before the readings, which then follow them.
+    // The Mix's bands and the user's come before the readings, which then
+    // follow them; each only while it is in use.
     void filters() => JustAudioMediaKit.audioFilters = [
-      ...MixEffects.desktopFilters,
-      ...MixEffects.userFilters,
+      ...MixEffects.desktopChain,
       _bandsFilter,
     ];
     filters();
-    mixTransitions.addListener(filters);
-    equalizerEnabled.addListener(filters);
+    for (final setting in [mixTransitions, mixPlaylists, equalizerEnabled]) {
+      setting.addListener(filters);
+    }
     // Zenify uses speed, not independent pitch control. Native mpv speed
     // preserves the analysis chain; media_kit's pitch mode replaces `af`.
     JustAudioMediaKit.pitch = false;

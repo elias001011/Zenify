@@ -76,4 +76,67 @@ void main() {
     skip: library == null ? 'Set MUSIFY_TEST_LIBMPV' : false,
     timeout: const Timeout(Duration(seconds: 60)),
   );
+
+  test(
+    'the chain follows the settings: filters come and go, the readings stay',
+    () async {
+      final previous = NativePlayer.test;
+      NativePlayer.test = true;
+      addTearDown(() => NativePlayer.test = previous);
+      MediaKit.ensureInitialized(libmpv: library);
+      final directory = await Directory.systemTemp.createTemp('mix-chain');
+      addTearDown(() => directory.delete(recursive: true));
+      final file = await File('${directory.path}/beats.wav')
+          .writeAsBytes(beatsWav(seconds: 10));
+      JustAudioMediaKit.pitch = false;
+      JustAudioMediaKit.audioFilters = [
+        '@zviz:lavfi=[aformat=channel_layouts=stereo]',
+      ];
+      final player = MediaKitPlayer('mix-chain');
+      addTearDown(player.release);
+      await player.ready();
+      await player.setMpvProperty('ao', 'null');
+      await player.load(
+        LoadRequest(
+          audioSourceMessage: ProgressiveAudioSourceMessage(
+            id: 'beats',
+            uri: file.uri.toString(),
+            headers: {},
+          ),
+        ),
+      );
+      Future<String> chain() => player.getMpvProperty('af');
+      expect(await MixEffects.syncChain(player, const []), isFalse);
+      expect(await chain(), isNot(contains('zuser0')));
+
+      // The user's equalizer comes on: its five bands join the chain.
+      expect(
+        await MixEffects.syncChain(player, MixEffects.userFilters),
+        isTrue,
+      );
+      for (var i = 0; i < 5; i++) {
+        expect(await chain(), contains('zuser$i'));
+      }
+      expect(await chain(), isNot(contains('zmixl')));
+      expect(
+        await MixEffects.syncChain(player, MixEffects.userFilters),
+        isFalse,
+      );
+
+      // The Mix comes on too, then both go: only the readings are left.
+      await MixEffects.syncChain(player, [
+        ...MixEffects.desktopFilters,
+        ...MixEffects.userFilters,
+      ]);
+      expect(await chain(), contains('zmixe'));
+      expect(await MixEffects.syncChain(player, const []), isTrue);
+      final left = await chain();
+      for (final label in ['zmixl', 'zmixhp', 'zmixe', 'zuser0', 'zuser4']) {
+        expect(left, isNot(contains(label)), reason: label);
+      }
+      expect(left, contains('zviz'));
+    },
+    skip: library == null ? 'Set MUSIFY_TEST_LIBMPV' : false,
+    timeout: const Timeout(Duration(seconds: 60)),
+  );
 }

@@ -22,10 +22,12 @@
 import 'dart:async';
 import 'dart:math';
 
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:hive_ce/hive_ce.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart' show logger;
+import 'package:musify/services/mix_playlists.dart';
 import 'package:musify/services/mix_transition.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
@@ -37,8 +39,8 @@ import 'package:musify/utilities/platform_utils.dart';
 class MixEffects {
   MixEffects({required this.equalizerOf});
 
-  /// The filters every desktop player gets while the Mix is on. At 0 dB each
-  /// passes the sound as it is.
+  /// The filters a desktop player gets while some playlist plays with the Mix.
+  /// At 0 dB each passes the sound as it is.
   static final desktopFilters = [
     '@zmixl:lavfi=[bass=g=0:f=200]',
     '@zmixm:lavfi=[equalizer=f=1000:t=o:w=2:g=0]',
@@ -88,11 +90,78 @@ class MixEffects {
       '@zuser$i:lavfi=[equalizer=f=${desktopFrequencies[i]}:t=o:w=2:g=${equalizerEnabled.value ? desktopGains[i] : 0}]',
   ];
 
-  Future<void> updateDesktopEq() async {
+  /// Whether the desktop players need the Mix's filters.
+  static bool get mixFiltersWanted =>
+      mixTransitions.value && mixPlaylists.value.isNotEmpty;
+
+  /// What a desktop player has in its chain: the Mix's filters while it is in
+  /// use and the user's bands while their equalizer is on. A filter that is
+  /// not there costs nothing.
+  static List<String> get desktopChain => [
+    if (mixFiltersWanted) ...desktopFilters,
+    if (equalizerEnabled.value) ...userFilters,
+  ];
+
+  static String _label(String filter) =>
+      filter.substring(1, filter.indexOf(':'));
+
+  Future<void> _queue = Future.value();
+
+  Future<void> _enqueue(Future<void> Function() job) => _queue = _queue
+      .then((_) => job())
+      .catchError((Object e, StackTrace stackTrace) {
+        logger.log(
+          'Equalizer: desktop filters failed',
+          error: e,
+          stackTrace: stackTrace,
+        );
+      });
+
+  Future<void> updateDesktopEq() => _enqueue(_setGains);
+
+  /// Puts on each loaded desktop player the filters [desktopChain] asks for
+  /// and takes off the others. Changing the chain interrupts the sound for a
+  /// moment, so it is done only when a setting changes.
+  Future<void> syncDesktopFilters() => _enqueue(() async {
     for (final entry in _mpv.entries.toList()) {
       final mpv = entry.value;
-      if (mpv == null || entry.key.processingState == ProcessingState.idle)
+      if (mpv == null || entry.key.processingState == ProcessingState.idle) {
         continue;
+      }
+      final changed = await syncChain(mpv, desktopChain);
+      if (changed) {
+        _sent.remove(entry.key);
+        _echo[entry.key] = echoDefault;
+      }
+    }
+    await _setGains();
+  });
+
+  /// Puts [mpv]'s chain in line with [chain], leaving the other filters as
+  /// they are; false when nothing had to change.
+  @visibleForTesting
+  static Future<bool> syncChain(MediaKitPlayer mpv, List<String> chain) async {
+    final wanted = {for (final filter in chain) _label(filter)};
+    final present = await mpv.getMpvProperty('af');
+    var changed = false;
+    for (final filter in [...desktopFilters, ...userFilters]) {
+      final label = _label(filter);
+      final has = RegExp('\\b$label\\b').hasMatch(present);
+      if (has == wanted.contains(label)) continue;
+      await mpv.mpvCommand(
+        has ? ['af', 'remove', '@$label'] : ['af', 'add', filter],
+      );
+      changed = true;
+    }
+    return changed;
+  }
+
+  Future<void> _setGains() async {
+    for (final entry in _mpv.entries.toList()) {
+      final mpv = entry.value;
+      if (mpv == null || entry.key.processingState == ProcessingState.idle) {
+        continue;
+      }
       if (!(await mpv.getMpvProperty('af')).contains('zuser0')) continue;
       for (var i = 0; i < 5; i++) {
         await mpv.mpvCommand([
@@ -154,16 +223,9 @@ class MixEffects {
       _mpv[player] = mpv;
       _sent.remove(player);
       _echo[player] = echoDefault;
-      unawaited(
-        updateDesktopEq().catchError((Object e, StackTrace stack) {
-          logger.log(
-            'Equalizer: desktop setup failed',
-            error: e,
-            stackTrace: stack,
-          );
-        }),
-      );
     }
+    // The same mpv may have been prepared under other settings.
+    unawaited(syncDesktopFilters());
   }
 
   /// Puts [bands] to [player]. Calls may come faster than the player takes
