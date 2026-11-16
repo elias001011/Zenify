@@ -72,6 +72,49 @@ void main() {
     await tester.pump(const Duration(seconds: 30));
   });
 
+  testWidgets('a slow press on the buttons does not shrink the mini player', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    audioHandler = MusifyAudioHandler();
+    audioHandler.mediaItem.add(const MediaItem(id: 'short', title: 'A'));
+    audioHandler.playbackState.add(PlaybackState(playing: true));
+    await tester.pumpWidget(app(const ValueKey('press')));
+    await tester.pump(const Duration(milliseconds: 400));
+    double scale() => tester
+        .widget<AnimatedScale>(
+          find
+              .descendant(
+                of: find.byType(MiniPlayer),
+                matching: find.byType(AnimatedScale),
+              )
+              .first,
+        )
+        .scale;
+
+    // As a touchpad press does: longer than the 100 ms a tap-down waits.
+    final onButton = await tester.startGesture(
+      tester.getCenter(find.byType(IconButton).first),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(scale(), 1);
+    await onButton.cancel();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    // Away from the buttons it still gives under the finger.
+    final rect = tester.getRect(find.byType(MiniPlayer));
+    final onSpace = await tester.startGesture(
+      Offset(rect.left + 200, rect.center.dy),
+    );
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(scale(), lessThan(1));
+    await onSpace.up();
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 30));
+  });
+
   testWidgets(
     'the mini player keeps its artwork while the player shows waves',
     (tester) async {
