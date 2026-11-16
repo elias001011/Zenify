@@ -37,6 +37,49 @@ void main() {
     ),
   };
 
+  // And when everything fits, nothing scrolls.
+  for (final platform in [TargetPlatform.android, TargetPlatform.linux]) {
+    for (final entry in pickersFor(platform).entries) {
+      testWidgets(
+        '${entry.key} does not scroll when it fits on ${platform.name}',
+        (tester) async {
+          debugDefaultTargetPlatformOverride = platform;
+          applicationDirPath = '/tmp/zenify-picker-scroll-test';
+          try {
+            tester.view.physicalSize = const Size(900, 1400);
+            tester.view.devicePixelRatio = 1;
+            addTearDown(tester.view.reset);
+            await tester.pumpWidget(localizedApp(const SettingsPage()));
+            await tester.pump();
+
+            await Scrollable.ensureVisible(
+              tester.element(bar(entry.value.row)),
+              alignment: 0.5,
+            );
+            await tester.pump();
+            await tester.tap(bar(entry.value.row));
+            await tester.pumpAndSettle();
+
+            final dialog = find.byType(AlertDialog);
+            expect(dialog, findsOneWidget);
+            final scrollables = find.descendant(
+              of: dialog,
+              matching: find.byType(Scrollable),
+            );
+            for (final element in scrollables.evaluate()) {
+              final position =
+                  ((element as StatefulElement).state as ScrollableState)
+                      .position;
+              expect(position.maxScrollExtent, 0, reason: entry.key);
+            }
+          } finally {
+            debugDefaultTargetPlatformOverride = null;
+          }
+        },
+      );
+    }
+  }
+
   for (final platform in [TargetPlatform.android, TargetPlatform.linux]) {
     for (final entry in pickersFor(platform).entries) {
       testWidgets('${entry.key} reaches its last option in a short window '
