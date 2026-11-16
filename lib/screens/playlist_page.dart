@@ -40,11 +40,11 @@ import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/utilities/song_filtering.dart';
 import 'package:musify/utilities/sort_utils.dart';
 import 'package:musify/widgets/artwork_glow.dart';
-import 'package:musify/widgets/dialog_parts.dart';
 import 'package:musify/widgets/edit_playlist_dialog.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/music_list_surface.dart';
+import 'package:musify/widgets/picker.dart';
 import 'package:musify/widgets/playlist_page/add_to_playlist_button.dart';
 import 'package:musify/widgets/playlist_page/download_button.dart';
 import 'package:musify/widgets/playlist_page/empty_playlist_state.dart';
@@ -622,29 +622,23 @@ class _PlaylistPageState extends State<PlaylistPage> {
     final targets = getUserCustomPlaylists()
         .where((p) => p['ytid'] != _resolvedPlaylistId)
         .toList();
-    final target = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(context.l10n!.moveToPlaylist),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: targets.isEmpty
-              ? Text(context.l10n!.noCustomPlaylists)
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: targets.length,
-                  itemBuilder: (_, index) => ListTile(
-                    leading: const Icon(FluentIcons.album_24_regular),
-                    title: Text(targets[index]['title']?.toString() ?? ''),
-                    onTap: () => Navigator.pop(
-                      dialogContext,
-                      targets[index]['ytid'].toString(),
-                    ),
-                  ),
-                ),
-        ),
-        actions: [const DialogCancel()],
-      ),
+    final target = await showPicker<String>(
+      context,
+      title: context.l10n!.moveToPlaylist,
+      content: targets.isEmpty
+          ? Text(context.l10n!.noCustomPlaylists)
+          : ListView.builder(
+              shrinkWrap: true,
+              itemCount: targets.length,
+              itemBuilder: (_, index) => ListTile(
+                leading: const Icon(FluentIcons.album_24_regular),
+                title: Text(targets[index]['title']?.toString() ?? ''),
+                onTap: () => Navigator.of(
+                  context,
+                  rootNavigator: true,
+                ).pop(targets[index]['ytid'].toString()),
+              ),
+            ),
     );
     if (target == null || !mounted) return;
     try {

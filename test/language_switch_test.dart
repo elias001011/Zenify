@@ -93,8 +93,8 @@ void main() {
     });
   }
 
-  /// Opens the picker of [tileName] (a bottom sheet on a phone), picks [row],
-  /// and expects the sheet gone and the page still there.
+  /// Opens the picker of [tileName], picks [row], and expects the dialog gone
+  /// and the page still there.
   Future<void> pick(
     WidgetTester tester,
     String tileName,
@@ -103,14 +103,16 @@ void main() {
   }) async {
     await tester.tap(tile(tileName));
     await tester.pumpAndSettle();
-    final sheet = find.byType(BottomSheet);
-    expect(sheet, findsOneWidget, reason: reason);
-    expect(find.byType(AlertDialog), findsNothing, reason: reason);
+    final dialog = find.byType(AlertDialog);
+    expect(dialog, findsOneWidget, reason: reason);
 
     await tester.scrollUntilVisible(
       row,
       100,
-      scrollable: find.descendant(of: sheet, matching: find.byType(Scrollable)),
+      scrollable: find.descendant(
+        of: dialog,
+        matching: find.byType(Scrollable),
+      ),
     );
     await tester.ensureVisible(row);
     await tester.pumpAndSettle();
@@ -120,7 +122,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull, reason: reason);
-    expect(find.byType(BottomSheet), findsNothing, reason: reason);
+    expect(find.byType(AlertDialog), findsNothing, reason: reason);
     expect(find.byType(SettingsPage), findsOneWidget, reason: reason);
   }
 
@@ -186,7 +188,7 @@ void main() {
         l10n.accentColor,
         find
             .descendant(
-              of: find.byType(BottomSheet),
+              of: find.byType(AlertDialog),
               matching: find.byType(InkWell),
             )
             .at(3),

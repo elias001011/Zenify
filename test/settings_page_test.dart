@@ -226,7 +226,7 @@ void main() {
       });
     }
 
-    testWidgets('opens a sheet of Off and six lengths and saves the choice', (
+    testWidgets('opens a dialog of Off and six lengths and saves the choice', (
       tester,
     ) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -245,9 +245,12 @@ void main() {
         await tester.tap(barFinder(l10n.songFade));
         await tester.pumpAndSettle();
 
-        final dialog = find.byType(BottomSheet);
+        final dialog = find.byType(AlertDialog);
         expect(dialog, findsOneWidget);
-        expect(find.byType(AlertDialog), findsNothing);
+        expect(
+          find.descendant(of: dialog, matching: find.text(l10n.songFade)),
+          findsOneWidget,
+        );
         final options = [
           l10n.songFadeOff,
           for (final seconds in [2, 4, 6, 8, 10, 12])
@@ -265,8 +268,8 @@ void main() {
         await tester.tap(find.text(l10n.songFadeSeconds(8)));
         await tester.pumpAndSettle();
 
-        expect(find.byType(BottomSheet), findsNothing);
-        // The Settings page stays, only the sheet closes.
+        expect(find.byType(AlertDialog), findsNothing);
+        // The Settings page stays, only the dialog closes.
         expect(find.byType(SettingsPage), findsOneWidget);
         expect(songFadeSeconds.value, 8);
         expect(Hive.box('settings').get('songFadeSeconds'), 8);
@@ -278,7 +281,7 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(
           find.descendant(
-            of: find.byType(BottomSheet),
+            of: find.byType(AlertDialog),
             matching: find.text(l10n.songFadeOff),
           ),
         );
@@ -316,54 +319,56 @@ void main() {
   });
 
   group('pickers', () {
-    testWidgets(
-      'a phone picker is a bottom sheet and applies the chosen option',
-      (tester) async {
-        debugDefaultTargetPlatformOverride = TargetPlatform.android;
-        final before = audioQualitySetting.value;
-        addTearDown(() => audioQualitySetting.value = before);
-        try {
-          audioQualitySetting.value = 'high';
-          tester.view.physicalSize = const Size(390, 844);
-          tester.view.devicePixelRatio = 1;
-          addTearDown(tester.view.reset);
-          await tester.pumpWidget(localizedApp(const SettingsPage()));
-          await tester.pump();
+    testWidgets('a phone picker is a dialog and applies the chosen option', (
+      tester,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      final before = audioQualitySetting.value;
+      addTearDown(() => audioQualitySetting.value = before);
+      try {
+        audioQualitySetting.value = 'high';
+        tester.view.physicalSize = const Size(390, 844);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        await tester.pumpWidget(localizedApp(const SettingsPage()));
+        await tester.pump();
 
-          // Centred, as the floating title would cover a row at the top edge.
-          await Scrollable.ensureVisible(
-            tester.element(barFinder(l10n.audioQuality)),
-            alignment: 0.5,
+        // Centred, as the floating title would cover a row at the top edge.
+        await Scrollable.ensureVisible(
+          tester.element(barFinder(l10n.audioQuality)),
+          alignment: 0.5,
+        );
+        await tester.pump();
+        await tester.tap(barFinder(l10n.audioQuality));
+        await tester.pumpAndSettle();
+
+        final dialog = find.byType(AlertDialog);
+        expect(dialog, findsOneWidget);
+        expect(
+          find.descendant(of: dialog, matching: find.text(l10n.audioQuality)),
+          findsOneWidget,
+        );
+        for (final option in [
+          l10n.audioQualityLow,
+          l10n.audioQualityMedium,
+          l10n.audioQualityHigh,
+        ]) {
+          expect(
+            find.descendant(of: dialog, matching: find.text(option)),
+            findsOneWidget,
           );
-          await tester.pump();
-          await tester.tap(barFinder(l10n.audioQuality));
-          await tester.pumpAndSettle();
-
-          final dialog = find.byType(BottomSheet);
-          expect(dialog, findsOneWidget);
-          expect(find.byType(AlertDialog), findsNothing);
-          for (final option in [
-            l10n.audioQualityLow,
-            l10n.audioQualityMedium,
-            l10n.audioQualityHigh,
-          ]) {
-            expect(
-              find.descendant(of: dialog, matching: find.text(option)),
-              findsOneWidget,
-            );
-          }
-
-          await tester.tap(find.text(l10n.audioQualityLow));
-          await tester.pumpAndSettle();
-
-          expect(find.byType(BottomSheet), findsNothing);
-          expect(audioQualitySetting.value, 'low');
-          expect(Hive.box('settings').get('audioQuality'), 'low');
-          await Hive.box('settings').delete('audioQuality');
-        } finally {
-          debugDefaultTargetPlatformOverride = null;
         }
-      },
-    );
+
+        await tester.tap(find.text(l10n.audioQualityLow));
+        await tester.pumpAndSettle();
+
+        expect(find.byType(AlertDialog), findsNothing);
+        expect(audioQualitySetting.value, 'low');
+        expect(Hive.box('settings').get('audioQuality'), 'low');
+        await Hive.box('settings').delete('audioQuality');
+      } finally {
+        debugDefaultTargetPlatformOverride = null;
+      }
+    });
   });
 }

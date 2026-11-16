@@ -776,7 +776,6 @@ class SettingsPage extends StatelessWidget {
       title: context.l10n!.language,
       height: 460,
       content: ListView.builder(
-        shrinkWrap: true,
         padding: commonListViewBottomPadding,
         itemCount: availableLanguages.length,
         itemBuilder: (context, index) {
