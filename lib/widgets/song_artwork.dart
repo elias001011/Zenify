@@ -55,7 +55,8 @@ class SongArtworkWidget extends StatelessWidget {
               borderRadius: BorderRadius.circular(borderRadius),
               child: Image.file(
                 File(source),
-                cacheWidth: (size * MediaQuery.devicePixelRatioOf(context))
+                // Height, not width: a 16:9 thumbnail is cropped to a square.
+                cacheHeight: (size * MediaQuery.devicePixelRatioOf(context))
                     .round(),
                 fit: BoxFit.cover,
                 errorBuilder: (_, _, _) => NullArtworkWidget(

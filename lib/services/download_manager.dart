@@ -120,6 +120,9 @@ class DownloadManager {
   Timer? _persistTimer;
   final _inFlight = <String, _Request>{};
 
+  /// The saver writing each song's file, until it lets go of it.
+  final _saving = <String, Completer<void>>{};
+
   /// Whether nothing is queued or downloading, for a moment longer than the
   /// last download: playlists start one after the other, and what is told at
   /// the end must not come in between. Notices about failures wait for it.
@@ -210,9 +213,11 @@ class DownloadManager {
       return request.result;
     }
     final request = _Request(_stopEpoch)..askers.add(asker);
+    // A stopped one still writing the file: this one waits for it.
+    final winding = _saving[ytid]?.future;
     // A block body: `remove` returns this very request, whose future
     // whenComplete would then wait for for ever.
-    request.result = _run(song, save, request).whenComplete(() {
+    request.result = _run(song, save, request, after: winding).whenComplete(() {
       if (identical(_inFlight[ytid], request)) _inFlight.remove(ytid);
     });
     return (_inFlight[ytid] = request).result;
@@ -240,7 +245,12 @@ class DownloadManager {
   /// Whether the download of [ytid] was cancelled, so its saver stops.
   bool isCancelled(Object? ytid) => _inFlight[ytid]?.cancelled ?? false;
 
-  Future<bool> _run(Map song, SongSaver save, _Request request) async {
+  Future<bool> _run(
+    Map song,
+    SongSaver save,
+    _Request request, {
+    Future<void>? after,
+  }) async {
     final earlier = entries.value
         .where((e) => e.ytid == song['ytid'].toString() && !_isActive(e))
         .firstOrNull;
@@ -263,16 +273,26 @@ class DownloadManager {
       return false;
     }
 
+    if (after != null) await after;
     await _acquire();
     try {
       if (stopped() || request.askers.every((cancelled) => cancelled())) {
         return leave();
       }
       _track(entry..status = DownloadStatus.downloading);
-      await save(entry.song, (value) {
-        if (stopped()) throw const DownloadStopped();
-        entry.progress.value = value;
-      });
+      final writing = Completer<void>();
+      _saving[entry.ytid] = writing;
+      try {
+        await save(entry.song, (value) {
+          if (stopped()) throw const DownloadStopped();
+          entry.progress.value = value;
+        });
+      } finally {
+        writing.complete();
+        if (identical(_saving[entry.ytid], writing)) {
+          _saving.remove(entry.ytid);
+        }
+      }
       finished(entry);
       return true;
     } catch (error) {

@@ -328,6 +328,12 @@ class KeyboardShortcutsManager {
         if (song == null || ytid == null || ytid.isEmpty) break;
         // Local files are never downloaded.
         if (isLocalSongId(ytid)) break;
+        // A station plays, not this queue song.
+        final playing = audioHandler.mediaItem.value?.extras;
+        if (playing?['isLive'] == true &&
+            playing?['ytid']?.toString() != ytid) {
+          break;
+        }
         unawaited(_toggleCurrentSongOffline(song, ytid));
       case ShortcutAction.focusSearch:
         NavigationManager.router.go(NavigationManager.searchPath);
@@ -438,11 +444,34 @@ class GlobalShortcuts extends StatelessWidget {
     for (final matcher in matchers) {
       if (isRepeat && !_repeatableActions.contains(matcher.action)) continue;
       if (matcher.activator.accepts(event, keyboard)) {
+        // A focused button or switch keeps Space and Enter, as in any app.
+        if (_activatesFocusedControl(event, keyboard)) {
+          return KeyEventResult.ignored;
+        }
         KeyboardShortcutsManager.invoke(matcher.action);
         return KeyEventResult.handled;
       }
     }
     return KeyEventResult.ignored;
+  }
+
+  static final _activationKeys = {
+    LogicalKeyboardKey.space,
+    LogicalKeyboardKey.enter,
+    LogicalKeyboardKey.numpadEnter,
+  };
+
+  bool _activatesFocusedControl(KeyEvent event, HardwareKeyboard keyboard) {
+    if (!_activationKeys.contains(event.logicalKey) ||
+        keyboard.isControlPressed ||
+        keyboard.isAltPressed ||
+        keyboard.isMetaPressed ||
+        keyboard.isShiftPressed) {
+      return false;
+    }
+    final context = FocusManager.instance.primaryFocus?.context;
+    return context != null &&
+        Actions.maybeFind<ActivateIntent>(context) != null;
   }
 
   bool _isEditingText() {

@@ -54,6 +54,7 @@ import 'package:musify/widgets/desktop_settings_section.dart';
 import 'package:musify/widgets/floating_effect_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/picker.dart';
 import 'package:musify/widgets/section_header.dart';
 import 'package:musify/widgets/wave_reading_bar.dart';
 
@@ -220,16 +221,15 @@ class SettingsPage extends StatelessWidget {
               onChanged: (value) => _togglePureBlack(context, value),
             ),
           ),
-        if (isAndroidPlatform)
-          CustomBar(
-            context.l10n!.dynamicColor,
-            FluentIcons.toggle_left_24_regular,
-            description: context.l10n!.dynamicColorDescription,
-            trailing: Switch(
-              value: useSystemColor.value,
-              onChanged: (value) => _toggleSystemColor(context, value),
-            ),
+        CustomBar(
+          context.l10n!.dynamicColor,
+          FluentIcons.toggle_left_24_regular,
+          description: context.l10n!.dynamicColorDescription,
+          trailing: Switch(
+            value: useSystemColor.value,
+            onChanged: (value) => _toggleSystemColor(context, value),
           ),
+        ),
 
         ValueListenableBuilder<bool>(
           valueListenable: showAudioQualityBadge,
@@ -678,7 +678,7 @@ class SettingsPage extends StatelessWidget {
   void _showAccentColorPicker(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    _showPickerDialog(
+    showPicker(
       context,
       title: context.l10n!.accentColor,
       content: GridView.builder(
@@ -688,7 +688,6 @@ class SettingsPage extends StatelessWidget {
           crossAxisSpacing: 12,
         ),
         shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
         itemCount: availableColors.length,
         itemBuilder: (context, index) {
           final color = availableColors[index];
@@ -750,12 +749,11 @@ class SettingsPage extends StatelessWidget {
       context.l10n!.themeModeDark,
     ];
 
-    _showPickerDialog(
+    showPicker(
       context,
       title: context.l10n!.themeMode,
       content: ListView(
         shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
         children: [
           for (var index = 0; index < availableModes.length; index++)
             BottomSheetBar(
@@ -788,7 +786,7 @@ class SettingsPage extends StatelessWidget {
         ? '$activeLanguageCode-$activeScriptCode'
         : activeLanguageCode;
 
-    _showPickerDialog(
+    showPicker(
       context,
       title: context.l10n!.language,
       height: 460,
@@ -830,12 +828,11 @@ class SettingsPage extends StatelessWidget {
       FluentIcons.speaker_2_24_filled,
     ];
 
-    _showPickerDialog(
+    showPicker(
       context,
       title: context.l10n!.audioQuality,
       content: ListView(
         shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
         children: [
           for (var index = 0; index < availableQualities.length; index++)
             BottomSheetBar(
@@ -863,15 +860,11 @@ class SettingsPage extends StatelessWidget {
       : context.l10n!.songFadeSeconds(seconds);
 
   void _showSongFadePicker(BuildContext context) {
-    _showPickerDialog(
+    showPicker(
       context,
       title: context.l10n!.songFade,
       content: ListView(
         shrinkWrap: true,
-        // The 7 options need ~540 px; on shorter screens the list must scroll.
-        physics: MediaQuery.sizeOf(context).height >= 700
-            ? const NeverScrollableScrollPhysics()
-            : null,
         children: [
           for (final seconds in songFadeChoices)
             BottomSheetBar(_songFadeLabel(context, seconds), () {
@@ -882,33 +875,6 @@ class SettingsPage extends StatelessWidget {
             }, songFadeSeconds.value == seconds),
         ],
       ),
-    );
-  }
-
-  /// The one container of every Settings choice, a dialog on every platform.
-  void _showPickerDialog(
-    BuildContext context, {
-    required String title,
-    required Widget content,
-    double? height,
-  }) {
-    showDialog<void>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(title),
-          contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-          content: SizedBox(width: 420, height: height, child: content),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(
-                MaterialLocalizations.of(dialogContext).cancelButtonLabel,
-              ),
-            ),
-          ],
-        );
-      },
     );
   }
 

@@ -278,6 +278,30 @@ void main() {
         expect(await stopping, isFalse);
         expect(await again, isTrue);
         expect(saved, ['r']);
+        // The stopped one let go of its file before the new one began.
+        expect(peak, 1);
+      },
+    );
+
+    test(
+      'a stopped transfer is waited for even after a retry is cancelled',
+      () async {
+        final first = manager.download(song('x'), save);
+        await Future<void>.delayed(Duration.zero);
+        final stopped = manager.stopAll();
+        final retry = manager.download(song('x'), save);
+        await Future<void>.delayed(Duration.zero);
+        expect(manager.cancel('x'), isTrue);
+        final again = manager.download(song('x'), save);
+        await Future<void>.delayed(Duration.zero);
+        expect(running, 1);
+
+        open('x');
+        await stopped;
+        expect(await first, isFalse);
+        expect(await retry, isFalse);
+        expect(await again, isTrue);
+        expect(peak, 1);
       },
     );
 

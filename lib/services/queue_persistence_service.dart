@@ -98,8 +98,12 @@ class QueuePersistenceService {
     ];
     // Unshuffled, the original order is the queue itself: not saved twice.
     final shuffled = !listEquals(ids, originalIds);
+    // A duration found after the first save must be saved too.
+    final durations = [
+      for (final song in window) readMediaDuration(song['duration'])?.inSeconds,
+    ];
     final shape =
-        '$start|$keepGoing|$playlistId|${ids.join(',')}|${shuffled ? originalIds.join(',') : ''}';
+        '$start|$keepGoing|$playlistId|${ids.join(',')}|${shuffled ? originalIds.join(',') : ''}|${durations.join(',')}';
 
     if (shape == _savedShape && _pending == null) {
       // Same queue, another song: remember which, cheaply.
@@ -191,10 +195,11 @@ class QueuePersistenceService {
     }
     final ids = songs.map((song) => song['queueEntryId']).toSet();
     final original = songsOf(data['original']);
+    // Songs added while shuffled are in the queue only, as in the live queue.
     final validOriginal =
-        original.length == songs.length &&
+        original.isNotEmpty &&
         original.map((song) => song['queueEntryId']).toSet().length ==
-            ids.length &&
+            original.length &&
         original.every((song) => ids.contains(song['queueEntryId']));
     var position = Duration.zero;
     if (saved is Map &&

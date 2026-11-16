@@ -234,12 +234,25 @@ class _Island extends StatefulWidget {
   State<_Island> createState() => _IslandState();
 }
 
-class _IslandState extends State<_Island> {
+class _IslandState extends State<_Island> with SingleTickerProviderStateMixin {
   static const _searchWidth = 480.0;
 
   final _ownController = TextEditingController();
   final _ownFocusNode = FocusNode();
   bool _searching = false;
+
+  // 1 with the field shown. Each part sizes itself, so the title's own
+  // resize carries the buttons after it along with the edge.
+  late final _field = AnimationController(
+    vsync: this,
+    duration: Motion.medium,
+    value: widget.pageSearch != null ? 1 : 0,
+  )..addStatusListener((_) => setState(() {}));
+  late final _fieldCurve = CurvedAnimation(
+    parent: _field,
+    curve: Motion.curve,
+    reverseCurve: Motion.curve.flipped,
+  );
 
   // A page search brings its own, which the page owns.
   TextEditingController get _controller =>
@@ -249,6 +262,8 @@ class _IslandState extends State<_Island> {
   @override
   void dispose() {
     offlineMode.removeListener(_onOfflineChanged);
+    _fieldCurve.dispose();
+    _field.dispose();
     _ownController.dispose();
     _ownFocusNode.dispose();
     super.dispose();
@@ -256,6 +271,7 @@ class _IslandState extends State<_Island> {
 
   void _openSearch() {
     setState(() => _searching = true);
+    _field.forward();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _focusNode.requestFocus();
     });
@@ -265,6 +281,10 @@ class _IslandState extends State<_Island> {
     _controller.clear();
     widget.onFilter?.call('');
     setState(() => _searching = false);
+    if (widget.pageSearch == null) {
+      _ownFocusNode.unfocus();
+      _field.reverse();
+    }
   }
 
   /// The clear button of a page search: the text goes, the focus stays.
@@ -327,10 +347,26 @@ class _IslandState extends State<_Island> {
   Widget build(BuildContext context) {
     final showSearch =
         widget.onFilter != null || (widget.globalSearch && !offlineMode.value);
-    final fieldShown = _searching || widget.pageSearch != null;
-    final width = fieldShown
-        ? (widget.maxWidth < _searchWidth ? widget.maxWidth : _searchWidth)
-        : null;
+    final fieldWidth = widget.maxWidth < _searchWidth
+        ? widget.maxWidth
+        : _searchWidth;
+    final fieldShown =
+        _field.status == AnimationStatus.forward || _field.isCompleted;
+    Widget bar() => _part(
+      key: const ValueKey('bar'),
+      factor: ReverseAnimation(_fieldCurve),
+      shown: !fieldShown,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: widget.maxWidth),
+        child: _buildBar(context, showSearch),
+      ),
+    );
+    Widget field() => _part(
+      key: const ValueKey('field'),
+      factor: _fieldCurve,
+      shown: fieldShown,
+      child: SizedBox(width: fieldWidth, child: _buildSearchField(context)),
+    );
 
     // Its own layer: with blur on, resizing would repaint the page each frame.
     return PopScope(
@@ -347,17 +383,17 @@ class _IslandState extends State<_Island> {
             borderRadius: const BorderRadius.all(
               Radius.circular(_islandHeight / 2),
             ),
-            child: AnimatedSize(
-              // Quick, so what it reveals does not trail behind its edge.
-              duration: Motion.short,
-              curve: Motion.curve,
-              alignment: Alignment.centerLeft,
-              child: SizedBox(
-                height: _islandHeight,
-                width: width,
-                child: fieldShown
-                    ? _buildSearchField(context)
-                    : _buildBar(context, showSearch),
+            child: SizedBox(
+              height: _islandHeight,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                // The part coming in first, so it stays put as the edge
+                // reveals it; the one leaving empties at once.
+                children: [
+                  if (fieldShown) field() else bar(),
+                  if (_field.isAnimating)
+                    if (fieldShown) bar() else field(),
+                ],
               ),
             ),
           ),
@@ -365,6 +401,31 @@ class _IslandState extends State<_Island> {
       ),
     );
   }
+
+  /// The bar or the field, at [factor] of its width; the one leaving is
+  /// blank and takes no focus or taps.
+  Widget _part({
+    required Key key,
+    required Animation<double> factor,
+    required bool shown,
+    required Widget child,
+  }) => AnimatedBuilder(
+    key: key,
+    animation: factor,
+    // Not clipped here: the island's own shape cuts what passes its edge.
+    builder: (context, child) => Align(
+      alignment: AlignmentDirectional.centerStart,
+      widthFactor: factor.value,
+      child: child,
+    ),
+    child: ExcludeFocus(
+      excluding: !shown,
+      child: IgnorePointer(
+        ignoring: !shown,
+        child: Opacity(opacity: shown ? 1 : 0, child: child),
+      ),
+    ),
+  );
 
   /// Only pages pushed over another one in their own navigator: a tab's
   /// first page has nowhere to go back to.
@@ -403,16 +464,22 @@ class _IslandState extends State<_Island> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (canPop) _backButton(context),
-          // Left out while hidden, so the island stays compact.
-          if (widget.title.isNotEmpty && titleShown)
+          if (widget.title.isNotEmpty)
             Flexible(
-              child: TweenAnimationBuilder<double>(
-                tween: Tween(begin: 0, end: 1),
-                duration: Motion.short,
+              // Empty while hidden, so the island stays compact.
+              child: AnimatedSize(
+                duration: Motion.medium,
                 curve: Motion.curve,
-                builder: (context, opacity, child) =>
-                    Opacity(opacity: opacity, child: child),
-                child: titleText,
+                alignment: AlignmentDirectional.centerStart,
+                child: titleShown
+                    ? TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: Motion.medium,
+                        builder: (context, opacity, child) =>
+                            Opacity(opacity: opacity, child: child),
+                        child: titleText,
+                      )
+                    : const SizedBox.shrink(),
               ),
             ),
           ...widget.actions,

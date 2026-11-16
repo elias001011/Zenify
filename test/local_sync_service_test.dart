@@ -594,12 +594,44 @@ void main() {
     },
   );
 
+  test(
+    'a page that closes or opens while the server changes is honoured',
+    () async {
+      await server.dispose();
+      await Hive.box('settings')
+          .putAll({'localSyncEnabled': true, 'localSyncAutomatic': false});
+      reloadSettingsFromStorage();
+      server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
+      await server.initialise();
+
+      // Closed before the server finished opening.
+      final opening = server.pageOpened();
+      await server.pageClosed();
+      await opening;
+      expect(server.serverPort, isNull);
+
+      // Opened again before the server finished closing.
+      await server.pageOpened();
+      final closing = server.pageClosed();
+      await server.pageOpened();
+      await closing;
+      expect(server.serverPort, isNotNull);
+
+      await server.pageClosed();
+      await server.setEnabled(false);
+    },
+  );
+
   test('only mobile data and tunnels are not a local network', () {
     expect(LocalSyncService.hasLocalNetwork(['wlan0']), isTrue);
     expect(LocalSyncService.hasLocalNetwork(['rmnet_data0', 'eth0']), isTrue);
     expect(LocalSyncService.hasLocalNetwork(['rmnet_data0', 'tun0']), isFalse);
     expect(LocalSyncService.hasLocalNetwork(const []), isFalse);
     expect(LocalSyncService.hasLocalNetwork(['wlp3s0']), isTrue);
+    // Seen on a phone with only mobile data: the IPv4 side of an IPv6 network.
+    expect(LocalSyncService.hasLocalNetwork(['v4-ccmni0']), isFalse);
+    expect(LocalSyncService.hasLocalNetwork(['v4-rmnet_data0']), isFalse);
+    expect(LocalSyncService.hasLocalNetwork(['wlan0', 'v4-ccmni0']), isTrue);
   });
 
   test('turning sync on starts one sync, not two', () async {

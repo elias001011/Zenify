@@ -29,8 +29,11 @@ List<List<String>> parseCsv(String input) {
       if (quoted && index + 1 < input.length && input[index + 1] == '"') {
         field.write('"');
         index++;
-      } else {
+      } else if (quoted || field.isEmpty) {
         quoted = !quoted;
+      } else {
+        // A quote inside an unquoted field is just text.
+        field.write(character);
       }
     } else if (character == ',' && !quoted) {
       row.add(field.toString());

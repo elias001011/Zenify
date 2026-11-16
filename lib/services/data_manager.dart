@@ -306,6 +306,7 @@ const _deviceSettings = [
   'equalizerBandGains',
   'showPlayerVisualizer',
   'useSystemColor',
+  'volume',
 ];
 
 const _libraryBoxes = ['user', 'settings'];

@@ -48,6 +48,8 @@ void main() {
             'audioPath': wav.path,
           },
       ]);
+      // Let the first save happen before the durations are known.
+      await Future<void>.delayed(const Duration(milliseconds: 500));
       await original.skipToSong(1);
       await original.pause();
       await original.seek(const Duration(seconds: 5));

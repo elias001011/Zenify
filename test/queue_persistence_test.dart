@@ -196,4 +196,31 @@ void main() {
       expect(QueuePersistenceService().read()!.keepGoing, isFalse);
     },
   );
+
+  test('a duration found after the first save is saved too', () async {
+    final local = {...song(0), 'ytid': 'local:a', 'audioPath': '/a.wav'}
+      ..remove('duration');
+    memory.saveQueue([local], [local], 0);
+    await memory.flush();
+
+    local['duration'] = 20;
+    memory.saveQueue([local], [local], 0);
+    await memory.flush();
+
+    expect(QueuePersistenceService().read()!.songs.single['duration'], 20);
+  });
+
+  test('a song added while shuffled keeps the saved original order', () async {
+    final original = [for (var i = 0; i < 4; i++) song(i)];
+    final shuffled = [original[2], original[0], original[3], original[1]];
+    final added = {...song(9), 'isManuallyAdded': true};
+    memory.saveQueue([...shuffled, added], original, 0);
+    await memory.flush();
+
+    final restored = QueuePersistenceService().read()!;
+    expect(
+      restored.original.map((s) => s['queueEntryId']),
+      original.map((s) => s['queueEntryId']),
+    );
+  });
 }
