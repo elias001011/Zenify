@@ -142,7 +142,9 @@ Map? _searchAppPlaylistsById(String id) {
   }
   // Zenify's own playlists are made by the Moods and kept in its cache, not
   // in the library: a pin on one would be dropped as gone otherwise.
-  if (MoodsService.isZenifyPlaylist(id)) return moodsService.cachedPlaylist(id);
+  if (MoodsService.isZenifyPlaylist(id) && moodsEnabled.value) {
+    return moodsService.cachedPlaylist(id);
+  }
   return null;
 }
 

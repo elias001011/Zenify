@@ -363,6 +363,9 @@ class AudioLevels {
 /// measured against its own recent peak, which decays, so quiet songs and
 /// quiet treble still move; a band far below the song's loudness stays low.
 /// A beat is the low bands rising above their recent average.
+/// Below this a peak stops decaying: hours of silence must not divide by zero.
+const _peakFloor = 1e-6;
+
 class _Normalizer {
   double _loudPeak = 1e-4;
   final _bandPeaks = List<double>.filled(AudioLevels.bandCount, 1e-4);
@@ -386,11 +389,11 @@ class _Normalizer {
         _bandPeaks[i] = max(_bandPeaks[i], frame.bands[i] * 1.6);
       }
     }
-    _loudPeak = max(frame.loud, _loudPeak * 0.997);
+    _loudPeak = max(frame.loud, max(_loudPeak * 0.997, _peakFloor));
     final bands = <double>[];
     for (var i = 0; i < AudioLevels.bandCount; i++) {
       final value = i < frame.bands.length ? frame.bands[i] : 0.0;
-      _bandPeaks[i] = max(value, _bandPeaks[i] * 0.996);
+      _bandPeaks[i] = max(value, max(_bandPeaks[i] * 0.996, _peakFloor));
       final relative = (value / _bandPeaks[i]).clamp(0.0, 1.0);
       final presence = (value / (_loudPeak * 0.02)).clamp(0.0, 1.0);
       bands.add(sqrt(relative) * presence);

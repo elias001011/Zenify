@@ -5,6 +5,7 @@ import 'package:hive_ce/hive_ce.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/settings_manager.dart' show moodsEnabled;
 
 void main() {
   late Directory directory;
@@ -117,5 +118,29 @@ void main() {
     final listed = resolvePinnedPlaylists(pinnedPlaylistIds.value);
     expect(listed.map((p) => p['ytid']), ['zenify:daily', 'p1']);
     expect(MoodsService.isZenifyPlaylist('zenify:daily'), isTrue);
+  });
+
+  testWidgets('a pin on a Zenify playlist is not counted with the Moods off', (
+    tester,
+  ) async {
+    late BuildContext context;
+    await tester.pumpWidget(
+      Builder(
+        builder: (c) {
+          context = c;
+          return const SizedBox();
+        },
+      ),
+    );
+    userCustomPlaylists.value = [];
+    pinnedPlaylistIds.value = [];
+    final before = moodsEnabled.value;
+    addTearDown(() => moodsEnabled.value = before);
+
+    moodsEnabled.value = true;
+    expect(togglePinnedPlaylist('zenify:daily', context), isTrue);
+    moodsEnabled.value = false;
+    // Hidden with the Moods, so it must not take one of the places.
+    expect(resolvePinnedPlaylists(pinnedPlaylistIds.value), isEmpty);
   });
 }

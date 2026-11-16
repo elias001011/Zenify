@@ -49,6 +49,13 @@ void main() {
     expect(csvFileName('x' * 200, taken).length, 84);
   });
 
+  test('Windows reads the part before the dot as the device name', () {
+    final taken = <String>{};
+    expect(csvFileName('Aux. Mix', taken), '_Aux. Mix.csv');
+    expect(csvFileName('Con.Tempo', taken), '_Con.Tempo.csv');
+    expect(csvFileName('Auxiliar', taken), 'Auxiliar.csv');
+  });
+
   test('a title that looks like a formula is shown, not run', () {
     final csv = playlistCsv([
       {'ytid': '-abcdefghij', 'title': '=HYPERLINK("x")', 'artist': '+1'},

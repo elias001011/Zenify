@@ -155,7 +155,10 @@ String csvFileName(
   var base = String.fromCharCodes(
     (clean.isEmpty ? 'playlist' : clean).runes.take(80),
   );
-  if (_windowsDeviceName.hasMatch(base)) base = '_$base';
+  // Windows reads "Aux. Mix" as the device AUX: only what is before the dot counts.
+  if (_windowsDeviceName.hasMatch(base.split('.').first.trimRight())) {
+    base = '_$base';
+  }
   var name = '$base.csv';
   for (
     var copy = 2;
@@ -191,7 +194,15 @@ Future<({List<String> files, int failed})> writePlaylistCsvs(
         exists: (name) => File('${directory.path}/$name').existsSync(),
       );
       final file = File('${directory.path}/$name');
-      await file.writeAsString(playlistCsv(songs));
+      // Through a temporary name, so a cut-off write never looks like a playlist.
+      final partial = File('${file.path}.part');
+      try {
+        await partial.writeAsString(playlistCsv(songs));
+        await partial.rename(file.path);
+      } catch (_) {
+        if (partial.existsSync()) partial.deleteSync();
+        rethrow;
+      }
       files.add(file.path);
     } catch (_) {
       failed++;

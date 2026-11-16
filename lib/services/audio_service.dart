@@ -2119,6 +2119,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> fastForward() {
+    if (_playsRadio) return Future.value();
     final target = _position + const Duration(seconds: 15);
     final trackDuration = audioPlayer.duration;
     final clamped = (trackDuration != null && target > trackDuration)
@@ -2129,6 +2130,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> rewind() {
+    if (_playsRadio) return Future.value();
     final target = _position - const Duration(seconds: 15);
     final clamped = target < Duration.zero ? Duration.zero : target;
     return seek(clamped);

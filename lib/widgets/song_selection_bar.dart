@@ -339,7 +339,8 @@ class SongSelectionBar extends StatelessWidget {
       () => Future.wait([for (final song in songs) makeSongOffline(song)]),
     );
     final downloaded = results.where((saved) => saved).length;
-    if (context.mounted) {
+    // What failed is told by the downloads' own notice.
+    if (downloaded > 0 && context.mounted) {
       showToast(context, context.l10n!.songsAddedToOffline(downloaded));
     }
   }
