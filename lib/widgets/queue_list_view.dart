@@ -512,7 +512,7 @@ class _ArtworkThumbnail extends StatelessWidget {
           File(artworkPath),
           width: size,
           height: size,
-          cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
+          cacheHeight: (size * MediaQuery.devicePixelRatioOf(context)).round(),
           fit: BoxFit.cover,
           errorBuilder: (_, __, ___) => _fallback(),
         ),
