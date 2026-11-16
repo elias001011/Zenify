@@ -463,25 +463,7 @@ bool reorderCustomPlaylist(String playlistId, List<dynamic> orderedSongs) {
       !ids.every(byId.containsKey))
     return false;
   found.playlist['list'] = [for (final id in ids) byId[id]];
-  if (found.isFromFolder) {
-    userPlaylistFolders.value = [...userPlaylistFolders.value];
-    unawaited(
-      addOrUpdateData<List>(
-        'user',
-        'playlistFolders',
-        userPlaylistFolders.value,
-      ),
-    );
-  } else {
-    userCustomPlaylists.value = [...userCustomPlaylists.value];
-    unawaited(
-      addOrUpdateData<List>(
-        'user',
-        'customPlaylists',
-        userCustomPlaylists.value,
-      ),
-    );
-  }
+  unawaited(_saveCustomPlaylist(found.isFromFolder));
   return true;
 }
 
