@@ -12,6 +12,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/audio_levels.dart';
 import 'package:musify/services/audio_service.dart';
+import 'package:musify/services/settings_manager.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../support/audio_fixture.dart';
@@ -59,6 +60,8 @@ void main() {
         JustAudioMediaKit.audioFilters = previousFilters;
         JustAudioMediaKit.pitch = previousPitch;
       });
+      showPlayerVisualizer.value = true;
+      addTearDown(() => showPlayerVisualizer.value = false);
       AudioLevels.configureDesktop();
 
       final wav = File('${dir.path}/beats.wav')..writeAsBytesSync(beatsWav());
@@ -162,6 +165,71 @@ void main() {
       expect(await replacement.getMpvProperty('af'), chainAfterCancel);
       await again.cancel();
       expect(replacement.filterEdits, isEmpty);
+    },
+    skip: library == null
+        ? 'Set MUSIFY_TEST_LIBMPV to run the native level reader check'
+        : false,
+    timeout: const Timeout(Duration(seconds: 60)),
+  );
+
+  test(
+    'the analysis is in the chain only while the waves are on',
+    () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final dir = await Directory.systemTemp.createTemp('musify_levels_toggle');
+      addTearDown(() => dir.delete(recursive: true));
+      Hive.init(dir.path);
+      for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
+        await Hive.openBox(box);
+      }
+      addTearDown(Hive.close);
+      final previousMode = NativePlayer.test;
+      NativePlayer.test = true;
+      addTearDown(() => NativePlayer.test = previousMode);
+      MediaKit.ensureInitialized(libmpv: library);
+      final previousFilters = JustAudioMediaKit.audioFilters;
+      final previousPitch = JustAudioMediaKit.pitch;
+      addTearDown(() {
+        JustAudioMediaKit.audioFilters = previousFilters;
+        JustAudioMediaKit.pitch = previousPitch;
+      });
+      showPlayerVisualizer.value = false;
+      waveReading.value = WaveReading.precise;
+      AudioLevels.configureDesktop();
+
+      final wav = File('${dir.path}/beats.wav')..writeAsBytesSync(beatsWav());
+      final player = _TrackedPlayer('toggle');
+      addTearDown(player.release);
+      await player.ready();
+      await player.setMpvProperty('ao', 'null');
+      await player.load(
+        LoadRequest(
+          audioSourceMessage: ProgressiveAudioSourceMessage(
+            id: 'beats',
+            uri: wav.uri.toString(),
+          ),
+        ),
+      );
+      await player.play(PlayRequest());
+      expect(await player.getMpvProperty('af'), isEmpty);
+
+      Future<String> chainAfter(bool on) async {
+        showPlayerVisualizer.value = on;
+        await Future<void>.delayed(const Duration(milliseconds: 300));
+        return player.getMpvProperty('af');
+      }
+
+      expect(await chainAfter(true), contains('amerge'));
+      expect(await chainAfter(false), isEmpty);
+      // The simple reading needs no analysis either.
+      expect(await chainAfter(true), contains('amerge'));
+      waveReading.value = WaveReading.simple;
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(await player.getMpvProperty('af'), isEmpty);
+      waveReading.value = WaveReading.precise;
+      showPlayerVisualizer.value = false;
     },
     skip: library == null
         ? 'Set MUSIFY_TEST_LIBMPV to run the native level reader check'

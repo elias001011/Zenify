@@ -59,8 +59,8 @@ class AudioLevels {
   static const _frames = MethodChannel('zenify/audio_levels/frames');
 
   /// mpv's label for the filters; their numbers land in `af-metadata/zviz`.
-  /// They are installed at engine preparation and retained until disposal.
-  /// The widgets only poll their metadata while visible.
+  /// They are in the chain only while the waves are on; the widgets only poll
+  /// their metadata while visible.
   static const _label = 'zviz';
   static const _mono = 'pan=mono|c0=0.5*c0+0.5*c1';
 
@@ -81,13 +81,50 @@ class AudioLevels {
       'measure_perchannel=RMS_level,'
       'pan=stereo|c0=c0|c1=c1]';
 
-  /// Prepare analysis before any desktop source is opened. Opening/closing
-  /// a visualizer must never add/remove filters on a playing output device.
+  /// The analysis is only in the libmpv chain while the waves read it.
+  static bool get _bandsWanted =>
+      showPlayerVisualizer.value && waveReading.value == WaveReading.precise;
+
+  /// Prepares the analysis for the players opened from now on and keeps the
+  /// open one in line when the waves are turned on or off.
   static void configureDesktop() {
-    JustAudioMediaKit.audioFilters = const [_bandsFilter];
+    JustAudioMediaKit.audioFilters = [if (_bandsWanted) _bandsFilter];
+    showPlayerVisualizer.removeListener(_onWavesChanged);
+    waveReading.removeListener(_onWavesChanged);
+    showPlayerVisualizer.addListener(_onWavesChanged);
+    waveReading.addListener(_onWavesChanged);
     // Zenify uses speed, not independent pitch control. Native mpv speed
     // preserves the analysis chain; media_kit's pitch mode replaces `af`.
     JustAudioMediaKit.pitch = false;
+  }
+
+  static Future<void> _syncing = Future.value();
+
+  static void _onWavesChanged() {
+    JustAudioMediaKit.audioFilters = [if (_bandsWanted) _bandsFilter];
+    final player = MediaKitPlayer.latest;
+    if (player == null) return;
+    _syncing = _syncing.then((_) => syncBands(player)).catchError((
+      Object e,
+      StackTrace stackTrace,
+    ) {
+      logger.log(
+        'Wave analysis filter failed',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    });
+  }
+
+  /// Puts the analysis in or out of [player]'s chain as the waves ask; the
+  /// sound passes through unchanged either way.
+  @visibleForTesting
+  static Future<void> syncBands(MediaKitPlayer player) async {
+    final has = (await player.getMpvProperty('af')).contains('@$_label');
+    if (has == _bandsWanted) return;
+    await player.mpvCommand(
+      has ? ['af', 'remove', '@$_label'] : ['af', 'add', _bandsFilter],
+    );
   }
 
   /// Whether levels can be read now: the precise reading is chosen and, on
