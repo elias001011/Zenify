@@ -26,16 +26,12 @@ import 'package:musify/services/settings_manager.dart';
 ThemeMode themeMode = getThemeMode(themeModeSetting);
 Brightness brightness = getBrightnessFromThemeMode(themeMode);
 
-Brightness getBrightnessFromThemeMode(ThemeMode themeMode) {
-  final themeBrightnessMapping = {
-    ThemeMode.light: Brightness.light,
-    ThemeMode.dark: Brightness.dark,
-    ThemeMode.system:
-        SchedulerBinding.instance.platformDispatcher.platformBrightness,
-  };
-
-  return themeBrightnessMapping[themeMode] ?? Brightness.dark;
-}
+Brightness getBrightnessFromThemeMode(ThemeMode mode) => switch (mode) {
+  ThemeMode.light => Brightness.light,
+  ThemeMode.dark => Brightness.dark,
+  ThemeMode.system =>
+    SchedulerBinding.instance.platformDispatcher.platformBrightness,
+};
 
 ThemeMode getThemeMode(int themeModeIndex) {
   const themeModes = ThemeMode.values;
@@ -43,24 +39,6 @@ ThemeMode getThemeMode(int themeModeIndex) {
     return themeModes[themeModeIndex];
   }
   return ThemeMode.system;
-}
-
-ColorScheme getAppColorScheme(
-  ColorScheme? lightColorScheme,
-  ColorScheme? darkColorScheme,
-) {
-  final selectedScheme = (brightness == Brightness.light)
-      ? lightColorScheme
-      : darkColorScheme;
-
-  if (useSystemColor.value && selectedScheme != null) {
-    return selectedScheme;
-  } else {
-    return ColorScheme.fromSeed(
-      seedColor: primaryColorSetting,
-      brightness: brightness,
-    );
-  }
 }
 
 /// Backgrounds stay neutral, never tinted by the accent: white in light mode,
