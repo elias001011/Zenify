@@ -248,7 +248,7 @@ final localSyncEnabled = ValueNotifier<bool>(
 );
 
 final localSyncAutomatic = ValueNotifier<bool>(
-  Hive.box('settings').get('localSyncAutomatic', defaultValue: true),
+  Hive.box('settings').get('localSyncAutomatic', defaultValue: false),
 );
 
 final localSyncLastSyncedAt = ValueNotifier<DateTime?>(
@@ -372,7 +372,7 @@ void reloadSettingsFromStorage() {
   );
   localSyncAutomatic.value = settings.get(
     'localSyncAutomatic',
-    defaultValue: true,
+    defaultValue: false,
   );
 
   localSyncLastSyncedAt.value = _readDateTimeSetting('localSyncLastSyncedAt');

@@ -11,7 +11,11 @@ import 'package:musify/services/local_sync/sync_pairing.dart';
 import 'package:musify/services/local_sync/sync_security.dart';
 import 'package:musify/services/local_sync_service.dart';
 import 'package:musify/services/settings_manager.dart'
-    show localSyncEnabled, reloadSettingsFromStorage;
+    show
+        localSyncAutomatic,
+        localSyncEnabled,
+        offlineMode,
+        reloadSettingsFromStorage;
 
 import 'local_sync/fixtures.dart';
 import 'support/app_harness.dart';
@@ -518,6 +522,8 @@ void main() {
     await server.dispose();
     await Hive.box('settings').put('localSyncEnabled', false);
     localSyncEnabled.value = false;
+    localSyncAutomatic.value = true;
+    addTearDown(() => localSyncAutomatic.value = false);
     server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
     await server.initialise();
 
@@ -532,10 +538,54 @@ void main() {
     expect(server.serverPort, isNull);
   });
 
+  test(
+    'offline mode stops the server and timers; online restores them',
+    () async {
+      addTearDown(() => offlineMode.value = false);
+      await server.dispose();
+      await Hive.box('settings').put('localSyncEnabled', true);
+      localSyncEnabled.value = true;
+      localSyncAutomatic.value = true;
+      addTearDown(() => localSyncAutomatic.value = false);
+      server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
+      await server.initialise();
+      expect(server.serverPort, isNotNull);
+      expect(server.hasBackgroundWork, isTrue);
+
+      offlineMode.value = true;
+      await server.onOfflineChanged();
+      for (var i = 0; i < 50 && server.serverPort != null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      expect(server.serverPort, isNull);
+      expect(server.hasBackgroundWork, isFalse);
+
+      // Turning sync on or automatic off and on while offline starts nothing.
+      await server.setAutomatic(false);
+      await server.setAutomatic(true);
+      expect(server.serverPort, isNull);
+      expect(server.hasBackgroundWork, isFalse);
+      await server.pageOpened();
+      expect(server.serverPort, isNull);
+      await server.pageClosed();
+
+      offlineMode.value = false;
+      await server.onOfflineChanged();
+      for (var i = 0; i < 50 && server.serverPort == null; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      expect(server.serverPort, isNotNull);
+      expect(server.hasBackgroundWork, isTrue);
+      await server.setEnabled(false);
+    },
+  );
+
   test('turned on at start, local sync starts its watch and timers', () async {
     await server.dispose();
     await Hive.box('settings').put('localSyncEnabled', true);
     localSyncEnabled.value = true;
+    localSyncAutomatic.value = true;
+    addTearDown(() => localSyncAutomatic.value = false);
     server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
     await server.initialise();
 

@@ -332,11 +332,31 @@ class LocalSyncService {
   int _pageHolds = 0;
   Timer? _settleTimer;
 
-  bool get _backgroundWanted =>
-      localSyncEnabled.value && localSyncAutomatic.value;
+  /// Offline mode keeps the app off the network, so it pauses local sync too.
+  bool get _active => localSyncEnabled.value && !offlineMode.value;
+
+  bool get _backgroundWanted => _active && localSyncAutomatic.value;
 
   bool get _serverWanted =>
-      localSyncEnabled.value && (localSyncAutomatic.value || _pageHolds > 0);
+      _active && (localSyncAutomatic.value || _pageHolds > 0);
+
+  /// Called when offline mode changes: it stops the server and the timers,
+  /// and going back online restores them.
+  Future<void> onOfflineChanged() async {
+    if (!localSyncEnabled.value || !_initialised) return;
+    await _settleServer();
+    if (_backgroundWanted) {
+      await _startBackgroundWork();
+      // Offline mode may have come back on while the watch was starting.
+      if (_backgroundWanted) {
+        unawaited(triggerSilentSync());
+      } else {
+        await _stopBackgroundWork();
+      }
+    } else {
+      await _stopBackgroundWork();
+    }
+  }
 
   bool get _busy =>
       _activeTransfers > 0 ||
@@ -487,7 +507,7 @@ class LocalSyncService {
   Future<void> setAutomatic(bool enabled) async {
     await Hive.box('settings').put(_automaticKey, enabled);
     localSyncAutomatic.value = enabled;
-    if (!localSyncEnabled.value) return;
+    if (!_active) return;
     if (enabled) {
       await _settleServer();
       await _startBackgroundWork();
@@ -1260,6 +1280,8 @@ class LocalSyncService {
 
   /// Runs a discovery for the UI, keeping [state] in sync with the scan.
   Future<void> startDiscovery() async {
+    // Offline mode keeps the app off the network: no scan.
+    if (offlineMode.value) return;
     if (state.value.status == LocalSyncStatus.syncing ||
         state.value.status == LocalSyncStatus.waitingForPin) {
       return;
@@ -1415,9 +1437,9 @@ class LocalSyncService {
   }
 
   /// Resuming fires on every desktop window focus, so it syncs at most every
-  /// 10 minutes, and not at all while local sync is off.
+  /// 10 minutes, and not at all while local sync is off or offline.
   Future<void> syncOnResume() async {
-    if (!localSyncEnabled.value) return;
+    if (!_active) return;
     final last = _lastResumeSync;
     if (last != null &&
         DateTime.now().difference(last) < const Duration(minutes: 10)) {
@@ -1434,9 +1456,7 @@ class LocalSyncService {
       _syncAgain = true;
       return;
     }
-    if (!localSyncEnabled.value ||
-        !localSyncAutomatic.value ||
-        offlineMode.value ||
+    if (!_backgroundWanted ||
         _httpServer == null ||
         pairedDevices.value.isEmpty) {
       return;
@@ -1778,7 +1798,7 @@ class LocalSyncService {
   }
 
   void _scheduleLocalSync() {
-    if (!localSyncEnabled.value || !localSyncAutomatic.value) return;
+    if (!_backgroundWanted) return;
     _localChangeTimer?.cancel();
     _localChangeTimer = Timer(
       _localChangeDebounce,

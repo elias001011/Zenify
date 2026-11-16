@@ -289,6 +289,7 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
   void _onOfflineModeChanged() {
     // Force rebuild when offline mode changes
     setState(() {});
+    unawaited(LocalSyncService.instance.onOfflineChanged());
   }
 
   @override
