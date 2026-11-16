@@ -1787,7 +1787,7 @@ class LocalSyncService {
   }
 
   static final _mobileInterface = RegExp(
-    '^(rmnet|v4-rmnet|ccmni|pdp|ppp|wwan|tun|tap)',
+    '^(v4-)?(rmnet|ccmni|pdp|ppp|wwan|tun|tap)',
     caseSensitive: false,
   );
 

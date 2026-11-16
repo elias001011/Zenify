@@ -628,6 +628,10 @@ void main() {
     expect(LocalSyncService.hasLocalNetwork(['rmnet_data0', 'tun0']), isFalse);
     expect(LocalSyncService.hasLocalNetwork(const []), isFalse);
     expect(LocalSyncService.hasLocalNetwork(['wlp3s0']), isTrue);
+    // Seen on a phone with only mobile data: the IPv4 side of an IPv6 network.
+    expect(LocalSyncService.hasLocalNetwork(['v4-ccmni0']), isFalse);
+    expect(LocalSyncService.hasLocalNetwork(['v4-rmnet_data0']), isFalse);
+    expect(LocalSyncService.hasLocalNetwork(['wlan0', 'v4-ccmni0']), isTrue);
   });
 
   test('turning sync on starts one sync, not two', () async {
