@@ -25,7 +25,7 @@ class _Handler extends WaveTestHandler {
 
 void main() {
   useAppSettings();
-  testWidgets('Play with an empty filter leaves the current playback alone', (
+  testWidgets('Play queues the whole list even when the filter hides it all', (
     tester,
   ) async {
     final handler = _Handler();
@@ -42,10 +42,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.widgetWithText(FilledButton, 'Play'));
     await tester.pump();
-    expect(handler.plays, 0);
-    await tester.enterText(find.byType(TextField), 'Song');
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.tap(find.widgetWithText(FilledButton, 'Play'));
     expect(handler.plays, 1);
     await tester.pumpWidget(const SizedBox());
   });

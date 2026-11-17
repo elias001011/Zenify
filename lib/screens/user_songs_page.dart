@@ -131,6 +131,12 @@ class _UserSongsPageState extends State<UserSongsPage> {
     );
   }
 
+  /// What Play queues: the whole list, whatever the filter hides; the offline
+  /// sort still orders it.
+  List _playQueue() => widget.page == 'offline'
+      ? _sortOfflineSongsLocal(_currentSongsList, _getCurrentOfflineSortType())
+      : _currentSongsList;
+
   List get _currentSongsList => switch (widget.page) {
     'liked' => userLikedSongsList.value,
     'offline' => userOfflineSongs.value,
@@ -246,7 +252,7 @@ class _UserSongsPageState extends State<UserSongsPage> {
         if (songsLength > 0) ...[
           PlaylistActionButtons(
             onPlay: () {
-              final songs = _getDisplayList(_currentSongsList);
+              final songs = _playQueue();
               if (songs.isEmpty) return;
               audioHandler.playPlaylistSong(
                 playlist: {
@@ -260,9 +266,7 @@ class _UserSongsPageState extends State<UserSongsPage> {
               );
             },
             onShuffle: () async {
-              final songs = _getDisplayList(_currentSongsList)
-                  .whereType<Map>()
-                  .toList();
+              final songs = _currentSongsList.whereType<Map>().toList();
               if (songs.isEmpty) return;
               await audioHandler.addPlaylistToQueue(
                 songs,

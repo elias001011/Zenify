@@ -156,5 +156,26 @@ void main() {
       await config.applyDownloadsDir();
       expect(Hive.box('userNoBackup').get('downloadsDirectory'), '/in/app');
     });
+
+    test(
+      'a new folder from a reinstall replaces the installer\'s own',
+      () async {
+        final first = '${root.path}/music';
+        final second = '${root.path}/music2';
+        await InstallConfig(downloadsDir: first).applyDownloadsDir();
+        await InstallConfig(downloadsDir: second).applyDownloadsDir();
+        expect(Hive.box('userNoBackup').get('downloadsDirectory'), second);
+        expect(Directory(second).existsSync(), isTrue);
+      },
+    );
+
+    test('a reinstall keeps a folder chosen in the app since', () async {
+      await InstallConfig(downloadsDir: '${root.path}/music')
+          .applyDownloadsDir();
+      await Hive.box('userNoBackup').put('downloadsDirectory', '/in/app');
+      await InstallConfig(downloadsDir: '${root.path}/music2')
+          .applyDownloadsDir();
+      expect(Hive.box('userNoBackup').get('downloadsDirectory'), '/in/app');
+    });
   });
 }

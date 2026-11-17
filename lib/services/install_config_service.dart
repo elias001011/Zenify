@@ -127,9 +127,12 @@ class InstallConfig {
 
     try {
       final store = Hive.box('userNoBackup');
-      if (store.get(_appliedDownloadsKey) == target) return;
+      final applied = store.get(_appliedDownloadsKey);
+      if (applied == target) return;
       final existing = store.get('downloadsDirectory');
-      if (existing is! String || existing.isEmpty) {
+      // Free, or still the folder the installer put there last time: a folder
+      // chosen in the app since is the person's and stays.
+      if (existing is! String || existing.isEmpty || existing == applied) {
         await Directory(target).create(recursive: true);
         await store.put('downloadsDirectory', target);
       }
