@@ -166,6 +166,7 @@ typedef _Reply = (int, Map<String, dynamic>);
 class LocalSyncService {
   LocalSyncService._()
     : _testDiscovery = null,
+      _hasLocalNetwork = _onLocalNetwork,
       _pairingNow = DateTime.now,
       _replyTimeout = _shortTimeout,
       _bodyTimeout = _mergeTimeout,
@@ -175,11 +176,13 @@ class LocalSyncService {
   @visibleForTesting
   LocalSyncService.forTesting({
     Future<List<DiscoveredSyncDevice>> Function()? discovery,
+    Future<bool> Function()? hasLocalNetwork,
     DateTime Function()? pairingNow,
     Duration? replyTimeout,
     Duration? bodyTimeout,
     this._allowLoopbackPeers = true,
   }) : _testDiscovery = discovery,
+       _hasLocalNetwork = hasLocalNetwork ?? _onLocalNetwork,
        _pairingNow = pairingNow ?? DateTime.now,
        _replyTimeout = replyTimeout ?? _shortTimeout,
        _bodyTimeout = bodyTimeout ?? _mergeTimeout;
@@ -222,6 +225,7 @@ class LocalSyncService {
   final ValueNotifier<bool> serverRunning = ValueNotifier(false);
 
   final Future<List<DiscoveredSyncDevice>> Function()? _testDiscovery;
+  final Future<bool> Function() _hasLocalNetwork;
   final DateTime Function() _pairingNow;
 
   /// Peers are on the local network; only tests talk to each other over loopback.
@@ -1386,6 +1390,13 @@ class LocalSyncService {
     );
   }
 
+  bool get _canSyncQuietly =>
+      localSyncEnabled.value &&
+      localSyncAutomatic.value &&
+      !offlineMode.value &&
+      _httpServer != null &&
+      pairedDevices.value.isNotEmpty;
+
   /// Syncs with every paired device that is online, one after another.
   Future<void> syncAllNow() async {
     final targets = state.value.discoveredDevices
@@ -1429,16 +1440,13 @@ class LocalSyncService {
 
   /// Syncs with every paired device found by a short discovery, without UI.
   Future<void> triggerSilentSync() async {
+    // Check again after the network lookup, which can race a settings change.
+    if (!_canSyncQuietly || !await _hasLocalNetwork() || !_canSyncQuietly) {
+      return;
+    }
     if (_silentSyncRunning) {
       // Edits made during a pass may have missed peers it already synced.
       _syncAgain = true;
-      return;
-    }
-    if (!localSyncEnabled.value ||
-        !localSyncAutomatic.value ||
-        offlineMode.value ||
-        _httpServer == null ||
-        pairedDevices.value.isEmpty) {
       return;
     }
     if (state.value.status != LocalSyncStatus.idle &&
@@ -1448,9 +1456,6 @@ class LocalSyncService {
       _scheduleLocalSync();
       return;
     }
-
-    // Away from any local network there is nobody to find.
-    if (!await _onLocalNetwork()) return;
 
     _silentSyncRunning = true;
     try {
@@ -1798,7 +1803,7 @@ class LocalSyncService {
       names.any((name) => !_mobileInterface.hasMatch(name));
 
   /// False when the device has only mobile data or no network at all.
-  Future<bool> _onLocalNetwork() async {
+  static Future<bool> _onLocalNetwork() async {
     try {
       final interfaces = await NetworkInterface.list(
         type: InternetAddressType.IPv4,

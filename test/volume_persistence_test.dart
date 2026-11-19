@@ -19,6 +19,22 @@ void main() {
     expect(next.audioPlayer.volume, 0.4);
   });
 
+  test(
+    'a pending volume save tolerates closed settings during restore',
+    () async {
+      final handler = MusifyAudioHandler();
+      await handler.setVolume(0.4);
+      await Hive.box('settings').close();
+      try {
+        await Future<void>.delayed(const Duration(milliseconds: 700));
+        expect(Hive.isBoxOpen('settings'), isFalse);
+        expect(handler.volume, 0.4);
+      } finally {
+        await Hive.openBox('settings');
+      }
+    },
+  );
+
   test('a mute is not kept, so the app does not open silent', () async {
     final first = MusifyAudioHandler();
     await first.setVolume(0.6);

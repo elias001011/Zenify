@@ -11,7 +11,11 @@ import 'package:musify/services/local_sync/sync_pairing.dart';
 import 'package:musify/services/local_sync/sync_security.dart';
 import 'package:musify/services/local_sync_service.dart';
 import 'package:musify/services/settings_manager.dart'
-    show localSyncAutomatic, localSyncEnabled, reloadSettingsFromStorage;
+    show
+        localSyncAutomatic,
+        localSyncEnabled,
+        offlineMode,
+        reloadSettingsFromStorage;
 
 import 'local_sync/fixtures.dart';
 import 'support/app_harness.dart';
@@ -102,6 +106,33 @@ void main() {
     );
     return (session: session, client: client, proof: client.proof());
   }
+
+  test('automatic sync rechecks offline mode after finding a LAN', () async {
+    final network = Completer<bool>();
+    var discoveries = 0;
+    final service = LocalSyncService.forTesting(
+      hasLocalNetwork: () => network.future,
+      discovery: () async {
+        discoveries++;
+        return [];
+      },
+    );
+    addTearDown(service.dispose);
+    await service.startServer();
+    service.pairedDevices.value = server.pairedDevices.value;
+    localSyncEnabled.value = true;
+    localSyncAutomatic.value = true;
+    final wasOffline = offlineMode.value;
+    addTearDown(() => offlineMode.value = wasOffline);
+
+    offlineMode.value = false;
+    final sync = service.triggerSilentSync();
+    offlineMode.value = true;
+    network.complete(true);
+    await sync;
+
+    expect(discoveries, 0);
+  });
 
   test(
     'declaring a trusted id without its key cannot read or mutate data',

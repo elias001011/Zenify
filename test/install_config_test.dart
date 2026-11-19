@@ -169,6 +169,21 @@ void main() {
       },
     );
 
+    test('a skipped installer folder does not become owned by it', () async {
+      final manual = '${root.path}/manual';
+      final skipped = '${root.path}/skipped';
+      final later = '${root.path}/later';
+      final store = Hive.box('userNoBackup');
+      await store.put('downloadsDirectory', manual);
+      await InstallConfig(downloadsDir: skipped).applyDownloadsDir();
+
+      await store.put('downloadsDirectory', skipped);
+      await InstallConfig(downloadsDir: later).applyDownloadsDir();
+
+      expect(store.get('downloadsDirectory'), skipped);
+      expect(Directory(later).existsSync(), isFalse);
+    });
+
     test('a reinstall keeps a folder chosen in the app since', () async {
       await InstallConfig(downloadsDir: '${root.path}/music')
           .applyDownloadsDir();

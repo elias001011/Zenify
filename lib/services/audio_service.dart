@@ -2046,8 +2046,18 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   void _saveVolume() {
     _volumeSaveTimer?.cancel();
     if (volume <= 0 || !Hive.isBoxOpen('settings')) return;
-    _volumeSaveTimer = Timer(const Duration(milliseconds: 500), () {
-      unawaited(Hive.box('settings').put('volume', volume));
+    _volumeSaveTimer = Timer(const Duration(milliseconds: 500), () async {
+      if (!Hive.isBoxOpen('settings')) return;
+      try {
+        final settings = Hive.box('settings');
+        if (settings.isOpen) await settings.put('volume', volume);
+      } catch (error, stackTrace) {
+        logger.log(
+          'Could not remember playback volume',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
     });
   }
 

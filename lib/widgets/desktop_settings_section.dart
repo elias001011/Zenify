@@ -314,10 +314,11 @@ class _DownloadsFolderBarState extends State<_DownloadsFolderBar> {
   Future<void> _pickFolder() async {
     String? picked;
     try {
-      picked = await FilePicker.getDirectoryPath(
+      final folder = await FilePicker.pickDirectory(
         dialogTitle: context.l10n!.downloadsFolder,
         initialDirectory: downloadsDirPath,
       );
+      picked = folder?.toFilePath();
     } catch (e, stackTrace) {
       logger.log('Folder picker failed', error: e, stackTrace: stackTrace);
       if (mounted) {

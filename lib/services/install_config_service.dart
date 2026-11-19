@@ -134,9 +134,11 @@ class InstallConfig {
       // chosen in the app since is the person's and stays.
       if (existing is! String || existing.isEmpty || existing == applied) {
         await Directory(target).create(recursive: true);
-        await store.put('downloadsDirectory', target);
+        await store.putAll({
+          'downloadsDirectory': target,
+          _appliedDownloadsKey: target,
+        });
       }
-      await store.put(_appliedDownloadsKey, target);
     } catch (e) {
       log?.call('Downloads folder $target is unusable, using the default: $e');
     }
