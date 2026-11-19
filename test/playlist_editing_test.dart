@@ -1,10 +1,16 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive_ce.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/screens/playlist_page.dart';
 import 'package:musify/services/audio_service.dart';
+import 'package:musify/services/keyboard_shortcuts_manager.dart';
 import 'package:musify/services/playlists_manager.dart';
+import 'package:musify/services/router_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/song_bar.dart';
@@ -239,4 +245,76 @@ void main() {
       await tester.pump(const Duration(seconds: 30));
     },
   );
+
+  testWidgets('leaving the playlist by shortcut cancels the pending move', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    tester.view.physicalSize = const Size(1000, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    audioHandler = _Handler();
+    dynamicBackground.value = false;
+    addTearDown(() => dynamicBackground.value = true);
+    final source = playlist('source', ids: ['a']);
+    final target = playlist('target', ids: []);
+    userCustomPlaylists.value = [source, target];
+    userPlaylistFolders.value = [];
+
+    final router = GoRouter(
+      initialLocation: '/home/playlist/source',
+      routes: [
+        ShellRoute(
+          builder: (_, _, child) => child,
+          routes: [
+            GoRoute(
+              path: '/home',
+              builder: (_, _) => const Scaffold(body: Text('Home')),
+              routes: [
+                GoRoute(
+                  path: 'playlist/:id',
+                  builder: (_, _) => PlaylistPage(playlistData: source),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    NavigationManager.router = router;
+    await tester.pumpWidget(
+      MaterialApp.router(
+        routerConfig: router,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          ...GlobalMaterialLocalizations.delegates,
+        ],
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (_, child) => GlobalShortcuts(child: child!),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.longPress(find.text('Track a'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Move to playlist'));
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit1);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(router.state.uri.path, '/home');
+    expect(find.text('Playlist target'), findsOneWidget);
+
+    await tester.tap(find.text('Playlist target'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(source['list'], hasLength(1));
+    expect(target['list'], isEmpty);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpAndSettle();
+  });
 }

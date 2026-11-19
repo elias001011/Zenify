@@ -68,25 +68,26 @@ class ChoiceBar<T> extends StatelessWidget {
     showPicker(
       context,
       title: title,
-      content: ListView(
+      content: ListView.builder(
         shrinkWrap: true,
-        children: [
-          for (final choice in choices)
-            BottomSheetBar(
-              choice.label,
-              () {
-                // The picker sits on the root navigator (see Musify#1010).
-                Navigator.of(context, rootNavigator: true).pop();
-                setting.value = choice.value;
-                onChosen(choice.value);
-                if (notify && context.mounted) {
-                  showToast(context, context.l10n!.settingChangedMsg);
-                }
-              },
-              setting.value == choice.value,
-              icon: choice.icon,
-            ),
-        ],
+        itemCount: choices.length,
+        itemBuilder: (itemContext, index) {
+          final choice = choices[index];
+          return BottomSheetBar(
+            choice.label,
+            () {
+              Navigator.of(itemContext).pop();
+              if (!context.mounted) return;
+              setting.value = choice.value;
+              onChosen(choice.value);
+              if (notify && context.mounted) {
+                showToast(context, context.l10n!.settingChangedMsg);
+              }
+            },
+            setting.value == choice.value,
+            icon: choice.icon,
+          );
+        },
       ),
     );
   }

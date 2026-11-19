@@ -21,9 +21,7 @@
 
 import 'package:material_ui/material_ui.dart';
 
-/// The one container of every choice, a dialog on every platform. It sits on
-/// the root navigator: close it with `Navigator.of(context, rootNavigator:
-/// true).pop(value)`.
+/// A dialog on every platform. Use a context inside it to return a choice.
 Future<T?> showPicker<T>(
   BuildContext context, {
   required String title,

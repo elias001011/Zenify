@@ -329,6 +329,26 @@ void main() {
     });
   });
 
+  test(
+    'restoring settings keeps the playback default and explicit opt-out',
+    () async {
+      final box = Hive.box('settings');
+      const key = 'playNextSongAutomatically';
+      addTearDown(() async {
+        await box.delete(key);
+        reloadSettingsFromStorage();
+      });
+
+      await box.put(key, false);
+      reloadSettingsFromStorage();
+      expect(playNextSongAutomatically.value, isFalse);
+
+      await box.delete(key);
+      reloadSettingsFromStorage();
+      expect(playNextSongAutomatically.value, isTrue);
+    },
+  );
+
   group('pickers', () {
     testWidgets('a phone picker is a dialog and applies the chosen option', (
       tester,

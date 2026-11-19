@@ -75,6 +75,39 @@ void main() {
   });
 
   test(
+    'concurrent exports keep existing files and get distinct names',
+    () async {
+      userLikedSongsList.value = [
+        {'ytid': 'likedlikedl', 'title': 'Liked', 'artist': 'Me'},
+      ];
+      final out = await Directory('${directory.path}/concurrent').create();
+      final existing = await File('${out.path}/Liked.csv').writeAsString('old');
+      final partial = await File('${out.path}/Liked (2).csv.part')
+          .writeAsString('keep this partial file');
+      const entry = (
+        id: likedSongsExportId,
+        title: 'Liked',
+        source: ExportSource.likedSongs,
+        artwork: null,
+      );
+
+      final results = await Future.wait([
+        writePlaylistCsvs([entry], out),
+        writePlaylistCsvs([entry], out),
+      ]);
+
+      expect(results.map((result) => result.failed), everyElement(0));
+      expect(results.expand((result) => result.files).toSet(), {
+        '${out.path}/Liked (2).csv',
+        '${out.path}/Liked (3).csv',
+      });
+      expect(await existing.readAsString(), 'old');
+      expect(await partial.readAsString(), 'keep this partial file');
+      expect(await out.list().length, 4);
+    },
+  );
+
+  test(
     'liked songs and custom playlists are written, the rest counted',
     () async {
       userLikedSongsList.value = [

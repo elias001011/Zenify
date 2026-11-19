@@ -120,25 +120,24 @@ class InstallConfig {
     }
   }
 
-  /// Applies the installer's downloads folder once, unless the app set one.
+  /// Seeds the downloads folder on first setup. Settings can move it later.
   Future<void> applyDownloadsDir({void Function(String message)? log}) async {
     final target = downloadsDir;
     if (target == null) return;
 
     try {
       final store = Hive.box('userNoBackup');
-      final applied = store.get(_appliedDownloadsKey);
-      if (applied == target) return;
       final existing = store.get('downloadsDirectory');
-      // Free, or still the folder the installer put there last time: a folder
-      // chosen in the app since is the person's and stays.
-      if (existing is! String || existing.isEmpty || existing == applied) {
-        await Directory(target).create(recursive: true);
-        await store.putAll({
-          'downloadsDirectory': target,
-          _appliedDownloadsKey: target,
-        });
+      // The old marker could also name a folder the installer never applied.
+      if (store.containsKey(_appliedDownloadsKey) ||
+          (existing is String && existing.isNotEmpty)) {
+        return;
       }
+      await Directory(target).create(recursive: true);
+      await store.putAll({
+        'downloadsDirectory': target,
+        _appliedDownloadsKey: target,
+      });
     } catch (e) {
       log?.call('Downloads folder $target is unusable, using the default: $e');
     }

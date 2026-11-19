@@ -179,35 +179,59 @@ Future<({List<String> files, int failed})> writePlaylistCsvs(
   Directory directory,
 ) async {
   await directory.create(recursive: true);
+  final staging = await directory.createTemp('.zenify-export-');
+  final partial = File('${staging.path}/playlist.part');
   final taken = <String>{};
   final files = <String>[];
   var failed = 0;
-  for (final entry in entries) {
-    try {
-      final songs = await exportSongs(entry);
-      if (songs == null || songs.isEmpty) {
-        failed++;
-        continue;
-      }
-      final name = csvFileName(
-        entry.title,
-        taken,
-        exists: (name) => File('${directory.path}/$name').existsSync(),
-      );
-      final file = File('${directory.path}/$name');
-      // Through a temporary name, so a cut-off write never looks like a playlist.
-      final partial = File('${file.path}.part');
+  try {
+    for (final entry in entries) {
       try {
+        final songs = await exportSongs(entry);
+        if (songs == null || songs.isEmpty) {
+          failed++;
+          continue;
+        }
         await partial.writeAsString(playlistCsv(songs));
-        await partial.rename(file.path);
+        files.add(_publishCsv(partial, directory, entry.title, taken));
       } catch (_) {
-        if (partial.existsSync()) partial.deleteSync();
-        rethrow;
+        failed++;
       }
-      files.add(file.path);
-    } catch (_) {
-      failed++;
     }
+  } finally {
+    await staging.delete(recursive: true);
   }
   return (files: files, failed: failed);
+}
+
+String _publishCsv(
+  File partial,
+  Directory directory,
+  String title,
+  Set<String> taken,
+) {
+  bool occupied(String name) =>
+      FileSystemEntity.typeSync(
+        '${directory.path}/$name',
+        followLinks: false,
+      ) !=
+      FileSystemEntityType.notFound;
+
+  while (true) {
+    final name = csvFileName(title, taken, exists: occupied);
+    final output = File('${directory.path}/$name');
+    // Claim the name before rename, which can replace an existing file.
+    try {
+      output.createSync(exclusive: true);
+    } on FileSystemException {
+      if (occupied(name)) continue;
+      rethrow;
+    }
+    try {
+      return partial.renameSync(output.path).path;
+    } catch (_) {
+      output.deleteSync();
+      rethrow;
+    }
+  }
 }

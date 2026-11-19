@@ -35,8 +35,11 @@ final shouldWeCheckUpdates = ValueNotifier<bool>(
   Hive.box('settings').get('shouldWeCheckUpdates', defaultValue: true),
 );
 
+bool _readPlayNextSongAutomatically(Box settings) =>
+    settings.get('playNextSongAutomatically', defaultValue: true);
+
 final playNextSongAutomatically = ValueNotifier<bool>(
-  Hive.box('settings').get('playNextSongAutomatically', defaultValue: true),
+  _readPlayNextSongAutomatically(Hive.box('settings')),
 );
 
 final useSystemColor = ValueNotifier<bool>(
@@ -281,10 +284,7 @@ void reloadSettingsFromStorage() {
     'shouldWeCheckUpdates',
     defaultValue: true,
   );
-  playNextSongAutomatically.value = settings.get(
-    'playNextSongAutomatically',
-    defaultValue: false,
-  );
+  playNextSongAutomatically.value = _readPlayNextSongAutomatically(settings);
   useSystemColor.value = settings.get('useSystemColor', defaultValue: true);
   floatingEffect.value = _readFloatingEffect();
   moodsEnabled.value = settings.get('moodsEnabled', defaultValue: true);
