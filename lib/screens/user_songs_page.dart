@@ -266,7 +266,7 @@ class _UserSongsPageState extends State<UserSongsPage> {
               );
             },
             onShuffle: () async {
-              final songs = _currentSongsList.whereType<Map>().toList();
+              final songs = _playQueue().whereType<Map>().toList();
               if (songs.isEmpty) return;
               await audioHandler.addPlaylistToQueue(
                 songs,

@@ -64,6 +64,11 @@ class WaveReadingBar extends StatelessWidget {
   Future<void> _choose(BuildContext context, WaveReading reading) async {
     if (reading == WaveReading.precise && !await AudioLevels.requestAccess()) {
       waveReading.value = WaveReading.simple;
+      await addOrUpdateData<String>(
+        'settings',
+        'waveReading',
+        WaveReading.simple.name,
+      );
       if (context.mounted) showToast(context, context.l10n!.waveReadingDenied);
       return;
     }

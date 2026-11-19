@@ -138,7 +138,7 @@ class SongSelectionBar extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return ListenableBuilder(
-      listenable: controller,
+      listenable: Listenable.merge([controller, offlineMode]),
       builder: (context, _) {
         final count = controller.selectedCount;
 

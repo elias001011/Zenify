@@ -191,6 +191,7 @@ class _SkipSlide extends StatefulWidget {
 class _SkipSlideState extends State<_SkipSlide> {
   /// 1 forward, -1 back. Read while the cover moves.
   int _direction = 1;
+  final _exitDirections = <Key, int>{};
 
   @override
   void didUpdateWidget(_SkipSlide oldWidget) {
@@ -198,6 +199,11 @@ class _SkipSlideState extends State<_SkipSlide> {
     if (widget.trackId != oldWidget.trackId) {
       _direction = skipDirection;
       skipDirection = 1;
+      _exitDirections.putIfAbsent(
+        ValueKey(oldWidget.trackId),
+        () => _direction,
+      );
+      _exitDirections.remove(ValueKey(widget.trackId));
     }
   }
 
@@ -218,9 +224,12 @@ class _SkipSlideState extends State<_SkipSlide> {
             // off screen before the arriving one comes in, and they never meet.
             final t = animation.value;
             final shift = incoming ? 1 - t : t - 1;
+            final direction = incoming
+                ? _direction
+                : (_exitDirections[child?.key] ?? _direction);
             final step = MediaQuery.sizeOf(context).width;
             return Transform.translate(
-              offset: Offset(shift * _direction * step, 0),
+              offset: Offset(shift * direction * step, 0),
               child: child,
             );
           },

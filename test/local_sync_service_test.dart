@@ -135,6 +135,48 @@ void main() {
   });
 
   test(
+    'going offline during UDP discovery cancels the silent sync pass',
+    () async {
+      var requests = 0;
+      final peer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(peer.close);
+      peer.listen((request) {
+        requests++;
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..close();
+      });
+      final found = Completer<List<DiscoveredSyncDevice>>();
+      final service = LocalSyncService.forTesting(
+        hasLocalNetwork: () async => true,
+        discovery: () => found.future,
+      );
+      addTearDown(service.dispose);
+      service.pairedDevices.value = server.pairedDevices.value;
+      localSyncEnabled.value = true;
+      localSyncAutomatic.value = true;
+      final wasOffline = offlineMode.value;
+      addTearDown(() => offlineMode.value = wasOffline);
+
+      offlineMode.value = false;
+      final sync = service.triggerSilentSync();
+      await Future<void>.delayed(Duration.zero);
+      offlineMode.value = true;
+      found.complete([
+        DiscoveredSyncDevice(
+          deviceId: peerId,
+          name: 'Peer',
+          ip: InternetAddress.loopbackIPv4.address,
+          port: peer.port,
+        ),
+      ]);
+      await sync;
+
+      expect(requests, 0);
+    },
+  );
+
+  test(
     'declaring a trusted id without its key cannot read or mutate data',
     () async {
       await Hive.box('user').put('likedSongs', [song('private')]);

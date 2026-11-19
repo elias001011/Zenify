@@ -82,32 +82,7 @@ class NavigationManager {
       debugLogDiagnostics: kDebugMode,
       routerNeglect: true,
       refreshListenable: offlineMode,
-      redirect: (context, state) {
-        // Handle offline mode redirects
-        final isOffline = offlineMode.value;
-        final currentPath = state.matchedLocation;
-
-        if (_offlineFallback(state) case final fallback?) return fallback;
-
-        if (isOffline && currentPath.startsWith(timeMachinePath)) {
-          // Redirect unavailable pages to home in offline mode
-          return homePath;
-        }
-
-        if (isOffline && currentPath.contains('/album/')) {
-          // Releases are only browsable through YouTube Music.
-          return homePath;
-        }
-
-        if (isOffline && currentPath.contains('/artist/')) {
-          final artistId = state.pathParameters['artistId'] ?? '';
-          if (!offlinePlaylistService.isPlaylistDownloaded(artistId)) {
-            return homePath;
-          }
-        }
-
-        return null; // No redirect needed
-      },
+      redirect: (context, state) => _offlineFallback(state),
     );
     offlineMode.addListener(_onOfflineModeChanged);
   }
@@ -122,8 +97,16 @@ class NavigationManager {
         location.endsWith('/radioStations')) {
       return libraryPath;
     }
-    if (MoodsService.isZenifyPlaylist(state.pathParameters['playlistId'])) {
+    if (MoodsService.isZenifyPlaylist(state.pathParameters['playlistId']) ||
+        location.startsWith(timeMachinePath) ||
+        location.contains('/album/')) {
       return homePath;
+    }
+    if (location.contains('/artist/')) {
+      final artistId = state.pathParameters['artistId'] ?? '';
+      if (!offlinePlaylistService.isPlaylistDownloaded(artistId)) {
+        return homePath;
+      }
     }
     return null;
   }

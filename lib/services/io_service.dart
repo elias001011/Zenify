@@ -60,23 +60,57 @@ class FilePaths {
 
   static final _youtubeIdPattern = RegExp(r'^[A-Za-z0-9_-]{11}$');
 
-  /// Whether [path] is inside our download folders. Files elsewhere, such as
-  /// a library copied from another Musify install, are never deleted.
-  static bool isOwnDownload(String path) {
-    String normalize(String value) {
-      final result = value.replaceAll(r'\', '/');
-      return Platform.isWindows ? result.toLowerCase() : result;
-    }
+  static String _normalizedPath(String path) {
+    final normalized = File(path).absolute.uri.normalizePath().toFilePath();
+    return Platform.isWindows ? normalized.toLowerCase() : normalized;
+  }
 
-    final file = normalize(path);
-    // Copies of local files live in the app's storage, but are not downloads.
-    if (file.startsWith(normalize('$applicationDirPath/$localFilesDirName/'))) {
+  static bool _inside(String path, String root) {
+    final prefix = root.endsWith(Platform.pathSeparator)
+        ? root
+        : '$root${Platform.pathSeparator}';
+    return path.startsWith(prefix);
+  }
+
+  /// Whether [path] is lexically inside our storage, excluding local files.
+  static bool isOwnDownload(String path) {
+    final file = _normalizedPath(path);
+    if (_inside(
+      file,
+      _normalizedPath('$applicationDirPath/$localFilesDirName'),
+    )) {
       return false;
     }
-    return {downloadsDirPath, applicationDirPath}.any((root) {
-      final prefix = normalize(root);
-      return file.startsWith(prefix.endsWith('/') ? prefix : '$prefix/');
-    });
+    return {
+      downloadsDirPath,
+      applicationDirPath,
+    }.any((root) => _inside(file, _normalizedPath(root)));
+  }
+
+  /// Checks the real file too: a link inside our folder may lead outside it.
+  static Future<bool> canDeleteDownload(String path) async {
+    if (!isOwnDownload(path)) return false;
+    try {
+      final file = _normalizedPath(await File(path).resolveSymbolicLinks());
+      final local = Directory('$applicationDirPath/$localFilesDirName');
+      if (await local.exists() &&
+          _inside(file, _normalizedPath(await local.resolveSymbolicLinks()))) {
+        return false;
+      }
+      for (final root in {downloadsDirPath, applicationDirPath}) {
+        final directory = Directory(root);
+        if (await directory.exists() &&
+            _inside(
+              file,
+              _normalizedPath(await directory.resolveSymbolicLinks()),
+            )) {
+          return true;
+        }
+      }
+    } on FileSystemException {
+      // Missing or unreadable: ownership cannot be established.
+    }
+    return false;
   }
 
   /// Deletes the files [offlineSongs] point at, plus any of ours left behind.
@@ -97,7 +131,7 @@ class FilePaths {
         '$downloadsDirPath/${artwork ? artworksDir : tracksDir}',
       );
       if (!await directory.exists()) continue;
-      await for (final entity in directory.list()) {
+      await for (final entity in directory.list(followLinks: false)) {
         if (entity is File && isDownloadedFile(entity.path, artwork: artwork)) {
           paths.add(entity.path);
         }
@@ -106,7 +140,7 @@ class FilePaths {
 
     for (final path in paths) {
       final file = File(path);
-      if (await file.exists()) await file.delete();
+      if (await canDeleteDownload(path)) await file.delete();
     }
   }
 

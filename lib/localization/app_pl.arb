@@ -283,8 +283,6 @@
   "useProxyDescription": "Używaj proxy tylko wtedy, gdy strumieniowanie nie powiedzie się, niepotrzebne użycie może uszkodzić odtwarzanie.",
   "userPlaylists": "Playlisty użytkownika",
   "youtubePlaylistLinkOrId": "Link lub ID playlisty YouTube",
-  "enableUpdateChecksDescription": "Czy chciałbyś, aby Musify automatycznie sprawdzał aktualizacje dostępne na GitHub? Zawsze możesz sprawdzić dostępność aktualizacji ręcznie w ustawieniach",
-  "shareTimeMachineText": "Moje podsumowanie w Musify",
   "syncAllNow": "Sync now",
   "syncAllNowDescription": "{count, plural, =1{With the paired device that is online} other{With the {count} paired devices online}}",
   "syncNow": "Sync",

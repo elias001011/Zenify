@@ -2044,13 +2044,14 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   // Once a drag settles; a mute is not kept, so the app never opens silent.
   void _saveVolume() {
+    final chosen = volume;
+    if (chosen <= 0 || !Hive.isBoxOpen('settings')) return;
     _volumeSaveTimer?.cancel();
-    if (volume <= 0 || !Hive.isBoxOpen('settings')) return;
     _volumeSaveTimer = Timer(const Duration(milliseconds: 500), () async {
       if (!Hive.isBoxOpen('settings')) return;
       try {
         final settings = Hive.box('settings');
-        if (settings.isOpen) await settings.put('volume', volume);
+        if (settings.isOpen) await settings.put('volume', chosen);
       } catch (error, stackTrace) {
         logger.log(
           'Could not remember playback volume',

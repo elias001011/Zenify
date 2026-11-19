@@ -446,11 +446,5 @@
         "type": "String"
       }
     }
-  },
-  "becomeSponsor": "成为赞助者",
-  "downloadFailed": "下载失败",
-  "enableUpdateChecksDescription": "您希望 Musify 自动从 GitHub Releases 检查更新吗？您也可以随时在设置中手动检查更新",
-  "no": "否",
-  "shareTimeMachineText": "我的 Musify 回顾",
-  "yes": "是"
+  }
 }

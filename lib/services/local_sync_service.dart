@@ -432,6 +432,7 @@ class LocalSyncService {
   }
 
   Future<void> pauseForStorageRestore() async {
+    _settleTimer?.cancel();
     _localChangeTimer?.cancel();
     await stopServer();
     await Future.wait(_outbound.values.toList());
@@ -448,7 +449,7 @@ class LocalSyncService {
     } else {
       await _stopBackgroundWork();
     }
-    if (_serverWanted) await startServer();
+    await _settleServer();
   }
 
   Future<void> dispose() async {
@@ -1470,10 +1471,10 @@ class LocalSyncService {
               .toList();
       // Devices synced before the last one that brought changes have not seen them yet.
       var lastChanged = -1;
-      for (var i = 0; i < targets.length; i++) {
+      for (var i = 0; i < targets.length && _canSyncQuietly; i++) {
         if (await _syncQuietly(targets[i])) lastChanged = i;
       }
-      for (var i = 0; i < lastChanged; i++) {
+      for (var i = 0; i < lastChanged && _canSyncQuietly; i++) {
         await _syncQuietly(targets[i]);
       }
     } finally {

@@ -44,4 +44,25 @@ void main() {
 
     expect(MusifyAudioHandler().volume, 0.6);
   });
+
+  test('muting during the debounce keeps the last audible choice', () async {
+    await Hive.box('settings').put('volume', 0.8);
+    final handler = MusifyAudioHandler();
+    await handler.setVolume(0.4);
+    await handler.setVolume(0);
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    expect(MusifyAudioHandler().volume, 0.4);
+  });
+
+  test('the sleep fade cannot become the saved volume', () async {
+    final handler = MusifyAudioHandler();
+    await handler.setVolume(0.6);
+    await handler.setSleepTimer(const Duration(seconds: 2));
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    try {
+      expect(Hive.box('settings').get('volume'), 0.6);
+    } finally {
+      await handler.cancelSleepTimer();
+    }
+  });
 }

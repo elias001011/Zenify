@@ -61,7 +61,7 @@ void main() {
       {'ytid': '-abcdefghij', 'title': '=HYPERLINK("x")', 'artist': '+1'},
     ]);
 
-    expect(csv, contains('"\'=HYPERLINK(""x"")",\'+1,,-abcdefghij,'));
+    expect(csv, contains('"\'=HYPERLINK(""x"")",\'+1,,\'-abcdefghij,'));
   });
 
   test('names avoid Windows devices and files already in the folder', () {
@@ -137,4 +137,18 @@ void main() {
       ]);
     },
   );
+
+  test('every untrusted CSV cell is escaped, including ids and URLs', () {
+    final csv = playlistCsv([
+      {'ytid': '=1+1', 'title': '  =1+1', 'artist': '@SUM(1)'},
+      {'ytid': 'id,with\nlines', 'title': 'Song', 'artist': 'Artist'},
+    ]);
+    expect(csv, contains("'  =1+1,'@SUM(1),,'=1+1,"));
+    expect(
+      csv,
+      contains(
+        '"id,with\nlines","https://music.youtube.com/watch?v=id,with\nlines"',
+      ),
+    );
+  });
 }

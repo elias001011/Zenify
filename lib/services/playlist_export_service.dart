@@ -114,9 +114,9 @@ String playlistCsv(Iterable<Map> songs) {
           _csvField(song['title'].toString(), text: true),
           _csvField(song['artist']?.toString() ?? '', text: true),
           readMediaDuration(song['duration'])?.inMilliseconds.toString() ?? '',
-          _csvField(song['ytid']?.toString() ?? ''),
+          _csvField(song['ytid']?.toString() ?? '', text: true),
           if (song['ytid'] case final String id when id.isNotEmpty)
-            'https://music.youtube.com/watch?v=$id'
+            _csvField('https://music.youtube.com/watch?v=$id')
           else
             '',
         ],
@@ -128,7 +128,8 @@ String playlistCsv(Iterable<Map> songs) {
 /// from whoever uploaded the video) gets a leading quote, so a spreadsheet
 /// shows it instead of running it.
 String _csvField(String value, {bool text = false}) {
-  final safe = text && RegExp(r'^[=+\-@\t\r]').hasMatch(value)
+  final safe =
+      text && RegExp(r'^(?:[\s\x00-\x1f]*[=+\-@]|[\t\r\n])').hasMatch(value)
       ? "'$value"
       : value;
   return safe.contains(RegExp(r'[",\r\n]'))

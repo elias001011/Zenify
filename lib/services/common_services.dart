@@ -1117,7 +1117,7 @@ Future<bool> removeSongFromOffline(dynamic songId) async {
         (audioPath, 'audio file'),
         (artworkPath, 'artwork file'),
       ])
-        if (FilePaths.isOwnDownload(path))
+        if (await FilePaths.canDeleteDownload(path))
           _deleteFileIfExists(File(path), description),
     ]);
 

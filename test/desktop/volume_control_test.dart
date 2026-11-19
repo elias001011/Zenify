@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/localization/app_localizations.dart';
@@ -133,6 +134,32 @@ void main() {
       await tester.tap(speaker);
       await tester.pumpAndSettle();
       expect(audioHandler.volume, closeTo(0.4, 0.05));
+    },
+    variant: const TargetPlatformVariant({
+      TargetPlatform.linux,
+      TargetPlatform.windows,
+    }),
+  );
+
+  testWidgets(
+    'the speaker can be muted and restored with the keyboard',
+    (tester) async {
+      await mount(tester);
+      bool speakerFocused() =>
+          FocusManager.instance.primaryFocus?.context
+              ?.findAncestorWidgetOfExactType<IconButton>() !=
+          null;
+      for (var i = 0; i < 4 && !speakerFocused(); i++) {
+        await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+        await tester.pump();
+      }
+      expect(speakerFocused(), isTrue);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(audioHandler.volume, 0);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pumpAndSettle();
+      expect(audioHandler.volume, 0.5);
     },
     variant: const TargetPlatformVariant({
       TargetPlatform.linux,
@@ -359,10 +386,7 @@ void main() {
     await tester.pumpWidget(
       localizedApp(
         const Scaffold(
-          body: Align(
-            alignment: Alignment.bottomCenter,
-            child: MiniPlayer(),
-          ),
+          body: Align(alignment: Alignment.bottomCenter, child: MiniPlayer()),
         ),
       ),
     );

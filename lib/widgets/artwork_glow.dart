@@ -142,6 +142,9 @@ class GlowColors {
     for (final read in pending) {
       read.then((found) {
         if (generation != _generation) return;
+        if (found.$2 == null && !ArtworkColors.isCached(sources[found.$1]!)) {
+          _sources = null;
+        }
         arrived[found.$1] = found.$2 ?? appColor;
         _flush ??= Timer(const Duration(milliseconds: 150), () {
           _flush = null;
