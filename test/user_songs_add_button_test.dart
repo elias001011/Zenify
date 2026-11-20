@@ -31,6 +31,7 @@ class _Recorder extends MusifyAudioHandler {
     bool? shuffle,
     bool keepGoing = false,
     int? startIndex,
+    String? playlistId,
   }) async => shuffled.add(List.of(songs));
 }
 

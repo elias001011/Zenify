@@ -215,10 +215,15 @@ void main() {
       await player.play(PlayRequest());
       expect(await player.getMpvProperty('af'), isEmpty);
 
+      final standby = _TrackedPlayer('standby');
+      addTearDown(standby.release);
+      await standby.ready();
       Future<String> chainAfter(bool on) async {
         showPlayerVisualizer.value = on;
         await Future<void>.delayed(const Duration(milliseconds: 300));
-        return player.getMpvProperty('af');
+        final filters = await player.getMpvProperty('af');
+        expect(await standby.getMpvProperty('af'), filters);
+        return filters;
       }
 
       expect(await chainAfter(true), contains('amerge'));

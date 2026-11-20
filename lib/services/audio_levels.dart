@@ -30,6 +30,7 @@ import 'package:flutter/widgets.dart'
 import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart';
+import 'package:musify/services/mix_effects.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:rxdart/rxdart.dart';
@@ -88,7 +89,10 @@ class AudioLevels {
   /// Prepares the analysis for the players opened from now on and keeps the
   /// open one in line when the waves are turned on or off.
   static void configureDesktop() {
-    JustAudioMediaKit.audioFilters = [if (_bandsWanted) _bandsFilter];
+    _configureFilters();
+    equalizerEnabled
+      ..removeListener(_configureFilters)
+      ..addListener(_configureFilters);
     showPlayerVisualizer.removeListener(_onWavesChanged);
     waveReading.removeListener(_onWavesChanged);
     showPlayerVisualizer.addListener(_onWavesChanged);
@@ -100,20 +104,29 @@ class AudioLevels {
 
   static Future<void> _syncing = Future.value();
 
+  static void _configureFilters() {
+    JustAudioMediaKit.audioFilters = [
+      if (equalizerEnabled.value) ...MixEffects.userFilters,
+      if (_bandsWanted) _bandsFilter,
+    ];
+  }
+
   static void _onWavesChanged() {
-    JustAudioMediaKit.audioFilters = [if (_bandsWanted) _bandsFilter];
-    final player = MediaKitPlayer.latest;
-    if (player == null) return;
-    _syncing = _syncing.then((_) => syncBands(player)).catchError((
-      Object e,
-      StackTrace stackTrace,
-    ) {
-      logger.log(
-        'Wave analysis filter failed',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    });
+    _configureFilters();
+    for (final player in MediaKitPlayer.openPlayers) {
+      _syncing = _syncing
+          .then((_) async {
+            await player.ready();
+            if (player.isOpen) await syncBands(player);
+          })
+          .catchError((Object e, StackTrace stackTrace) {
+            logger.log(
+              'Wave analysis filter failed',
+              error: e,
+              stackTrace: stackTrace,
+            );
+          });
+    }
   }
 
   /// Puts the analysis in or out of [player]'s chain as the waves ask; the
@@ -236,7 +249,8 @@ class AudioLevels {
   /// (session 0, the whole output, needs another permission) and a new one
   /// when the player recreates it.
   static Stream<_Frame> _androidFrames() {
-    return audioHandler.audioPlayer.androidAudioSessionIdStream
+    return audioHandler.activePlayerStream
+        .switchMap((player) => player.androidAudioSessionIdStream)
         .whereType<int>()
         .distinct()
         .where((session) => session > 0)

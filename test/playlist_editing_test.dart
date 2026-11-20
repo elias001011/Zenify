@@ -78,6 +78,21 @@ void main() {
     );
   });
 
+  test('replacing a playlist with its own map retains its contents', () async {
+    final source = userCustomPlaylists.value.single;
+    expect(await replaceCustomPlaylist('source', source), isTrue);
+    expect(source['title'], 'Playlist source');
+    expect((source['list'] as List).map((song) => song['ytid']), [
+      'a',
+      'b',
+      'c',
+    ]);
+    expect(
+      (Hive.box('user').get('customPlaylists') as List).single['title'],
+      'Playlist source',
+    );
+  });
+
   test(
     'moving across folders preserves selection order and handles duplicates',
     () async {
@@ -196,6 +211,32 @@ void main() {
       await tester.pump(const Duration(seconds: 30));
     },
   );
+
+  testWidgets('an open playlist adopts an order saved in the Mix editor', (
+    tester,
+  ) async {
+    await mount(tester);
+    final source = userCustomPlaylists.value.single;
+    final songs = source['list'] as List;
+    await tester.runAsync(() async {
+      await replaceCustomPlaylist('source', {
+        ...source,
+        'list': [songs[2], songs[0], songs[1]],
+      });
+    });
+    await tester.pump();
+    expect(
+      tester.getTopLeft(find.text('Track c')).dy,
+      lessThan(tester.getTopLeft(find.text('Track a')).dy),
+    );
+    expect(
+      tester.getTopLeft(find.text('Track a')).dy,
+      lessThan(tester.getTopLeft(find.text('Track b')).dy),
+    );
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 30));
+  });
 
   testWidgets(
     'manual reorder uses final insertion index and search hides handles',

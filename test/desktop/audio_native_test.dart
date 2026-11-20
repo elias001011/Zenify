@@ -110,7 +110,33 @@ void main() {
             await completed.timeout(const Duration(seconds: 10));
             await player.pause(PauseRequest());
           }
+          final clip = ClippingAudioSourceMessage(
+            id: 'restored',
+            child: ProgressiveAudioSourceMessage(
+              id: 'file',
+              uri: 'http://127.0.0.1:${server.port}/audio.wav',
+              headers: {'X-Musify-Test': 'required'},
+            ),
+            start: const Duration(milliseconds: 900),
+          );
+          await player.load(
+            LoadRequest(
+              audioSourceMessage: clip,
+              initialPosition: const Duration(milliseconds: 300),
+            ),
+          );
+          await Future<void>.delayed(const Duration(milliseconds: 150));
+          expect(
+            double.parse(await player.getMpvProperty('time-pos')),
+            closeTo(1.2, 0.1),
+            reason: 'restore position relative to the kept clip',
+          );
           expect(events.where((event) => event.errorCode != null), isEmpty);
+          expect(
+            events.where((event) => (event.currentIndex ?? 0) < 0),
+            isEmpty,
+            reason: 'empty mpv playlists must not leak index -1 to just_audio',
+          );
           expect(events.map((event) => event.currentIndex), contains(1));
         },
         zoneSpecification: ZoneSpecification(

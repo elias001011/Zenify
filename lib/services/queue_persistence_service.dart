@@ -34,6 +34,7 @@ typedef SavedQueue = ({
   int index,
   Duration position,
   bool keepGoing,
+  String? playlistId,
 });
 
 /// Device-local playback state. Queue edits are coalesced; position is a
@@ -43,7 +44,14 @@ class QueuePersistenceService {
   static const positionKey = 'playbackQueuePosition';
   static const limit = 500;
   Timer? _timer;
-  ({List<Map> songs, List<Map>? original, int index, bool keepGoing})? _pending;
+  ({
+    List<Map> songs,
+    List<Map>? original,
+    int index,
+    bool keepGoing,
+    String? playlistId,
+  })?
+  _pending;
 
   /// The entries and order last saved; a track change within the same queue
   /// only moves the small position record.
@@ -78,6 +86,7 @@ class QueuePersistenceService {
     List<Map> original,
     int index, {
     bool keepGoing = false,
+    String? playlistId,
   }) {
     final start = max(0, min(index - limit ~/ 2, songs.length - limit));
     final window = songs.skip(start).take(limit).toList();
@@ -94,7 +103,7 @@ class QueuePersistenceService {
       for (final song in window) readMediaDuration(song['duration'])?.inSeconds,
     ];
     final shape =
-        '$start|$keepGoing|${ids.join(',')}|${shuffled ? originalIds.join(',') : ''}|${durations.join(',')}';
+        '$start|$keepGoing|$playlistId|${ids.join(',')}|${shuffled ? originalIds.join(',') : ''}|${durations.join(',')}';
 
     if (shape == _savedShape && _pending == null) {
       // Same queue, another song: remember which, cheaply.
@@ -115,6 +124,7 @@ class QueuePersistenceService {
     }
     _pending = (
       keepGoing: keepGoing,
+      playlistId: playlistId,
       songs: window,
       original: shuffled
           ? [
@@ -207,6 +217,9 @@ class QueuePersistenceService {
       index: index,
       position: position,
       keepGoing: data['keepGoing'] == true,
+      playlistId: data['playlistId'] is String
+          ? data['playlistId'] as String
+          : null,
     );
   }
 
@@ -229,6 +242,7 @@ class QueuePersistenceService {
           'original': pending.original?.map(_song).toList(),
           'index': pending.index,
           'keepGoing': pending.keepGoing,
+          if (pending.playlistId != null) 'playlistId': pending.playlistId,
         });
       }
       await box.flush();

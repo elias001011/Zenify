@@ -24,6 +24,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hive_ce/hive_ce.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:musify/constants/app_constants.dart';
@@ -36,6 +37,12 @@ import 'package:musify/services/common_services.dart';
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/local_files_service.dart';
+import 'package:musify/services/mix_analysis.dart';
+import 'package:musify/services/mix_edits.dart';
+import 'package:musify/services/mix_effects.dart';
+import 'package:musify/services/mix_engine.dart';
+import 'package:musify/services/mix_playlists.dart';
+import 'package:musify/services/mix_transition.dart';
 import 'package:musify/services/music_radio.dart';
 import 'package:musify/services/playback_buffer.dart';
 import 'package:musify/services/queue_persistence_service.dart';
@@ -51,18 +58,37 @@ import 'package:rxdart/rxdart.dart';
 
 class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   MusifyAudioHandler() {
-    final androidEqualizer = Platform.isAndroid ? AndroidEqualizer() : null;
-    _androidEqualizer = androidEqualizer;
-    audioPlayer = AudioPlayer(
-      handleInterruptions: isMobilePlatform,
-      handleAudioSessionActivation: isMobilePlatform,
-      audioPipeline: androidEqualizer == null
-          ? null
-          : AudioPipeline(androidAudioEffects: [androidEqualizer]),
-      audioLoadConfiguration: playbackLoadConfigurationFor(
-        wholeSong: bufferWholeSong.value,
-      ),
+    _mix = MixEngine(
+      first: _createPlayer(),
+      createPlayer: _createPlayer,
+      plan: _mixPlan,
+      cue: _mixCue,
+      resolve: _mixSource,
+      prepared: (player, song) async {
+        await _mixEffects.loaded(player);
+        await _configureEqualizer(_equalizers[player]);
+        // Silent now: the echo can be set to the beat this song ends on.
+        final tail = _mixAnalyzer.edge(song, tail: true);
+        if (tail != null && tail.rhythmic) {
+          await _mixEffects.tuneEcho(player, tail.bpm);
+        }
+      },
+      advance: _advanceIntoMix,
+      userVolume: () => volume,
+      applyVolume: _applyVolume,
+      setBands: _mixEffects.write,
+      // Measured with libmpv: its filters run this far ahead of the output.
+      bandsLead: isDesktopPlatform
+          ? const Duration(milliseconds: 350)
+          : Duration.zero,
     );
+
+    _mixAnalyzer.changes.addListener(_mix.refresh);
+    if (isDesktopPlatform) {
+      for (final setting in [mixTransitions, mixPlaylists, equalizerEnabled]) {
+        setting.addListener(() => unawaited(_mixEffects.syncDesktopFilters()));
+      }
+    }
     if (volume < 1) unawaited(audioPlayer.setVolume(volume));
 
     _androidAutoBrowser = AndroidAutoBrowser(this);
@@ -72,21 +98,51 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     }
     _updatePlaybackState();
 
+    _initialize();
+  }
+
+  AudioPlayer _createPlayer() {
+    final androidEqualizer = Platform.isAndroid ? AndroidEqualizer() : null;
+    final player = AudioPlayer(
+      handleInterruptions: isMobilePlatform,
+      handleAudioSessionActivation: isMobilePlatform,
+      audioPipeline: androidEqualizer == null
+          ? null
+          : AudioPipeline(androidAudioEffects: [androidEqualizer]),
+      audioLoadConfiguration: playbackLoadConfigurationFor(
+        wholeSong: bufferWholeSong.value,
+      ),
+    );
+    _equalizers[player] = androidEqualizer;
     if (isAndroidPlatform) {
-      audioPlayer.setAndroidAudioAttributes(
+      player.setAndroidAudioAttributes(
         const AndroidAudioAttributes(
           contentType: AndroidAudioContentType.music,
           usage: AndroidAudioUsage.media,
         ),
       );
     }
-
-    _initialize();
+    return player;
   }
 
-  // Player and service collaborators.
-  late final AndroidEqualizer? _androidEqualizer;
-  late final AudioPlayer audioPlayer;
+  // Player and service collaborators. The Mix owns the players: the one that
+  // plays the current song is the active one, and may change at a transition.
+  late final MixEngine _mix;
+  late final _mixEffects = MixEffects(
+    mixWanted: () => _mixPreviewing || (mixActive && !_playsRadio),
+    equalizerOf: (player) => _equalizers[player],
+  );
+  late final _mixAnalyzer = MixAnalyzer(locate: _mixLocation);
+  final _equalizers = <AudioPlayer, AndroidEqualizer?>{};
+  AudioPlayer get audioPlayer => _mix.active;
+  AndroidEqualizer? get _androidEqualizer => _equalizers[audioPlayer];
+
+  /// The active player and each one that takes its place.
+  Stream<AudioPlayer> get activePlayerStream => _mix.activeStream;
+
+  /// A stream of the active player, followed across the Mix's swaps.
+  Stream<T> _ofPlayer<T>(Stream<T> Function(AudioPlayer player) stream) =>
+      _mix.activeStream.switchMap(stream);
   late final AndroidAutoBrowser _androidAutoBrowser;
   bool _equalizerInitialized = false;
   Future<bool>? _equalizerInitFuture;
@@ -163,6 +219,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   final _resumeSeeks = PublishSubject<void>();
 
   Future<void> persistPlaybackState() async {
+    if (_mixPreviewing) return;
     if (_currentLoadingIndex < 0 &&
         audioPlayer.processingState != ProcessingState.idle &&
         _playerSourceMatchesCurrentSong() &&
@@ -183,6 +240,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     _originalQueueList.addAll(saved.original);
     _currentQueueIndex = saved.index;
     _queueKeepsGoing = saved.keepGoing;
+    _queuePlaylistId = saved.playlistId;
     _hydrateQueueEntryIds();
     _resumePosition = saved.position;
     _resumeEntryId = _queueEntryIds.ensureId(currentSong!);
@@ -211,9 +269,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   late final Stream<PositionData> _positionDataStream =
       Rx.merge([
         Rx.combineLatest3<Duration, Duration, Duration?, PositionData>(
-          audioPlayer.positionStream,
-          audioPlayer.bufferedPositionStream,
-          audioPlayer.durationStream,
+          _ofPlayer((player) => player.positionStream),
+          _ofPlayer((player) => player.bufferedPositionStream),
+          _ofPlayer((player) => player.durationStream),
           (position, bufferedPosition, duration) => PositionData(
             _resumePosition ?? position,
             bufferedPosition,
@@ -239,7 +297,8 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     return _applyVolume();
   }
 
-  Future<void> _applyVolume() => audioPlayer.setVolume(volume * _songFade.gain);
+  Future<void> _applyVolume() =>
+      audioPlayer.setVolume(volume * _songFade.gain * mixVolumeFor(_mix.gain));
 
   /// Keeps the fade in step with the player. While a song loads the player
   /// still holds the one before it: the fade waits for the new one.
@@ -265,7 +324,10 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     position: audioPlayer.position,
     duration: audioPlayer.duration,
     // SponsorBlock may cut a song into clips, each with positions of its own.
-    seconds: audioPlayer.sequence.length > 1 ? 0 : songFadeSeconds.value,
+    // The Mix replaces the fade.
+    seconds: audioPlayer.sequence.length > 1 || mixActive || _mixPreviewing
+        ? 0
+        : songFadeSeconds.value,
     fadeOut: _advancesByItself,
     playing:
         audioPlayer.playing &&
@@ -374,12 +436,16 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }
 
   void _setupEventSubscriptions() {
-    audioPlayer.positionStream.listen(
-      (_) => _updateSongFade(),
+    _ofPlayer((player) => player.positionStream).listen(
+      (_) {
+        _updateSongFade();
+        _mix.update();
+        _skipMixStretch();
+      },
       onError: (Object error, StackTrace stack) =>
           _logStreamError('Song fade position failed', error, stack),
     );
-    audioPlayer.positionStream
+    _ofPlayer((player) => player.positionStream)
         .where(
           (_) =>
               _currentLoadingIndex < 0 &&
@@ -399,7 +465,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           onError: (Object error, StackTrace stack) =>
               _logStreamError('Position checkpoint failed', error, stack),
         );
-    audioPlayer.playbackEventStream
+    _ofPlayer((player) => player.playbackEventStream)
         .throttleTime(const Duration(milliseconds: 100))
         .listen(
           (event) {
@@ -410,14 +476,14 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           },
         );
 
-    audioPlayer.processingStateStream.distinct().listen(
+    _ofPlayer((player) => player.processingStateStream).distinct().listen(
       _handleProcessingStateChange,
       onError: (error, stackTrace) {
         _logStreamError('Processing state stream error', error, stackTrace);
       },
     );
 
-    audioPlayer.durationStream.listen(
+    _ofPlayer((player) => player.durationStream).listen(
       (duration) {
         if (_currentQueueIndex >= 0 &&
             _currentQueueIndex < _queueList.length &&
@@ -434,12 +500,13 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       },
     );
 
-    audioPlayer.playerStateStream.distinct().listen(
+    _ofPlayer((player) => player.playerStateStream).distinct().listen(
       (state) {
         // Transport changes are infrequent and must reach every control
         // immediately; only queue/sequence bookkeeping is debounced.
         _updatePlaybackState();
         _updateSongFade();
+        if (_mixPreviewing) return;
         listeningStatsService.handlePlayerStateForListeningStats(
           state,
           currentSong: _songForStats,
@@ -456,8 +523,8 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     );
 
     Rx.combineLatest2(
-          audioPlayer.currentIndexStream.distinct(),
-          audioPlayer.sequenceStateStream.distinct(),
+          _ofPlayer((player) => player.currentIndexStream).distinct(),
+          _ofPlayer((player) => player.sequenceStateStream).distinct(),
           (index, sequence) => {'index': index, 'sequence': sequence},
         )
         .throttleTime(const Duration(milliseconds: 100))
@@ -502,6 +569,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       _queueList.map(_getMediaItemForQueue).toList(growable: false);
 
   bool _playerSourceMatchesCurrentSong() {
+    if (_mixPreviewing) return false;
     if (!_hasCurrentQueueIndex) return false;
 
     final sourceTag = audioPlayer.sequenceState.currentSource?.tag;
@@ -654,6 +722,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           _originalQueueList,
           _currentQueueIndex,
           keepGoing: _queueKeepsGoing,
+          playlistId: _queuePlaylistId,
         );
       }
       if (mediaItemChanged || publishedQueueChanged) {
@@ -748,8 +817,11 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     }
   }
 
-  Future<bool> _configureEqualizer() async {
-    final equalizer = _androidEqualizer;
+  /// Sets up [equalizer], the active player's own unless the Mix asks for
+  /// the one of the player it loaded the next song in.
+  Future<bool> _configureEqualizer([AndroidEqualizer? equalizer]) async {
+    final ofActive = equalizer == null;
+    equalizer ??= _androidEqualizer;
     if (equalizer == null) return false;
 
     try {
@@ -769,6 +841,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       }
 
       await equalizer.setEnabled(equalizerEnabled.value);
+      if (!ofActive) return true;
       _equalizerInitialized = true;
       _equalizerRetryNotBefore = DateTime.fromMillisecondsSinceEpoch(0);
       return true;
@@ -804,6 +877,12 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }
 
   Future<void> setEqualizerEnabled(bool enabled) async {
+    if (isDesktopPlatform) {
+      equalizerEnabled.value = enabled;
+      await addOrUpdateData<bool>('settings', 'equalizerEnabled', enabled);
+      await _mixEffects.updateDesktopEq();
+      return;
+    }
     final equalizer = _androidEqualizer;
     if (equalizer == null) return;
 
@@ -823,6 +902,18 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }
 
   Future<void> setEqualizerBandGain(int index, double gain) async {
+    if (isDesktopPlatform) {
+      if (index < 0 || index >= 5) return;
+      final gains = MixEffects.desktopGains;
+      gains[index] = gain.clamp(-12.0, 12.0);
+      await addOrUpdateData<List<double>>(
+        'settings',
+        'desktopEqualizerGains',
+        gains,
+      );
+      await _mixEffects.updateDesktopEq();
+      return;
+    }
     final equalizer = _androidEqualizer;
     if (equalizer == null) return;
 
@@ -853,6 +944,15 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }
 
   Future<void> resetEqualizerBands() async {
+    if (isDesktopPlatform) {
+      await addOrUpdateData<List<double>>(
+        'settings',
+        'desktopEqualizerGains',
+        List.filled(5, 0),
+      );
+      await _mixEffects.updateDesktopEq();
+      return;
+    }
     final equalizer = _androidEqualizer;
     if (equalizer == null) return;
 
@@ -980,6 +1080,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }
 
   void _handleProcessingStateChange(ProcessingState state) {
+    if (_mixPreviewing) return;
     try {
       if (state == ProcessingState.completed) {
         if (sleepTimerEndOfSong) {
@@ -1102,6 +1203,359 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         stackTrace: stackTrace,
       );
     }
+  }
+
+  /// The song the Mix brings in over the end of this one; null when this one
+  /// ends as it always did.
+  /// The custom playlist the queue was started from, for its Mix.
+  String? _queuePlaylistId;
+
+  /// Whether the queue plays with the Mix: its playlist has it on.
+  /// The playlist whose transitions the queue plays, while the Mix is on.
+  String? get mixPlaylistId => mixActive ? _queuePlaylistId : null;
+
+  /// The song the current one will mix into, if any.
+  Map? get mixNextSong => _mixPlan()?.song;
+
+  bool get mixActive =>
+      mixTransitions.value && mixPlaylists.value.contains(_queuePlaylistId);
+
+  MixAnalyzer get mixAnalyzer => _mixAnalyzer;
+
+  final _mixSkips = <String, List<MixSkip>>{};
+  final _mixSkipLoads = <String, Future<List<MixSkip>>>{};
+  bool _skippingStretch = false;
+
+  /// The stretches SponsorBlock skips in [song]. The Mix plays its songs
+  /// whole and keeps out of these itself.
+  Future<List<MixSkip>> mixSkips(Map song) async {
+    final id = song['ytid']?.toString();
+    if (id == null ||
+        id.isEmpty ||
+        isLocalSongId(id) ||
+        !sponsorBlockSupport.value) {
+      return const [];
+    }
+    if (_mixSkips[id] case final known?) return known;
+    return _mixSkipLoads[id] ??= _loadMixSkips(id).whenComplete(() {
+      _mixSkipLoads.remove(id);
+    });
+  }
+
+  Future<List<MixSkip>> _loadMixSkips(String id) async {
+    try {
+      final cached = getCachedSponsorBlockSegments(id);
+      if (cached == null && offlineMode.value) return const [];
+      final found =
+          cached ??
+          await fetchSkipSegments(id).timeout(const Duration(seconds: 5));
+      final skips = <MixSkip>[
+        for (final segment in found)
+          if ((segment['end'] ?? 0) > (segment['start'] ?? 0))
+            (
+              start: (segment['start'] ?? 0) * 1000,
+              end: segment['end']! * 1000,
+            ),
+      ]..sort((a, b) => a.start.compareTo(b.start));
+      final merged = <MixSkip>[];
+      for (final skip in skips) {
+        if (merged.isEmpty || skip.start > merged.last.end) {
+          merged.add(skip);
+        } else if (skip.end > merged.last.end) {
+          merged.last = (start: merged.last.start, end: skip.end);
+        }
+      }
+      if (_mixSkips.length >= 128) _mixSkips.remove(_mixSkips.keys.first);
+      return _mixSkips[id] = merged;
+    } catch (error, stackTrace) {
+      logger.log(
+        'Mix: SponsorBlock lookup failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      return const [];
+    }
+  }
+
+  List<MixSkip> _knownMixSkips(Map song) => sponsorBlockSupport.value
+      ? _mixSkips[song['ytid']?.toString()] ?? const []
+      : const [];
+
+  /// Where a song the Mix loads whole starts: after a skipped opening.
+  Duration? _mixStart(Map song, AudioSource source) {
+    final skips = _mixSkips[song['ytid']?.toString()];
+    if (skips == null || source is! UriAudioSource) return null;
+    if (!sponsorBlockSupport.value) return null;
+    final start = mixBounds(skips, null).start;
+    return start > 0 ? Duration(milliseconds: start) : null;
+  }
+
+  /// A song the Mix loaded whole jumps over its skipped stretches here.
+  void _skipMixStretch() {
+    if (!sponsorBlockSupport.value ||
+        _mixSkips.isEmpty ||
+        _skippingStretch ||
+        _mixPreviewing)
+      return;
+    final song = _playerSourceMatchesCurrentSong() ? currentSong : null;
+    final skips = _mixSkips[song?['ytid']?.toString()];
+    if (skips == null || skips.isEmpty) return;
+    if (_currentPlayerSourceIsClipped()) return;
+    final position = audioPlayer.position.inMilliseconds;
+    final duration = audioPlayer.duration?.inMilliseconds;
+    for (final skip in skips) {
+      if (position < skip.start || position >= skip.end - 300) continue;
+      var target = skip.end;
+      if (duration != null && target > duration - 300) target = duration - 300;
+      if (target <= position) return;
+      _skippingStretch = true;
+      unawaited(
+        audioPlayer
+            .seek(Duration(milliseconds: target))
+            .catchError((Object _) {})
+            .whenComplete(() => _skippingStretch = false),
+      );
+      return;
+    }
+  }
+
+  /// Where the song playing starts to give way to the next, with the Mix.
+  ValueListenable<Duration?> get mixOutStart => _mix.outStart;
+
+  bool _mixPreviewing = false;
+  Future<bool>? _mixPreviewTask;
+  bool _resumeAfterPreview = true;
+  bool _previewCancelled = false;
+
+  /// The editor borrows the decks without replacing, persisting or advancing
+  /// the queue. Preview audio never enters listening stats or history.
+  Future<bool> previewMix(Map song, Map next, MixCue cue, {Duration? startAt}) {
+    if (cue.length <= const Duration(milliseconds: 300) ||
+        _mixPreviewTask != null ||
+        _currentLoadingIndex >= 0)
+      return Future.value(false);
+    final task = _runMixPreview(song, next, cue, startAt: startAt);
+    _mixPreviewTask = task;
+    return task;
+  }
+
+  Future<bool> _runMixPreview(
+    Map song,
+    Map next,
+    MixCue cue, {
+    Duration? startAt,
+  }) async {
+    final source = audioPlayer.audioSource;
+    final sourceIndex = audioPlayer.currentIndex;
+    final position = audioPlayer.position;
+    final wasPlaying = audioPlayer.playing;
+    final speed = _mix.userSpeed;
+    final loop = audioPlayer.loopMode;
+    final shuffle = audioPlayer.shuffleModeEnabled;
+    final item = mediaItem.valueOrNull;
+    var success = true;
+    var restored = false;
+    _resumeAfterPreview = true;
+    _previewCancelled = false;
+    _mixPreviewing = true;
+    try {
+      listeningStatsService.finishListeningSession(
+        countCurrentTick: true,
+        wasPlaying: wasPlaying,
+      );
+      _mix.cancel();
+      await audioPlayer.pause();
+      await audioPlayer.setSpeed(1);
+      await _songFade.update();
+      if (!_previewCancelled) {
+        await _mix.preview(
+          song,
+          next,
+          cue,
+          startAt: startAt,
+          onSong: (song) {
+            mediaItem.add(mapToMediaItem(song));
+            _updatePlaybackState(force: true);
+          },
+        );
+      }
+    } catch (e, stackTrace) {
+      logger.log('Mix: preview failed', error: e, stackTrace: stackTrace);
+      success = false;
+    } finally {
+      try {
+        if (source != null) {
+          await audioPlayer
+              .setAudioSource(
+                source,
+                initialPosition: position,
+                initialIndex: sourceIndex,
+              )
+              .timeout(_songTransitionTimeout);
+          await _mixEffects.loaded(audioPlayer);
+          await _configureEqualizer(_equalizers[audioPlayer]);
+        } else {
+          await audioPlayer.stop();
+        }
+        restored = true;
+      } catch (e, stackTrace) {
+        logger.log(
+          'Mix: restoring playback after preview failed',
+          error: e,
+          stackTrace: stackTrace,
+        );
+        success = false;
+        await audioPlayer.stop();
+      } finally {
+        await audioPlayer.setSpeed(speed);
+        await audioPlayer.setLoopMode(loop);
+        await audioPlayer.setShuffleModeEnabled(shuffle);
+        mediaItem.add(item);
+        _mixPreviewing = false;
+        if (isDesktopPlatform) await _mixEffects.syncDesktopFilters();
+        _mixPreviewTask = null;
+        _updateSongFade();
+        if (restored && source != null && wasPlaying && _resumeAfterPreview) {
+          unawaited(
+            audioPlayer.play().catchError((Object e, StackTrace s) {
+              logger.log(
+                'Mix: resuming playback failed',
+                error: e,
+                stackTrace: s,
+              );
+            }),
+          );
+          startListeningStatsSessionIfNeeded();
+        }
+        _updatePlaybackState(force: true);
+      }
+    }
+    return success;
+  }
+
+  Future<void> stopMixPreview({bool resume = true}) async {
+    final task = _mixPreviewTask;
+    if (task == null) return;
+    _resumeAfterPreview = resume;
+    _previewCancelled = true;
+    _mix.stopPreview();
+    await task;
+  }
+
+  /// Called after an edit is saved: a preloaded automatic cue is obsolete.
+  void refreshMix() => _mix.refresh();
+
+  Future<void> refreshMixSkips() async {
+    if (!mixActive) return;
+    _mix.refresh();
+    final song = currentSong;
+    if (song != null && sponsorBlockSupport.value) {
+      await mixSkips(song);
+      _mix.refresh();
+    }
+  }
+
+  MixPlan? _mixPlan() {
+    if (_mixPreviewing) return null;
+    if (!mixActive ||
+        !_advancesByItself ||
+        _currentLoadingIndex >= 0 ||
+        audioPlayer.sequence.length > 1 ||
+        _currentPlayerSourceIsClipped() ||
+        !_playerSourceMatchesCurrentSong()) {
+      return null;
+    }
+    final next = _currentQueueIndex < _queueList.length - 1
+        ? _currentQueueIndex + 1
+        : 0;
+    if (next == _currentQueueIndex) return null;
+    final song = _queueList[next];
+    if (song['isLive'] == true) return null;
+    return (song: song, entryId: _queueEntryIds.ensureId(song));
+  }
+
+  /// The Automatic transition from the song playing to [next]. It asks for
+  /// the analysis of both ends, and is a plain crossfade until that is done.
+  MixCue _mixCue(MixPlan next, Duration duration) {
+    final current = currentSong!;
+    _mixAnalyzer
+      ..want(current, tail: true, duration: duration)
+      ..want(next.song, tail: false);
+    // A few songs ahead too, so their transitions are not plain crossfades.
+    for (var ahead = 1; ahead <= 3 && ahead < _queueList.length; ahead++) {
+      final song = _queueList[(_currentQueueIndex + ahead) % _queueList.length];
+      final length = readMediaDuration(song['duration']);
+      _mixAnalyzer
+        ..want(song, tail: true, duration: length)
+        ..want(
+          _queueList[(_currentQueueIndex + ahead + 1) % _queueList.length],
+          tail: false,
+        );
+    }
+    final coming = readMediaDuration(next.song['duration']);
+    final edit = mixEdits.get(
+      _queuePlaylistId,
+      current['ytid']?.toString(),
+      next.song['ytid']?.toString(),
+    );
+    final outgoing = _knownMixSkips(current);
+    final incoming = _knownMixSkips(next.song);
+    final tail = _mixAnalyzer.edge(current, tail: true);
+    final cue =
+        edit?.cue(duration, coming) ??
+        chooseCue(
+          endAt: mixBounds(outgoing, duration).end,
+          startAt: mixBounds(incoming, coming).start,
+          duration: duration,
+          coming: coming,
+          tail: tail,
+          head: _mixAnalyzer.edge(next.song, tail: false),
+          pair: '${current['ytid']}>${next.song['ytid']}',
+          echo: tail != null && _mixEffects.echoFits(audioPlayer, tail.bpm),
+        );
+    return fitMixSkips(cue, outgoing, incoming, duration, coming);
+  }
+
+  Future<MixLocation?> _mixLocation(Map song) async {
+    final songData = cloneMap(song);
+    final playback = await _resolvePlaybackSource(songData);
+    if (playback == null) return null;
+    final host = Uri.tryParse(playback.songUrl)?.host ?? '';
+    return (
+      source: playback.songUrl,
+      headers: !playback.isOffline && host.endsWith('googlevideo.com')
+          ? streamPlaybackHeaders(songData['ytid']?.toString())
+          : null,
+    );
+  }
+
+  Future<MixSource?> _mixSource(Map song, {bool whole = false}) async {
+    final songData = cloneMap(song);
+    final playback = await _resolvePlaybackSource(songData);
+    if (playback == null) return null;
+    final source = await buildAudioSource(
+      songData,
+      playback.songUrl,
+      playback.isOffline,
+      skipSegments: false,
+    );
+    await mixSkips(songData);
+    if (source == null) return null;
+    return (
+      song: songData,
+      source: source,
+      url: playback.songUrl,
+      offline: playback.isOffline,
+    );
+  }
+
+  /// The next song came in: for the queue, the one before it has ended.
+  Future<void> _advanceIntoMix() async {
+    listeningStatsService.finishListeningSession(
+      countCurrentTick: true,
+      wasPlaying: true,
+    );
+    await _handleSongCompletion();
   }
 
   /// Queues one similar song when the current song is the last of the queue.
@@ -1299,9 +1753,15 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     int? startIndex,
     bool? shuffle,
     bool keepGoing = false,
+    String? playlistId,
   }) async {
+    await stopMixPreview();
     try {
-      if (replace) _queueKeepsGoing = keepGoing;
+      if (replace) {
+        _queueKeepsGoing = keepGoing;
+        _queuePlaylistId = playlistId;
+        if (isDesktopPlatform) unawaited(_mixEffects.syncDesktopFilters());
+      }
       final manuallyAddedSongs = replace ? _getUnplayedManualSongs() : <Map>[];
       final shuffleAfterReplace = shuffle ?? shuffleNotifier.value;
       if (replace) {
@@ -1496,6 +1956,8 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           ? cloneMap(_queueList[_currentQueueIndex])
           : null;
 
+      _queuePlaylistId = null;
+      if (isDesktopPlatform) unawaited(_mixEffects.syncDesktopFilters());
       _queueList.clear();
       _originalQueueList.clear();
       _originalQueueEntriesById.clear();
@@ -1531,6 +1993,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         _originalQueueList,
         _currentQueueIndex,
         keepGoing: _queueKeepsGoing,
+        playlistId: _queuePlaylistId,
       );
 
       if (_currentQueueIndex >= 0 && _currentQueueIndex < mediaItems.length) {
@@ -1658,6 +2121,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
             _originalQueueList,
             _currentQueueIndex,
             keepGoing: _queueKeepsGoing,
+            playlistId: _queuePlaylistId,
           );
           _preloadUpcomingSongs();
           // Trigger background song addition if auto-play is enabled
@@ -1978,6 +2442,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       // Do NOT await play(): its future only completes when playback pauses/
       // stops/finishes (just_audio semantics), which would defer the resume
       // below until the song ended - losing the whole session.
+      _mix.resume();
       unawaited(
         audioPlayer.play().catchError((Object e, StackTrace stackTrace) {
           logger.log(
@@ -2015,7 +2480,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     }
     try {
       final wasPlaying = audioPlayer.playing;
+      _mix.pause();
       await audioPlayer.pause();
+      if (_mixPreviewing) return;
       listeningStatsService.recordListeningSessionProgress(
         wasPlaying: wasPlaying,
       );
@@ -2064,6 +2531,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> stop() async {
+    await stopMixPreview(resume: false);
     _debounceTimer?.cancel();
     _completionEventPending = false;
     _currentLoadingIndex = -1;
@@ -2076,6 +2544,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         wasPlaying: audioPlayer.playing,
       );
       await persistPlaybackState();
+      _mix.cancel();
       await audioPlayer.stop();
       _resetPreloadingState();
     } catch (e, stackTrace) {
@@ -2103,12 +2572,13 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> setSpeed(double speed) async {
-    await audioPlayer.setSpeed(speed);
+    await _mix.setSpeed(speed);
     _updatePlaybackState();
   }
 
   @override
   Future<void> seek(Duration position) async {
+    await stopMixPreview();
     try {
       listeningStatsService.recordListeningSessionProgress(
         wasPlaying: audioPlayer.playing,
@@ -2119,6 +2589,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         _resumeSeeks.add(null);
         _updatePlaybackState(force: true);
       } else {
+        _mix.cutTail();
         await audioPlayer.seek(position);
         await persistPlaybackState();
       }
@@ -2198,6 +2669,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     int? transitionId,
     bool playWhenReady = true,
   }) async {
+    await stopMixPreview();
     try {
       final songData = cloneMap(song);
       if (_resumeEntryId != songData['queueEntryId']) {
@@ -2211,6 +2683,20 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       }
 
       _lastError = null;
+      final mixed = _mix.adopt(songData['queueEntryId']?.toString());
+      if (mixed != null) {
+        return await _setAudioSourceAndPlay(
+          mixed.song..['queueEntryId'] = songData['queueEntryId'],
+          mixed.source,
+          mixed.url,
+          mixed.offline,
+          mediaId: mediaId,
+          transitionId: transitionId,
+          playWhenReady: playWhenReady,
+          loaded: true,
+        );
+      }
+      _mix.cancel();
       if (audioPlayer.playing) {
         listeningStatsService.recordListeningSessionProgress(
           wasPlaying: audioPlayer.playing,
@@ -2241,10 +2727,14 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         mediaId: mediaId,
       );
 
+      // With the Mix the song plays whole: a transition needs its real times.
+      final whole = mixActive;
+      if (whole) await mixSkips(songData);
       final audioSource = await buildAudioSource(
         songData,
         playback.songUrl,
         playback.isOffline,
+        skipSegments: !whole,
       );
 
       // Check again after building the audio source (SponsorBlock fetch can also be slow).
@@ -2395,6 +2885,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     bool allowOnlineRetry = true,
     int? transitionId,
     bool playWhenReady = true,
+    bool loaded = false,
   }) async {
     try {
       // Final staleness check before we touch the audio player.
@@ -2408,22 +2899,21 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       // source, not whatever session we're about to finish.
       final wasPlayingBeforeSwap = audioPlayer.playing;
 
-      final loadedDuration = await audioPlayer
-          .setAudioSource(
-            audioSource,
-            initialPosition: _resumeEntryId == song['queueEntryId']
-                ? _resumePosition
-                : null,
-          )
-          .timeout(_songTransitionTimeout);
+      // The Mix loaded this song in the player already.
+      final loadedDuration = loaded
+          ? audioPlayer.duration
+          : await audioPlayer
+                .setAudioSource(
+                  audioSource,
+                  initialPosition: _resumeEntryId == song['queueEntryId']
+                      ? _resumePosition
+                      : _mixStart(song, audioSource),
+                )
+                .timeout(_songTransitionTimeout);
 
-      // Check once more after the async setAudioSource: a fast offline song
-      // could have loaded and started playing while we were buffering/setting up.
-      // If so, stop the source we just loaded and yield to the newer song.
-      if (_isStaleTransition(transitionId)) {
-        unawaited(audioPlayer.stop());
-        return false;
-      }
+      if (_isStaleTransition(transitionId)) return false;
+      if (!loaded) await _mixEffects.loaded(audioPlayer);
+      if (_isStaleTransition(transitionId)) return false;
 
       _resumeEntryId = null;
       _resumePosition = null;
@@ -2594,6 +3084,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           startIndex: songIndex,
           shuffle: shuffle,
           keepGoing: keepGoing,
+          playlistId: playlist['source'] == 'user-created'
+              ? playlist['ytid']?.toString()
+              : null,
         );
       }
     } catch (e, stackTrace) {
@@ -2613,6 +3106,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     String? genre,
     List<RadioStation>? stations,
   }) async {
+    await stopMixPreview();
     try {
       _radioStations = stations != null && stations.any((s) => s.id == id)
           ? List.of(stations)
@@ -2660,9 +3154,11 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       }
 
       // Play the radio stream
+      _mix.cancel();
       await audioPlayer
           .setAudioSource(audioSource)
           .timeout(_songTransitionTimeout);
+      await _mixEffects.loaded(audioPlayer);
 
       listeningStatsService.finishListeningSession(
         countCurrentTick: true,
@@ -2698,15 +3194,16 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   Future<AudioSource?> buildAudioSource(
     Map song,
     String songUrl,
-    bool isOffline,
-  ) async {
+    bool isOffline, {
+    bool skipSegments = true,
+  }) async {
     try {
       final tag = mapToMediaItem(song);
 
       if (isOffline) {
         final fileSource = AudioSource.file(songUrl, tag: tag);
 
-        if (sponsorBlockSupport.value) {
+        if (sponsorBlockSupport.value && skipSegments) {
           return _applyOfflineSponsorBlock(fileSource, song['ytid']) ??
               fileSource;
         }
@@ -2725,7 +3222,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         tag: tag,
       );
 
-      if (!sponsorBlockSupport.value) {
+      if (!sponsorBlockSupport.value || !skipSegments) {
         return audioSource;
       }
 

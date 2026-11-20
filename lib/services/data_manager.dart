@@ -304,6 +304,7 @@ const _deviceSettings = [
   'waveReading',
   'equalizerEnabled',
   'equalizerBandGains',
+  'desktopEqualizerGains',
   'showPlayerVisualizer',
   'useSystemColor',
   'volume',

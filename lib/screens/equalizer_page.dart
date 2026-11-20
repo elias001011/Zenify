@@ -25,7 +25,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
+import 'package:musify/services/mix_effects.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
 import 'package:musify/widgets/spinner.dart';
@@ -40,6 +42,12 @@ class EqualizerPage extends StatefulWidget {
 class _EqualizerPageState extends State<EqualizerPage> {
   AndroidEqualizerParameters? _params;
   List<double> _gains = [];
+  List<double> get _frequencies => isDesktopPlatform
+      ? MixEffects.desktopFrequencies
+      : _params?.bands.map((b) => b.centerFrequency).toList() ?? [];
+  double get _minimum => isDesktopPlatform ? -12 : _params!.minDecibels;
+  double get _maximum => isDesktopPlatform ? 12 : _params!.maxDecibels;
+
   bool _enabled = equalizerEnabled.value;
   bool _isLoading = true;
   String? _activePreset;
@@ -79,7 +87,7 @@ class _EqualizerPageState extends State<EqualizerPage> {
 
   // Get preset gains for the current number of bands
   List<double> _getPresetGains(String preset) {
-    final bandCount = _params?.bands.length ?? 0;
+    final bandCount = _frequencies.length;
     if (bandCount == 0) return [];
 
     // Normalize band index to 0-1 range for frequency distribution
@@ -157,6 +165,13 @@ class _EqualizerPageState extends State<EqualizerPage> {
   }
 
   Future<void> _loadEqualizer() async {
+    if (isDesktopPlatform) {
+      setState(() {
+        _gains = MixEffects.desktopGains;
+        _isLoading = false;
+      });
+      return;
+    }
     try {
       final params = await audioHandler.getEqualizerParameters();
       if (!mounted) return;
@@ -204,10 +219,9 @@ class _EqualizerPageState extends State<EqualizerPage> {
           tooltip: context.l10n!.equalizerResetBands,
           onPressed: () async {
             await audioHandler.resetEqualizerBands();
-            final params = _params;
-            if (!mounted || params == null) return;
+            if (!mounted || _frequencies.isEmpty) return;
             setState(() {
-              _gains = List<double>.filled(params.bands.length, 0);
+              _gains = List<double>.filled(_frequencies.length, 0);
               _activePreset = null;
             });
           },
@@ -215,7 +229,7 @@ class _EqualizerPageState extends State<EqualizerPage> {
       ],
       body: _isLoading
           ? const Spinner()
-          : _params == null
+          : _frequencies.isEmpty
           ? Center(
               child: Padding(
                 padding: commonSingleChildScrollViewPadding,
@@ -334,14 +348,12 @@ class _EqualizerPageState extends State<EqualizerPage> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: Column(
-                          children: List.generate(_params!.bands.length, (
-                            index,
-                          ) {
-                            final band = _params!.bands[index];
+                          children: List.generate(_frequencies.length, (index) {
+                            final frequency = _frequencies[index];
                             final gain = _gains[index];
-                            final min = _params!.minDecibels;
-                            final max = _params!.maxDecibels;
-                            final isLast = index == _params!.bands.length - 1;
+                            final min = _minimum;
+                            final max = _maximum;
+                            final isLast = index == _frequencies.length - 1;
 
                             return Padding(
                               padding: EdgeInsets.only(
@@ -363,9 +375,7 @@ class _EqualizerPageState extends State<EqualizerPage> {
                                             MainAxisAlignment.spaceBetween,
                                         children: [
                                           Text(
-                                            _formatFrequency(
-                                              band.centerFrequency,
-                                            ),
+                                            _formatFrequency(frequency),
                                             style: Theme.of(context)
                                                 .textTheme
                                                 .titleSmall

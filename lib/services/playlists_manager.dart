@@ -29,6 +29,8 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart' show logger;
 import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/data_manager.dart';
+import 'package:musify/services/mix_edits.dart';
+import 'package:musify/services/mix_playlists.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/proxy_manager.dart';
@@ -428,9 +430,12 @@ Future<int> moveSongsToCustomPlaylist(
 Future<bool> replaceCustomPlaylist(String playlistId, Map updated) async {
   final found = _findCustomPlaylist(playlistId);
   if (found == null) return false;
-  found.playlist
+  // Snapshot before clearing: updated may be the same map. The cast view
+  // writes entries individually even when the stored map has narrower types.
+  final replacement = Map.of(updated);
+  found.playlist.cast<dynamic, dynamic>()
     ..clear()
-    ..addAll(updated);
+    ..addAll(replacement);
   await _saveCustomPlaylist(found.isFromFolder);
   return true;
 }
@@ -546,6 +551,14 @@ bool _storePlaylistSongs(Map playlist, List<dynamic> playlistSongs) {
   try {
     if (playlist['source'] == 'user-created') {
       final playlistId = playlist['ytid']?.toString();
+      if (playlistId != null) {
+        unawaited(
+          mixEdits.retainSongs(playlistId, {
+            for (final song in playlistSongs)
+              if (song is Map && song['ytid'] != null) song['ytid'].toString(),
+          }),
+        );
+      }
       final storedPlaylist = playlistId == null
           ? null
           : _findCustomPlaylist(playlistId)?.playlist;
@@ -687,6 +700,8 @@ void removeUserCustomPlaylist(dynamic playlist) {
     final updatedPlaylists = List<Map>.from(userCustomPlaylists.value)
       ..removeWhere((p) => p['ytid']?.toString() == playlistId);
     userCustomPlaylists.value = updatedPlaylists;
+    setPlaylistMix(playlistId, on: false);
+    unawaited(mixEdits.retainSongs(playlistId, {}));
 
     final foldersChanged = _removePlaylistFromFolders(playlistId);
     final likedChanged = _removePlaylistFromLikedPlaylists(playlistId);
