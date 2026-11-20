@@ -46,6 +46,7 @@ class FloatingSurface extends StatefulWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(28)),
     this.padding = EdgeInsets.zero,
     this.grouped = false,
+    this.navigationChrome = false,
   });
 
   final Widget child;
@@ -58,6 +59,9 @@ class FloatingSurface extends StatefulWidget {
   /// backdrop once, at its first surface, so anything painted after that one
   /// would be missing behind the rest.
   final bool grouped;
+
+  /// Slightly stronger tint for the dock and island in transparency mode.
+  final bool navigationChrome;
 
   /// Shared window-edge spacing for the island, rail and dock.
   static const edgeMargin = 12.0;
@@ -86,7 +90,9 @@ class _FloatingSurfaceState extends State<FloatingSurface> {
     final colorScheme = Theme.of(context).colorScheme;
     final dark = colorScheme.brightness == Brightness.dark;
     final color = colorScheme.surfaceContainer.withValues(
-      alpha: floatingOpacity(effect, dark: dark),
+      alpha: widget.navigationChrome && effect == FloatingEffect.translucent
+          ? (dark ? 0.95 : 0.96)
+          : floatingOpacity(effect, dark: dark),
     );
     final borderRadius = widget.borderRadius;
 

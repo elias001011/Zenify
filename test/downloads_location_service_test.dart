@@ -88,6 +88,34 @@ void main() {
     expect(playlistSong['audioPath'], audio);
   });
 
+  test('a collision preserves both files and the original path', () async {
+    final source = File('$defaultRoot/tracks/$songId.m4a');
+    final target = File('$customRoot/tracks/$songId.m4a');
+    await target.parent.create(recursive: true);
+    await target.writeAsString('other'); // Same length as 'audio'.
+    final status = await DownloadsLocation.change(customRoot);
+    expect(status, DownloadsMoveStatus.partiallyMoved);
+    expect(source.readAsStringSync(), 'audio');
+    expect(target.readAsStringSync(), 'other');
+    expect(userOfflineSongs.value.single['audioPath'], source.path);
+  });
+
+  test('checking writability preserves a pre-existing probe file', () async {
+    final probe = File('$customRoot/tracks/.musify-write-test');
+    await probe.parent.create(recursive: true);
+    await probe.writeAsString('keep');
+    await DownloadsLocation.change(customRoot);
+    expect(probe.readAsStringSync(), 'keep');
+  });
+
+  test('preserves unrelated partial files in the destination', () async {
+    final partial = File('$customRoot/tracks/$songId.m4a.partial');
+    await partial.parent.create(recursive: true);
+    await partial.writeAsString('keep');
+    await DownloadsLocation.change(customRoot);
+    expect(partial.readAsStringSync(), 'keep');
+  });
+
   test('moving back to the default forgets the custom folder', () async {
     await DownloadsLocation.change(customRoot);
     final status = await DownloadsLocation.change(null);

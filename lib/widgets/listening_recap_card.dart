@@ -24,10 +24,9 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
-import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/app_logo.dart';
 import 'package:musify/widgets/music_list_surface.dart';
-import 'package:musify/widgets/song_artwork.dart';
+import 'package:musify/widgets/recap_artist_avatar.dart';
 import 'package:musify/widgets/song_bar.dart';
 
 /// A listening period in cards: minutes and the top artist side by side,
@@ -230,11 +229,7 @@ class _ArtistContent extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
-        SongArtworkWidget(
-          size: _artworkSize,
-          borderRadius: _artworkSize / 2,
-          metadata: mapToMediaItem(artist.topSong),
-        ),
+        RecapArtistAvatar(artist: artist, size: _artworkSize),
         const SizedBox(height: 10),
         Text(
           artist.name,

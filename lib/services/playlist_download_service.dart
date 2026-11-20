@@ -177,9 +177,8 @@ class OfflinePlaylistService {
 
       final songsList = playlist['list'] as List<dynamic>;
 
-      // Only add to offline playlists if not cancelled and most songs succeeded
-      if (!progressNotifier.value.isCancelled &&
-          progressNotifier.value.completed > progressNotifier.value.failed) {
+      // Only call the playlist downloaded once every song is available.
+      if (progressNotifier.value.isComplete) {
         // Create an offline version of the playlist
         final offlinePlaylist = {
           ...playlist,
@@ -570,6 +569,9 @@ class DownloadProgress {
   int completed;
   int failed;
   bool isCancelled;
+
+  bool get isComplete =>
+      !isCancelled && total > 0 && failed == 0 && completed == total;
 
   double get progress {
     if (total <= 0) return 0;

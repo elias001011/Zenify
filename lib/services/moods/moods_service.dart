@@ -31,7 +31,6 @@ import 'package:musify/main.dart' show audioHandler, logger;
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/moods/mix_engine.dart';
-import 'package:musify/services/moods/moods_preferences.dart';
 import 'package:musify/services/moods/moods_worker.dart';
 import 'package:musify/services/moods/taste.dart';
 import 'package:musify/services/playlists_manager.dart';
@@ -74,8 +73,7 @@ typedef DetectedGenre = ({
 /// playlists it curates for each mood and genre, and its charts.
 ///
 /// What comes from the network is cached in the `cache` box, which backups
-/// leave out; the user's tuning and saved playlists live in the library (see
-/// `moods_preferences.dart`).
+/// leave out; saved playlists live in the library.
 class MoodsService {
   MoodsService() {
     offlineMode.addListener(_onAvailabilityChanged);
@@ -113,10 +111,8 @@ class MoodsService {
     return _worker.run(_musicTask(task));
   }
 
-  /// What the cached playlists were made with. Blocked artists and left-out
-  /// genres are filtered when a playlist is read, so only the discovery
-  /// asks for a new one.
-  String get _tuningSignature => moodsTuning.value.discovery.name;
+  // Invalidates playlists produced with the former manual tuning.
+  static const _playlistAlgorithmVersion = 'automatic-v1';
   Box get _cache => Hive.box('cache');
 
   /// The device's region, for regional moods, genres and charts.
@@ -131,38 +127,22 @@ class MoodsService {
 
   final _radios = <String, Future<List<Map>>>{};
 
-  /// The user's taste right now, from the library. The tuning page asks for
-  /// it [withBlocked] artists too, to list them under their names.
-  Taste taste({bool withBlocked = false}) {
+  /// The user's taste right now, from the library.
+  Taste taste() {
     // Making the day's playlists asks for it a dozen times in a row.
     final now = DateTime.now();
     final memo = _tasteMemo;
     if (memo != null &&
-        memo.withBlocked == withBlocked &&
-        memo.tuning == moodsTuning.value &&
         memo.library == _libraryIdentity &&
         now.difference(memo.at) < const Duration(seconds: 30)) {
       return memo.taste;
     }
-    final taste = _readTaste(withBlocked);
-    _tasteMemo = (
-      taste: taste,
-      at: now,
-      withBlocked: withBlocked,
-      tuning: moodsTuning.value,
-      library: _libraryIdentity,
-    );
+    final taste = _readTaste();
+    _tasteMemo = (taste: taste, at: now, library: _libraryIdentity);
     return taste;
   }
 
-  ({
-    Taste taste,
-    DateTime at,
-    bool withBlocked,
-    MoodsTuning tuning,
-    Object library,
-  })?
-  _tasteMemo;
+  ({Taste taste, DateTime at, Object library})? _tasteMemo;
 
   // Notifier lists are replaced when the library is edited or restored.
   // Comparing their identities keeps the memo cheap without delaying edits.
@@ -175,7 +155,7 @@ class MoodsService {
     userLikedPlaylists.value,
   );
 
-  Taste _readTaste(bool withBlocked) {
+  Taste _readTaste() {
     final kept = <Map>[
       for (final playlist in [
         ...userCustomPlaylists.value,
@@ -194,7 +174,6 @@ class MoodsService {
         for (final artist in getLikedArtistItems())
           artist['title']?.toString() ?? '',
       ],
-      blockedArtists: withBlocked ? const {} : moodsTuning.value.blockedArtists,
       notSongs: _notSongs,
     );
   }
@@ -264,13 +243,11 @@ class MoodsService {
     if (generation != _generation || !_enabled) return const [];
     final radios = await _radiosOf(seeds.keys);
     if (generation != _generation || !_enabled) return const [];
-    final excluded = await _excludedArtists();
     return assembleQueue(
       taste: taste,
       scored: scoreRadios(taste: taste, radios: radios, seedWeights: seeds),
-      discovery: discovery ?? moodsTuning.value.discovery,
+      discovery: discovery ?? Discovery.balanced,
       length: length,
-      excludedArtists: excluded,
       random: shuffle,
     );
   }
@@ -334,10 +311,9 @@ class MoodsService {
     return assembleQueue(
       taste: taste,
       scored: scored,
-      discovery: discovery ?? moodsTuning.value.discovery,
+      discovery: discovery ?? Discovery.balanced,
       length: length,
       perArtist: 2,
-      excludedArtists: await _excludedArtists(),
       random: random,
     );
   }
@@ -376,17 +352,13 @@ class MoodsService {
         song['ytid'].toString(): 1.0 - i * 0.15,
     };
     final taste = this.taste();
-    final seedArtists = {for (final song in songs) artistKey(song['artist'])};
     final radios = await _radiosOf(weights.keys);
     if (!_online || generation != _generation) return false;
     final queue = assembleQueue(
       taste: taste,
       scored: scoreRadios(taste: taste, radios: radios, seedWeights: weights),
-      discovery: moodsTuning.value.discovery,
       length: 50,
       perArtist: perArtist,
-      // Asking for an artist's radio overrides leaving its genre out.
-      excludedArtists: (await _excludedArtists()).difference(seedArtists),
     );
     if (!_online || generation != _generation) return false;
     await audioHandler.playPlaylistSong(
@@ -576,35 +548,6 @@ class MoodsService {
     }
   }
 
-  /// Artists of the genres the user left out, unless another genre they
-  /// listen to claims them too. Reads the genres already known, however old:
-  /// a tap on a mood never waits on the minute it takes to read them again.
-  Future<Set<String>> _excludedArtists() async {
-    final tuning = moodsTuning.value;
-    if (tuning.excludedGenres.isEmpty) return tuning.blockedArtists;
-    final cached = _cache.get(_genresKey);
-    if (cached is! Map || !_fresh(cached, const Duration(days: 7))) {
-      unawaited(_genreArtists());
-    }
-    return _cachedExcludedArtists();
-  }
-
-  Set<String> _cachedExcludedArtists() {
-    final tuning = moodsTuning.value;
-    if (tuning.excludedGenres.isEmpty) return tuning.blockedArtists;
-    final cached = _cache.get(_genresKey);
-    final genres = cached is Map ? _maps(cached['genres']) : const <Map>[];
-    final out = <String>{};
-    final kept = <String>{};
-    for (final genre in genres) {
-      final artists = (genre['artists'] as List).map((e) => e.toString());
-      (tuning.excludedGenres.contains(genre['title']) ? out : kept).addAll(
-        artists,
-      );
-    }
-    return {...tuning.blockedArtists, ...out.difference(kept)};
-  }
-
   Future<List<Map>> _chartSongs([String chart = 'ZZ']) async {
     final key = 'moods:chart:$chart';
     final generation = _generation;
@@ -645,19 +588,14 @@ class MoodsService {
   Stream<List<Map>> playlists() async* {
     if (!_enabled) return;
     final generation = _generation;
-    final tuning = _tuningSignature;
-    bool active() =>
-        _enabled && generation == _generation && tuning == _tuningSignature;
+    bool active() => _enabled && generation == _generation;
     final ids = [
       '${_playlistPrefix}daily',
       '${_playlistPrefix}moment',
       '${_playlistPrefix}new',
       '${_playlistPrefix}discoveries',
       '${_playlistPrefix}most-played',
-      for (final genre
-          in (await _detectedGenresIfReady())
-              .where((g) => !moodsTuning.value.excludedGenres.contains(g.title))
-              .take(2))
+      for (final genre in (await _detectedGenresIfReady()).take(2))
         '${_playlistPrefix}genre:${genre.title}',
       for (final month in _addictionMonths())
         '${_playlistPrefix}addictions:$month',
@@ -741,7 +679,7 @@ class MoodsService {
     final cached = _cache.get('moods:playlist:$id');
     if (cached is Map &&
         cached['language'] == languageSetting.languageCode &&
-        cached['tuning'] == _tuningSignature &&
+        cached['algorithm'] == _playlistAlgorithmVersion &&
         (DateTime.tryParse('${cached['until']}')?.isAfter(DateTime.now()) ??
             false)) {
       return _playlistMap(cached);
@@ -753,7 +691,6 @@ class MoodsService {
   Future<Map?> playlist(String id) async {
     if (!isZenifyPlaylist(id)) return null;
     final generation = _generation;
-    final tuning = _tuningSignature;
     if (_currentPlaylist(id) case final current?) return current;
     final cacheKey = 'moods:playlist:$id';
     final cached = _cache.get(cacheKey);
@@ -762,7 +699,6 @@ class MoodsService {
     try {
       final made = await _make(id.substring(_playlistPrefix.length), now);
       if (!_enabled || generation != _generation) return null;
-      if (tuning != _tuningSignature) return await playlist(id);
       if (made == null || (made['list'] as List).length < 8) {
         return cached is Map ? _playlistMap(cached) : null;
       }
@@ -770,7 +706,7 @@ class MoodsService {
         ...made,
         'ytid': id,
         'language': languageSetting.languageCode,
-        'tuning': tuning,
+        'algorithm': _playlistAlgorithmVersion,
       };
       await _cache.put(cacheKey, stored);
       return _playlistMap(stored);
@@ -786,12 +722,7 @@ class MoodsService {
   }
 
   Map _playlistMap(Map stored) {
-    final blocked = _cachedExcludedArtists();
-    final songs = blocked.isEmpty
-        ? _maps(stored['list'])
-        : _maps(stored['list'])
-              .where((song) => !blocked.contains(artistKey(song['artist'])))
-              .toList();
+    final songs = _maps(stored['list']);
     // Recap songs may carry an empty artwork.
     final covers = {
       for (final song in songs.take(12))

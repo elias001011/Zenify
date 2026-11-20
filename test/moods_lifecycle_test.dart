@@ -8,7 +8,6 @@ import 'package:hive_ce/hive_ce.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/moods/mix_engine.dart';
-import 'package:musify/services/moods/moods_preferences.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/moods/moods_worker.dart';
 import 'package:musify/services/playlists_manager.dart';
@@ -57,7 +56,6 @@ void main() {
     }
     offlineMode.value = false;
     moodsEnabled.value = true;
-    moodsTuning.value = const MoodsTuning();
     languageSetting = const Locale('en');
     userCustomPlaylists.value = [];
     userPlaylistFolders.value = [];
@@ -70,68 +68,21 @@ void main() {
   tearDown(() => service.dispose());
 
   test(
-    'current playlists regenerate immediately after changing the tuning',
+    'legacy tuned playlists are regenerated with automatic settings',
     () async {
-      final first = await service.playlist('zenify:daily');
-      expect(first!['list'], _songs('generation1'));
+      await Hive.box('cache').put('moods:playlist:zenify:daily', {
+        'ytid': 'zenify:daily',
+        'language': 'en',
+        'tuning': 'adventurous',
+        'until': DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+        'list': _songs('old'),
+      });
+      final result = await service.playlist('zenify:daily');
+      expect(result!['list'], _songs('generation1'));
       await service.playlist('zenify:daily');
       expect(service.made, 1);
-
-      await setMoodsTuning(const MoodsTuning(discovery: Discovery.adventurous));
-      final refreshed = await service.playlist('zenify:daily');
-      expect(refreshed!['list'], _songs('generation2'));
-      expect(service.made, 2);
     },
   );
-
-  test('a tuning change mid-generation remakes the playlist instead of dropping it', () async {
-    service.pending = Completer<List<Map>>();
-    final pending = service.playlist('zenify:daily');
-    await setMoodsTuning(const MoodsTuning(discovery: Discovery.familiar));
-    service.pending!.complete(_songs('late'));
-    expect((await pending)!['list'], _songs('late'));
-    expect(service.made, 2);
-  });
-
-  test('a tuning reloaded unchanged from storage notifies nobody', () async {
-    await setMoodsTuning(
-      const MoodsTuning(
-        excludedGenres: {'Jazz', 'Rock'},
-        blockedArtists: {'x'},
-      ),
-    );
-    reloadMoodsFromStorage();
-    var notified = 0;
-    void count() => notified++;
-    moodsTuning.addListener(count);
-    savedZenifyPlaylists.addListener(count);
-    addTearDown(() {
-      moodsTuning.removeListener(count);
-      savedZenifyPlaylists.removeListener(count);
-    });
-    reloadMoodsFromStorage();
-    expect(notified, 0);
-    expect(
-      const MoodsTuning(
-        excludedGenres: {'Rock', 'Jazz'},
-        blockedArtists: {'x'},
-      ),
-      moodsTuning.value,
-    );
-  });
-
-  test('blocked artists are removed even from an offline fallback', () async {
-    await service.playlist('zenify:daily');
-    await setMoodsTuning(const MoodsTuning(blockedArtists: {'artist0'}));
-    offlineMode.value = true;
-    final fallback = await service.playlist('zenify:daily');
-    expect((fallback!['list'] as List).length, 9);
-    expect(
-      (fallback['list'] as List).any((song) => song['artist'] == 'Artist 0'),
-      isFalse,
-    );
-    expect(service.made, 1);
-  });
 
   test('a damaged cached expiry never breaks the playlist page', () async {
     await Hive.box('cache').put('moods:playlist:zenify:daily', {

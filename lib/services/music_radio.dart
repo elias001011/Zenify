@@ -70,11 +70,13 @@ Future<Map<String, dynamic>?> pickNextSong(
     var pick = continues ? next(current.songs) : null;
     if (pick == null) {
       final songs = await radioOf(songYtId);
+      if (offlineMode.value) return null;
       _following = (seed: songYtId, songs: songs);
       pick = next(songs);
     }
     if (pick != null) return Map<String, dynamic>.from(pick);
   }
+  if (offlineMode.value) return null;
   return relatedTo(songYtId, excludedYtIds: excludedYtIds);
 }
 
@@ -87,9 +89,12 @@ Future<List> getPlaylistRecommendations(
   final inPlaylist = {
     for (final song in playlistSongs.whereType<Map>()) song['ytid']?.toString(),
   };
-  final cached = _playlistRadios[playlistId]?.where(
-    (song) => !inPlaylist.contains(song['ytid']),
-  );
+  final ids = inPlaylist.whereType<String>().toList()..sort();
+  final signature = ids.join('\u0000');
+  final record = _playlistRadios[playlistId];
+  final cached = record?.signature == signature
+      ? record!.songs.where((song) => !inPlaylist.contains(song['ytid']))
+      : null;
   if (cached != null && cached.isNotEmpty) return cached.toList();
 
   if (!offlineMode.value) {
@@ -97,6 +102,7 @@ Future<List> getPlaylistRecommendations(
     final radios = await Future.wait([
       for (final seed in seeds) radioOf(seed['ytid'].toString()),
     ]);
+    if (offlineMode.value) return const [];
     final scores = <String, double>{};
     final songs = <String, Map>{};
     for (final (seedIndex, radio) in radios.indexed) {
@@ -111,10 +117,17 @@ Future<List> getPlaylistRecommendations(
     final ranked = (scores.entries.toList()
       ..sort((a, b) => b.value.compareTo(a.value)));
     final picks = [for (final e in ranked.take(15)) songs[e.key]!];
-    if (picks.isNotEmpty) return _playlistRadios[playlistId] = picks;
+    if (picks.isNotEmpty) {
+      if (_playlistRadios.length >= 100) {
+        _playlistRadios.remove(_playlistRadios.keys.first);
+      }
+      _playlistRadios[playlistId] = (signature: signature, songs: picks);
+      return picks;
+    }
   }
+  if (offlineMode.value) return const [];
   return fallbackRecommendations(playlistId, playlistSongs);
 }
 
 /// In-memory, like the related-videos recommendations, cleared on restart.
-final _playlistRadios = <String, List<Map>>{};
+final _playlistRadios = <String, ({String signature, List<Map> songs})>{};

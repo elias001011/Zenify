@@ -27,7 +27,6 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/listening_stats_service.dart';
-import 'package:musify/services/moods/moods_preferences.dart';
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
@@ -60,11 +59,7 @@ class _HomePageState extends State<HomePage> {
   Stream<List<Map>>? _zenifyPlaylists;
   DateTime _zenifyLoadedAt = DateTime.now();
   late final AppLifecycleListener _lifecycle;
-  final _moodsInputs = Listenable.merge([
-    moodsEnabled,
-    offlineMode,
-    moodsTuning,
-  ]);
+  final _moodsInputs = Listenable.merge([moodsEnabled, offlineMode]);
 
   @override
   void initState() {

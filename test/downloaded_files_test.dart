@@ -2,8 +2,21 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:musify/services/io_service.dart';
+import 'package:musify/services/playlist_download_service.dart';
 
 void main() {
+  test('only a complete successful playlist is marked downloaded', () {
+    expect(
+      DownloadProgress(total: 3, completed: 2, failed: 1).isComplete,
+      isFalse,
+    );
+    expect(DownloadProgress(total: 3, completed: 3).isComplete, isTrue);
+    expect(
+      DownloadProgress(total: 3, completed: 3, isCancelled: true).isComplete,
+      isFalse,
+    );
+  });
+
   test('recognises only files Musify downloaded', () {
     expect(
       FilePaths.isDownloadedFile('/a/tracks/dQw4w9WgXcQ.m4a', artwork: false),

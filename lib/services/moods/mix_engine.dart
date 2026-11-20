@@ -25,9 +25,7 @@ import 'package:musify/services/moods/taste.dart';
 
 /// How much of a queue is new to the user.
 enum Discovery {
-  familiar(0.4),
   balanced(0.65),
-  adventurous(0.85),
 
   /// Only songs the user has never heard, liked or kept.
   onlyNew(1);
@@ -69,24 +67,19 @@ Map<String, ({Map song, double score})> scoreRadios({
 /// Picks [length] songs from [scored]: the share of new songs [discovery]
 /// asks for, the best of each first with a little shuffle from [random], at
 /// most [perArtist] per artist and never the same artist twice in a row.
-/// Songs by [excludedArtists] (keys) are left out.
 List<Map> assembleQueue({
   required Taste taste,
   required Map<String, ({Map song, double score})> scored,
   Discovery discovery = Discovery.balanced,
   int length = 40,
   int perArtist = 3,
-  Set<String> excludedArtists = const {},
   Random? random,
 }) {
   final shuffle = random ?? Random();
   // A little noise keeps two queues of the same mood from being twins.
   double jitter(double score) => score * (0.85 + shuffle.nextDouble() * 0.3);
   final ranked =
-      scored.values
-          .where((e) => !excludedArtists.contains(artistKey(e.song['artist'])))
-          .map((e) => (song: e.song, score: jitter(e.score)))
-          .toList()
+      scored.values.map((e) => (song: e.song, score: jitter(e.score))).toList()
         ..sort((a, b) => b.score.compareTo(a.score));
 
   final fresh = <Map>[];

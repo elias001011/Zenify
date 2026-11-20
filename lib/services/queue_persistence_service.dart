@@ -100,7 +100,12 @@ class QueuePersistenceService {
       // Same queue, another song: remember which, cheaply.
       if (index >= 0 && index < songs.length) {
         final entry = songs[index]['queueEntryId'];
-        if (entry is String) savePosition(entry, Duration.zero);
+        final saved = Hive.isBoxOpen('userNoBackup')
+            ? Hive.box('userNoBackup').get(positionKey)
+            : null;
+        if (entry is String && (saved is! Map || saved['entry'] != entry)) {
+          savePosition(entry, Duration.zero);
+        }
       }
       return;
     }

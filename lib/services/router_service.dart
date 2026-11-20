@@ -37,7 +37,6 @@ import 'package:musify/screens/keyboard_shortcuts_page.dart';
 import 'package:musify/screens/library_page.dart';
 import 'package:musify/screens/local_files_page.dart';
 import 'package:musify/screens/local_sync_page.dart';
-import 'package:musify/screens/moods_tuning_page.dart';
 import 'package:musify/screens/playlist_folder_page.dart';
 import 'package:musify/screens/playlist_page.dart';
 import 'package:musify/screens/radio_stations_page.dart';
@@ -93,8 +92,7 @@ class NavigationManager {
     if (!offlineMode.value) return null;
     final location = state.matchedLocation;
     if (location.endsWith('/export-playlists')) return settingsPath;
-    if (location.endsWith('/moods-tuning') ||
-        location.endsWith('/radioStations')) {
+    if (location.endsWith('/radioStations')) {
       return libraryPath;
     }
     if (MoodsService.isZenifyPlaylist(state.pathParameters['playlistId']) ||
@@ -279,11 +277,6 @@ class NavigationManager {
               ),
               _artistRoute(),
               _albumRoute(),
-              GoRoute(
-                path: 'moods-tuning',
-                pageBuilder: (context, state) =>
-                    _pushPage(child: const MoodsTuningPage(), state: state),
-              ),
               GoRoute(
                 path: 'local-files',
                 pageBuilder: (context, state) =>

@@ -114,6 +114,7 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void initState() {
     super.initState();
+    offlineMode.addListener(_onOfflineChanged);
     // Only the desktop shortcut asks for focus; phones keep no listener.
     if (isDesktopPlatform) {
       searchFocusRequest.addListener(_focusOnRequest);
@@ -145,6 +146,15 @@ class _SearchPageState extends State<SearchPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _inputNode.requestFocus();
     });
+  }
+
+  void _onOfflineChanged() {
+    if (!offlineMode.value) return;
+    _debounce?.cancel();
+    _latestSuggestionRequest++;
+    _suggestionsList = [];
+    // Invalidate outstanding online results and show the offline library.
+    unawaited(search());
   }
 
   void _onQueryChanged(String query) {
@@ -195,6 +205,7 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    offlineMode.removeListener(_onOfflineChanged);
     searchFocusRequest.removeListener(_focusOnRequest);
     _latestSearchRequest++;
     _latestSuggestionRequest++;
@@ -397,8 +408,9 @@ class _SearchPageState extends State<SearchPage> {
     Future<List<Map<String, dynamic>>> artistsFuture,
   ) async {
     final songs = await fetchSongsList(query, rethrowErrors: true);
-    if (songs.isNotEmpty) return songs;
+    if (songs.isNotEmpty || offlineMode.value) return songs;
     final artists = await artistsFuture;
+    if (offlineMode.value) return const [];
     final artistName = artists.firstOrNull?['title']?.toString().trim();
     if (artistName == null || artistName.isEmpty) return const [];
 
@@ -409,6 +421,7 @@ class _SearchPageState extends State<SearchPage> {
     };
 
     for (final fallbackQuery in fallbackQueries) {
+      if (offlineMode.value) return const [];
       final songs = await fetchSongsList(fallbackQuery, rethrowErrors: true);
       if (songs.isNotEmpty) return songs;
     }

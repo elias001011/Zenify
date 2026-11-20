@@ -70,7 +70,9 @@ bool isSameRecording(Map song, Map candidate) {
       ..._words(candidate['artist']),
       ..._words(candidate['videoAuthor']),
     };
-    if (artist.intersection(credited).isEmpty) return false;
+    const common = {'the', 'and', 'les', 'los', 'las', 'das', 'dos'};
+    final distinctive = artist.difference(common);
+    if (distinctive.isEmpty || !credited.containsAll(distinctive)) return false;
   }
 
   final length = song['duration'];

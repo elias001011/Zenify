@@ -1063,10 +1063,20 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
     if (_canRetryPlayback()) {
       final currentIndexWhenFailed = _currentQueueIndex;
+      final transition = _songTransitionCounter;
+      final retryIndex = failedIndex ?? _currentQueueIndex;
+      final entry = retryIndex >= 0 && retryIndex < _queueList.length
+          ? _queueList[retryIndex]['queueEntryId']
+          : null;
       Future.delayed(_errorRetryDelay, () {
-        // Only retry if still on the same song (user didn't manually change tracks)
-        if (_currentQueueIndex == currentIndexWhenFailed) {
-          _skipToNextFrom(failedIndex ?? _currentQueueIndex);
+        if (!_playsRadio &&
+            _songTransitionCounter == transition &&
+            _currentQueueIndex == currentIndexWhenFailed &&
+            retryIndex >= 0 &&
+            retryIndex < _queueList.length &&
+            entry != null &&
+            _queueList[retryIndex]['queueEntryId'] == entry) {
+          _skipToNextFrom(retryIndex);
         }
       });
     } else {
@@ -1139,6 +1149,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       // The user may have skipped, paused or extended the queue meanwhile.
       final isStillRelevant =
           audioPlayer.playing &&
+          _continuesQueue &&
+          !offlineMode.value &&
+          repeatNotifier.value == AudioServiceRepeatMode.none &&
           !hasNext &&
           _getCurrentSongForRecommendations()?['ytid']?.toString() == baseYtid;
       if (recommended == null || !isStillRelevant) return;

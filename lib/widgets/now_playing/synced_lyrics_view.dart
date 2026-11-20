@@ -23,6 +23,7 @@ import 'dart:async';
 
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/gestures.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/motion.dart';
 import 'package:musify/main.dart';
@@ -179,63 +180,70 @@ class _SyncedLyricsViewState extends State<SyncedLyricsView> {
     return Column(
       children: [
         Expanded(
-          child: NotificationListener<ScrollStartNotification>(
-            onNotification: (notification) {
-              // Only a finger/mouse drag pauses auto-scroll, not our own
-              // ensureVisible animation (which has no drag details).
-              if (notification.dragDetails != null) {
+          child: Listener(
+            onPointerSignal: (event) {
+              if (event is PointerScrollEvent) {
                 _autoScrollResumesAt = DateTime.now().add(_manualScrollPause);
               }
-              return false;
             },
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // Resizing reflows the lines and changes the edge padding.
-                // A pixel offset alone no longer keeps the current verse in
-                // view, even when playback is paused and emits no new ticks.
-                if (_viewportSize != constraints.biggest) {
-                  _viewportSize = constraints.biggest;
-                  _scheduleScrollToActive(animate: false);
+            child: NotificationListener<ScrollStartNotification>(
+              onNotification: (notification) {
+                // Only a finger/mouse drag pauses auto-scroll, not our own
+                // ensureVisible animation (which has no drag details).
+                if (notification.dragDetails != null) {
+                  _autoScrollResumesAt = DateTime.now().add(_manualScrollPause);
                 }
-                // Blank space above and below lets the first and last lines
-                // reach the vertical middle of the card.
-                final edgePadding = constraints.maxHeight * 0.4;
-                return SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    20,
-                    edgePadding,
-                    20,
-                    edgePadding,
-                  ),
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < lines.length; i++)
-                        _LyricRow(
-                          key: _lineKeys[i],
-                          index: i,
-                          line: lines[i],
-                          active: _active,
-                          progress: _progress,
-                          color: textColor,
-                          fontSize: constraints.maxWidth >= 500 ? 32 : 20,
-                          onTap: () => _seekToLine(lines[i]),
-                        ),
-                      Padding(
-                        padding: const EdgeInsets.only(top: 24),
-                        child: Text(
-                          '© ${widget.lyrics.source}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: textColor.withValues(alpha: 0.5),
+                return false;
+              },
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  // Resizing reflows the lines and changes the edge padding.
+                  // A pixel offset alone no longer keeps the current verse in
+                  // view, even when playback is paused and emits no new ticks.
+                  if (_viewportSize != constraints.biggest) {
+                    _viewportSize = constraints.biggest;
+                    _scheduleScrollToActive(animate: false);
+                  }
+                  // Blank space above and below lets the first and last lines
+                  // reach the vertical middle of the card.
+                  final edgePadding = constraints.maxHeight * 0.4;
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      20,
+                      edgePadding,
+                      20,
+                      edgePadding,
+                    ),
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < lines.length; i++)
+                          _LyricRow(
+                            key: _lineKeys[i],
+                            index: i,
+                            line: lines[i],
+                            active: _active,
+                            progress: _progress,
+                            color: textColor,
+                            fontSize: constraints.maxWidth >= 500 ? 32 : 20,
+                            onTap: () => _seekToLine(lines[i]),
+                          ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 24),
+                          child: Text(
+                            '© ${widget.lyrics.source}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: textColor.withValues(alpha: 0.5),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                );
-              },
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ),

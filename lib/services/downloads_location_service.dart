@@ -87,27 +87,38 @@ class DownloadsLocation {
     if (!await _prepare(target)) return DownloadsMoveStatus.notWritable;
 
     var failed = 0;
+    final movedPaths = <String, String>{};
     final sources = <String>{downloadsDirPath, defaultPath, ?customPath}
       ..remove(target);
 
     try {
       for (final source in sources) {
-        failed += await _moveFolderContents(source, target);
+        failed += await _moveFolderContents(source, target, movedPaths);
       }
 
       // Copied, not moved: files outside our folders, such as an older
       // documents directory, may still belong to another Musify install.
       for (final song in userOfflineSongs.value) {
         if (song is! Map) continue;
-        failed += await _copyReferencedFile(song['audioPath'], target, false);
-        failed += await _copyReferencedFile(song['artworkPath'], target, true);
+        failed += await _copyReferencedFile(
+          song['audioPath'],
+          target,
+          false,
+          movedPaths,
+        );
+        failed += await _copyReferencedFile(
+          song['artworkPath'],
+          target,
+          true,
+          movedPaths,
+        );
       }
     } catch (e, stackTrace) {
       failed++;
       logger.log('Moving downloads stopped', error: e, stackTrace: stackTrace);
     } finally {
       // Whatever moved so far must be found again.
-      _rewriteStoredPaths(target);
+      _rewriteStoredPaths(movedPaths);
     }
 
     if (target == _trimSeparator(defaultPath)) {
@@ -132,8 +143,8 @@ class DownloadsLocation {
       await Directory('$root/${FilePaths.tracksDir}').create(recursive: true);
       await Directory('$root/${FilePaths.artworksDir}').create(recursive: true);
 
-      final probe = File('$root/${FilePaths.tracksDir}/.musify-write-test');
-      await probe.writeAsString('ok', flush: true);
+      final probe = await Directory('$root/${FilePaths.tracksDir}')
+          .createTemp('.zenify-write-');
       await probe.delete();
       return true;
     } catch (e, stackTrace) {
@@ -147,7 +158,11 @@ class DownloadsLocation {
   }
 
   /// Returns how many files could not be moved.
-  static Future<int> _moveFolderContents(String source, String target) async {
+  static Future<int> _moveFolderContents(
+    String source,
+    String target,
+    Map<String, String> movedPaths,
+  ) async {
     var failed = 0;
     for (final artwork in [false, true]) {
       final subDir = artwork ? FilePaths.artworksDir : FilePaths.tracksDir;
@@ -160,7 +175,12 @@ class DownloadsLocation {
           continue;
         }
         final name = entity.uri.pathSegments.last;
-        if (!await _moveFile(entity, '$target/$subDir/$name')) failed++;
+        final destination = '$target/$subDir/$name';
+        if (await _moveFile(entity, destination)) {
+          movedPaths[_pathKey(entity.path)] = destination;
+        } else {
+          failed++;
+        }
       }
     }
     return failed;
@@ -170,16 +190,29 @@ class DownloadsLocation {
     Object? path,
     String target,
     bool artwork,
+    Map<String, String> movedPaths,
   ) async {
     if (path is! String || path.isEmpty) return 0;
+    if (movedPaths.containsKey(_pathKey(path))) return 0;
     final file = File(path);
     if (!await file.exists()) return 0;
 
     final subDir = artwork ? FilePaths.artworksDir : FilePaths.tracksDir;
     final destination = '$target/$subDir/${file.uri.pathSegments.last}';
-    if (destination == path || await File(destination).exists()) return 0;
+    if (_pathKey(destination) == _pathKey(path)) return 0;
     try {
-      await _copy(file, destination);
+      if (await FileSystemEntity.type(destination, followLinks: false) !=
+          FileSystemEntityType.notFound)
+        return 1;
+      final placeholder = File(destination);
+      await placeholder.create(exclusive: true);
+      try {
+        await _copy(file, destination);
+      } catch (_) {
+        if (await placeholder.exists()) await placeholder.delete();
+        rethrow;
+      }
+      movedPaths[_pathKey(path)] = destination;
       return 0;
     } catch (e, stackTrace) {
       logger.log(
@@ -199,18 +232,22 @@ class DownloadsLocation {
           await FileSystemEntity.identical(existing.path, file.path)) {
         return true;
       }
-      if (await existing.exists() &&
-          await existing.length() == await file.length()) {
-        // Same song id, already there: keep one copy, not two.
-        await file.delete();
-        return true;
-      }
+      // Do not assume two files are equal merely because their names or
+      // lengths match. A collision keeps both and reports a partial move.
+      if (await FileSystemEntity.type(destination, followLinks: false) !=
+          FileSystemEntityType.notFound)
+        return false;
+      await existing.create(exclusive: true);
       try {
-        await file.rename(destination);
-      } on FileSystemException {
-        // rename() can't cross drives: copy, then delete the original.
-        await _copy(file, destination);
-        await file.delete();
+        try {
+          await file.rename(destination);
+        } on FileSystemException {
+          await _copy(file, destination);
+          await file.delete();
+        }
+      } catch (_) {
+        if (await existing.exists()) await existing.delete();
+        rethrow;
       }
       return true;
     } catch (e, stackTrace) {
@@ -223,31 +260,31 @@ class DownloadsLocation {
     }
   }
 
-  /// Through a temporary name, so an interrupted copy never looks complete.
+  /// Stage copies under a unique directory on the destination filesystem.
   static Future<void> _copy(File file, String destination) async {
-    final partial = '$destination.partial';
+    final staging = await File(destination).parent.createTemp('.zenify-move-');
     try {
-      await file.copy(partial);
-      await File(partial).rename(destination);
-    } catch (_) {
-      final leftover = File(partial);
-      if (await leftover.exists()) await leftover.delete();
-      rethrow;
+      final partial = await file.copy('${staging.path}/download.part');
+      await partial.rename(destination);
+    } finally {
+      await staging.delete(recursive: true);
     }
   }
 
   /// Songs whose file did not move keep the path that still works.
-  static void _rewriteStoredPaths(String root) {
+  static String _pathKey(String path) {
+    final value = File(path).absolute.uri.normalizePath().toFilePath();
+    return Platform.isWindows ? value.toLowerCase() : value;
+  }
+
+  static void _rewriteStoredPaths(Map<String, String> movedPaths) {
     Map rewrite(Map song) {
       final updated = Map<String, dynamic>.from(song);
-      for (final (key, subDir) in [
-        ('audioPath', FilePaths.tracksDir),
-        ('artworkPath', FilePaths.artworksDir),
-      ]) {
+      for (final key in ['audioPath', 'artworkPath']) {
         final path = updated[key];
         if (path is! String || path.isEmpty) continue;
-        final moved = '$root/$subDir/${File(path).uri.pathSegments.last}';
-        if (File(moved).existsSync()) updated[key] = moved;
+        final moved = movedPaths[_pathKey(path)];
+        if (moved != null) updated[key] = moved;
       }
       return updated;
     }

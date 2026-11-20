@@ -28,6 +28,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
 import 'package:musify/utilities/mediaitem.dart';
 import 'package:musify/widgets/listening_recap_card.dart';
+import 'package:musify/widgets/recap_artist_avatar.dart';
 import 'package:musify/widgets/song_artwork.dart';
 
 /// The most listened artists of a period, ranked.
@@ -96,7 +97,10 @@ class TopArtistTile extends StatelessWidget {
         rank: rank,
         // Artist pages need YouTube.
         onTap: onTap ?? (isOffline ? null : () => _openArtist(context)),
-        artwork: ArtistAvatar(artist.topSong),
+        artwork: RecapArtistAvatar(
+          artist: artist,
+          size: ArtistTile.artworkSize,
+        ),
         name: artist.name,
         subtitle: context.l10n!.artistListeningSummary(
           artist.seconds ~/ 60,

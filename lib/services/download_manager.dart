@@ -313,10 +313,11 @@ class DownloadManager {
   /// every download), and waits for it to let go of its files. What stopped
   /// leaves no entry: it was not tried to the end.
   Future<void> stopAll() async {
+    // Wait for the requests being stopped, not for new downloads started later.
+    // A stalled transfer may take longer than ten seconds to release its file.
+    final stopping = [for (final request in _inFlight.values) request.result];
     _stopEpoch++;
-    for (var i = 0; i < 100 && entries.value.any(_isActive); i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
+    await Future.wait(stopping);
   }
 
   Future<void> _acquire() async {

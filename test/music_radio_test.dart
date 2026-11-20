@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -73,10 +74,28 @@ void main() {
       );
     });
 
+    test(
+      'switching offline during a lookup does not start a fallback',
+      () async {
+        final pending = Completer<List<Map>>();
+        var fallbackCalls = 0;
+        radioOf = (_) => pending.future;
+        relatedTo = (id, {excludedYtIds = const {}}) async {
+          fallbackCalls++;
+          return song('unexpected');
+        };
+        final result = pickNextSong('a');
+        offlineMode.value = true;
+        pending.complete([]);
+        expect(await result, isNull);
+        expect(fallbackCalls, 0);
+      },
+    );
+
     test('never asks for a radio offline', () async {
       offlineMode.value = true;
       radios['a'] = [song('b')];
-      expect((await pickNextSong('a'))!['ytid'], 'related-of-a');
+      expect(await pickNextSong('a'), isNull);
       expect(radioCalls, isEmpty);
     });
   });
@@ -96,6 +115,19 @@ void main() {
     test('fall back to the related videos when no radio has songs', () async {
       final picks = await getPlaylistRecommendations('q', [song('a')]);
       expect(picks.single['ytid'], 'fallback');
+    });
+
+    test('editing a playlist invalidates its cached radio', () async {
+      radios['a'] = [song('old')];
+      radios['b'] = [song('new')];
+      expect(
+        (await getPlaylistRecommendations('edit', [song('a')])).single['ytid'],
+        'old',
+      );
+      expect(
+        (await getPlaylistRecommendations('edit', [song('b')])).single['ytid'],
+        'new',
+      );
     });
 
     test('are kept for the next time the page opens', () async {

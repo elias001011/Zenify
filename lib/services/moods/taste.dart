@@ -49,16 +49,14 @@ class Taste {
 
   /// From the library. [recap] holds the songs of each recap month, the
   /// current one first; [recentlyPlayed] and [liked] are newest first.
-  /// Songs by [blockedArtists] (keys) are left out entirely, and so are
-  /// [notSongs]: what YouTube Music says is no song (rain for sleeping, an
-  /// hour-long mix uploaded by someone), still counted as known.
+  /// [notSongs] are left out: uploads YouTube Music does not classify as
+  /// music, such as rain or hour-long mixes, still counted as known.
   factory Taste.of({
     List<Map> recap = const [],
     List recentlyPlayed = const [],
     List liked = const [],
     List kept = const [],
     Iterable<String> likedArtists = const [],
-    Set<String> blockedArtists = const {},
     Set<String> notSongs = const {},
     DateTime? now,
   }) {
@@ -72,9 +70,7 @@ class Taste {
       final id = raw['ytid']?.toString() ?? '';
       if (id.isEmpty) return;
       known.add(id);
-      if (weight <= 0 ||
-          notSongs.contains(id) ||
-          blockedArtists.contains(artistKey(raw['artist']))) {
+      if (weight <= 0 || notSongs.contains(id)) {
         return;
       }
       songs.putIfAbsent(id, () => raw);
@@ -131,7 +127,7 @@ class Taste {
     }
     for (final name in likedArtists) {
       final key = artistKey(name);
-      if (key.isEmpty || blockedArtists.contains(key)) continue;
+      if (key.isEmpty) continue;
       artists[key] = (artists[key] ?? 0) + 1;
       names.putIfAbsent(key, () => name);
     }

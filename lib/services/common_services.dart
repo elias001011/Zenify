@@ -881,6 +881,7 @@ Future<Map<String, dynamic>> getSongDetails(
 }
 
 Lyrics? _lastLyricsResult;
+(String, String, Duration?, String?)? _lastLyricsIdentity;
 int _lyricsRequestCounter = 0;
 
 /// Plain-text version of [result] as shown for unsynced lyrics.
@@ -899,7 +900,12 @@ Future<Lyrics?> getSongLyricsResult(
 }) async {
   if (artist == null) return null;
   final key = '$artist - $title';
-  if (lastFetchedLyrics == key) return _lastLyricsResult;
+  final identity = (artist, title, duration, album);
+  if (lastFetchedLyrics == key && _lastLyricsIdentity == identity) {
+    // A pending lookup for another track must not overwrite this one.
+    _lyricsRequestCounter++;
+    return _lastLyricsResult;
+  }
   if (offlineMode.value) return null;
 
   lyrics.value = null;
@@ -912,6 +918,7 @@ Future<Lyrics?> getSongLyricsResult(
   // Ignore the response if the user already moved on to another song.
   if (requestId == _lyricsRequestCounter) {
     _lastLyricsResult = result;
+    _lastLyricsIdentity = identity;
     lyrics.value = formatPlainLyrics(result);
     lastFetchedLyrics = key;
   }

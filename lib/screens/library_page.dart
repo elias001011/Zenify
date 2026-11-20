@@ -44,7 +44,6 @@ import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/utilities/playlist_utils.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
-import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/dialog_parts.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
@@ -81,11 +80,25 @@ class _LibraryPageState extends State<LibraryPage> {
   }
 
   Future<List<dynamic>>? _addedPlaylists;
+  late final _emptyStateInputs = Listenable.merge([
+    userPlaylistFolders,
+    userPlaylists,
+    userCustomPlaylists,
+    offlinePlaylistService.offlinePlaylists,
+    userLikedPlaylists,
+    userOfflineSongs,
+    localFiles,
+  ]);
+
+  void _refreshOfflineEmptyState() {
+    if (offlineMode.value && mounted) setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
     offlineMode.addListener(_onOfflineModeChanged);
+    _emptyStateInputs.addListener(_refreshOfflineEmptyState);
     showLocalFiles.addListener(_onLocalFilesChanged);
     userPlaylists.addListener(_invalidateAddedPlaylists);
     userPlaylistFolders.addListener(_invalidateAddedPlaylists);
@@ -96,6 +109,8 @@ class _LibraryPageState extends State<LibraryPage> {
       setState(() {
         _filter = _LibraryFilter.all;
       });
+    } else {
+      _refreshOfflineEmptyState();
     }
   }
 
@@ -133,6 +148,7 @@ class _LibraryPageState extends State<LibraryPage> {
   @override
   void dispose() {
     offlineMode.removeListener(_onOfflineModeChanged);
+    _emptyStateInputs.removeListener(_refreshOfflineEmptyState);
     showLocalFiles.removeListener(_onLocalFilesChanged);
     userPlaylists.removeListener(_invalidateAddedPlaylists);
     userPlaylistFolders.removeListener(_invalidateAddedPlaylists);
@@ -596,7 +612,7 @@ class _LibraryPageState extends State<LibraryPage> {
     return slivers;
   }
 
-  /// The tuning of the Moods and the Zenify playlists the user saved.
+  /// The Zenify playlists the user saved.
   List<Widget> _buildZenifySlivers() {
     if (offlineMode.value ||
         !moodsEnabled.value ||
@@ -607,49 +623,15 @@ class _LibraryPageState extends State<LibraryPage> {
       for (final id in savedZenifyPlaylists.value)
         moodsService.cachedPlaylist(id),
     ];
+    if (saved.isEmpty) return [];
     return [
       SliverToBoxAdapter(
-        child: Column(
-          children: [
-            SectionHeader(
-              title: context.l10n!.fromZenify,
-              icon: FluentIcons.bookmark_multiple_24_filled,
-            ),
-            CustomBar(
-              context.l10n!.moodsTuning,
-              FluentIcons.options_24_regular,
-              description: context.l10n!.moodsTuningDescription,
-              borderRadius: saved.isEmpty
-                  ? commonCustomBarRadius
-                  : commonCustomBarRadiusFirst,
-              onTap: () => context.push('/library/moods-tuning'),
-            ),
-          ],
+        child: SectionHeader(
+          title: context.l10n!.fromZenify,
+          icon: FluentIcons.bookmark_multiple_24_filled,
         ),
       ),
-      if (saved.isNotEmpty)
-        MusicSliverSurface(
-          sliver: SliverList.builder(
-            itemCount: saved.length,
-            itemBuilder: (context, index) {
-              final playlist = saved[index];
-              final id = playlist['ytid'].toString();
-              return PlaylistBar(
-                key: ValueKey(id),
-                playlist['title'],
-                playlistId: id,
-                playlistArtwork: playlist['image'],
-                borderRadius: getItemBorderRadius(
-                  index,
-                  saved.length,
-                  hasItemsBefore: true,
-                ),
-                onPressed: () =>
-                    context.push('/home/playlist/${Uri.encodeComponent(id)}'),
-              );
-            },
-          ),
-        ),
+      _buildSliverPlaylistList(saved),
     ];
   }
 
@@ -740,6 +722,12 @@ class _LibraryPageState extends State<LibraryPage> {
     return SliverPadding(
       padding: hasItemsAfter ? EdgeInsets.zero : commonListViewBottomPadding,
       sliver: MusicSliverSurface(
+        borderRadius: getItemBorderRadius(
+          0,
+          1,
+          hasItemsBefore: hasItemsBefore,
+          hasItemsAfter: hasItemsAfter,
+        ),
         sliver: SliverList.builder(
           itemCount: playlists.length,
           itemBuilder: (BuildContext context, index) => _playlistRow(
@@ -764,14 +752,22 @@ class _LibraryPageState extends State<LibraryPage> {
     required bool hasItemsAfter,
   }) {
     final isArtist = playlist['source']?.toString() == 'youtube-artist';
+    final isZenify = MoodsService.isZenifyPlaylist(playlist['ytid']);
     final isEditable =
         playlist['source'] == 'user-created' ||
         playlist['source'] == 'user-youtube';
     return PlaylistBar(
-      key: listItemKey('library_playlist', index, playlist),
+      key: isZenify
+          ? ValueKey<String>(playlist['ytid'].toString())
+          : listItemKey('library_playlist', index, playlist),
       playlist['title'],
       playlistId: playlist['ytid'],
       playlistArtwork: playlist['image'],
+      onPressed: isZenify
+          ? () => context.push(
+              '/home/playlist/${Uri.encodeComponent(playlist['ytid'].toString())}',
+            )
+          : null,
       cubeIcon: isArtist
           ? FluentIcons.person_24_filled
           : FluentIcons.text_bullet_list_24_filled,
@@ -799,6 +795,12 @@ class _LibraryPageState extends State<LibraryPage> {
     required bool hasItemsAfter,
   }) {
     return MusicSliverSurface(
+      borderRadius: getItemBorderRadius(
+        0,
+        1,
+        hasItemsBefore: hasItemsBefore,
+        hasItemsAfter: hasItemsAfter,
+      ),
       sliver: SliverList.builder(
         itemCount: folders.length,
         itemBuilder: (BuildContext context, index) {

@@ -572,6 +572,17 @@ void main() {
       );
     });
 
+    test('a common word is not enough to identify an artist', () {
+      expect(
+        isSameRecording({
+          'title': 'Yesterday',
+          'artist': 'The Beatles',
+          'duration': 125,
+        }, candidate('Yesterday', artist: 'The Cure', seconds: 125)),
+        isFalse,
+      );
+    });
+
     test('accepts another upload of it', () {
       expect(isSameRecording(original, candidate('Bohemian Rhapsody')), isTrue);
       expect(

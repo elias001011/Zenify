@@ -37,15 +37,20 @@ class _MusicListGroup extends InheritedWidget {
 
 /// One continuous background prevents seams between fractional row boundaries.
 class MusicSliverSurface extends StatelessWidget {
-  const MusicSliverSurface({super.key, required this.sliver});
+  const MusicSliverSurface({
+    super.key,
+    required this.sliver,
+    this.borderRadius = commonCustomBarRadius,
+  });
   final Widget sliver;
+  final BorderRadius borderRadius;
 
   @override
   Widget build(BuildContext context) => _MusicListGroup(
     child: DecoratedSliver(
       decoration: BoxDecoration(
         color: _surfaceColor(context),
-        borderRadius: commonCustomBarRadius,
+        borderRadius: borderRadius,
       ),
       sliver: sliver,
     ),

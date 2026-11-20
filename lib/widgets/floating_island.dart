@@ -393,6 +393,7 @@ class _IslandState extends State<_Island> with SingleTickerProviderStateMixin {
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: widget.maxWidth),
           child: FloatingSurface(
+            navigationChrome: true,
             borderRadius: const BorderRadius.all(
               Radius.circular(_islandHeight / 2),
             ),

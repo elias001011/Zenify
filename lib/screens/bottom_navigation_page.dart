@@ -188,6 +188,7 @@ class _BottomNavigationPageState extends State<BottomNavigationPage> {
           bottom: safeBottom + _margin,
           child: RepaintBoundary(
             child: FloatingSurface(
+              navigationChrome: true,
               grouped: true,
               padding: const EdgeInsets.all(_dockPadding),
               child: Column(

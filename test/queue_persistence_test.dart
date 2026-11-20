@@ -22,6 +22,17 @@ void main() {
   });
   tearDown(() => memory.flush());
 
+  test('saving the same queue preserves the current position', () async {
+    final songs = [song(0), song(1)];
+    memory.saveQueue(songs, songs, 0);
+    await memory.flush();
+    memory.savePosition('entry0', const Duration(seconds: 37));
+    await Future<void>.delayed(Duration.zero);
+    memory.saveQueue(songs, songs, 0);
+    await Future<void>.delayed(Duration.zero);
+    expect(memory.read()!.position, const Duration(seconds: 37));
+  });
+
   test('a queue that could not be written is written again', () async {
     final songs = [for (var i = 0; i < 4; i++) song(i)];
     await Hive.box('userNoBackup').close();

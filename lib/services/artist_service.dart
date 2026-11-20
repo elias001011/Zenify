@@ -32,6 +32,14 @@ import 'package:youtube_music_explode_dart/youtube_music_explode_dart.dart';
 
 final ytMusicClient = YoutubeMusicExplode();
 final Map<String, Future<void>> _artistCatalogOperationTails = {};
+final Map<
+  (String, String?, String?, String?, String?, bool),
+  Future<Map<String, dynamic>?>
+>
+_artistProfileRequests = {};
+
+String _artistSourceCacheKey(String name, String sourceSongId) =>
+    'artist_source_v2_${Uri.encodeComponent(name.trim().toLowerCase())}_${Uri.encodeComponent(sourceSongId.trim())}';
 
 Future<List<Map<String, dynamic>>> searchVerifiedArtists(
   String query, {
@@ -162,8 +170,89 @@ Future<Map<String, dynamic>?> resolveArtist(
   return artist;
 }
 
-/// Entry point for artist profile: page info, top songs, releases, and suggestions.
+/// A resolved profile for this artist credit and source, without network.
+Future<Map<String, dynamic>?> getCachedArtistProfileForSong(
+  String name,
+  String? sourceSongId,
+) async {
+  final source = sourceSongId?.trim() ?? '';
+  if (source.isEmpty) return null;
+  final id = await getData('cache', _artistSourceCacheKey(name, source));
+  if (id is! String || id.isEmpty) return null;
+  final cached = await getData('cache', _artistProfileCacheKey(id));
+  return cached is Map ? Map<String, dynamic>.from(cached) : null;
+}
+
+/// Entry point for artist profile: page info, top songs, releases and suggestions.
 Future<Map<String, dynamic>?> getArtistProfile(
+  String artistId, {
+  bool forceRefresh = false,
+  bool cacheResult = true,
+  String? sourceSongId,
+  String? sourceVideoAuthor,
+  String? preferredName,
+  String? preferredImage,
+  bool preferredVerified = false,
+}) {
+  Future<Map<String, dynamic>?> load() async {
+    final lookup = artistId.trim();
+    if (!forceRefresh && !_isChannelId(lookup)) {
+      final cached = await getCachedArtistProfileForSong(lookup, sourceSongId);
+      if (cached != null) return cached;
+    }
+    final profile = await _getArtistProfile(
+      artistId,
+      forceRefresh: forceRefresh,
+      cacheResult: cacheResult,
+      sourceSongId: sourceSongId,
+      sourceVideoAuthor: sourceVideoAuthor,
+      preferredName: preferredName,
+      preferredImage: preferredImage,
+      preferredVerified: preferredVerified,
+    );
+    final resolvedId = profile?['ytid']?.toString();
+    final alias = _isChannelId(lookup) ? preferredName?.trim() : lookup;
+    if (cacheResult &&
+        alias != null &&
+        alias.isNotEmpty &&
+        sourceSongId != null &&
+        sourceSongId.trim().isNotEmpty &&
+        resolvedId != null &&
+        resolvedId.isNotEmpty) {
+      try {
+        await addOrUpdateData<String>(
+          'cache',
+          _artistSourceCacheKey(alias, sourceSongId),
+          resolvedId,
+        );
+      } catch (error, stack) {
+        logger.log(
+          'Could not cache artist lookup',
+          error: error,
+          stackTrace: stack,
+        );
+      }
+    }
+    return profile;
+  }
+
+  if (forceRefresh || !cacheResult) return load();
+  final key = (
+    artistId.trim().toLowerCase(),
+    sourceSongId,
+    sourceVideoAuthor,
+    preferredName,
+    preferredImage,
+    preferredVerified,
+  );
+  final pending = _artistProfileRequests[key];
+  if (pending != null) return pending;
+  final future = load();
+  _artistProfileRequests[key] = future;
+  return future.whenComplete(() => _artistProfileRequests.remove(key));
+}
+
+Future<Map<String, dynamic>?> _getArtistProfile(
   String artistId, {
   bool forceRefresh = false,
   bool cacheResult = true,
@@ -328,7 +417,15 @@ Future<Map<String, dynamic>?> _artistPageOf(
   }
 
   if (cacheResult) {
-    cacheArtistProfileInBackground(artistProfile);
+    try {
+      await cacheArtistProfile(artistProfile);
+    } catch (error, stack) {
+      logger.log(
+        'Failed to cache artist profile',
+        error: error,
+        stackTrace: stack,
+      );
+    }
   }
   return artistProfile;
 }

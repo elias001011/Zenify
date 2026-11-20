@@ -1394,7 +1394,6 @@ class LocalSyncService {
   bool get _canSyncQuietly =>
       localSyncEnabled.value &&
       localSyncAutomatic.value &&
-      !offlineMode.value &&
       _httpServer != null &&
       pairedDevices.value.isNotEmpty;
 

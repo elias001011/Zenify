@@ -68,7 +68,7 @@ Future<void> setPlayerVisualizer(bool value) async {
   }
 }
 
-/// The Moods row, Zenify's own playlists and their tuning. Off, none of them
+/// The Moods row and Zenify's own playlists. Off, none of them
 /// shows and nothing is fetched for them.
 final moodsEnabled = ValueNotifier<bool>(
   Hive.box('settings').get('moodsEnabled', defaultValue: true),

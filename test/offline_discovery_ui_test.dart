@@ -10,7 +10,6 @@ import 'package:musify/localization/app_localizations.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/screens/export_playlists_page.dart';
 import 'package:musify/screens/library_page.dart';
-import 'package:musify/screens/moods_tuning_page.dart';
 import 'package:musify/screens/playlist_page.dart';
 import 'package:musify/screens/radio_stations_page.dart';
 import 'package:musify/services/audio_service.dart';
@@ -104,14 +103,12 @@ void main() {
         await tester.pump(const Duration(milliseconds: 300));
         final l10n = lookupAppLocalizations(const Locale('en'));
         expect(find.text(l10n.radioStations), findsOneWidget);
-        expect(find.text(l10n.moodsTuning), findsOneWidget);
         expect(find.byKey(const ValueKey('zenify:daily')), findsOneWidget);
 
         offlineMode.value = true;
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 200));
         expect(find.text(l10n.radioStations), findsNothing);
-        expect(find.text(l10n.moodsTuning), findsNothing);
         expect(find.byKey(const ValueKey('zenify:daily')), findsNothing);
         expect(find.text('My local playlist'), findsOneWidget);
 
@@ -119,7 +116,6 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 200));
         expect(find.text(l10n.radioStations), findsOneWidget);
-        expect(find.text(l10n.moodsTuning), findsOneWidget);
         expect(find.byKey(const ValueKey('zenify:daily')), findsOneWidget);
         await finish(tester);
       },
@@ -222,7 +218,6 @@ void main() {
       await tester.pumpWidget(routedApp());
       await tester.pump(const Duration(milliseconds: 300));
       for (final (path, start) in [
-        ('/library/moods-tuning', '/library'),
         ('/library/radioStations', '/library'),
         ('/home/playlist/zenify%3Adaily', '/home'),
         ('/settings/export-playlists', '/settings'),
@@ -231,7 +226,6 @@ void main() {
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 300));
         expect(router.routeInformationProvider.value.uri.path, start);
-        expect(find.byType(MoodsTuningPage), findsNothing);
         expect(find.byType(RadioStationsPage), findsNothing);
         expect(find.byType(PlaylistPage), findsNothing);
         expect(find.byType(ExportPlaylistsPage), findsNothing);
@@ -280,7 +274,7 @@ void main() {
           'title': 'Daily',
           'list': <Map>[],
           'language': languageSetting.languageCode,
-          'tuning': moodsTuning.value.discovery.name,
+          'algorithm': 'automatic-v1',
           'until': DateTime.now()
               .add(const Duration(days: 1))
               .toIso8601String(),
