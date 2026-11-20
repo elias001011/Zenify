@@ -342,6 +342,61 @@ typedef MixSkip = ({int start, int end});
   return (start: start, end: end);
 }
 
+/// Keeps each deck in a continuous playable stretch during the overlap.
+MixCue fitMixSkips(
+  MixCue cue,
+  List<MixSkip> outgoing,
+  List<MixSkip> incoming,
+  Duration duration,
+  Duration? coming,
+) {
+  if (outgoing.isEmpty && incoming.isEmpty) return cue;
+  final desired = cue.length.inMilliseconds;
+  var exit = min(
+    duration.inMilliseconds,
+    (cue.outStart + cue.length).inMilliseconds,
+  );
+  var start = 0;
+  for (final skip in outgoing.reversed) {
+    if (skip.start >= exit) continue;
+    if (skip.end < exit) {
+      start = skip.end;
+      break;
+    }
+    exit = skip.start;
+  }
+  var entry = cue.inStart.inMilliseconds;
+  var end = coming?.inMilliseconds;
+  for (final skip in incoming) {
+    if (skip.end <= entry) continue;
+    if (skip.start > entry) {
+      end = end == null ? skip.start : min(end, skip.start);
+      break;
+    }
+    entry = skip.end;
+  }
+  final length = max(
+    0,
+    min(
+      desired,
+      min(
+        exit - start,
+        end == null ? desired : ((end - entry) / cue.tempoRatio).floor(),
+      ),
+    ),
+  );
+  return MixCue(
+    outStart: Duration(milliseconds: max(0, exit - length)),
+    inStart: Duration(milliseconds: entry),
+    length: Duration(milliseconds: length),
+    style: cue.style,
+    volume: cue.volume,
+    eq: cue.eq,
+    filter: cue.filter,
+    tempoRatio: cue.tempoRatio,
+  );
+}
+
 /// The Automatic transition: where and how a song of [duration] gives way
 /// to the next, from the [tail] of the one and the [head] of the other.
 /// The audio decides which styles fit; [pair] picks among them, so a
@@ -373,7 +428,7 @@ MixCue chooseCue({
     double ratio = 1,
   }) => MixCue(
     outStart: Duration(milliseconds: out.clamp(0, total)),
-    inStart: Duration(milliseconds: max(0, into)),
+    inStart: Duration(milliseconds: max(startAt, into)),
     length: Duration(milliseconds: max(500, length)),
     style: style,
     tempoRatio: ratio,
@@ -641,11 +696,12 @@ class MixAnalyzer {
     final whole =
         _songs[id] ??
         _stored(song, id) ??
-        await (_reading[id] ??= _read(
-          Map<dynamic, dynamic>.of(song),
-          id,
-          duration,
-        ).whenComplete(() => _reading.remove(id)));
+        await (_reading[id] ??=
+            _read(Map<dynamic, dynamic>.of(song), id, duration).whenComplete(
+              () {
+                _reading.remove(id);
+              },
+            ));
     if (whole == null) return null;
     return (
       edge: tail ? whole.tail : whole.head,
@@ -763,7 +819,8 @@ class MixAnalyzer {
     final key = _key(id, tail);
     if (_edges.containsKey(key)) return _edges[key];
     final stored = Hive.box('cache').get(key);
-    if (stored is List && (stored.length == 6 || stored.length == 8)) {
+    if (stored is List &&
+        (stored.length == 6 || stored.length == 8 || stored.length == 9)) {
       try {
         return _edges[key] = MixEdge.fromList(stored);
       } catch (_) {}

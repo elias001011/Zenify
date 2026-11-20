@@ -125,6 +125,7 @@ void main() {
     await tester.runAsync(() async {
       // This device: the visualizer is on and the system colour is off.
       await Hive.box('settings').put('showPlayerVisualizer', true);
+      await Hive.box('settings').put('desktopEqualizerGains', [3, 0, 0, 0, 0]);
       await Hive.box('settings').put('useSystemColor', false);
       final sourceUser = await Hive.openBox('sourceuser');
       await sourceUser.put('likedSongs', ['restored']);
@@ -132,6 +133,7 @@ void main() {
       // The backup comes from another device with the opposite choices.
       final sourceSettings = await Hive.openBox('sourcesettings');
       await sourceSettings.put('showPlayerVisualizer', false);
+      await sourceSettings.put('desktopEqualizerGains', [0, 0, 0, 0, 5]);
       await sourceSettings.put('useSystemColor', true);
       await sourceSettings.put('theme', 'dark');
       await sourceSettings.flush();
@@ -151,6 +153,7 @@ void main() {
     expect(settings.get('theme'), 'dark');
     // ...what is about this device stays as it was.
     expect(settings.get('showPlayerVisualizer'), isTrue);
+    expect(settings.get('desktopEqualizerGains'), [3, 0, 0, 0, 0]);
     expect(settings.get('useSystemColor'), isFalse);
   });
   for (final failRollback in [false, true]) {

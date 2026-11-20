@@ -85,6 +85,27 @@ void main() {
     expect(cue.inStart, const Duration(seconds: 12));
   });
 
+  test('a middle skip bounds both decks at the synced playback speed', () {
+    const original = MixCue(
+      outStart: Duration(seconds: 38),
+      inStart: Duration(seconds: 10),
+      length: Duration(seconds: 12),
+      style: MixStyle.blend,
+      tempoRatio: 1.05,
+    );
+    final fitted = fitMixSkips(
+      original,
+      [(start: 38000, end: 42000)],
+      [(start: 14200, end: 22000)],
+      const Duration(seconds: 60),
+      const Duration(seconds: 40),
+    );
+    expect(fitted.outStart, const Duration(seconds: 46));
+    expect(fitted.length, const Duration(seconds: 4));
+    expect(fitted.inStart, original.inStart);
+    expect(fitted.tempoRatio, original.tempoRatio);
+  });
+
   test('a whole song gives both ends and a waveform scaled to its loudest', () {
     const rate = 11025;
     final samples = Int16List(rate * 60);

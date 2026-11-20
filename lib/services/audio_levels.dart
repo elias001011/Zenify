@@ -31,7 +31,6 @@ import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/mix_effects.dart';
-import 'package:musify/services/mix_playlists.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:rxdart/rxdart.dart';
@@ -91,10 +90,9 @@ class AudioLevels {
   /// open one in line when the waves are turned on or off.
   static void configureDesktop() {
     _configureFilters();
-    for (final setting in [mixTransitions, mixPlaylists, equalizerEnabled]) {
-      setting.removeListener(_configureFilters);
-      setting.addListener(_configureFilters);
-    }
+    equalizerEnabled
+      ..removeListener(_configureFilters)
+      ..addListener(_configureFilters);
     showPlayerVisualizer.removeListener(_onWavesChanged);
     waveReading.removeListener(_onWavesChanged);
     showPlayerVisualizer.addListener(_onWavesChanged);
@@ -108,25 +106,27 @@ class AudioLevels {
 
   static void _configureFilters() {
     JustAudioMediaKit.audioFilters = [
-      ...MixEffects.desktopChain,
+      if (equalizerEnabled.value) ...MixEffects.userFilters,
       if (_bandsWanted) _bandsFilter,
     ];
   }
 
   static void _onWavesChanged() {
     _configureFilters();
-    final player = MediaKitPlayer.latest;
-    if (player == null) return;
-    _syncing = _syncing.then((_) => syncBands(player)).catchError((
-      Object e,
-      StackTrace stackTrace,
-    ) {
-      logger.log(
-        'Wave analysis filter failed',
-        error: e,
-        stackTrace: stackTrace,
-      );
-    });
+    for (final player in MediaKitPlayer.openPlayers) {
+      _syncing = _syncing
+          .then((_) async {
+            await player.ready();
+            if (player.isOpen) await syncBands(player);
+          })
+          .catchError((Object e, StackTrace stackTrace) {
+            logger.log(
+              'Wave analysis filter failed',
+              error: e,
+              stackTrace: stackTrace,
+            );
+          });
+    }
   }
 
   /// Puts the analysis in or out of [player]'s chain as the waves ask; the

@@ -82,8 +82,16 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   /// (audio filters for a visualizer).
   static MediaKitPlayer? latest;
 
-  /// The player that last loaded a song.
-  static MediaKitPlayer? lastLoaded;
+  static final _open = <MediaKitPlayer>{};
+  static List<MediaKitPlayer> get openPlayers => _open.toList();
+  bool get isOpen => _open.contains(this);
+
+  Object? _sourceTag;
+
+  /// just_audio passes the source tag by reference to this desktop backend.
+  static MediaKitPlayer? forSourceTag(Object? tag) => tag == null
+      ? null
+      : _open.where((player) => identical(player._sourceTag, tag)).firstOrNull;
 
   /// Sets an mpv property on this player.
   Future<void> setMpvProperty(String key, String value) =>
@@ -96,6 +104,7 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   Future<void> mpvCommand(List<String> args) => command(_player, args);
 
   MediaKitPlayer(super.id) {
+    _open.add(this);
     latest ??= this;
     _player = Player(
       configuration: PlayerConfiguration(
@@ -116,7 +125,7 @@ class MediaKitPlayer extends AudioPlayerPlatform {
       _player.stream.duration.listen((duration) {
         if (_currentMedia?.extras?['overrideDuration'] != null) return;
 
-        if (_setPosition != null && duration.inSeconds > 0) {
+        if (_setPosition != null && duration > Duration.zero) {
           unawaited(_player.seek(_setPosition!));
           _setPosition = null;
         }
@@ -281,7 +290,7 @@ class MediaKitPlayer extends AudioPlayerPlatform {
   @override
   Future<LoadResponse> load(LoadRequest request) async {
     _logger.finest('load(${request.toMap()})');
-    lastLoaded = this;
+    _setPosition = null;
     _mediaOpened = false;
     _loadCompleter = Completer();
     _currentIndex = request.initialIndex ?? 0;
@@ -293,17 +302,26 @@ class MediaKitPlayer extends AudioPlayerPlatform {
     _errorMessage = null;
     _updatePlaybackEvent();
 
+    final sources = flattenAudioSource(request.audioSourceMessage).toList();
+    final first = sources.elementAtOrNull(_currentIndex);
+    _sourceTag = first is IndexedAudioSourceMessage ? first.tag : null;
     final playable = Playlist(
-      flattenAudioSource(request.audioSourceMessage)
-          .map(audioSourceToMedia)
-          .toList(),
+      sources.map(audioSourceToMedia).toList(),
       index: _currentIndex,
     );
     await _player.open(playable, play: _playing);
     _mediaOpened = true;
 
-    if (request.initialPosition != null) {
-      _setPosition = _position = request.initialPosition!;
+    final position = request.initialPosition;
+    if (position != null) {
+      _position = position;
+      final start = first is ClippingAudioSourceMessage ? first.start : null;
+      final target = position + (start ?? Duration.zero);
+      if (_player.state.duration > Duration.zero) {
+        await _player.seek(target);
+      } else {
+        _setPosition = target;
+      }
     }
 
     _updatePlaybackEvent();
@@ -446,7 +464,8 @@ class MediaKitPlayer extends AudioPlayerPlatform {
 
   /// Release the resources used by this player.
   Future<void> release() async {
-    if (identical(latest, this)) latest = null;
+    _open.remove(this);
+    if (identical(latest, this)) latest = _open.lastOrNull;
     _logger.info('releasing player resources');
     _mediaOpened = false;
     await _player.dispose();

@@ -27,7 +27,6 @@ import 'package:hive_ce/hive_ce.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_media_kit/mediakit_player.dart';
 import 'package:musify/main.dart' show logger;
-import 'package:musify/services/mix_playlists.dart';
 import 'package:musify/services/mix_transition.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/platform_utils.dart';
@@ -37,17 +36,20 @@ import 'package:musify/utilities/platform_utils.dart';
 /// Desktop: three filters in libmpv, untouched at 0 dB, moved by commands.
 /// Android: the player's own equalizer, on top of the bands the user set.
 class MixEffects {
-  MixEffects({required this.equalizerOf});
+  MixEffects({required this.equalizerOf, required this.mixWanted});
 
-  /// The filters a desktop player gets while some playlist plays with the Mix.
-  /// At 0 dB each passes the sound as it is.
+  final bool Function() mixWanted;
+
+  // Keep the 14 and 20 kHz filters below Nyquist, including on low-rate input.
+  static const _bandFormat =
+      'aformat=sample_rates=44100|48000|88200|96000|176400|192000|352800|384000';
   static final desktopFilters = [
-    '@zmixl:lavfi=[bass=g=0:f=200]',
-    '@zmixm:lavfi=[equalizer=f=1000:t=o:w=2:g=0]',
-    '@zmixh:lavfi=[treble=g=0:f=4000]',
+    '@zmixl:lavfi=[$_bandFormat,bass=g=0:f=200]',
+    '@zmixm:lavfi=[$_bandFormat,equalizer=f=1000:t=o:w=2:g=0]',
+    '@zmixh:lavfi=[$_bandFormat,treble=g=0:f=4000]',
     // Open at these cutoffs. Their mix option is never sent: mpv crashed.
-    '@zmixhp:lavfi=[highpass=f=20]',
-    '@zmixlp:lavfi=[lowpass=f=20000]',
+    '@zmixhp:lavfi=[$_bandFormat,highpass=f=20]',
+    '@zmixlp:lavfi=[$_bandFormat,lowpass=f=20000]',
     // Silent until used: the echo is tuned to each song's beat.
     '@zmixe:${_echoGraph(echoDefault)}',
   ];
@@ -85,20 +87,16 @@ class MixEffects {
     );
   }
 
-  static List<String> get userFilters => [
-    for (var i = 0; i < 5; i++)
-      '@zuser$i:lavfi=[equalizer=f=${desktopFrequencies[i]}:t=o:w=2:g=${equalizerEnabled.value ? desktopGains[i] : 0}]',
-  ];
+  static List<String> get userFilters {
+    final gains = desktopGains;
+    return [
+      for (var i = 0; i < desktopFrequencies.length; i++)
+        '@zuser$i:lavfi=[$_bandFormat,equalizer=f=${desktopFrequencies[i]}:t=o:w=2:g=${gains[i]}]',
+    ];
+  }
 
-  /// Whether the desktop players need the Mix's filters.
-  static bool get mixFiltersWanted =>
-      mixTransitions.value && mixPlaylists.value.isNotEmpty;
-
-  /// What a desktop player has in its chain: the Mix's filters while it is in
-  /// use and the user's bands while their equalizer is on. A filter that is
-  /// not there costs nothing.
-  static List<String> get desktopChain => [
-    if (mixFiltersWanted) ...desktopFilters,
+  List<String> get desktopChain => [
+    if (mixWanted()) ...desktopFilters,
     if (equalizerEnabled.value) ...userFilters,
   ];
 
@@ -125,13 +123,19 @@ class MixEffects {
   Future<void> syncDesktopFilters() => _enqueue(() async {
     for (final entry in _mpv.entries.toList()) {
       final mpv = entry.value;
-      if (mpv == null || entry.key.processingState == ProcessingState.idle) {
+      if (mpv == null ||
+          !mpv.isOpen ||
+          entry.key.processingState == ProcessingState.idle) {
         continue;
       }
       final changed = await syncChain(mpv, desktopChain);
       if (changed) {
         _sent.remove(entry.key);
-        _echo[entry.key] = echoDefault;
+        if (mixWanted()) {
+          _echo.putIfAbsent(entry.key, () => echoDefault);
+        } else {
+          _echo.remove(entry.key);
+        }
       }
     }
     await _setGains();
@@ -141,15 +145,19 @@ class MixEffects {
   /// they are; false when nothing had to change.
   @visibleForTesting
   static Future<bool> syncChain(MediaKitPlayer mpv, List<String> chain) async {
-    final wanted = {for (final filter in chain) _label(filter)};
+    final wanted = {for (final filter in chain) _label(filter): filter};
     final present = await mpv.getMpvProperty('af');
     var changed = false;
-    for (final filter in [...desktopFilters, ...userFilters]) {
-      final label = _label(filter);
-      final has = RegExp('\\b$label\\b').hasMatch(present);
-      if (has == wanted.contains(label)) continue;
+    for (final label in [
+      ...desktopFilters.map(_label),
+      for (var i = 0; i < desktopFrequencies.length; i++) 'zuser$i',
+    ].reversed) {
+      if (!mpv.isOpen) break;
+      final has = present.contains('@$label:');
+      final filter = wanted[label];
+      if (has == (filter != null)) continue;
       await mpv.mpvCommand(
-        has ? ['af', 'remove', '@$label'] : ['af', 'add', filter],
+        filter == null ? ['af', 'remove', '@$label'] : ['af', 'pre', filter],
       );
       changed = true;
     }
@@ -157,18 +165,23 @@ class MixEffects {
   }
 
   Future<void> _setGains() async {
+    if (!equalizerEnabled.value) return;
+    final gains = desktopGains;
     for (final entry in _mpv.entries.toList()) {
       final mpv = entry.value;
-      if (mpv == null || entry.key.processingState == ProcessingState.idle) {
+      if (mpv == null ||
+          !mpv.isOpen ||
+          entry.key.processingState == ProcessingState.idle) {
         continue;
       }
       if (!(await mpv.getMpvProperty('af')).contains('zuser0')) continue;
-      for (var i = 0; i < 5; i++) {
+      for (var i = 0; i < gains.length; i++) {
+        if (!mpv.isOpen) break;
         await mpv.mpvCommand([
           'af-command',
           'zuser$i',
           'gain',
-          '${equalizerEnabled.value ? desktopGains[i] : 0}',
+          '${gains[i]}',
           'equalizer',
         ]);
       }
@@ -216,21 +229,25 @@ class MixEffects {
 
   /// [player] just loaded a song: on desktop that may be a new libmpv, which
   /// starts with its bands untouched.
-  void loaded(AudioPlayer player) {
+  Future<void> loaded(AudioPlayer player) async {
     if (!isDesktopPlatform) return;
-    final mpv = MediaKitPlayer.lastLoaded;
+    final mpv = MediaKitPlayer.forSourceTag(player.sequence.firstOrNull?.tag);
     if (_mpv[player] != mpv) {
       _mpv[player] = mpv;
       _sent.remove(player);
+      _wanted.remove(player);
       _echo[player] = echoDefault;
     }
     // The same mpv may have been prepared under other settings.
-    unawaited(syncDesktopFilters());
+    await syncDesktopFilters();
   }
 
   /// Puts [bands] to [player]. Calls may come faster than the player takes
   /// them: the newest wins.
   void write(AudioPlayer player, MixBands bands) {
+    if (isDesktopPlatform && bands == mixFlat && _wanted[player] == mixFlat) {
+      return;
+    }
     _wanted[player] = bands;
     if (!player.playing) {
       _fresh[player] = 10;
@@ -306,6 +323,7 @@ class MixEffects {
         ['zmixe', 'weights', '1 ${bands.echo.toStringAsFixed(3)}', 'amix'],
     ];
     for (final arg in args) {
+      if (!mpv.isOpen || !mixWanted() || _mpv[player] != mpv) return;
       try {
         await mpv.mpvCommand(['af-command', ...arg]);
       } catch (_) {

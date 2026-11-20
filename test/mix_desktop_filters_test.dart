@@ -14,9 +14,13 @@ void main() {
 
   test('the desktop chain holds only the filters in use', () {
     equalizerEnabled.value = false;
+    showPlayerVisualizer.value = false;
+    waveReading.value = WaveReading.precise;
     mixTransitions.value = true;
     mixPlaylists.value = {};
     AudioLevels.configureDesktop();
+    expect(has('zviz'), isFalse);
+    showPlayerVisualizer.value = true;
     expect(has('zviz'), isTrue);
     for (final label in ['zmixl', 'zmixe', 'zuser0', 'zuser4']) {
       expect(has(label), isFalse, reason: label);
@@ -29,8 +33,8 @@ void main() {
     expect(JustAudioMediaKit.audioFilters.last, startsWith('@zviz:'));
 
     mixPlaylists.value = {'playlist'};
-    expect(has('zmixl'), isTrue);
-    expect(has('zmixe'), isTrue);
+    expect(has('zmixl'), isFalse);
+    expect(has('zmixe'), isFalse);
 
     mixTransitions.value = false;
     equalizerEnabled.value = false;

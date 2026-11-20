@@ -9,6 +9,7 @@ import 'package:just_audio/just_audio.dart' as audio;
 import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/audio_service.dart';
+import 'package:musify/services/common_services.dart' show userOfflineSongs;
 import 'package:musify/services/data_manager.dart';
 import 'package:musify/services/mix_edits.dart';
 import 'package:musify/services/mix_engine.dart';
@@ -394,6 +395,9 @@ void main() {
     await settle();
     expect(first.playing, isFalse);
     expect(handler.audioPlayer.playing, isFalse);
+    final writes = platform.of('aaa').log.length;
+    await ticks();
+    expect(platform.of('aaa').log.length, writes);
 
     await handler.play();
     await settle();
@@ -613,6 +617,64 @@ void main() {
       expect(platform.of('bbb').log.last, 'speed:0.003');
     },
   );
+
+  test('offline lookup can use segments downloaded later', () async {
+    sponsorBlockSupport.value = true;
+    offlineMode.value = true;
+    final song = _songs.first;
+    final previous = userOfflineSongs.value;
+    addTearDown(() => userOfflineSongs.value = previous);
+    userOfflineSongs.value = [song];
+    expect(await handler.mixSkips(song), isEmpty);
+    userOfflineSongs.value = [
+      {
+        ...song,
+        'sponsorSegments': [
+          {'start': 4, 'end': 8},
+          {'start': 0, 'end': 6},
+        ],
+      },
+    ];
+    expect(await handler.mixSkips(song), [(start: 0, end: 8000)]);
+  });
+
+  test('a saved transition respects a newly skipped intro and outro', () async {
+    sponsorBlockSupport.value = true;
+    final previous = userOfflineSongs.value;
+    addTearDown(() => userOfflineSongs.value = previous);
+    userOfflineSongs.value = [
+      {
+        ..._songs[0],
+        'sponsorSegments': [
+          {'start': 50, 'end': 60},
+        ],
+      },
+      {
+        ..._songs[1],
+        'sponsorSegments': [
+          {'start': 0, 'end': 9},
+        ],
+      },
+      {..._songs[2], 'sponsorSegments': []},
+    ];
+    await mixEdits.set(
+      'mixed',
+      'aaa',
+      'bbb',
+      MixEdit(
+        outStart: _s(52),
+        inStart: Duration.zero,
+        length: _s(8),
+        style: MixStyle.smooth,
+      ),
+    );
+    await startSong(0);
+    await at('aaa', 39);
+    expect(handler.mixOutStart.value, _s(42));
+    expect(platform.of('bbb').loadedAt, _s(9));
+    await at('aaa', 42.5);
+    expect(handler.currentQueueIndex, 1);
+  });
 
   test('a single SponsorBlock clip is ineligible for a transition', () async {
     await startSong(0);

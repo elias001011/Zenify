@@ -11,6 +11,7 @@ import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/audio_levels.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/listening_stats_service.dart';
+import 'package:musify/services/mix_playlists.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/listening_stats_utils.dart';
 
@@ -61,7 +62,15 @@ void main() {
       await audioHandler.pause();
       final native = MediaKitPlayer.latest!;
       await native.setMpvProperty('ao', 'null');
+      mixPlaylists.value = {'another-playlist'};
+      await audioHandler.setEqualizerEnabled(true);
+      final enabled = await native.getMpvProperty('af');
+      expect(enabled, contains('zuser4'));
+      expect(enabled, isNot(contains('zmixl')));
+      await audioHandler.setEqualizerEnabled(false);
       final chain = await native.getMpvProperty('af');
+      expect(chain, contains('zviz'));
+      expect(chain, isNot(contains('zuser')));
       int total() =>
           listeningStatsService.monthStats(
                 listeningStatsMonthKey(DateTime.now()),

@@ -587,7 +587,7 @@ bool isPlaylistFullyOffline(List songs) {
 
 Map<String, dynamic> getOfflineSongByYtid(String ytid) {
   try {
-    final song = userOfflineSongs.value.firstWhere(
+    final song = userOfflineSongs.value.whereType<Map>().firstWhere(
       (s) => s['ytid'] == ytid,
       orElse: () => <String, dynamic>{},
     );
@@ -638,7 +638,7 @@ Future<List<String>> getSearchSuggestions(String query) async {
 // callers that need to tell "confirmed no segments" apart from "failed to
 // fetch" (e.g. the offline cache, which must not persist a false negative)
 // can do so.
-Future<List<Map<String, int>>> _fetchSkipSegments(String id) async {
+Future<List<Map<String, int>>> fetchSkipSegments(String id) async {
   // A local file's id is never sent out, so it has no segments to fetch.
   if (isLocalSongId(id)) return [];
   final res = await ProxyManager().getProxiedResponse(
@@ -680,7 +680,7 @@ Future<List<Map<String, int>>> _fetchSkipSegments(String id) async {
 
 Future<List<Map<String, int>>> getSkipSegments(String id) async {
   try {
-    return await _fetchSkipSegments(id);
+    return await fetchSkipSegments(id);
   } catch (e, stackTrace) {
     logger.log('Error in getSkipSegments', error: e, stackTrace: stackTrace);
     return [];
@@ -1180,7 +1180,7 @@ Future<void> cacheSponsorBlockSegments(String ytid) async {
     for (var attempt = 0; attempt < 2; attempt++) {
       try {
         final segments = await _sponsorSerialCall(
-          () => _fetchSkipSegments(ytid),
+          () => fetchSkipSegments(ytid),
         );
         await _storeSponsorBlockSegments(ytid, segments);
         return;

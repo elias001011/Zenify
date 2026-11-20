@@ -65,7 +65,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       cue: _mixCue,
       resolve: _mixSource,
       prepared: (player, song) async {
-        _mixEffects.loaded(player);
+        await _mixEffects.loaded(player);
         await _configureEqualizer(_equalizers[player]);
         // Silent now: the echo can be set to the beat this song ends on.
         final tail = _mixAnalyzer.edge(song, tail: true);
@@ -129,6 +129,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   // plays the current song is the active one, and may change at a transition.
   late final MixEngine _mix;
   late final _mixEffects = MixEffects(
+    mixWanted: () => _mixPreviewing || (mixActive && !_playsRadio),
     equalizerOf: (player) => _equalizers[player],
   );
   late final _mixAnalyzer = MixAnalyzer(locate: _mixLocation);
@@ -1229,40 +1230,56 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   /// whole and keeps out of these itself.
   Future<List<MixSkip>> mixSkips(Map song) async {
     final id = song['ytid']?.toString();
-    if (id == null || id.isEmpty || !sponsorBlockSupport.value) return const [];
+    if (id == null ||
+        id.isEmpty ||
+        isLocalSongId(id) ||
+        !sponsorBlockSupport.value) {
+      return const [];
+    }
     if (_mixSkips[id] case final known?) return known;
-    return _mixSkipLoads[id] ??= () async {
-      try {
-        final found =
-            getCachedSponsorBlockSegments(id) ??
-            (offlineMode.value
-                ? const <Map<String, int>>[]
-                : await getSkipSegments(id));
-        return _mixSkips[id] = [
-          for (final segment in found)
-            if ((segment['end'] ?? 0) > (segment['start'] ?? 0))
-              (start: segment['start']! * 1000, end: segment['end']! * 1000),
-        ];
-      } finally {
-        unawaited(_mixSkipLoads.remove(id));
-      }
-    }();
+    return _mixSkipLoads[id] ??= _loadMixSkips(id).whenComplete(() {
+      _mixSkipLoads.remove(id);
+    });
   }
 
-  /// The same, when already looked up; asks for them otherwise.
-  List<MixSkip> _knownMixSkips(Map song) {
-    final id = song['ytid']?.toString();
-    if (id == null || !sponsorBlockSupport.value) return const [];
-    final known = _mixSkips[id];
-    if (known == null && !_mixSkipLoads.containsKey(id)) {
-      unawaited(
-        mixSkips(song).then((found) {
-          if (found.isNotEmpty) _mix.refresh();
-        }),
+  Future<List<MixSkip>> _loadMixSkips(String id) async {
+    try {
+      final cached = getCachedSponsorBlockSegments(id);
+      if (cached == null && offlineMode.value) return const [];
+      final found =
+          cached ??
+          await fetchSkipSegments(id).timeout(const Duration(seconds: 5));
+      final skips = <MixSkip>[
+        for (final segment in found)
+          if ((segment['end'] ?? 0) > (segment['start'] ?? 0))
+            (
+              start: (segment['start'] ?? 0) * 1000,
+              end: segment['end']! * 1000,
+            ),
+      ]..sort((a, b) => a.start.compareTo(b.start));
+      final merged = <MixSkip>[];
+      for (final skip in skips) {
+        if (merged.isEmpty || skip.start > merged.last.end) {
+          merged.add(skip);
+        } else if (skip.end > merged.last.end) {
+          merged.last = (start: merged.last.start, end: skip.end);
+        }
+      }
+      if (_mixSkips.length >= 128) _mixSkips.remove(_mixSkips.keys.first);
+      return _mixSkips[id] = merged;
+    } catch (error, stackTrace) {
+      logger.log(
+        'Mix: SponsorBlock lookup failed',
+        error: error,
+        stackTrace: stackTrace,
       );
+      return const [];
     }
-    return known ?? const [];
   }
+
+  List<MixSkip> _knownMixSkips(Map song) => sponsorBlockSupport.value
+      ? _mixSkips[song['ytid']?.toString()] ?? const []
+      : const [];
 
   /// Where a song the Mix loads whole starts: after a skipped opening.
   Duration? _mixStart(Map song, AudioSource source) {
@@ -1275,10 +1292,14 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   /// A song the Mix loaded whole jumps over its skipped stretches here.
   void _skipMixStretch() {
-    if (_skippingStretch || _mixPreviewing) return;
+    if (!sponsorBlockSupport.value ||
+        _mixSkips.isEmpty ||
+        _skippingStretch ||
+        _mixPreviewing)
+      return;
     final song = _playerSourceMatchesCurrentSong() ? currentSong : null;
     final skips = _mixSkips[song?['ytid']?.toString()];
-    if (skips == null || skips.isEmpty || !sponsorBlockSupport.value) return;
+    if (skips == null || skips.isEmpty) return;
     if (_currentPlayerSourceIsClipped()) return;
     final position = audioPlayer.position.inMilliseconds;
     final duration = audioPlayer.duration?.inMilliseconds;
@@ -1309,7 +1330,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   /// The editor borrows the decks without replacing, persisting or advancing
   /// the queue. Preview audio never enters listening stats or history.
   Future<bool> previewMix(Map song, Map next, MixCue cue, {Duration? startAt}) {
-    if (_mixPreviewTask != null || _currentLoadingIndex >= 0)
+    if (cue.length <= const Duration(milliseconds: 300) ||
+        _mixPreviewTask != null ||
+        _currentLoadingIndex >= 0)
       return Future.value(false);
     final task = _runMixPreview(song, next, cue, startAt: startAt);
     _mixPreviewTask = task;
@@ -1369,7 +1392,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
                 initialIndex: sourceIndex,
               )
               .timeout(_songTransitionTimeout);
-          _mixEffects.loaded(audioPlayer);
+          await _mixEffects.loaded(audioPlayer);
           await _configureEqualizer(_equalizers[audioPlayer]);
         } else {
           await audioPlayer.stop();
@@ -1389,6 +1412,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
         await audioPlayer.setShuffleModeEnabled(shuffle);
         mediaItem.add(item);
         _mixPreviewing = false;
+        if (isDesktopPlatform) await _mixEffects.syncDesktopFilters();
         _mixPreviewTask = null;
         _updateSongFade();
         if (restored && source != null && wasPlaying && _resumeAfterPreview) {
@@ -1420,6 +1444,16 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   /// Called after an edit is saved: a preloaded automatic cue is obsolete.
   void refreshMix() => _mix.refresh();
+
+  Future<void> refreshMixSkips() async {
+    if (!mixActive) return;
+    _mix.refresh();
+    final song = currentSong;
+    if (song != null && sponsorBlockSupport.value) {
+      await mixSkips(song);
+      _mix.refresh();
+    }
+  }
 
   MixPlan? _mixPlan() {
     if (_mixPreviewing) return null;
@@ -1464,18 +1498,22 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       current['ytid']?.toString(),
       next.song['ytid']?.toString(),
     );
-    if (edit != null) return edit.cue(duration, coming);
+    final outgoing = _knownMixSkips(current);
+    final incoming = _knownMixSkips(next.song);
     final tail = _mixAnalyzer.edge(current, tail: true);
-    return chooseCue(
-      endAt: mixBounds(_knownMixSkips(current), duration).end,
-      startAt: mixBounds(_knownMixSkips(next.song), coming).start,
-      duration: duration,
-      coming: coming,
-      tail: tail,
-      head: _mixAnalyzer.edge(next.song, tail: false),
-      pair: '${current['ytid']}>${next.song['ytid']}',
-      echo: tail != null && _mixEffects.echoFits(audioPlayer, tail.bpm),
-    );
+    final cue =
+        edit?.cue(duration, coming) ??
+        chooseCue(
+          endAt: mixBounds(outgoing, duration).end,
+          startAt: mixBounds(incoming, coming).start,
+          duration: duration,
+          coming: coming,
+          tail: tail,
+          head: _mixAnalyzer.edge(next.song, tail: false),
+          pair: '${current['ytid']}>${next.song['ytid']}',
+          echo: tail != null && _mixEffects.echoFits(audioPlayer, tail.bpm),
+        );
+    return fitMixSkips(cue, outgoing, incoming, duration, coming);
   }
 
   Future<MixLocation?> _mixLocation(Map song) async {
@@ -1719,8 +1757,11 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
   }) async {
     await stopMixPreview();
     try {
-      if (replace) _queueKeepsGoing = keepGoing;
-      if (replace) _queuePlaylistId = playlistId;
+      if (replace) {
+        _queueKeepsGoing = keepGoing;
+        _queuePlaylistId = playlistId;
+        if (isDesktopPlatform) unawaited(_mixEffects.syncDesktopFilters());
+      }
       final manuallyAddedSongs = replace ? _getUnplayedManualSongs() : <Map>[];
       final shuffleAfterReplace = shuffle ?? shuffleNotifier.value;
       if (replace) {
@@ -1916,6 +1957,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
           : null;
 
       _queuePlaylistId = null;
+      if (isDesktopPlatform) unawaited(_mixEffects.syncDesktopFilters());
       _queueList.clear();
       _originalQueueList.clear();
       _originalQueueEntriesById.clear();
@@ -2869,15 +2911,9 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
                 )
                 .timeout(_songTransitionTimeout);
 
-      if (!loaded) _mixEffects.loaded(audioPlayer);
-
-      // Check once more after the async setAudioSource: a fast offline song
-      // could have loaded and started playing while we were buffering/setting up.
-      // If so, stop the source we just loaded and yield to the newer song.
-      if (_isStaleTransition(transitionId)) {
-        unawaited(audioPlayer.stop());
-        return false;
-      }
+      if (_isStaleTransition(transitionId)) return false;
+      if (!loaded) await _mixEffects.loaded(audioPlayer);
+      if (_isStaleTransition(transitionId)) return false;
 
       _resumeEntryId = null;
       _resumePosition = null;
@@ -3122,6 +3158,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
       await audioPlayer
           .setAudioSource(audioSource)
           .timeout(_songTransitionTimeout);
+      await _mixEffects.loaded(audioPlayer);
 
       listeningStatsService.finishListeningSession(
         countCurrentTick: true,

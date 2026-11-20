@@ -77,6 +77,22 @@ void main() {
       ]);
       await player.setSpeed(SetSpeedRequest(speed: 1));
       expect(await player.getMpvProperty('af'), contains('zuser4'));
+      final song = {'ytid': 'beat'};
+      final analyzer = MixAnalyzer(
+        locate: (_) async => (source: file.path, headers: null),
+      );
+      final inspection = await analyzer
+          .inspect(song, tail: false, duration: const Duration(seconds: 20))
+          .timeout(const Duration(seconds: 12));
+      expect(inspection?.edge.bpm, closeTo(120, 1));
+      final reopened = MixAnalyzer(
+        locate: (_) async => throw StateError('already analysed'),
+      );
+      expect(reopened.edge(song, tail: true)?.bpm, closeTo(120, 1));
+      expect(
+        (await reopened.inspect(song, tail: false, duration: null))?.wave,
+        [for (final level in inspection!.wave) closeTo(level, 1 / 255)],
+      );
       final decoded = await MixAnalyzer.decode(
         (source: file.path, headers: null),
         start: const Duration(seconds: -12),

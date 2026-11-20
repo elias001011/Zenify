@@ -88,6 +88,7 @@ class _MixEditorState extends State<MixEditor> {
   // The stretches SponsorBlock skips: the transition keeps out of them.
   List<MixSkip> _outSkips = const [];
   List<MixSkip> _inSkips = const [];
+  late final Future<void> _skipsReady;
   Timer? _clock;
   double? _playhead;
   int _audition = 0;
@@ -112,6 +113,7 @@ class _MixEditorState extends State<MixEditor> {
           );
     _automatic = edit == null;
     _cue = edit?.cue(_duration ?? Duration.zero, _coming) ?? _autoCue();
+    _skipsReady = _loadSkips();
     unawaited(_load());
   }
 
@@ -126,20 +128,35 @@ class _MixEditorState extends State<MixEditor> {
     startAt: mixBounds(_inSkips, _coming).start,
   );
 
-  Future<void> _load() async {
-    final skips = Future.wait([
+  MixCue _fitSkips(MixCue cue) => fitMixSkips(
+    cue,
+    _outSkips,
+    _inSkips,
+    _duration ?? Duration.zero,
+    _coming,
+  );
+
+  Future<void> _loadSkips() async {
+    final skips = await Future.wait([
       audioHandler.mixSkips(widget.song),
       audioHandler.mixSkips(widget.next),
     ]).catchError((Object _) => const [<MixSkip>[], <MixSkip>[]]);
+    if (!mounted) return;
+    setState(() {
+      _outSkips = skips[0];
+      _inSkips = skips[1];
+      if (_canEdit) _cue = _fitSkips(_cue);
+    });
+  }
+
+  Future<void> _load() async {
     final edges = await Future.wait([
       _analyzer.inspect(widget.song, tail: true, duration: _duration),
       _analyzer.inspect(widget.next, tail: false, duration: _coming),
     ]);
-    final skipped = await skips;
+    await _skipsReady;
     if (!mounted) return;
     setState(() {
-      _outSkips = skipped[0];
-      _inSkips = skipped[1];
       _tail = edges[0];
       _head = edges[1];
       _loading = false;
@@ -157,6 +174,7 @@ class _MixEditorState extends State<MixEditor> {
         // A saved edit is bound to the songs only once both lengths are known.
         _cue = (_initialEdit ?? MixEdit.fromCue(_cue)).cue(_duration!, _coming);
       }
+      if (_canEdit) _cue = _fitSkips(_cue);
     });
   }
 
@@ -243,6 +261,7 @@ class _MixEditorState extends State<MixEditor> {
         filter: style != null ? null : filter ?? _cue.filter,
         tempoRatio: ratio ?? _cue.tempoRatio,
       ).cue(_duration!, _coming);
+      _cue = _fitSkips(_cue);
       widget.onDraft?.call(MixEdit.fromCue(_cue));
     });
   }
@@ -291,6 +310,8 @@ class _MixEditorState extends State<MixEditor> {
       return;
     }
     final request = ++_audition;
+    await _skipsReady;
+    if (!mounted || request != _audition) return;
     if (_previewing) await audioHandler.stopMixPreview();
     if (!mounted || request != _audition) return;
     setState(() {
@@ -314,14 +335,14 @@ class _MixEditorState extends State<MixEditor> {
       widget.song,
       widget.next,
       _cue,
-      startAt: at == null
-          ? null
-          : Duration(
-              milliseconds: max(
-                0,
-                _cue.outStart.inMilliseconds + (at * 1000).round(),
-              ),
-            ),
+      startAt: Duration(
+        milliseconds: max(
+          _outSkips
+              .where((skip) => skip.end <= _cue.outStart.inMilliseconds)
+              .fold(0, (end, skip) => max(end, skip.end)),
+          _cue.outStart.inMilliseconds + ((at ?? -5) * 1000).round(),
+        ),
+      ),
     );
     if (!mounted || request != _audition) return;
     _clock?.cancel();
@@ -677,7 +698,7 @@ class _MixEditorState extends State<MixEditor> {
                                   : (_) => setState(() {
                                       widget.onDraft?.call(null);
                                       _automatic = true;
-                                      _cue = _autoCue();
+                                      _cue = _fitSkips(_autoCue());
                                     }),
                             ),
                             if (!_automatic && _cue.customized)
@@ -738,7 +759,12 @@ class _MixEditorState extends State<MixEditor> {
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _canEdit && !_busy ? _save : null,
+                    onPressed:
+                        _canEdit &&
+                            !_busy &&
+                            (_automatic || _cue.length > Duration.zero)
+                        ? _save
+                        : null,
                     child: Text(l.mixSave),
                   ),
                 ),

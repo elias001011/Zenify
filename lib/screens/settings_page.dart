@@ -954,6 +954,7 @@ class SettingsPage extends StatelessWidget {
   void _toggleSponsorBlock(BuildContext context, bool value) {
     addOrUpdateData<bool>('settings', 'sponsorBlockSupport', value);
     sponsorBlockSupport.value = value;
+    unawaited(audioHandler.refreshMixSkips());
     showToast(context, context.l10n!.settingChangedMsg);
   }
 

@@ -230,7 +230,7 @@ class MixEngine {
         }),
       );
       // Also bounds a stalled network source that never advances its clock.
-      await done.future.timeout(const Duration(seconds: 90));
+      await done.future.timeout(cue.length + const Duration(seconds: 90));
     } finally {
       _previewReady = false;
       _previewDone = null;
@@ -284,6 +284,10 @@ class MixEngine {
         position < _settle &&
         cue.outStart > _prepareAhead + _settle)
       return;
+    if (cue.length <= _shortest) {
+      outStart.value = null;
+      return;
+    }
     outStart.value = cue.outStart;
     if (position < cue.outStart - _prepareAhead) return;
 
@@ -348,12 +352,17 @@ class MixEngine {
   /// A paused song pauses the one going out with it.
   void pause() {
     final tail = _tail;
+    _timer?.cancel();
+    _timer = null;
     if (tail != null) unawaited(tail.pause().catchError(_logError));
   }
 
   void resume() {
     final tail = _tail;
-    if (tail != null) unawaited(tail.play().catchError(_logError));
+    if (tail != null) {
+      unawaited(tail.play().catchError(_logError));
+      _timer ??= Timer.periodic(tick, (_) => _step());
+    }
   }
 
   /// A tempo change reaches both decks, including a song prepared but not
@@ -422,6 +431,14 @@ class MixEngine {
       }
       await _stopped;
       if (generation != _generation) return;
+      // Resolving the incoming track also retrieves its SponsorBlock segments.
+      final duration = _active.duration;
+      if (_previewDone == null && duration != null)
+        cue = this.cue(next, duration);
+      if (cue.length <= _shortest) {
+        _failedId = next.entryId;
+        return;
+      }
       final player = _other ??= createPlayer();
       await player.setVolume(0);
       await player.setLoopMode(LoopMode.off);
@@ -434,7 +451,10 @@ class MixEngine {
         return;
       }
       await prepared(player, next.song);
-      if (generation != _generation) return;
+      if (generation != _generation) {
+        _stop(player);
+        return;
+      }
       _prepared = (entryId: next.entryId, source: source, cue: cue);
     } catch (e, stackTrace) {
       logger.log(
@@ -469,7 +489,7 @@ class MixEngine {
       if (_baseSpeed != null) await tail.setSpeed(speed);
       _baseSpeed = speed;
       await coming.setSpeed(speed * cue.tempoRatio);
-      if (generation != _generation) return;
+      if (generation != _generation || !tail.playing) return;
       _tail = tail;
       _tailStart = cue.outStart;
       _cue = cue;
