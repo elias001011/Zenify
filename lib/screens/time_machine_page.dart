@@ -383,8 +383,12 @@ class _PeriodSectionState extends State<_PeriodSection> {
 
       await WidgetsBinding.instance.endOfFrame;
       final captured = await boundary.toImage(pixelRatio: 3);
-      final image = await _onBackground(captured, background);
-      captured.dispose();
+      final ui.Image image;
+      try {
+        image = await _onBackground(captured, background);
+      } finally {
+        captured.dispose();
+      }
       final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
       image.dispose();
       final bytes = byteData?.buffer.asUint8List();

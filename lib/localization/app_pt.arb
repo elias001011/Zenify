@@ -487,7 +487,6 @@
   "youtubePlaylistLinkOrId": "Link ou ID da playlist do YouTube",
   "imageSaved": "Imagem salva",
   "selectAll": "Selecionar todas",
-  "selectSongs": "Selecionar músicas",
   "moveToPlaylist": "Mover para playlist",
   "songsMoved": "{count, plural, =1{1 música movida} other{{count} músicas movidas}}",
   "songsSelected": "{count, plural, =1{1 música selecionada} other{{count} músicas selecionadas}}",

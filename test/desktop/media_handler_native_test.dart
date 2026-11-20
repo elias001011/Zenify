@@ -174,38 +174,39 @@ void main() {
         expect(handler.currentQueueIndex, 0);
       });
 
-      test(
-        'play and pause publish the transport state without debounce',
-        () async {
-          final observations = <(bool, bool)>[];
-          final subscription = handler.audioPlayer.playerStateStream.listen((
-            state,
-          ) {
-            if (state.processingState.name == 'ready') {
-              observations.add((
-                state.playing,
-                handler.playbackState.value.playing,
-              ));
-            }
-          });
-          addTearDown(subscription.cancel);
-          for (var i = 0; i < 4; i++) {
-            await handler.play();
-            await waitFor(() => handler.audioPlayer.playing);
-            await handler.pause();
-            expect(handler.audioPlayer.playing, isFalse);
-            expect(handler.playbackState.value.playing, isFalse);
+      test('play and pause publish the transport state without debounce', () async {
+        final observations = <(bool, bool)>[];
+        final initialState = Completer<void>();
+        final subscription = handler.audioPlayer.playerStateStream.listen((
+          state,
+        ) {
+          if (state.processingState.name == 'ready') {
+            observations.add((
+              state.playing,
+              handler.playbackState.value.playing,
+            ));
+            if (!initialState.isCompleted) initialState.complete();
           }
-          expect(observations.where((state) => state.$1), isNotEmpty);
-          expect(observations.where((state) => !state.$1), isNotEmpty);
-          expect(
-            observations.every((state) => state.$1 == state.$2),
-            isTrue,
-            reason:
-                'Controls must match every native play/pause event immediately',
-          );
-        },
-      );
+        });
+        addTearDown(subscription.cancel);
+        // Drain the replayed state before issuing a new transport command.
+        await initialState.future.timeout(const Duration(seconds: 5));
+        for (var i = 0; i < 4; i++) {
+          await handler.play();
+          await waitFor(() => handler.audioPlayer.playing);
+          await handler.pause();
+          expect(handler.audioPlayer.playing, isFalse);
+          expect(handler.playbackState.value.playing, isFalse);
+        }
+        expect(observations.where((state) => state.$1), isNotEmpty);
+        expect(observations.where((state) => !state.$1), isNotEmpty);
+        expect(
+          observations.every((state) => state.$1 == state.$2),
+          isTrue,
+          reason:
+              'Controls must match every native play/pause event immediately: $observations',
+        );
+      });
 
       test('playing Next and Previous continue playback', () async {
         await handler.play();

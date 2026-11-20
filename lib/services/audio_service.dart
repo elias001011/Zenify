@@ -2469,10 +2469,21 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   // Once a drag settles; a mute is not kept, so the app never opens silent.
   void _saveVolume() {
+    final chosen = volume;
+    if (chosen <= 0 || !Hive.isBoxOpen('settings')) return;
     _volumeSaveTimer?.cancel();
-    if (volume <= 0 || !Hive.isBoxOpen('settings')) return;
-    _volumeSaveTimer = Timer(const Duration(milliseconds: 500), () {
-      unawaited(Hive.box('settings').put('volume', volume));
+    _volumeSaveTimer = Timer(const Duration(milliseconds: 500), () async {
+      if (!Hive.isBoxOpen('settings')) return;
+      try {
+        final settings = Hive.box('settings');
+        if (settings.isOpen) await settings.put('volume', chosen);
+      } catch (error, stackTrace) {
+        logger.log(
+          'Could not remember playback volume',
+          error: error,
+          stackTrace: stackTrace,
+        );
+      }
     });
   }
 
@@ -2548,6 +2559,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> fastForward() {
+    if (_playsRadio) return Future.value();
     final target = _position + const Duration(seconds: 15);
     final trackDuration = audioPlayer.duration;
     final clamped = (trackDuration != null && target > trackDuration)
@@ -2558,6 +2570,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
 
   @override
   Future<void> rewind() {
+    if (_playsRadio) return Future.value();
     final target = _position - const Duration(seconds: 15);
     final clamped = target < Duration.zero ? Duration.zero : target;
     return seek(clamped);

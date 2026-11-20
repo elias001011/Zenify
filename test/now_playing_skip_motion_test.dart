@@ -116,6 +116,81 @@ void main() {
     await disposePlayer(tester);
   });
 
+  testWidgets(
+    'skipping back before a forward skip finishes keeps the first cover leaving left',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      await pumpPlayer(tester);
+
+      // Track 'a' starts leaving to the left (dx < 0) as 'b' enters from the right.
+      await tester.tap(find.byIcon(FluentIcons.next_24_filled));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      double shiftOf(String id) {
+        final key = find.byKey(ValueKey(id));
+        final transform = tester.widget<Transform>(
+          find.ancestor(of: key, matching: find.byType(Transform)).first,
+        );
+        return transform.transform.getTranslation().x;
+      }
+
+      expect(shiftOf('a'), lessThan(0));
+
+      // Before the 300 ms slide ends, skip back to a third track 'c'.
+      skipDirection = -1;
+      audioHandler.mediaItem.add(_song('c'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      // Track 'a' was already leaving to the left and must not jump to the right.
+      expect(shiftOf('a'), lessThan(0));
+
+      await disposePlayer(tester);
+    },
+  );
+
+  testWidgets('repeat wraps while both previous covers keep moving smoothly', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await pumpPlayer(tester);
+    final first = tester.element(find.byKey(const ValueKey('a')));
+
+    double shiftOf(Element cover) {
+      late Transform slide;
+      cover.visitAncestorElements((ancestor) {
+        if (ancestor.widget case final Transform transform) {
+          slide = transform;
+          return false;
+        }
+        return true;
+      });
+      return slide.transform.getTranslation().x;
+    }
+
+    await tester.tap(find.byIcon(FluentIcons.next_24_filled));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final second = tester.element(find.byKey(const ValueKey('b')));
+    final firstOffset = shiftOf(first);
+    final secondOffset = shiftOf(second);
+    expect(firstOffset, lessThan(0));
+    expect(secondOffset, greaterThan(0));
+
+    // Another forward skip wraps the two-track queue to A again.
+    skipDirection = 1;
+    audioHandler.mediaItem.add(_song('a'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(shiftOf(first), lessThan(firstOffset));
+    expect(shiftOf(second), greaterThan(secondOffset));
+    expect(find.byKey(const ValueKey('a')), findsNWidgets(2));
+    await disposePlayer(tester);
+  });
+
   for (final panel in ['Lyrics', 'Queue']) {
     testWidgets('a phone keeps the small cover still on a skip ($panel open)', (
       tester,

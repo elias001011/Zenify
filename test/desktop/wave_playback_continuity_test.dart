@@ -31,6 +31,8 @@ void main() {
       for (final box in ['settings', 'user', 'userNoBackup', 'cache']) {
         await Hive.openBox(box);
       }
+      showPlayerVisualizer.value = true;
+      addTearDown(() => showPlayerVisualizer.value = false);
       AudioLevels.configureDesktop();
       addTearDown(() async {
         await audioHandler.stop();

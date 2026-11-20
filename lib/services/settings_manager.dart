@@ -36,8 +36,11 @@ final shouldWeCheckUpdates = ValueNotifier<bool>(
   Hive.box('settings').get('shouldWeCheckUpdates', defaultValue: true),
 );
 
+bool _readPlayNextSongAutomatically(Box settings) =>
+    settings.get('playNextSongAutomatically', defaultValue: true);
+
 final playNextSongAutomatically = ValueNotifier<bool>(
-  Hive.box('settings').get('playNextSongAutomatically', defaultValue: true),
+  _readPlayNextSongAutomatically(Hive.box('settings')),
 );
 
 final useSystemColor = ValueNotifier<bool>(
@@ -110,6 +113,14 @@ FloatingEffect _readFloatingEffect() {
 
 /// How the floating island, dock and rail let the content behind show.
 final floatingEffect = ValueNotifier<FloatingEffect>(_readFloatingEffect());
+
+/// Saves the choice under both keys, so a backup opened in Musify keeps it.
+Future<void> setPureBlack(bool value) async {
+  usePureBlackColor.value = value;
+  final settings = Hive.box('settings');
+  await settings.put('pureBlackTheme', value);
+  await settings.put('usePureBlackColor', value);
+}
 
 bool get isPureBlackTheme => usePureBlackColor.value;
 
@@ -255,7 +266,7 @@ final localSyncEnabled = ValueNotifier<bool>(
 );
 
 final localSyncAutomatic = ValueNotifier<bool>(
-  Hive.box('settings').get('localSyncAutomatic', defaultValue: true),
+  Hive.box('settings').get('localSyncAutomatic', defaultValue: false),
 );
 
 final localSyncLastSyncedAt = ValueNotifier<DateTime?>(
@@ -280,10 +291,7 @@ void reloadSettingsFromStorage() {
     'shouldWeCheckUpdates',
     defaultValue: true,
   );
-  playNextSongAutomatically.value = settings.get(
-    'playNextSongAutomatically',
-    defaultValue: false,
-  );
+  playNextSongAutomatically.value = _readPlayNextSongAutomatically(settings);
   useSystemColor.value = settings.get('useSystemColor', defaultValue: true);
   floatingEffect.value = _readFloatingEffect();
   moodsEnabled.value = settings.get('moodsEnabled', defaultValue: true);
@@ -382,7 +390,7 @@ void reloadSettingsFromStorage() {
   );
   localSyncAutomatic.value = settings.get(
     'localSyncAutomatic',
-    defaultValue: true,
+    defaultValue: false,
   );
 
   localSyncLastSyncedAt.value = _readDateTimeSetting('localSyncLastSyncedAt');

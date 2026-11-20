@@ -68,4 +68,27 @@ void main() {
     expect(mine.existsSync(), isTrue);
     expect(foreign.existsSync(), isTrue);
   });
+
+  test(
+    'download cleanup keeps files reached by traversal or symlink',
+    () async {
+      final root = await Directory.systemTemp.createTemp('zenify_cleanup');
+      addTearDown(() => root.delete(recursive: true));
+      final app = Directory('${root.path}/app')..createSync();
+      final outside = Directory('${root.path}/personal')..createSync();
+      downloadsDirPath = app.path;
+      applicationDirPath = app.path;
+      final personal = File('${outside.path}/aaaaaaaaaaa.m4a')
+        ..writeAsStringSync('personal recording');
+      final traversal = '${app.path}/../personal/aaaaaaaaaaa.m4a';
+      expect(FilePaths.isOwnDownload(traversal), isFalse);
+      final link = Link('${app.path}/legacy');
+      await link.create(outside.path);
+      await FilePaths.deleteDownloadedFiles([
+        {'audioPath': traversal},
+        {'audioPath': '${link.path}/aaaaaaaaaaa.m4a'},
+      ]);
+      expect(personal.readAsStringSync(), 'personal recording');
+    },
+  );
 }

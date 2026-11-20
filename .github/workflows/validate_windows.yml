@@ -19,7 +19,7 @@ jobs:
         shell: bash
         run: |
           echo "FLUTTER_VERSION=$(sed -n 's/^  flutter: \^*//p' pubspec.yaml)" >> "$GITHUB_ENV"
-          echo "ZENIFY_VERSION=$(sed -n 's/^version: \([^ +]*\).*/\1/p' pubspec.yaml)" >> "$GITHUB_ENV"
+          echo "ZENIFY_VERSION=$(bash scripts/release_version.sh)" >> "$GITHUB_ENV"
       - uses: subosito/flutter-action@v2
         with:
           channel: stable

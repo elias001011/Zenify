@@ -144,7 +144,9 @@ Map? _searchAppPlaylistsById(String id) {
   }
   // Zenify's own playlists are made by the Moods and kept in its cache, not
   // in the library: a pin on one would be dropped as gone otherwise.
-  if (MoodsService.isZenifyPlaylist(id)) return moodsService.cachedPlaylist(id);
+  if (MoodsService.isZenifyPlaylist(id) && moodsEnabled.value) {
+    return moodsService.cachedPlaylist(id);
+  }
   return null;
 }
 
@@ -468,25 +470,7 @@ bool reorderCustomPlaylist(String playlistId, List<dynamic> orderedSongs) {
       !ids.every(byId.containsKey))
     return false;
   found.playlist['list'] = [for (final id in ids) byId[id]];
-  if (found.isFromFolder) {
-    userPlaylistFolders.value = [...userPlaylistFolders.value];
-    unawaited(
-      addOrUpdateData<List>(
-        'user',
-        'playlistFolders',
-        userPlaylistFolders.value,
-      ),
-    );
-  } else {
-    userCustomPlaylists.value = [...userCustomPlaylists.value];
-    unawaited(
-      addOrUpdateData<List>(
-        'user',
-        'customPlaylists',
-        userCustomPlaylists.value,
-      ),
-    );
-  }
+  unawaited(_saveCustomPlaylist(found.isFromFolder));
   return true;
 }
 

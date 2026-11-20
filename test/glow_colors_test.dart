@@ -1,3 +1,6 @@
+import 'dart:io';
+import 'dart:ui' as ui;
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/widgets/artwork_glow.dart';
@@ -124,6 +127,50 @@ void main() {
       expect(colors.reveal, 1);
       expect(colors.colorAt(0), red);
       colors.dispose();
+    },
+  );
+
+  testWidgets(
+    'a failed artwork read retries when the same page updates again',
+    (tester) async {
+      late Directory dir;
+      late File art;
+      await tester.runAsync(() async {
+        dir = await Directory.systemTemp.createTemp('zenify_glow_retry');
+        art = File('${dir.path}/cover.png');
+      });
+      addTearDown(() => dir.deleteSync(recursive: true));
+
+      final colors = GlowColors(const TestVSync());
+      addTearDown(colors.dispose);
+
+      // First update while the file is still missing: falls back to red.
+      await tester.runAsync(() async {
+        colors.update([art.path], red);
+        await Future<void>.delayed(const Duration(milliseconds: 220));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1500));
+      expect(colors.colorAt(0), red);
+
+      // The artwork arrives while the page is still open and updates again.
+      await tester.runAsync(() async {
+        final recorder = ui.PictureRecorder();
+        Canvas(recorder).drawRect(
+          const Rect.fromLTWH(0, 0, 24, 24),
+          Paint()..color = const Color(0xFF0055FF),
+        );
+        final img = await recorder.endRecording().toImage(24, 24);
+        final png = await img.toByteData(format: ui.ImageByteFormat.png);
+        await art.writeAsBytes(png!.buffer.asUint8List());
+        colors.update([art.path], red);
+        for (var i = 0; i < 5; i++) {
+          await Future<void>.delayed(const Duration(milliseconds: 50));
+          await tester.pump(const Duration(milliseconds: 50));
+        }
+      });
+      await tester.pump(const Duration(milliseconds: 1500));
+      expect(colors.colorAt(0), isNot(red));
     },
   );
 }

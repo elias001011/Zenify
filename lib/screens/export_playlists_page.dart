@@ -93,10 +93,10 @@ class _ExportPlaylistsPageState extends State<ExportPlaylistsPage> {
       // sheet, where they can be saved or sent.
       final Directory? target;
       if (isDesktopPlatform) {
-        final picked = await FilePicker.getDirectoryPath(
+        final picked = await FilePicker.pickDirectory(
           dialogTitle: context.l10n!.exportPlaylistsCsv,
         );
-        target = picked == null ? null : Directory(picked);
+        target = picked == null ? null : Directory.fromUri(picked);
       } else {
         // Emptied by the next export, not now: the app that receives the files
         // may read them after the share sheet is gone.

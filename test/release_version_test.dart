@@ -51,4 +51,13 @@ void main() {
     expect(result.exitCode, 0, reason: '${result.stderr}');
     expect('${result.stdout}'.trim(), appVersion);
   });
+
+  test(
+    'Windows installer workflow resolves version via release_version.sh',
+    () {
+      final workflow = File('.github/workflows/validate_windows.yml')
+          .readAsStringSync();
+      expect(workflow, contains('scripts/release_version.sh'));
+    },
+  );
 }

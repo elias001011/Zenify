@@ -340,7 +340,10 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
           dialogContext,
         );
         showToast(dialogContext, result);
-        if (name.isNotEmpty) setState(() => _folderName = name);
+        final stored = userPlaylistFolders.value
+            .where((folder) => folder['id'] == widget.folderId)
+            .firstOrNull?['name'];
+        if (stored != null) setState(() => _folderName = stored.toString());
       },
     );
   }

@@ -195,4 +195,31 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     });
   });
+
+  testWidgets('toggling offline mode updates the available batch actions', (
+    tester,
+  ) async {
+    offlineMode.value = false;
+    addTearDown(() => offlineMode.value = false);
+    final selection = SongSelectionController()..start({'ytid': 'one'});
+    addTearDown(selection.dispose);
+    await tester.pumpWidget(
+      localizedApp(
+        Scaffold(
+          body: SongSelectionBar(
+            controller: selection,
+            visibleSongs: () => [
+              {'ytid': 'one'},
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byIcon(FluentIcons.heart_24_regular), findsOneWidget);
+
+    offlineMode.value = true;
+    await tester.pumpAndSettle();
+    expect(find.byIcon(FluentIcons.heart_24_regular), findsNothing);
+  });
 }

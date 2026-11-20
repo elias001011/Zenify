@@ -77,6 +77,17 @@ void main() {
       expect(rows.single.artist, 'CR');
       expect(rows.single.ytid, 'fffffffffff');
     });
+
+    test('protected whitespace formulas and negative ids round trip', () {
+      final rows = _import(
+        playlistCsv([
+          {'ytid': '-abcdefghij', 'title': '  =SUM(A1)', 'artist': '  +Artist'},
+        ]),
+      );
+      expect(rows.single.title, '=SUM(A1)');
+      expect(rows.single.artist, '+Artist');
+      expect(rows.single.ytid, '-abcdefghij');
+    });
   });
 
   group('files from Spotify and Chosic', () {

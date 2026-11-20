@@ -118,7 +118,7 @@ final _youtubeId = RegExp(r'^[A-Za-z0-9_-]{11}$');
 /// [cell] as a YouTube video id, or null when it is not one (a local file's
 /// id, an empty cell).
 String? _validId(String cell) {
-  final id = cell.trim();
+  final id = _unprotected(cell).trim();
   return _youtubeId.hasMatch(id) ? id : null;
 }
 
@@ -126,7 +126,9 @@ String? _validId(String cell) {
 /// as a formula, as it was. A name that starts with a quote of its own, like
 /// 'Til Tuesday, is left alone.
 String _unprotected(String value) =>
-    RegExp(r"^'[=+\-@\t\r]").hasMatch(value) ? value.substring(1) : value;
+    RegExp(r"^'(?:[\s\x00-\x1f]*[=+\-@]|[\t\r\n])").hasMatch(value)
+    ? value.substring(1)
+    : value;
 
 /// Finds the song of [row]: by its YouTube id when the file has one, else (or
 /// when the id gives nothing) with [search]. The second value is `true` when

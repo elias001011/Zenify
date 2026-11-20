@@ -49,12 +49,19 @@ void main() {
     expect(csvFileName('x' * 200, taken).length, 84);
   });
 
+  test('Windows reads the part before the dot as the device name', () {
+    final taken = <String>{};
+    expect(csvFileName('Aux. Mix', taken), '_Aux. Mix.csv');
+    expect(csvFileName('Con.Tempo', taken), '_Con.Tempo.csv');
+    expect(csvFileName('Auxiliar', taken), 'Auxiliar.csv');
+  });
+
   test('a title that looks like a formula is shown, not run', () {
     final csv = playlistCsv([
       {'ytid': '-abcdefghij', 'title': '=HYPERLINK("x")', 'artist': '+1'},
     ]);
 
-    expect(csv, contains('"\'=HYPERLINK(""x"")",\'+1,,-abcdefghij,'));
+    expect(csv, contains('"\'=HYPERLINK(""x"")",\'+1,,\'-abcdefghij,'));
   });
 
   test('names avoid Windows devices and files already in the folder', () {
@@ -66,6 +73,39 @@ void main() {
       'Mine (2).csv',
     );
   });
+
+  test(
+    'concurrent exports keep existing files and get distinct names',
+    () async {
+      userLikedSongsList.value = [
+        {'ytid': 'likedlikedl', 'title': 'Liked', 'artist': 'Me'},
+      ];
+      final out = await Directory('${directory.path}/concurrent').create();
+      final existing = await File('${out.path}/Liked.csv').writeAsString('old');
+      final partial = await File('${out.path}/Liked (2).csv.part')
+          .writeAsString('keep this partial file');
+      const entry = (
+        id: likedSongsExportId,
+        title: 'Liked',
+        source: ExportSource.likedSongs,
+        artwork: null,
+      );
+
+      final results = await Future.wait([
+        writePlaylistCsvs([entry], out),
+        writePlaylistCsvs([entry], out),
+      ]);
+
+      expect(results.map((result) => result.failed), everyElement(0));
+      expect(results.expand((result) => result.files).toSet(), {
+        '${out.path}/Liked (2).csv',
+        '${out.path}/Liked (3).csv',
+      });
+      expect(await existing.readAsString(), 'old');
+      expect(await partial.readAsString(), 'keep this partial file');
+      expect(await out.list().length, 4);
+    },
+  );
 
   test(
     'liked songs and custom playlists are written, the rest counted',
@@ -130,4 +170,18 @@ void main() {
       ]);
     },
   );
+
+  test('every untrusted CSV cell is escaped, including ids and URLs', () {
+    final csv = playlistCsv([
+      {'ytid': '=1+1', 'title': '  =1+1', 'artist': '@SUM(1)'},
+      {'ytid': 'id,with\nlines', 'title': 'Song', 'artist': 'Artist'},
+    ]);
+    expect(csv, contains("'  =1+1,'@SUM(1),,'=1+1,"));
+    expect(
+      csv,
+      contains(
+        '"id,with\nlines","https://music.youtube.com/watch?v=id,with\nlines"',
+      ),
+    );
+  });
 }

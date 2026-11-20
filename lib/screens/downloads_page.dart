@@ -96,6 +96,16 @@ class _DownloadsPageState extends State<DownloadsPage> {
           }
         }
 
+        final nothingMatches =
+            entries.isNotEmpty &&
+            [
+              downloading,
+              waiting,
+              failed,
+              unavailable,
+              done,
+            ].every((list) => list.isEmpty);
+
         return IslandScaffold(
           background: const PageGlow(source: null, cacheKey: 'downloads_page'),
           title: l10n.downloads,
@@ -111,6 +121,19 @@ class _DownloadsPageState extends State<DownloadsPage> {
           ],
           body: entries.isEmpty
               ? _buildEmpty(context)
+              : nothingMatches
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Text(
+                      l10n.noLibraryMatches,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                )
               : Builder(
                   builder: (context) {
                     return CustomScrollView(

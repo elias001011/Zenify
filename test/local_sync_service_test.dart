@@ -11,7 +11,11 @@ import 'package:musify/services/local_sync/sync_pairing.dart';
 import 'package:musify/services/local_sync/sync_security.dart';
 import 'package:musify/services/local_sync_service.dart';
 import 'package:musify/services/settings_manager.dart'
-    show localSyncEnabled, reloadSettingsFromStorage;
+    show
+        localSyncAutomatic,
+        localSyncEnabled,
+        offlineMode,
+        reloadSettingsFromStorage;
 
 import 'local_sync/fixtures.dart';
 import 'support/app_harness.dart';
@@ -102,6 +106,75 @@ void main() {
     );
     return (session: session, client: client, proof: client.proof());
   }
+
+  test('automatic sync rechecks offline mode after finding a LAN', () async {
+    final network = Completer<bool>();
+    var discoveries = 0;
+    final service = LocalSyncService.forTesting(
+      hasLocalNetwork: () => network.future,
+      discovery: () async {
+        discoveries++;
+        return [];
+      },
+    );
+    addTearDown(service.dispose);
+    await service.startServer();
+    service.pairedDevices.value = server.pairedDevices.value;
+    localSyncEnabled.value = true;
+    localSyncAutomatic.value = true;
+    final wasOffline = offlineMode.value;
+    addTearDown(() => offlineMode.value = wasOffline);
+
+    offlineMode.value = false;
+    final sync = service.triggerSilentSync();
+    offlineMode.value = true;
+    network.complete(true);
+    await sync;
+
+    expect(discoveries, 0);
+  });
+
+  test(
+    'going offline during UDP discovery cancels the silent sync pass',
+    () async {
+      var requests = 0;
+      final peer = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(peer.close);
+      peer.listen((request) {
+        requests++;
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..close();
+      });
+      final found = Completer<List<DiscoveredSyncDevice>>();
+      final service = LocalSyncService.forTesting(
+        hasLocalNetwork: () async => true,
+        discovery: () => found.future,
+      );
+      addTearDown(service.dispose);
+      service.pairedDevices.value = server.pairedDevices.value;
+      localSyncEnabled.value = true;
+      localSyncAutomatic.value = true;
+      final wasOffline = offlineMode.value;
+      addTearDown(() => offlineMode.value = wasOffline);
+
+      offlineMode.value = false;
+      final sync = service.triggerSilentSync();
+      await Future<void>.delayed(Duration.zero);
+      offlineMode.value = true;
+      found.complete([
+        DiscoveredSyncDevice(
+          deviceId: peerId,
+          name: 'Peer',
+          ip: InternetAddress.loopbackIPv4.address,
+          port: peer.port,
+        ),
+      ]);
+      await sync;
+
+      expect(requests, 0);
+    },
+  );
 
   test(
     'declaring a trusted id without its key cannot read or mutate data',
@@ -518,6 +591,8 @@ void main() {
     await server.dispose();
     await Hive.box('settings').put('localSyncEnabled', false);
     localSyncEnabled.value = false;
+    localSyncAutomatic.value = true;
+    addTearDown(() => localSyncAutomatic.value = false);
     server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
     await server.initialise();
 
@@ -536,6 +611,8 @@ void main() {
     await server.dispose();
     await Hive.box('settings').put('localSyncEnabled', true);
     localSyncEnabled.value = true;
+    localSyncAutomatic.value = true;
+    addTearDown(() => localSyncAutomatic.value = false);
     server = LocalSyncService.forTesting(pairingNow: () => pairingClock);
     await server.initialise();
 

@@ -114,9 +114,9 @@ String playlistCsv(Iterable<Map> songs) {
           _csvField(song['title'].toString(), text: true),
           _csvField(song['artist']?.toString() ?? '', text: true),
           readMediaDuration(song['duration'])?.inMilliseconds.toString() ?? '',
-          _csvField(song['ytid']?.toString() ?? ''),
+          _csvField(song['ytid']?.toString() ?? '', text: true),
           if (song['ytid'] case final String id when id.isNotEmpty)
-            'https://music.youtube.com/watch?v=$id'
+            _csvField('https://music.youtube.com/watch?v=$id')
           else
             '',
         ],
@@ -128,7 +128,8 @@ String playlistCsv(Iterable<Map> songs) {
 /// from whoever uploaded the video) gets a leading quote, so a spreadsheet
 /// shows it instead of running it.
 String _csvField(String value, {bool text = false}) {
-  final safe = text && RegExp(r'^[=+\-@\t\r]').hasMatch(value)
+  final safe =
+      text && RegExp(r'^(?:[\s\x00-\x1f]*[=+\-@]|[\t\r\n])').hasMatch(value)
       ? "'$value"
       : value;
   return safe.contains(RegExp(r'[",\r\n]'))
@@ -155,7 +156,10 @@ String csvFileName(
   var base = String.fromCharCodes(
     (clean.isEmpty ? 'playlist' : clean).runes.take(80),
   );
-  if (_windowsDeviceName.hasMatch(base)) base = '_$base';
+  // Windows reads "Aux. Mix" as the device AUX: only what is before the dot counts.
+  if (_windowsDeviceName.hasMatch(base.split('.').first.trimRight())) {
+    base = '_$base';
+  }
   var name = '$base.csv';
   for (
     var copy = 2;
@@ -175,27 +179,59 @@ Future<({List<String> files, int failed})> writePlaylistCsvs(
   Directory directory,
 ) async {
   await directory.create(recursive: true);
+  final staging = await directory.createTemp('.zenify-export-');
+  final partial = File('${staging.path}/playlist.part');
   final taken = <String>{};
   final files = <String>[];
   var failed = 0;
-  for (final entry in entries) {
-    try {
-      final songs = await exportSongs(entry);
-      if (songs == null || songs.isEmpty) {
+  try {
+    for (final entry in entries) {
+      try {
+        final songs = await exportSongs(entry);
+        if (songs == null || songs.isEmpty) {
+          failed++;
+          continue;
+        }
+        await partial.writeAsString(playlistCsv(songs));
+        files.add(_publishCsv(partial, directory, entry.title, taken));
+      } catch (_) {
         failed++;
-        continue;
       }
-      final name = csvFileName(
-        entry.title,
-        taken,
-        exists: (name) => File('${directory.path}/$name').existsSync(),
-      );
-      final file = File('${directory.path}/$name');
-      await file.writeAsString(playlistCsv(songs));
-      files.add(file.path);
-    } catch (_) {
-      failed++;
     }
+  } finally {
+    await staging.delete(recursive: true);
   }
   return (files: files, failed: failed);
+}
+
+String _publishCsv(
+  File partial,
+  Directory directory,
+  String title,
+  Set<String> taken,
+) {
+  bool occupied(String name) =>
+      FileSystemEntity.typeSync(
+        '${directory.path}/$name',
+        followLinks: false,
+      ) !=
+      FileSystemEntityType.notFound;
+
+  while (true) {
+    final name = csvFileName(title, taken, exists: occupied);
+    final output = File('${directory.path}/$name');
+    // Claim the name before rename, which can replace an existing file.
+    try {
+      output.createSync(exclusive: true);
+    } on FileSystemException {
+      if (occupied(name)) continue;
+      rethrow;
+    }
+    try {
+      return partial.renameSync(output.path).path;
+    } catch (_) {
+      output.deleteSync();
+      rethrow;
+    }
+  }
 }

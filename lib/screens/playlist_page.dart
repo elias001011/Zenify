@@ -701,13 +701,12 @@ class _PlaylistPageState extends State<PlaylistPage> {
           : ListView.builder(
               shrinkWrap: true,
               itemCount: targets.length,
-              itemBuilder: (_, index) => ListTile(
+              itemBuilder: (itemContext, index) => ListTile(
                 leading: const Icon(FluentIcons.album_24_regular),
                 title: Text(targets[index]['title']?.toString() ?? ''),
-                onTap: () => Navigator.of(
-                  context,
-                  rootNavigator: true,
-                ).pop(targets[index]['ytid'].toString()),
+                onTap: () =>
+                    Navigator.of(itemContext)
+                        .pop(targets[index]['ytid'].toString()),
               ),
             ),
     );

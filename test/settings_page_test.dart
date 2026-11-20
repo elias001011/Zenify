@@ -113,6 +113,17 @@ void main() {
     });
   });
 
+  test('the pure black choice is saved under Musify\'s key too', () async {
+    final before = usePureBlackColor.value;
+    addTearDown(() => usePureBlackColor.value = before);
+    await setPureBlack(!before);
+
+    final settings = Hive.box('settings');
+    expect(usePureBlackColor.value, !before);
+    expect(settings.get('pureBlackTheme'), !before);
+    expect(settings.get('usePureBlackColor'), !before);
+  });
+
   group('accent colour row', () {
     Finder dot(String name) => find.descendant(
       of: barFinder(name),
@@ -317,6 +328,26 @@ void main() {
       });
     });
   });
+
+  test(
+    'restoring settings keeps the playback default and explicit opt-out',
+    () async {
+      final box = Hive.box('settings');
+      const key = 'playNextSongAutomatically';
+      addTearDown(() async {
+        await box.delete(key);
+        reloadSettingsFromStorage();
+      });
+
+      await box.put(key, false);
+      reloadSettingsFromStorage();
+      expect(playNextSongAutomatically.value, isFalse);
+
+      await box.delete(key);
+      reloadSettingsFromStorage();
+      expect(playNextSongAutomatically.value, isTrue);
+    },
+  );
 
   group('pickers', () {
     testWidgets('a phone picker is a dialog and applies the chosen option', (

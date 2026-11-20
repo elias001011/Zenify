@@ -37,6 +37,10 @@ class ArtworkColors {
   static const _sampleSize = 24;
   static const _maxEntries = 400;
 
+  /// What a read that failed (no network, a missing file) answers: not kept,
+  /// so the next ask tries again.
+  static const _failed = Color(0x01000000);
+
   static final _cache = <String, Color?>{};
   static final _pending = <String, Future<Color?>>{};
 
@@ -49,6 +53,7 @@ class ArtworkColors {
     if (_cache.containsKey(source)) return Future.value(_cache[source]);
     return _pending[source] ??= _extract(source).then((color) {
       _pending.remove(source);
+      if (color == _failed) return null;
       if (_cache.length >= _maxEntries) _cache.remove(_cache.keys.first);
       return _cache[source] = color;
     });
@@ -74,7 +79,7 @@ class ArtworkColors {
         image.dispose();
       }
     } catch (_) {
-      return null;
+      return _failed;
     }
   }
 

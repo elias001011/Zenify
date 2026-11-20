@@ -25,6 +25,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/motion.dart';
+import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/models/position_data.dart';
 import 'package:musify/screens/now_playing_page.dart';
@@ -163,6 +164,18 @@ class _MiniPlayerBody extends StatefulWidget {
 class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
   bool _pressed = false;
 
+  // A press that starts on the buttons is theirs: the mini player does not
+  // shrink as if it were about to open.
+  bool _onControls = false;
+
+  Widget _controls(Widget child) => Listener(
+    behavior: HitTestBehavior.translucent,
+    onPointerDown: (_) => _onControls = true,
+    onPointerUp: (_) => _onControls = false,
+    onPointerCancel: (_) => _onControls = false,
+    child: child,
+  );
+
   static const double _dragThresholdForNavigation = 10;
 
   void _handleVerticalDrag(DragUpdateDetails details) {
@@ -186,7 +199,9 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
       curve: Motion.curve,
       child: ClickDetector(
         behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => setState(() => _pressed = true),
+        onTapDown: (_) {
+          if (!_onControls) setState(() => _pressed = true);
+        },
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
         onVerticalDragUpdate: _handleVerticalDrag,
@@ -203,12 +218,14 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
                       children: [
                         _ArtworkWidget(metadata: metadata),
                         Expanded(child: _metadata(context)),
-                        _ControlsWidget(
-                          colorScheme: colorScheme,
-                          playbackState: widget.playbackState,
-                          hasNext: widget.hasNext,
-                          duration: metadata.duration,
-                          live: metadata.extras?['isLive'] == true,
+                        _controls(
+                          _ControlsWidget(
+                            colorScheme: colorScheme,
+                            playbackState: widget.playbackState,
+                            hasNext: widget.hasNext,
+                            duration: metadata.duration,
+                            live: metadata.extras?['isLive'] == true,
+                          ),
                         ),
                       ],
                     ),
@@ -317,12 +334,16 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
             width: live ? 164 : math.min(440, c.maxWidth * 0.4),
             // A station has no progress bar, shuffle or repeat: just previous,
             // play and next.
-            child: live ? Center(child: _dockControls()) : _transport(context),
+            child: _controls(
+              live ? Center(child: _dockControls()) : _transport(context),
+            ),
           ),
           Expanded(
             child: Align(
               alignment: AlignmentDirectional.centerEnd,
-              child: PlayerActions(metadata: widget.metadata, miniPlayer: true),
+              child: _controls(
+                PlayerActions(metadata: widget.metadata, miniPlayer: true),
+              ),
             ),
           ),
         ],
@@ -461,6 +482,7 @@ class _ControlsWidget extends StatelessWidget {
             const SizedBox(width: 4),
             SkipIconButton(
               forward: true,
+              tooltip: context.l10n!.skipToNext,
               onPressed: audioHandler.skipOrRepeat,
               splashColor: Colors.transparent,
               highlightColor: Colors.transparent,
@@ -535,6 +557,9 @@ class _CircularPlayButton extends StatelessWidget {
             const Spinner(size: 24, strokeWidth: 2.5)
           else
             IconButton(
+              tooltip: isCompleted
+                  ? context.l10n!.replay
+                  : (isPlaying ? context.l10n!.pause : context.l10n!.play),
               onPressed: isCompleted
                   ? () => audioHandler.playAgain()
                   : (isPlaying ? audioHandler.pause : audioHandler.play),

@@ -156,5 +156,72 @@ void main() {
       await config.applyDownloadsDir();
       expect(Hive.box('userNoBackup').get('downloadsDirectory'), '/in/app');
     });
+
+    test('a reinstall preserves the configured folder and its files', () async {
+      final first = '${root.path}/music';
+      final second = '${root.path}/music2';
+      await InstallConfig(downloadsDir: first).applyDownloadsDir();
+      final track = File('$first/tracks/abcdefghijk.m4a');
+      await track.create(recursive: true);
+      await track.writeAsString('music');
+
+      await InstallConfig(downloadsDir: second).applyDownloadsDir();
+
+      expect(Hive.box('userNoBackup').get('downloadsDirectory'), first);
+      expect(await track.readAsString(), 'music');
+      expect(await Directory(second).exists(), isFalse);
+    });
+
+    test('a legacy installer marker does not claim a manual choice', () async {
+      final store = Hive.box('userNoBackup');
+      final manual = '${root.path}/manual';
+      final target = '${root.path}/new-installer';
+      await store.putAll({
+        'downloadsDirectory': manual,
+        'installDownloadsDirectory': manual,
+      });
+
+      await InstallConfig(downloadsDir: target).applyDownloadsDir();
+
+      expect(store.get('downloadsDirectory'), manual);
+      expect(await Directory(target).exists(), isFalse);
+    });
+
+    test('a reinstall keeps a return to the default location', () async {
+      final store = Hive.box('userNoBackup');
+      await InstallConfig(downloadsDir: '${root.path}/music')
+          .applyDownloadsDir();
+      await store.delete('downloadsDirectory');
+      final target = '${root.path}/new-installer';
+
+      await InstallConfig(downloadsDir: target).applyDownloadsDir();
+
+      expect(store.containsKey('downloadsDirectory'), isFalse);
+      expect(await Directory(target).exists(), isFalse);
+    });
+
+    test('a skipped installer folder does not become owned by it', () async {
+      final manual = '${root.path}/manual';
+      final skipped = '${root.path}/skipped';
+      final later = '${root.path}/later';
+      final store = Hive.box('userNoBackup');
+      await store.put('downloadsDirectory', manual);
+      await InstallConfig(downloadsDir: skipped).applyDownloadsDir();
+
+      await store.put('downloadsDirectory', skipped);
+      await InstallConfig(downloadsDir: later).applyDownloadsDir();
+
+      expect(store.get('downloadsDirectory'), skipped);
+      expect(Directory(later).existsSync(), isFalse);
+    });
+
+    test('a reinstall keeps a folder chosen in the app since', () async {
+      await InstallConfig(downloadsDir: '${root.path}/music')
+          .applyDownloadsDir();
+      await Hive.box('userNoBackup').put('downloadsDirectory', '/in/app');
+      await InstallConfig(downloadsDir: '${root.path}/music2')
+          .applyDownloadsDir();
+      expect(Hive.box('userNoBackup').get('downloadsDirectory'), '/in/app');
+    });
   });
 }

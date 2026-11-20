@@ -25,7 +25,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/utilities/platform_utils.dart';
-import 'package:musify/widgets/click_detector.dart';
 import 'package:musify/widgets/now_playing/player_actions.dart';
 
 bool get supportsDesktopVolumeControl => isDesktopPlatform;
@@ -120,12 +119,11 @@ class DesktopVolumeControl extends StatelessWidget {
                     right: 0,
                     bottom: 0,
                     height: thickness,
-                    child: Tooltip(
-                      message: context.l10n!.volume,
-                      child: ClickDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: audioHandler.toggleMute,
-                      ),
+                    child: IconButton(
+                      tooltip: context.l10n!.volume,
+                      onPressed: audioHandler.toggleMute,
+                      // The speaker is painted by the two fill layers above.
+                      icon: const SizedBox.shrink(),
                     ),
                   ),
                 ],

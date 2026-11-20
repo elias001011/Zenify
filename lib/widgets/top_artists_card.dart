@@ -90,15 +90,18 @@ class TopArtistTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ArtistTile(
-      rank: rank,
-      // Artist pages need YouTube.
-      onTap: onTap ?? (offlineMode.value ? null : () => _openArtist(context)),
-      artwork: ArtistAvatar(artist.topSong),
-      name: artist.name,
-      subtitle: context.l10n!.artistListeningSummary(
-        artist.seconds ~/ 60,
-        artist.songCount,
+    return ValueListenableBuilder<bool>(
+      valueListenable: offlineMode,
+      builder: (context, isOffline, _) => ArtistTile(
+        rank: rank,
+        // Artist pages need YouTube.
+        onTap: onTap ?? (isOffline ? null : () => _openArtist(context)),
+        artwork: ArtistAvatar(artist.topSong),
+        name: artist.name,
+        subtitle: context.l10n!.artistListeningSummary(
+          artist.seconds ~/ 60,
+          artist.songCount,
+        ),
       ),
     );
   }

@@ -87,7 +87,7 @@ begin
     'Data locations',
     'Where should Zenify keep your data?',
     'Application data holds playlists, liked songs, history and settings. ' +
-    'Downloads holds saved music and artwork. Leave a field empty to use the default. ' +
+    'Choose the initial downloads folder here. To move existing downloads, use Zenify Settings. ' +
     'Avoid folders synced by OneDrive or similar services. ' +
     'Existing data is copied to a new data folder and the original is kept.',
     False, '');

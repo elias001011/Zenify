@@ -189,49 +189,64 @@ class _SkipSlide extends StatefulWidget {
 }
 
 class _SkipSlideState extends State<_SkipSlide> {
-  /// 1 forward, -1 back. Read while the cover moves.
-  int _direction = 1;
+  var _motion = _CoverMotion(1);
 
   @override
   void didUpdateWidget(_SkipSlide oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.trackId != oldWidget.trackId) {
-      _direction = skipDirection;
+      final direction = skipDirection;
       skipDirection = 1;
+      // An interrupted entrance retreats from its current position.
+      if (_motion.animation?.isCompleted ?? false) {
+        _motion.direction = -direction;
+      }
+      _motion = _CoverMotion(direction);
     }
+  }
+
+  Widget _transition(Widget child, Animation<double> animation) {
+    final motion = (child as _SlidingCover).motion..animation = animation;
+    return AnimatedBuilder(
+      animation: animation,
+      child: child,
+      builder: (context, child) {
+        final step = MediaQuery.sizeOf(context).width;
+        return Transform.translate(
+          offset: Offset((1 - animation.value) * motion.direction * step, 0),
+          child: child,
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    // Keep the cover and its shadow on their own layer while sliding.
+    final cover = RepaintBoundary(
+      key: ValueKey(widget.trackId),
+      child: widget.child,
+    );
+    if (!widget.enabled) return cover;
     return AnimatedSwitcher(
-      // No time to move: the new cover simply takes the place.
-      duration: widget.enabled ? Motion.medium : Duration.zero,
-      transitionBuilder: (child, animation) {
-        if (!widget.enabled) return child;
-        final incoming = child.key == ValueKey(widget.trackId);
-        return AnimatedBuilder(
-          animation: animation,
-          child: child,
-          builder: (context, child) {
-            // Linear on purpose: both covers ride one rail at a steady speed.
-            // The rail's step is a whole screen, so the leaving cover is
-            // off screen before the arriving one comes in, and they never meet.
-            final t = animation.value;
-            final shift = incoming ? 1 - t : t - 1;
-            final step = MediaQuery.sizeOf(context).width;
-            return Transform.translate(
-              offset: Offset(shift * _direction * step, 0),
-              child: child,
-            );
-          },
-        );
-      },
-      // Its own layer: the slide moves the picture and its wide shadow as
-      // they were drawn, instead of drawing them again on every frame.
-      child: KeyedSubtree(
-        key: ValueKey(widget.trackId),
-        child: RepaintBoundary(child: widget.child),
-      ),
+      duration: Motion.medium,
+      transitionBuilder: _transition,
+      child: _SlidingCover(_motion, cover),
     );
   }
+}
+
+// Each appearance gets its own motion, including a repeated track.
+class _CoverMotion {
+  _CoverMotion(this.direction);
+
+  int direction;
+  Animation<double>? animation;
+}
+
+class _SlidingCover extends KeyedSubtree {
+  _SlidingCover(this.motion, Widget child)
+    : super(key: ObjectKey(motion), child: child);
+
+  final _CoverMotion motion;
 }
