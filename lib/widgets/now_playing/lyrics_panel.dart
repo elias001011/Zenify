@@ -43,7 +43,7 @@ class LyricsPanel extends StatefulWidget {
 }
 
 class _LyricsPanelState extends State<LyricsPanel> {
-  String? _resolvedKey;
+  (String, String?, String, String?, Duration?, bool)? _resolvedKey;
   late Future<Lyrics?> _lyricsFuture;
   late final VoidCallback _releaseScreen;
 
@@ -58,10 +58,7 @@ class _LyricsPanelState extends State<LyricsPanel> {
   }
 
   void _onOfflineChanged() {
-    if (!offlineMode.value) {
-      _resolvedKey = null;
-      setState(_resolveIfNeeded);
-    }
+    setState(_resolveIfNeeded);
   }
 
   @override
@@ -78,8 +75,15 @@ class _LyricsPanelState extends State<LyricsPanel> {
   }
 
   void _resolveIfNeeded() {
-    final key =
-        '${widget.metadata.id}:${widget.metadata.artist}:${widget.metadata.title}';
+    final metadata = widget.metadata;
+    final key = (
+      metadata.id,
+      metadata.artist,
+      metadata.title,
+      metadata.album,
+      metadata.duration,
+      offlineMode.value,
+    );
     if (key == _resolvedKey) return;
     _resolvedKey = key;
     // A local file's title is its file name: it is never sent online.
@@ -91,6 +95,7 @@ class _LyricsPanelState extends State<LyricsPanel> {
     _lyricsFuture = getSongLyricsResult(
       widget.metadata.artist,
       widget.metadata.title,
+      recordingId: widget.metadata.extras?['ytid']?.toString(),
       duration: widget.metadata.duration,
       album: widget.metadata.album,
     );

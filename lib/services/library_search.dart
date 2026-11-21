@@ -40,7 +40,7 @@ LibraryMatches searchLibrary(String query, {bool offlineOnly = false}) {
       needle.isNotEmpty &&
       (value?.toString().toLowerCase().contains(needle) ?? false);
 
-  final offlinePlaylists = offlinePlaylistService.offlinePlaylists.value
+  final offlinePlaylists = offlinePlaylistService.availableOfflinePlaylists
       .whereType<Map>()
       .where((playlist) => !isArtistPlaylist(playlist));
   final addedIds = userPlaylists.value.toSet();

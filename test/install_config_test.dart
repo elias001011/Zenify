@@ -90,6 +90,19 @@ void main() {
       expect(File('${chosen.path}/user.hive').readAsStringSync(), 'user newer');
     });
 
+    test('keeps a pre-existing file with the old write probe name', () async {
+      final old = await withBoxes('old');
+      final chosen = await Directory('${root.path}/target').create();
+      final existing = await File('${chosen.path}/.write-test')
+          .writeAsString('keep');
+
+      expect(
+        await InstallConfig(dataDir: chosen.path).resolveDataDir(old.path),
+        chosen.path,
+      );
+      expect(await existing.readAsString(), 'keep');
+    });
+
     test('same folder, or no choice, keeps the default', () async {
       final old = await withBoxes('old');
       expect(await const InstallConfig().resolveDataDir(old.path), old.path);

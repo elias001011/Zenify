@@ -134,8 +134,8 @@ Map? _searchAppPlaylistsById(String id) {
   for (final p in onlinePlaylists.value) {
     if (p['ytid']?.toString() == id) return p;
   }
-  for (final p in offlinePlaylistService.offlinePlaylists.value) {
-    if (p is Map && p['ytid']?.toString() == id) return p;
+  for (final p in offlinePlaylistService.availableOfflinePlaylists) {
+    if (p['ytid']?.toString() == id) return p;
   }
   for (final p in playlists) {
     if (p['ytid']?.toString() == id) return p;
@@ -232,26 +232,22 @@ Future<String> addUserPlaylist(String input, BuildContext context) async {
   }
 }
 
-(String message, String playlistId) createCustomPlaylist(
-  String playlistName,
-  String? image,
-  BuildContext context,
-) {
+Future<String> createCustomPlaylist(String playlistName, String? image) async {
   final newPlaylistId = PlaylistUtils.generateCustomPlaylistId();
   final creationTime = DateTime.now().millisecondsSinceEpoch;
-  final customPlaylist = {
+  final customPlaylist = <String, dynamic>{
     'ytid': newPlaylistId,
     'title': playlistName,
     'source': 'user-created',
-    if (image != null) 'image': image,
+    if (image != null && image.isNotEmpty) 'image': image,
     'list': [],
     'createdAt': creationTime,
   };
-  userCustomPlaylists.value = [...userCustomPlaylists.value, customPlaylist];
-  unawaited(
-    addOrUpdateData<List>('user', 'customPlaylists', userCustomPlaylists.value),
-  );
-  return ('${context.l10n!.addedSuccess}!', newPlaylistId);
+  await _writeCustomPlaylistCollection(userCustomPlaylists, 'customPlaylists', [
+    ...userCustomPlaylists.value,
+    customPlaylist,
+  ]);
+  return newPlaylistId;
 }
 
 String addSongInCustomPlaylist(
@@ -262,10 +258,10 @@ String addSongInCustomPlaylist(
 }) {
   final found = _findCustomPlaylist(playlistId);
   final customPlaylist = found?.playlist;
-  final isFromFolder = found?.isFromFolder ?? false;
+  final isFromFolder = found?.folderIndex != null;
 
   if (customPlaylist != null) {
-    final List<dynamic> playlistSongs = customPlaylist['list'];
+    final playlistSongs = List<dynamic>.of(customPlaylist['list'] as List);
     if (playlistSongs.any(
       (playlistElement) => playlistElement['ytid'] == song['ytid'],
     )) {
@@ -277,23 +273,8 @@ String addSongInCustomPlaylist(
     } else {
       playlistSongs.add(song);
     }
-    if (isFromFolder) {
-      unawaited(
-        addOrUpdateData<List>(
-          'user',
-          'playlistFolders',
-          userPlaylistFolders.value,
-        ),
-      );
-    } else {
-      unawaited(
-        addOrUpdateData<List>(
-          'user',
-          'customPlaylists',
-          userCustomPlaylists.value,
-        ),
-      );
-    }
+    customPlaylist['list'] = playlistSongs;
+    unawaited(_saveCustomPlaylist(isFromFolder));
 
     offlinePlaylistService.checkAndAutoMarkOffline(customPlaylist);
     return context.l10n!.songAdded;
@@ -329,10 +310,10 @@ String addSongsInCustomPlaylist(
 ) {
   final found = _findCustomPlaylist(playlistId);
   final customPlaylist = found?.playlist;
-  final isFromFolder = found?.isFromFolder ?? false;
+  final isFromFolder = found?.folderIndex != null;
 
   if (customPlaylist != null) {
-    final List<dynamic> playlistSongs = customPlaylist['list'];
+    final playlistSongs = List<dynamic>.of(customPlaylist['list'] as List);
 
     final newSongs = <dynamic>[];
     for (final song in songs) {
@@ -346,23 +327,8 @@ String addSongsInCustomPlaylist(
     }
 
     if (newSongs.isNotEmpty) {
-      if (isFromFolder) {
-        unawaited(
-          addOrUpdateData<List>(
-            'user',
-            'playlistFolders',
-            userPlaylistFolders.value,
-          ),
-        );
-      } else {
-        unawaited(
-          addOrUpdateData<List>(
-            'user',
-            'customPlaylists',
-            userCustomPlaylists.value,
-          ),
-        );
-      }
+      customPlaylist['list'] = playlistSongs;
+      unawaited(_saveCustomPlaylist(isFromFolder));
       offlinePlaylistService.checkAndAutoMarkOffline(customPlaylist);
       return context.l10n!.addedSuccess;
     } else {
@@ -402,7 +368,7 @@ Future<int> moveSongsToCustomPlaylist(
       destination.add(song);
   }
   target.playlist['list'] = destination;
-  await _saveCustomPlaylist(target.isFromFolder);
+  await _saveCustomPlaylist(target.folderIndex != null);
   // Read the source again: an undo or another move may have changed it.
   final current = _findCustomPlaylist(from);
   if (current != null) {
@@ -412,7 +378,7 @@ Future<int> moveSongsToCustomPlaylist(
         .where((song) => !moved.contains(song['ytid']))
         .toList();
     try {
-      await _saveCustomPlaylist(current.isFromFolder);
+      await _saveCustomPlaylist(current.folderIndex != null);
     } catch (_) {
       current.playlist['list'] = before;
       rethrow;
@@ -428,10 +394,64 @@ Future<int> moveSongsToCustomPlaylist(
 Future<bool> replaceCustomPlaylist(String playlistId, Map updated) async {
   final found = _findCustomPlaylist(playlistId);
   if (found == null) return false;
-  found.playlist
-    ..clear()
-    ..addAll(updated);
-  await _saveCustomPlaylist(found.isFromFolder);
+  final songs = updated['list'] ?? found.playlist['list'] ?? <dynamic>[];
+  if (songs is! List) return false;
+  final replacement = <String, dynamic>{
+    ...updated,
+    'ytid': found.playlist['ytid'],
+    'list': List<dynamic>.of(songs),
+  };
+
+  if (found.folderIndex case final folderIndex?) {
+    final folders = [...userPlaylistFolders.value];
+    final folder = folders[folderIndex];
+    final members = List<dynamic>.of(folder['playlists'] as List)
+      ..[found.index] = replacement;
+    folders[folderIndex] = {...folder, 'playlists': members};
+    await _writeCustomPlaylistCollection(
+      userPlaylistFolders,
+      'playlistFolders',
+      folders,
+    );
+  } else {
+    final playlists = [...userCustomPlaylists.value]
+      ..[found.index] = replacement;
+    await _writeCustomPlaylistCollection(
+      userCustomPlaylists,
+      'customPlaylists',
+      playlists,
+    );
+  }
+  return true;
+}
+
+Future<void> _writeCustomPlaylistCollection(
+  ValueNotifier<List<Map>> playlists,
+  String key,
+  List<Map> next,
+) async {
+  final previous = playlists.value;
+  playlists.value = next;
+  try {
+    await addOrUpdateData<List<Map>>('user', key, next);
+  } catch (_) {
+    if (identical(playlists.value, next)) playlists.value = previous;
+    rethrow;
+  }
+}
+
+/// Saves the name and cover against the current playlist, including changes
+/// to its songs made while the editor was open.
+Future<bool> updateCustomPlaylistMetadata(String playlistId, Map edit) async {
+  final current = _findCustomPlaylist(playlistId)?.playlist;
+  if (current == null) return false;
+  final updated = <String, dynamic>{...current, 'title': edit['title']}
+    ..remove('image');
+  if (edit['image'] case final String image when image.isNotEmpty) {
+    updated['image'] = image;
+  }
+  if (!await replaceCustomPlaylist(playlistId, updated)) return false;
+  await syncOfflinePlaylistMetadata(updated);
   return true;
 }
 
@@ -453,6 +473,62 @@ Future<void> _saveCustomPlaylist(bool inFolder) async {
   }
 }
 
+/// Inserts manual CSV matches next to the remaining imports. Existing tracks
+/// keep their relative order, and tracks removed during review stay removed.
+Future<int> insertReviewedPlaylistSongs(
+  String playlistId,
+  Map<int, Map> imported,
+  Map<int, Map> reviewed,
+) async {
+  final found = _findCustomPlaylist(playlistId);
+  final stored = found?.playlist['list'];
+  if (found == null || stored is! List) return 0;
+  final songs = List<dynamic>.of(stored);
+  final remainingIds = songIdsOf([found.playlist]);
+  final csvPositions = <String, int>{};
+  final importedRows = imported.keys.toList()..sort();
+  for (final row in importedRows) {
+    final id = imported[row]?['ytid']?.toString();
+    if (id != null) csvPositions.putIfAbsent(id, () => row);
+  }
+
+  var inserted = 0;
+  final reviewedRows = reviewed.keys.toList()..sort();
+  for (final row in reviewedRows) {
+    final song = reviewed[row]!;
+    final id = song['ytid']?.toString();
+    if (id == null || id.isEmpty || !remainingIds.add(id)) continue;
+    int? previousIndex;
+    int? previousRow;
+    int? nextIndex;
+    int? nextRow;
+    for (final (index, current) in songs.indexed) {
+      if (current is! Map) continue;
+      final position = csvPositions[current['ytid']?.toString()];
+      if (position == null) continue;
+      if (position < row && (previousRow == null || position > previousRow)) {
+        previousIndex = index;
+        previousRow = position;
+      }
+      if (position > row && (nextRow == null || position < nextRow)) {
+        nextIndex = index;
+        nextRow = position;
+      }
+    }
+    final index =
+        nextIndex ?? (previousIndex == null ? songs.length : previousIndex + 1);
+    songs.insert(index, song);
+    csvPositions[id] = row;
+    inserted++;
+  }
+  if (inserted > 0) {
+    final updated = {...found.playlist, 'list': songs};
+    if (!await replaceCustomPlaylist(playlistId, updated)) return 0;
+    offlinePlaylistService.checkAndAutoMarkOffline(updated);
+  }
+  return inserted;
+}
+
 /// Reorder the full stored playlist, refusing a stale or filtered subset.
 bool reorderCustomPlaylist(String playlistId, List<dynamic> orderedSongs) {
   final found = _findCustomPlaylist(playlistId);
@@ -465,7 +541,7 @@ bool reorderCustomPlaylist(String playlistId, List<dynamic> orderedSongs) {
       !ids.every(byId.containsKey))
     return false;
   found.playlist['list'] = [for (final id in ids) byId[id]];
-  unawaited(_saveCustomPlaylist(found.isFromFolder));
+  unawaited(_saveCustomPlaylist(found.folderIndex != null));
   return true;
 }
 
@@ -502,7 +578,15 @@ bool removeSongFromPlaylist(
 
 /// Removes [songs] from [playlist] in one write; returns how many went.
 int removeSongsFromPlaylist(Map playlist, Iterable<Map> songs) {
-  final remaining = List<dynamic>.from(playlist['list'] as List? ?? const []);
+  final Map current;
+  if (playlist['source'] == 'user-created') {
+    final stored = _findCustomPlaylist(playlist['ytid']?.toString() ?? '');
+    if (stored == null) return 0;
+    current = stored.playlist;
+  } else {
+    current = playlist;
+  }
+  final remaining = List<dynamic>.from(current['list'] as List? ?? const []);
   var removed = 0;
   for (final song in songs) {
     final index = remaining.indexWhere((s) => s['ytid'] == song['ytid']);
@@ -545,39 +629,10 @@ bool _storePlaylistSongs(Map playlist, List<dynamic> playlistSongs) {
   playlist['list'] = playlistSongs;
   try {
     if (playlist['source'] == 'user-created') {
-      final playlistId = playlist['ytid']?.toString();
-      final storedPlaylist = playlistId == null
-          ? null
-          : _findCustomPlaylist(playlistId)?.playlist;
-      storedPlaylist?['list'] = playlistSongs;
-      final isInFolder =
-          playlistId != null &&
-          userPlaylistFolders.value.any((folder) {
-            final folderPlaylists = folder['playlists'] as List<dynamic>? ?? [];
-            return folderPlaylists.any(
-              (p) => p['ytid']?.toString() == playlistId,
-            );
-          });
-
-      if (isInFolder) {
-        userPlaylistFolders.value = List<Map>.from(userPlaylistFolders.value);
-        unawaited(
-          addOrUpdateData<List>(
-            'user',
-            'playlistFolders',
-            userPlaylistFolders.value,
-          ),
-        );
-      } else {
-        userCustomPlaylists.value = List<Map>.from(userCustomPlaylists.value);
-        unawaited(
-          addOrUpdateData<List>(
-            'user',
-            'customPlaylists',
-            userCustomPlaylists.value,
-          ),
-        );
-      }
+      final stored = _findCustomPlaylist(playlist['ytid']?.toString() ?? '');
+      if (stored == null) return false;
+      stored.playlist['list'] = playlistSongs;
+      unawaited(_saveCustomPlaylist(stored.folderIndex != null));
     } else {
       final playlistId = playlist['ytid']?.toString();
 
@@ -1237,20 +1292,22 @@ Future<Map?> getPlaylistInfoForWidget(
   return _fetchYouTubePlaylist(normalizedId);
 }
 
-({Map playlist, bool isFromFolder})? _findCustomPlaylist(String playlistId) {
+({Map playlist, int index, int? folderIndex})? _findCustomPlaylist(
+  String playlistId,
+) {
   final normalizedId = _playlistId(playlistId);
   if (normalizedId == null) return null;
 
-  for (final playlist in userCustomPlaylists.value) {
+  for (final (index, playlist) in userCustomPlaylists.value.indexed) {
     if (_playlistId(playlist['ytid']) == normalizedId) {
-      return (playlist: playlist, isFromFolder: false);
+      return (playlist: playlist, index: index, folderIndex: null);
     }
   }
-  for (final folder in userPlaylistFolders.value) {
+  for (final (folderIndex, folder) in userPlaylistFolders.value.indexed) {
     final folderPlaylists = folder['playlists'] as List<dynamic>? ?? [];
-    for (final playlist in folderPlaylists) {
+    for (final (index, playlist) in folderPlaylists.indexed) {
       if (playlist is Map && _playlistId(playlist['ytid']) == normalizedId) {
-        return (playlist: playlist, isFromFolder: true);
+        return (playlist: playlist, index: index, folderIndex: folderIndex);
       }
     }
   }
@@ -1258,7 +1315,7 @@ Future<Map?> getPlaylistInfoForWidget(
 }
 
 Map? _findOfflinePlaylist(String id) {
-  return _findPlaylistById(offlinePlaylistService.offlinePlaylists.value, id);
+  return offlinePlaylistService.getOfflinePlaylist(id);
 }
 
 Map? _findPlaylistById(Iterable<dynamic> playlists, String id) {
@@ -1417,7 +1474,7 @@ Future<void> renameSongInPlaylist(
   try {
     final found = _findCustomPlaylist(playlistId.toString());
     final playlist = found?.playlist;
-    final isFromFolder = found?.isFromFolder ?? false;
+    final isFromFolder = found?.folderIndex != null;
 
     if (playlist != null && playlist['list'] != null) {
       final songIndex = (playlist['list'] as List).indexWhere(
@@ -1609,10 +1666,7 @@ void _unpinPlaylist(String playlistId) {
 /// in the library displays the updated information.
 Future<void> syncOfflinePlaylistMetadata(Map updatedPlaylist) async {
   final playlistId = updatedPlaylist['ytid']?.toString();
-  if (playlistId == null ||
-      !offlinePlaylistService.isPlaylistDownloaded(playlistId)) {
-    return;
-  }
+  if (playlistId == null) return;
 
   final offlinePlaylists = List<dynamic>.from(
     offlinePlaylistService.offlinePlaylists.value,

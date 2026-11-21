@@ -319,16 +319,15 @@ class MoodsService {
   }
 
   /// Starts [mood] playing. The queue keeps going on its own after it.
-  Future<bool> play(Mood mood) async {
+  Future<bool> play(Mood mood, {int? playbackRequest}) async {
+    if (!_enabled) return false;
+    final request = playbackRequest ?? audioHandler.beginPlaybackRequest();
     final songs = await this.mood(mood);
     if (!_enabled || songs.isEmpty) return false;
-    await audioHandler.playPlaylistSong(
-      playlist: {'title': moodLabel(_l10n, mood), 'list': songs},
-      songIndex: 0,
-      shuffle: false,
-      keepGoing: true,
-    );
-    return true;
+    return audioHandler.playRequestedPlaylist(request, {
+      'title': moodLabel(_l10n, mood),
+      'list': songs,
+    });
   }
 
   /// Starts a radio from [seeds], as YouTube Music would after them but
@@ -342,9 +341,11 @@ class MoodsService {
   Future<bool> playRadio(
     List<Map> seeds, {
     required String title,
+    int? playbackRequest,
     int perArtist = 3,
   }) async {
     if (!_online || seeds.isEmpty) return false;
+    final request = playbackRequest ?? audioHandler.beginPlaybackRequest();
     final generation = _generation;
     final songs = seeds.where(_isSong).take(4).toList();
     final weights = {
@@ -361,16 +362,10 @@ class MoodsService {
       perArtist: perArtist,
     );
     if (!_online || generation != _generation) return false;
-    await audioHandler.playPlaylistSong(
-      playlist: {
-        'title': title,
-        'list': queue.isEmpty ? [seeds.first] : queue,
-      },
-      songIndex: 0,
-      shuffle: false,
-      keepGoing: true,
-    );
-    return true;
+    return audioHandler.playRequestedPlaylist(request, {
+      'title': title,
+      'list': queue.isEmpty ? [seeds.first] : queue,
+    });
   }
 
   /// Up to 8 of the strongest seeds, at most 2 per artist, plus 3 from
@@ -536,7 +531,7 @@ class MoodsService {
       if (result.isNotEmpty) {
         await _cache.put(_genresKey, {
           'at': DateTime.now().toIso8601String(),
-          'language': languageSetting.languageCode,
+          'language': language,
           'genres': result,
         });
       }
@@ -645,8 +640,8 @@ class MoodsService {
   /// songs, or just its title when this device never made it (after a
   /// restore or a sync). Opening it makes it.
   Map cachedPlaylist(String id) {
-    final cached = _cache.get('moods:playlist:$id');
-    if (cached is Map) return _playlistMap(cached);
+    final cached = _cachedAutomaticPlaylist(id);
+    if (cached != null) return _playlistMap(cached);
     return {'ytid': id, 'title': _titleOf(id), 'source': 'zenify', 'list': []};
   }
 
@@ -674,12 +669,18 @@ class MoodsService {
     };
   }
 
+  Map? _cachedAutomaticPlaylist(String id) {
+    final cached = _cache.get('moods:playlist:$id');
+    return cached is Map && cached['algorithm'] == _playlistAlgorithmVersion
+        ? cached
+        : null;
+  }
+
   /// A Zenify playlist from its cache while it is current, else null.
   Map? _currentPlaylist(String id) {
-    final cached = _cache.get('moods:playlist:$id');
-    if (cached is Map &&
+    final cached = _cachedAutomaticPlaylist(id);
+    if (cached != null &&
         cached['language'] == languageSetting.languageCode &&
-        cached['algorithm'] == _playlistAlgorithmVersion &&
         (DateTime.tryParse('${cached['until']}')?.isAfter(DateTime.now()) ??
             false)) {
       return _playlistMap(cached);
@@ -693,19 +694,20 @@ class MoodsService {
     final generation = _generation;
     if (_currentPlaylist(id) case final current?) return current;
     final cacheKey = 'moods:playlist:$id';
-    final cached = _cache.get(cacheKey);
-    if (!_enabled) return cached is Map ? _playlistMap(cached) : null;
+    final cached = _cachedAutomaticPlaylist(id);
+    if (!_enabled) return cached == null ? null : _playlistMap(cached);
+    final language = languageSetting.languageCode;
     final now = DateTime.now();
     try {
       final made = await _make(id.substring(_playlistPrefix.length), now);
       if (!_enabled || generation != _generation) return null;
       if (made == null || (made['list'] as List).length < 8) {
-        return cached is Map ? _playlistMap(cached) : null;
+        return cached == null ? null : _playlistMap(cached);
       }
       final stored = {
         ...made,
         'ytid': id,
-        'language': languageSetting.languageCode,
+        'language': language,
         'algorithm': _playlistAlgorithmVersion,
       };
       await _cache.put(cacheKey, stored);
@@ -717,7 +719,7 @@ class MoodsService {
         error: e,
         stackTrace: stackTrace,
       );
-      return cached is Map ? _playlistMap(cached) : null;
+      return cached == null ? null : _playlistMap(cached);
     }
   }
 
@@ -1111,7 +1113,10 @@ Map<String, dynamic> trackToSong(MusicTrack track) {
     'ytid': video.id.value,
     'title': title.isEmpty ? video.title : title,
     'artist': video.author,
-    if (track.artistId != null) 'artistId': track.artistId,
+    if (track.artistId case final String id) ...{
+      'artistId': id,
+      if (track.type == MusicVideoType.song) 'creditedArtistId': id,
+    },
     'image': sized(544) ?? video.thumbnails.standardResUrl,
     'lowResImage': sized(226) ?? video.thumbnails.lowResUrl,
     'highResImage': sized(1080) ?? video.thumbnails.maxResUrl,

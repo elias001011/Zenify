@@ -20,7 +20,6 @@
  */
 
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:developer' as developer;
 
@@ -39,6 +38,8 @@ class _CacheEntry {
   final DateTime storedAt;
 }
 
+typedef _LyricsKey = (String?, String, String, String?, Duration?);
+
 /// Fetches lyrics from several sources.
 ///
 /// Order: LRCLIB (synced + plain, open API) first, then the plain-text
@@ -56,12 +57,11 @@ class LyricsManager {
   static const _missTtl = Duration(minutes: 5);
 
   // Shared between instances: callers create a new LyricsManager per request.
-  static final LinkedHashMap<String, _CacheEntry> _cache =
-      LinkedHashMap<String, _CacheEntry>();
+  static final _cache = <_LyricsKey, _CacheEntry>{};
 
   /// Clears the in-memory cache (mainly for tests).
   static void clearCache() => _cache.clear();
-  static final _pending = <String, Future<Lyrics?>>{};
+  static final _pending = <_LyricsKey, Future<Lyrics?>>{};
 
   /// Backwards compatible entry point: plain text with a source credit.
   Future<String?> fetchLyrics(
@@ -83,24 +83,38 @@ class LyricsManager {
   }
 
   /// Full result, including timestamps when the provider supplies them.
-  Future<Lyrics?> fetchLyricsResult(TrackInfo track) async {
+  Future<Lyrics?> fetchLyricsResult(
+    TrackInfo track, {
+    String? recordingId,
+    bool Function()? canUseNetwork,
+  }) async {
     if (track.title.trim().isEmpty || track.artist.trim().isEmpty) {
       return null;
     }
 
-    final variants = buildSearchVariants(track);
-    if (variants.isEmpty) return null;
-
-    final cacheKey = _cacheKey(variants.first);
+    final cacheKey = (
+      recordingId,
+      track.artist.trim(),
+      track.title.trim(),
+      track.album?.trim(),
+      track.duration,
+    );
     final cached = _readCache(cacheKey);
     if (cached != null) return cached.value;
+    if (canUseNetwork?.call() == false) return null;
 
     final existing = _pending[cacheKey];
-    if (existing != null) return existing;
-    final request = _search(variants);
+    if (existing != null) {
+      final result = await existing;
+      return canUseNetwork?.call() == false ? null : result;
+    }
+    final variants = buildSearchVariants(track);
+    if (variants.isEmpty) return null;
+    final request = _search(variants, canUseNetwork);
     _pending[cacheKey] = request;
     try {
       final result = await request;
+      if (canUseNetwork?.call() == false) return null;
       _writeCache(cacheKey, result);
       return result;
     } finally {
@@ -108,13 +122,18 @@ class LyricsManager {
     }
   }
 
-  Future<Lyrics?> _search(List<TrackInfo> variants) async {
+  Future<Lyrics?> _search(
+    List<TrackInfo> variants,
+    bool Function()? canUseNetwork,
+  ) async {
     for (final variant in variants.take(3)) {
+      if (canUseNetwork?.call() == false) return null;
       final lrclib = await _fetchFromLrclib(variant);
       if (lrclib != null) return lrclib;
     }
 
     for (final variant in variants.take(2)) {
+      if (canUseNetwork?.call() == false) return null;
       // Start every scraper at once, then consume in priority order so the
       // worst case is one timeout instead of the sum of all of them.
       final pending = <Future<Lyrics?>>[
@@ -273,12 +292,7 @@ class LyricsManager {
     );
   }
 
-  String _cacheKey(TrackInfo t) {
-    final seconds = t.duration?.inSeconds ?? 0;
-    return '${foldDiacritics(t.artist)}|${foldDiacritics(t.title)}|$seconds';
-  }
-
-  _CacheEntry? _readCache(String key) {
+  _CacheEntry? _readCache(_LyricsKey key) {
     final entry = _cache.remove(key);
     if (entry == null) return null;
     final ttl = entry.value == null ? _missTtl : _hitTtl;
@@ -287,7 +301,7 @@ class LyricsManager {
     return entry;
   }
 
-  void _writeCache(String key, Lyrics? value) {
+  void _writeCache(_LyricsKey key, Lyrics? value) {
     _cache.remove(key);
     _cache[key] = _CacheEntry(value);
     while (_cache.length > _maxCacheEntries) {

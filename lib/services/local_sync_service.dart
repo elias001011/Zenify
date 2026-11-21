@@ -249,7 +249,7 @@ class LocalSyncService {
   /// Runs once a pairing is trusted and before the reply is sent (tests).
   @visibleForTesting
   Future<void> Function()? beforePairingReply;
-  final http.Client _client = http.Client();
+  http.Client? _client;
   Future<void> _pairedWrites = Future.value();
   Future<void> _serverOperations = Future.value();
   int _activeTransfers = 0;
@@ -454,12 +454,11 @@ class LocalSyncService {
 
   Future<void> dispose() async {
     _settleTimer?.cancel();
-    _periodicTimer?.cancel();
-    _startupTimer?.cancel();
-    _localChangeTimer?.cancel();
-    await _userBoxSubscription?.cancel();
+    await _stopBackgroundWork();
     await stopServer();
-    _client.close();
+    _client?.close();
+    _client = null;
+    _initialised = false;
   }
 
   /// Turns local sync on or off; false if the server could not start.
@@ -1718,7 +1717,8 @@ class LocalSyncService {
           ..maxRedirects = 0
           ..headers.addAll({'Content-Type': 'application/json', ...headers})
           ..bodyBytes = encoded;
-    final response = await _client.send(outgoing).timeout(timeout);
+    final client = _client ??= http.Client();
+    final response = await client.send(outgoing).timeout(timeout);
     final responseBytes = await _readMessage(response.stream).timeout(timeout);
     dynamic decoded;
     try {

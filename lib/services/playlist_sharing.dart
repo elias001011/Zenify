@@ -93,10 +93,12 @@ class PlaylistSharingService {
   static Future<Map<String, dynamic>> expandCompactPlaylist(
     Map<String, dynamic> compactPlaylist,
   ) async {
+    if (offlineMode.value) return {...compactPlaylist, 'list': []};
     final List<dynamic> songIds = compactPlaylist['list'];
+    final usesProxy = useProxy.value;
     YoutubeExplode? ytClient;
     try {
-      if (useProxy.value) {
+      if (usesProxy) {
         ytClient = await ProxyManager().getYoutubeExplodeClient();
       } else {
         ytClient = ProxyManager().getClientSync();
@@ -109,6 +111,7 @@ class PlaylistSharingService {
         null,
       );
       for (var start = 0; start < songIds.length; start += _expandBatch) {
+        if (offlineMode.value) break;
         final end = min(start + _expandBatch, songIds.length);
         await Future.wait([
           for (var index = start; index < end; index++)
@@ -126,6 +129,7 @@ class PlaylistSharingService {
             }(),
         ]);
       }
+      if (offlineMode.value) return {...compactPlaylist, 'list': []};
 
       return {
         ...compactPlaylist,
@@ -133,7 +137,7 @@ class PlaylistSharingService {
       };
     } finally {
       try {
-        if (useProxy.value) {
+        if (usesProxy) {
           ytClient?.close();
         }
       } catch (_) {}

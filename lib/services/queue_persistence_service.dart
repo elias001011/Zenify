@@ -56,6 +56,7 @@ class QueuePersistenceService {
       'title',
       'artist',
       'artistId',
+      'creditedArtistId',
       'videoAuthor',
       'image',
       'lowResImage',

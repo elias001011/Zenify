@@ -398,6 +398,7 @@ class _DownloadsFolderBarState extends State<_DownloadsFolderBar> {
       DownloadsMoveStatus.moved => l10n.downloadsFolderMoved,
       DownloadsMoveStatus.partiallyMoved => l10n.downloadsFolderPartiallyMoved,
       DownloadsMoveStatus.notWritable => l10n.downloadsFolderNotWritable,
+      DownloadsMoveStatus.busy => l10n.downloadsFolderBusy,
     });
   }
 }

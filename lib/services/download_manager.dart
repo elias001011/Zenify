@@ -122,6 +122,28 @@ class DownloadManager {
 
   /// The saver writing each song's file, until it lets go of it.
   final _saving = <String, Completer<void>>{};
+  Completer<void>? _storageRelease;
+
+  bool get storageBusy => _storageRelease != null;
+  bool get hasPendingTransfers => _inFlight.isNotEmpty || _saving.isNotEmpty;
+
+  /// Runs [operation] with the download storage to itself: no transfer
+  /// starts and no other folder change or bulk deletion runs meanwhile. A
+  /// caller that arrives during one waits for it instead of failing.
+  Future<T> withExclusiveStorage<T>(Future<T> Function() operation) async {
+    var busy = _storageRelease;
+    while (busy != null) {
+      await busy.future;
+      busy = _storageRelease;
+    }
+    final release = _storageRelease = Completer<void>();
+    try {
+      return await operation();
+    } finally {
+      if (identical(_storageRelease, release)) _storageRelease = null;
+      release.complete();
+    }
+  }
 
   /// Whether nothing is queued or downloading, for a moment longer than the
   /// last download: playlists start one after the other, and what is told at
@@ -200,7 +222,7 @@ class DownloadManager {
   }) {
     final ytid = song['ytid'].toString();
     _watchOffline();
-    if (offlineMode.value) return Future.value(false);
+    if (storageBusy || offlineMode.value) return Future.value(false);
     final asker = cancelled ?? _never;
     // A cancelled one still winding down holds the file.
     if (_inFlight[ytid] case final request? when request.cancelled) {
@@ -315,7 +337,10 @@ class DownloadManager {
   Future<void> stopAll() async {
     // Wait for the requests being stopped, not for new downloads started later.
     // A stalled transfer may take longer than ten seconds to release its file.
-    final stopping = [for (final request in _inFlight.values) request.result];
+    final stopping = <Future<void>>[
+      for (final request in _inFlight.values) request.result,
+      for (final writer in _saving.values) writer.future,
+    ];
     _stopEpoch++;
     await Future.wait(stopping);
   }

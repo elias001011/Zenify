@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive_ce/hive_ce.dart';
 import 'package:musify/services/common_services.dart';
+import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/downloads_location_service.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/playlist_download_service.dart';
@@ -116,6 +117,73 @@ void main() {
     expect(partial.readAsStringSync(), 'keep');
   });
 
+  test(
+    'exclusive storage operations block new transfers and folder changes',
+    () async {
+      final manager = DownloadManager.instance;
+      await manager.withExclusiveStorage(() async {
+        expect(
+          await DownloadsLocation.change(customRoot),
+          DownloadsMoveStatus.busy,
+        );
+        expect(
+          await manager.download({'ytid': songId}, (_, _) async {
+            fail('The transfer must not start while storage is reserved');
+          }),
+          isFalse,
+        );
+      });
+      expect(
+        await DownloadsLocation.change(customRoot),
+        DownloadsMoveStatus.moved,
+      );
+    },
+  );
+
+  test('reuses a verified copy left by an interrupted move', () async {
+    final target = File('$customRoot/tracks/$songId.m4a');
+    await target.parent.create(recursive: true);
+    await target.writeAsString('audio');
+
+    expect(
+      await DownloadsLocation.change(customRoot),
+      DownloadsMoveStatus.moved,
+    );
+    final saved = (Hive.box('userNoBackup').get('offlineSongs') as List).single;
+    expect(saved['audioPath'], target.path);
+    expect(target.readAsStringSync(), 'audio');
+    expect(File('$defaultRoot/tracks/$songId.m4a').existsSync(), isFalse);
+  });
+
+  test(
+    'checks old offline flags and retains temporarily missing files',
+    () async {
+      final complete =
+          offlinePlaylistService.offlinePlaylists.value.single as Map;
+      offlinePlaylistService.offlinePlaylists.value = [
+        complete,
+        {
+          'ytid': 'partial',
+          'list': [
+            {'ytid': songId},
+            {'ytid': 'missing'},
+          ],
+        },
+      ];
+      final audio = File(FilePaths.getAudioPath(songId));
+      await audio.delete();
+      await offlinePlaylistService.validateStoredPlaylists();
+
+      expect(offlinePlaylistService.availableOfflinePlaylists, isEmpty);
+      expect(offlinePlaylistService.offlinePlaylists.value, [complete]);
+      expect(userOfflineSongs.value, hasLength(1));
+
+      await audio.writeAsString('audio');
+      await offlinePlaylistService.validateStoredPlaylists();
+      expect(offlinePlaylistService.getOfflinePlaylist('playlist'), complete);
+    },
+  );
+
   test('moving back to the default forgets the custom folder', () async {
     await DownloadsLocation.change(customRoot);
     final status = await DownloadsLocation.change(null);
@@ -192,4 +260,43 @@ void main() {
     expect(legacyAudio.existsSync(), isTrue);
     expect(userOfflineSongs.value.last['audioPath'], copied);
   });
+
+  test(
+    'copies a referenced download through a link without moving its target',
+    () async {
+      if (Platform.isWindows) return;
+      final tracks = Directory('$defaultRoot/tracks');
+      final external = await tracks.rename('$defaultRoot/external');
+      final original = File('${external.path}/$songId.m4a');
+      await Link(tracks.path).create(external.path);
+
+      expect(
+        await DownloadsLocation.change(customRoot),
+        DownloadsMoveStatus.moved,
+      );
+      expect(original.readAsStringSync(), 'audio');
+      expect(Link(tracks.path).existsSync(), isTrue);
+      final stored = userOfflineSongs.value.single['audioPath'] as String;
+      expect(stored, '$customRoot/tracks/$songId.m4a');
+      expect(File(stored).readAsStringSync(), 'audio');
+    },
+  );
+
+  test(
+    'a linked destination subfolder leaves the original library alone',
+    () async {
+      if (Platform.isWindows) return;
+      final external = await Directory('$defaultRoot/external').create();
+      await Directory(customRoot).create();
+      await Link('$customRoot/tracks').create(external.path);
+
+      expect(
+        await DownloadsLocation.change(customRoot),
+        DownloadsMoveStatus.notWritable,
+      );
+      expect(await external.list().isEmpty, isTrue);
+      expect(downloadsDirPath, defaultRoot);
+      expect(File(FilePaths.getAudioPath(songId)).readAsStringSync(), 'audio');
+    },
+  );
 }

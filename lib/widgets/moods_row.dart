@@ -22,6 +22,7 @@
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/main.dart' show audioHandler;
 import 'package:musify/services/moods/moods_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
@@ -73,10 +74,16 @@ class _MoodsRowState extends State<MoodsRow> {
   Future<void> _start(Mood mood) async {
     if (_starting != null || offlineMode.value || !moodsEnabled.value) return;
     setState(() => _starting = mood);
-    final started = await moodsService.play(mood).catchError((_) => false);
+    final request = audioHandler.beginPlaybackRequest();
+    final started = await moodsService
+        .play(mood, playbackRequest: request)
+        .catchError((_) => false);
     if (!mounted) return;
     setState(() => _starting = null);
-    if (!started && !offlineMode.value && moodsEnabled.value) {
+    if (!started &&
+        audioHandler.isCurrentPlaybackRequest(request) &&
+        !offlineMode.value &&
+        moodsEnabled.value) {
       showToast(context, context.l10n!.moodUnavailable);
     }
   }

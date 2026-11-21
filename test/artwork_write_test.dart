@@ -26,4 +26,16 @@ void main() {
     expect(await writeArtworkFile(path, []), isNull);
     expect(directory.listSync(), isEmpty);
   });
+
+  test('publishing a cover preserves an occupied filename', () async {
+    final existing = File('${directory.path}/song.jpg')
+      ..writeAsBytesSync([1, 2, 3]);
+
+    await expectLater(
+      writeArtworkFile(existing.path, [4, 5, 6]),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(existing.readAsBytesSync(), [1, 2, 3]);
+    expect(directory.listSync().length, 1);
+  });
 }

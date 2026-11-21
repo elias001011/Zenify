@@ -618,6 +618,21 @@ void main() {
     await server.setEnabled(false);
   });
 
+  test('the same instance can initialize again after dispose', () async {
+    await server.setEnabled(true);
+    await server.setAutomatic(true);
+    await server.initialise();
+    await server.dispose();
+    expect(server.serverPort, isNull);
+    expect(server.hasBackgroundWork, isFalse);
+
+    await server.initialise();
+    expect(server.serverPort, isNotNull);
+    expect(server.hasBackgroundWork, isTrue);
+    await server.setEnabled(false);
+    await server.setAutomatic(false);
+  });
+
   test(
     'with automatic sync off a server runs only while the page is open',
     () async {

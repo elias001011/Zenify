@@ -1,9 +1,17 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/services/common_services.dart';
+import 'package:musify/services/download_manager.dart';
+import 'package:musify/services/io_service.dart';
+import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/settings_manager.dart';
+import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/song_selection_bar.dart';
 import 'package:musify/widgets/song_selection_controller.dart';
 
@@ -221,5 +229,116 @@ void main() {
     offlineMode.value = true;
     await tester.pumpAndSettle();
     expect(find.byIcon(FluentIcons.heart_24_regular), findsNothing);
+  });
+
+  testWidgets('offline actions require a common action and update live', (
+    tester,
+  ) async {
+    const first = {'ytid': 'aaaaaaaaaaa'};
+    const second = {'ytid': 'bbbbbbbbbbb'};
+    final local = {'ytid': '${localSongPrefix}one'};
+    final selection = SongSelectionController()
+      ..start(first)
+      ..toggle(second);
+    final downloads = DownloadManager.instance..persist = false;
+    addTearDown(() {
+      selection.dispose();
+      downloads
+        ..reset()
+        ..persist = true;
+      offlineMode.value = false;
+      userOfflineSongs.value = [];
+    });
+    await tester.pumpWidget(
+      localizedApp(
+        Scaffold(
+          body: SongSelectionBar(
+            controller: selection,
+            visibleSongs: () => [first, second, local],
+          ),
+        ),
+      ),
+    );
+    final makeOffline = find.text('Make available offline');
+    final cancel = find.text('Cancel download');
+    final remove = find.text('Remove from offline');
+    expect(makeOffline, findsOneWidget);
+
+    selection.toggle(local);
+    await tester.pump();
+    expect(makeOffline, findsNothing);
+    selection.toggle(local);
+
+    userOfflineSongs.value = [first];
+    await tester.pump();
+    expect(makeOffline, findsNothing);
+    expect(remove, findsNothing);
+
+    userOfflineSongs.value = [first, second];
+    await tester.pump();
+    expect(remove, findsOneWidget);
+    offlineMode.value = true;
+    await tester.pump();
+    expect(remove, findsOneWidget);
+
+    await tester.ensureVisible(remove);
+    await tester.tap(remove);
+    await tester.pumpAndSettle();
+    expect(find.byType(ConfirmationDialog), findsOneWidget);
+    expect(userOfflineSongs.value, [first, second]);
+    final root = Directory.systemTemp.createTempSync('zenify_batch_remove');
+    addTearDown(() => root.deleteSync(recursive: true));
+    applicationDirPath = downloadsDirPath = root.path;
+    Directory('${root.path}/${FilePaths.tracksDir}').createSync();
+    final files = [
+      for (final song in [first, second])
+        File(FilePaths.getAudioPath(song['ytid']!))..writeAsStringSync('audio'),
+    ];
+    await tester.runAsync(() async {
+      final removed = Completer<void>();
+      void onOfflineChanged() {
+        if (userOfflineSongs.value.isEmpty) removed.complete();
+      }
+
+      userOfflineSongs.addListener(onOfflineChanged);
+      try {
+        await tester.tap(
+          find.descendant(
+            of: find.byType(ConfirmationDialog),
+            matching: remove,
+          ),
+        );
+        await removed.future;
+      } finally {
+        userOfflineSongs.removeListener(onOfflineChanged);
+      }
+    });
+    await tester.pump();
+    expect(files.every((file) => !file.existsSync()), isTrue);
+
+    offlineMode.value = false;
+    selection
+      ..start(first)
+      ..toggle(second);
+    final release = Completer<void>();
+    Future<void> save(Map song, void Function(double) progress) async {
+      await release.future;
+      progress(0.5);
+    }
+
+    final firstDownload = downloads.download(first, save);
+    await tester.pump();
+    expect(makeOffline, findsNothing);
+    expect(cancel, findsNothing);
+    final secondDownload = downloads.download(second, save);
+    await tester.pump();
+    expect(cancel, findsOneWidget);
+
+    await tester.ensureVisible(cancel);
+    await tester.tap(cancel);
+    release.complete();
+    expect(await Future.wait([firstDownload, secondDownload]), [false, false]);
+    await tester.pump(const Duration(seconds: 4));
+    expect(downloads.active, isEmpty);
   });
 }

@@ -27,6 +27,18 @@ void main() {
     expect(artists.first.topSong['ytid'], anyOf('b1', 'b2', 'b3'));
   });
 
+  test('keeps verified homonyms apart from generic uploader channels', () {
+    final artists = topListeningArtists([
+      {...song('a', 'Same name', 180), 'creditedArtistId': 'UCfirst'},
+      {...song('b', 'Same name', 60), 'creditedArtistId': 'UCfirst'},
+      {...song('c', 'Same name', 75), 'creditedArtistId': 'UCsecond'},
+      {...song('d', 'Same name', 50), 'artistId': 'UCfirst'},
+    ]);
+
+    expect(artists.map((artist) => artist.id), ['UCfirst', 'UCsecond', null]);
+    expect(artists.map((artist) => artist.seconds), [240, 75, 50]);
+  });
+
   test('skips songs without an artist or time, and keeps the top five', () {
     final artists = topListeningArtists([
       song('x', '', 500),

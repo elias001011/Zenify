@@ -26,6 +26,7 @@ import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/utilities/artwork_provider.dart';
 
 /// The most vivid colour of an artwork, for the dynamic background.
 ///
@@ -63,6 +64,8 @@ class ArtworkColors {
     try {
       final provider = source.startsWith('http')
           ? CachedNetworkImageProvider(source) as ImageProvider
+          : source.startsWith('data:')
+          ? ArtworkProvider.get(source)
           : FileImage(File(source));
       final sample = ResizeImage(
         provider,

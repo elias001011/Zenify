@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:musify/services/artwork_colors.dart';
 import 'package:musify/widgets/artwork_glow.dart';
 
 void main() {
@@ -52,6 +53,50 @@ void main() {
     await tester.pump();
     expect(tester.binding.hasScheduledFrame, isFalse);
     revisited.dispose();
+  });
+
+  testWidgets('a cached page keeps its glow while retrying artwork', (
+    tester,
+  ) async {
+    final dir = Directory.systemTemp.createTempSync('zenify_glow_reopen');
+    addTearDown(() => dir.deleteSync(recursive: true));
+    final art = File('${dir.path}/cover.png');
+    const cacheKey = 'cached-page-with-missing-artwork';
+
+    final first = GlowColors(const TestVSync(), cacheKey: cacheKey);
+    await tester.runAsync(() async {
+      first.update([art.path], red);
+      expect(await ArtworkColors.of(art.path), isNull);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+    });
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 2));
+    expect(first.colorAt(0), red);
+    first.dispose();
+
+    final revisited = GlowColors(const TestVSync(), cacheKey: cacheKey);
+    addTearDown(revisited.dispose);
+    final artworkColor = await tester.runAsync(() async {
+      final recorder = ui.PictureRecorder();
+      Canvas(recorder).drawColor(blue, BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(24, 24);
+      picture.dispose();
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      await art.writeAsBytes(png!.buffer.asUint8List());
+
+      revisited.update([art.path], red);
+      expect(revisited.reveal, 1);
+      expect(revisited.colorAt(0), red);
+      final color = await ArtworkColors.of(art.path);
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      return color;
+    });
+    expect(artworkColor, isNotNull);
+    expect(revisited.colorAt(0), artworkColor);
+    await tester.pump();
+    expect(tester.binding.hasScheduledFrame, isFalse);
   });
 
   testWidgets('a glow that goes away fades out', (tester) async {

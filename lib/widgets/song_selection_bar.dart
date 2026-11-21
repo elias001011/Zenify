@@ -30,8 +30,11 @@ import 'package:musify/extensions/l10n.dart';
 import 'package:musify/main.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/download_manager.dart';
+import 'package:musify/services/local_files_service.dart';
+import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/settings_manager.dart';
 import 'package:musify/utilities/flutter_toast.dart';
+import 'package:musify/utilities/map_utils.dart';
 import 'package:musify/utilities/platform_utils.dart';
 import 'package:musify/utilities/playlist_dialogs.dart';
 import 'package:musify/widgets/confirmation_dialog.dart';
@@ -138,7 +141,14 @@ class SongSelectionBar extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return ListenableBuilder(
-      listenable: Listenable.merge([controller, offlineMode]),
+      listenable: Listenable.merge([
+        controller,
+        offlineMode,
+        if (showOfflineAction) ...[
+          userOfflineSongs,
+          DownloadManager.instance.entries,
+        ],
+      ]),
       builder: (context, _) {
         final count = controller.selectedCount;
 
@@ -187,6 +197,7 @@ class SongSelectionBar extends StatelessWidget {
   List<Widget> _buildActions(BuildContext context, ColorScheme colorScheme) {
     final l10n = context.l10n!;
     final isOffline = offlineMode.value;
+    final offlineAction = showOfflineAction ? _selectedOfflineAction() : null;
 
     return [
       ...[
@@ -224,12 +235,21 @@ class SongSelectionBar extends StatelessWidget {
           label: l10n.moveToPlaylist,
           onPressed: () => _run(context, (_, songs) => onMoveSelected!(songs)),
         ),
-      if (showOfflineAction && !isOffline)
+      if (offlineAction != null)
         _action(
           colorScheme: colorScheme,
-          icon: FluentIcons.cloud_arrow_down_24_regular,
-          label: l10n.makeOffline,
-          onPressed: () => _run(context, _makeSelectedOffline),
+          icon: switch (offlineAction) {
+            _OfflineAction.download => FluentIcons.cloud_arrow_down_24_regular,
+            _OfflineAction.cancel => FluentIcons.dismiss_circle_24_regular,
+            _OfflineAction.remove => FluentIcons.cloud_dismiss_24_regular,
+          },
+          label: switch (offlineAction) {
+            _OfflineAction.download => l10n.makeOffline,
+            _OfflineAction.cancel => l10n.cancelDownload,
+            _OfflineAction.remove => l10n.removeOffline,
+          },
+          isDangerous: offlineAction == _OfflineAction.remove,
+          onPressed: () => _runOfflineAction(context, offlineAction),
         ),
       if (onRemoveSelected != null)
         _action(
@@ -237,7 +257,11 @@ class SongSelectionBar extends StatelessWidget {
           icon: FluentIcons.delete_24_regular,
           label: removeLabel ?? l10n.remove,
           isDangerous: true,
-          onPressed: () => _confirmRemoveSelected(context),
+          onPressed: () => _confirmRemoveSelected(
+            context,
+            label: removeLabel ?? l10n.remove,
+            remove: (_, songs) => onRemoveSelected!(songs),
+          ),
         ),
     ];
   }
@@ -265,17 +289,21 @@ class SongSelectionBar extends StatelessWidget {
   /// Runs [action] on the ticked songs, then leaves selection mode.
   void _run(
     BuildContext context,
-    Future<void> Function(BuildContext context, List<Map> songs) action,
-  ) {
-    final songs = controller.selectedSongs;
-    if (songs.isEmpty) return;
+    Future<void> Function(BuildContext context, List<Map> songs) action, {
+    List<Map>? songs,
+  }) {
+    final selected = songs ?? controller.selectedSongs;
+    if (selected.isEmpty) return;
     // The bar leaves the tree with selection mode, and its context with it,
     // while the action is still running. Its report goes to the messenger,
     // which outlives both.
     final toastContext = ScaffoldMessenger.of(context).context;
     controller.exit();
     unawaited(
-      action(toastContext, songs).catchError((Object error, StackTrace stack) {
+      action(toastContext, selected).catchError((
+        Object error,
+        StackTrace stack,
+      ) {
         logger.log('Batch song action failed', error: error, stackTrace: stack);
         if (toastContext.mounted)
           showToast(toastContext, toastContext.l10n!.error);
@@ -331,6 +359,44 @@ class SongSelectionBar extends StatelessWidget {
     controller.exit();
   }
 
+  _OfflineAction? _selectedOfflineAction() {
+    if (!controller.hasSelection) return null;
+    final active = DownloadManager.instance.active
+        .map((entry) => entry.ytid)
+        .toSet();
+    _OfflineAction? shared;
+    for (final song in controller.selectedSongs) {
+      final id = songYtid(song);
+      if (id == null || isLocalSongId(id)) return null;
+      final action = active.contains(id)
+          ? _OfflineAction.cancel
+          : isSongAlreadyOffline(id)
+          ? _OfflineAction.remove
+          : offlineMode.value
+          ? null
+          : _OfflineAction.download;
+      if (action == null || (shared != null && action != shared)) return null;
+      shared = action;
+    }
+    return shared;
+  }
+
+  void _runOfflineAction(BuildContext context, _OfflineAction action) {
+    if (_selectedOfflineAction() != action) return;
+    switch (action) {
+      case _OfflineAction.download:
+        _run(context, _makeSelectedOffline);
+      case _OfflineAction.cancel:
+        _run(context, _cancelSelectedDownloads);
+      case _OfflineAction.remove:
+        _confirmRemoveSelected(
+          context,
+          label: context.l10n!.removeOffline,
+          remove: _removeSelectedDownloads,
+        );
+    }
+  }
+
   Future<void> _makeSelectedOffline(
     BuildContext context,
     List<Map> songs,
@@ -345,10 +411,45 @@ class SongSelectionBar extends StatelessWidget {
     }
   }
 
-  void _confirmRemoveSelected(BuildContext context) {
+  Future<void> _cancelSelectedDownloads(
+    BuildContext context,
+    List<Map> songs,
+  ) async {
+    final downloads = DownloadManager.instance;
+    var cancelled = false;
+    for (final song in songs) {
+      if (downloads.cancel(songYtid(song))) cancelled = true;
+    }
+    if (cancelled) showToast(context, context.l10n!.downloadCancelled);
+  }
+
+  Future<void> _removeSelectedDownloads(
+    BuildContext context,
+    List<Map> songs,
+  ) async {
+    final offline = OfflinePlaylistService();
+    var removed = 0;
+    for (final song in songs) {
+      final id = songYtid(song);
+      if (id != null &&
+          isSongAlreadyOffline(id) &&
+          await offline.removeSongFromOfflineAndResync(id)) {
+        removed++;
+      }
+    }
+    if (removed > 0 && context.mounted) {
+      showToast(context, context.l10n!.songsRemoved(removed));
+    }
+  }
+
+  void _confirmRemoveSelected(
+    BuildContext context, {
+    required String label,
+    required Future<void> Function(BuildContext context, List<Map> songs)
+    remove,
+  }) {
     final songs = controller.selectedSongs;
-    final remove = onRemoveSelected;
-    if (songs.isEmpty || remove == null) return;
+    if (songs.isEmpty) return;
 
     showDialog(
       context: context,
@@ -356,18 +457,19 @@ class SongSelectionBar extends StatelessWidget {
         confirmationMessage: dialogContext.l10n!.removeSelectedSongsQuestion(
           songs.length,
         ),
-        submitMessage: removeLabel ?? dialogContext.l10n!.remove,
+        submitMessage: label,
         isDangerous: true,
         onCancel: () => Navigator.pop(dialogContext),
         onSubmit: () {
           Navigator.pop(dialogContext);
-          controller.exit();
-          unawaited(remove(songs));
+          _run(dialogContext, remove, songs: songs);
         },
       ),
     );
   }
 }
+
+enum _OfflineAction { download, cancel, remove }
 
 /// Explicit paging for mouse users; touch, trackpad, wheel and keyboard focus
 /// can still scroll the same actions without opening a separate menu.

@@ -251,6 +251,39 @@ void main() {
       expect(calls, firstRunCalls);
     });
 
+    test(
+      'offline cache distinguishes otherwise identical album editions',
+      () async {
+        var calls = 0;
+        final manager = LyricsManager(
+          client: MockClient((_) async {
+            calls++;
+            return _json([
+              {
+                'trackName': 'Song',
+                'artistName': 'Artist',
+                'plainLyrics': 'first',
+              },
+            ]);
+          }),
+        );
+        const first = TrackInfo(title: 'Song', artist: 'Artist', album: 'One');
+        const second = TrackInfo(title: 'Song', artist: 'Artist', album: 'Two');
+
+        final lyrics = await manager.fetchLyricsResult(first);
+        expect(lyrics?.text, 'first');
+        expect(
+          await manager.fetchLyricsResult(first, canUseNetwork: () => false),
+          same(lyrics),
+        );
+        expect(
+          await manager.fetchLyricsResult(second, canUseNetwork: () => false),
+          isNull,
+        );
+        expect(calls, 1);
+      },
+    );
+
     test('does not request slug based sites for non-Latin titles', () async {
       final hosts = <String>{};
       final client = MockClient((request) async {
@@ -262,6 +295,29 @@ void main() {
       expect(hosts.contains('www.lyricsmania.com'), isFalse);
       expect(hosts.contains('lrclib.net'), isTrue);
     });
+
+    test(
+      'going offline during a lookup suppresses fallback requests',
+      () async {
+        var online = true;
+        var calls = 0;
+        final manager = LyricsManager(
+          client: MockClient((_) async {
+            calls++;
+            online = false;
+            return _json([]);
+          }),
+        );
+
+        final result = await manager.fetchLyricsResult(
+          const TrackInfo(title: 'Song (Official Video)', artist: 'Artist'),
+          canUseNetwork: () => online,
+        );
+
+        expect(result, isNull);
+        expect(calls, 1);
+      },
+    );
 
     test('returns null for empty input', () async {
       expect(await LyricsManager().fetchLyrics('', 'x'), isNull);

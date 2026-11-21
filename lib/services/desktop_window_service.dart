@@ -366,7 +366,11 @@ class DesktopCaptionControls extends StatelessWidget {
             MaterialLocalizations.of(context).closeButtonTooltip,
             WindowCaptionButton.close(
               brightness: colors.brightness,
-              onPressed: windowManager.close,
+              onPressed: () async {
+                // Startup may still be building the handler.
+                if (audioHandlerReady) await audioHandler.flushVolume();
+                await windowManager.close();
+              },
             ),
           ),
         ],

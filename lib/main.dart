@@ -51,6 +51,7 @@ import 'package:musify/services/listening_stats_service.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/local_sync_service.dart';
 import 'package:musify/services/logger_service.dart';
+import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlist_sharing.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/router_service.dart';
@@ -73,6 +74,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 late MusifyAudioHandler audioHandler;
+
+/// Set once [audioHandler] exists: the window can be closed before that, and
+/// there is then no volume to flush.
+var audioHandlerReady = false;
 LinuxMediaControls? linuxMediaControls;
 WindowsMediaControls? windowsMediaControls;
 StreamSubscription<String?>? sharingIntentSubscription;
@@ -261,6 +266,7 @@ class _MusifyState extends State<Musify> with WidgetsBindingObserver {
       );
       unawaited(listeningStatsService.flush());
       unawaited(audioHandler.persistPlaybackState());
+      unawaited(audioHandler.flushVolume());
       // These two write after a short delay, which the OS may not allow.
       unavailableSongs.flush();
       DownloadManager.instance.flush();
@@ -450,6 +456,7 @@ Future<String?> initialisation() async {
           },
         ),
       );
+      audioHandlerReady = true;
       NavigationManager.instance;
     } else {
       // Init router before the audio engine so a playback failure cannot
@@ -461,6 +468,7 @@ Future<String?> initialisation() async {
         JustAudioMediaKit.title = appName;
         JustAudioMediaKit.ensureInitialized();
         audioHandler = MusifyAudioHandler();
+        audioHandlerReady = true;
       } catch (e, stackTrace) {
         logger.log(
           'Desktop audio initialization failed',
@@ -568,6 +576,7 @@ Future<String?> initialisation() async {
     await installConfig.applyDownloadsDir(log: logger.log);
     await DownloadsLocation.initialise();
     await FilePaths.ensureDirectoriesExist();
+    await offlinePlaylistService.validateStoredPlaylists();
   } catch (e, stackTrace) {
     logger.log(
       'Failed to create application directories',
@@ -661,9 +670,13 @@ void handleIncomingLink(Uri? uri) async {
       songCount: (parsed['list'] as List).length,
     );
     if (!accepted) return;
+    if (offlineMode.value) {
+      _showPlaylistError();
+      return;
+    }
 
     final playlist = await PlaylistSharingService.expandCompactPlaylist(parsed);
-    if ((playlist['list'] as List).isEmpty) {
+    if (offlineMode.value || (playlist['list'] as List).isEmpty) {
       _showPlaylistError();
       return;
     }

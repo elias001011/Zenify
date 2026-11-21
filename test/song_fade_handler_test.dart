@@ -22,6 +22,7 @@ class _Platform extends JustAudioPlatform {
   final log = <Object>[];
   _Player? current;
   Duration songLength = const Duration(seconds: 60);
+  ({Completer<void> entered, Completer<void> release})? nextLoad;
 
   List<double> get volumes => log.whereType<double>().toList();
   double get lastVolume => volumes.last;
@@ -69,6 +70,13 @@ class _Player extends AudioPlayerPlatform {
 
   @override
   Future<LoadResponse> load(LoadRequest request) async {
+    final delay = platform.nextLoad;
+    platform.nextLoad = null;
+    if (delay != null) {
+      delay.entered.complete();
+      await delay.release.future;
+      return LoadResponse(duration: platform.songLength);
+    }
     emit(
       request.initialPosition ?? Duration.zero,
       ProcessingStateMessage.ready,
@@ -86,7 +94,9 @@ class _Player extends AudioPlayerPlatform {
 
   @override
   Future<PauseResponse> pause(PauseRequest request) async {
-    _playing?.complete();
+    if (_playing case final pending? when !pending.isCompleted) {
+      pending.complete();
+    }
     return PauseResponse();
   }
 
@@ -117,7 +127,9 @@ class _Player extends AudioPlayerPlatform {
 
   @override
   Future<DisposeResponse> dispose(DisposeRequest request) async {
-    _playing?.complete();
+    if (_playing case final pending? when !pending.isCompleted) {
+      pending.complete();
+    }
     return DisposeResponse();
   }
 }
@@ -199,6 +211,36 @@ void main() {
     if (fadeOut && into > 0) gain *= cos(into / length * pi / 2);
     return gain;
   }
+
+  test('a Mood resolved late cannot replace a manual choice', () async {
+    final request = handler.beginPlaybackRequest();
+    await startSong(1);
+    expect(
+      await handler.playRequestedPlaylist(request, {
+        'list': [_songs[2]],
+      }),
+      isFalse,
+    );
+    expect(handler.currentSong?['ytid'], 'bbb');
+    expect(handler.audioPlayer.playing, isTrue);
+  });
+
+  test('an interrupted source load leaves the newer track playing', () async {
+    await startSong(0);
+    final entered = Completer<void>();
+    final release = Completer<void>();
+    platform.nextLoad = (entered: entered, release: release);
+    final old = handler.skipToSong(1);
+    try {
+      await entered.future;
+      await startSong(2);
+    } finally {
+      release.complete();
+      await old;
+    }
+    expect(handler.currentSong?['ytid'], 'ccc');
+    expect(handler.audioPlayer.playing, isTrue);
+  });
 
   group('the fade out', () {
     test('starts in the last seconds of a song another one follows', () async {

@@ -96,6 +96,22 @@ void main() {
   });
 
   test(
+    'an incomplete generation cannot fall back to a tuned playlist',
+    () async {
+      const id = 'zenify:daily';
+      await Hive.box('cache').put('moods:playlist:$id', {
+        'ytid': id,
+        'tuning': 'adventurous',
+        'list': _songs('old'),
+      });
+      expect(service.cachedPlaylist(id)['list'], isEmpty);
+
+      service.pending = Completer<List<Map>>()..complete([]);
+      expect(await service.playlist(id), isNull);
+    },
+  );
+
+  test(
     'clearing the cache prevents a pending generation from writing back',
     () async {
       service.pending = Completer<List<Map>>();

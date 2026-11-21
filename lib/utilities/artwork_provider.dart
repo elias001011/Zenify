@@ -19,7 +19,6 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -40,11 +39,8 @@ class ArtworkProvider {
     try {
       if (artwork.startsWith('http')) {
         provider = CachedNetworkImageProvider(artwork);
-      } else if (artwork.startsWith('data:image')) {
-        final commaIdx = artwork.indexOf(',');
-        if (commaIdx == -1) throw Exception('invalid base64 image');
-        final bytes = base64Decode(artwork.substring(commaIdx + 1));
-        provider = MemoryImage(bytes);
+      } else if (artwork.startsWith('data:')) {
+        provider = MemoryImage(UriData.parse(artwork).contentAsBytes());
       } else if (artwork.startsWith('file://') || artwork.startsWith('/')) {
         final path = artwork.replaceFirst('file://', '');
         provider = FileImage(File(path));

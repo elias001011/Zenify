@@ -26,6 +26,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/constants/motion.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/main.dart' show logger;
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/playlists_manager.dart';
@@ -44,6 +45,7 @@ void showCreatePlaylistDialog(
   var id = '';
   var customPlaylistName = '';
   var isYouTubeMode = songToAdd == null && songsToAdd == null;
+  var creating = false;
   String? imageUrl;
   String? imageBase64;
 
@@ -56,7 +58,7 @@ void showCreatePlaylistDialog(
 
           Future<void> _pickImage() async {
             final result = await pickImage();
-            if (result != null) {
+            if (result != null && context.mounted) {
               dialogSetState(() {
                 imageBase64 = result;
                 imageUrl = null;
@@ -289,6 +291,7 @@ void showCreatePlaylistDialog(
               const DialogCancel(style: DialogCancelStyle.outlined),
               FilledButton.icon(
                 onPressed: () async {
+                  if (creating) return;
                   if (isYouTubeMode && id.isNotEmpty) {
                     final result = await addUserPlaylist(id, context);
                     if (context.mounted) showToast(context, result);
@@ -296,11 +299,27 @@ void showCreatePlaylistDialog(
                     Navigator.pop(context);
                   } else if (!isYouTubeMode &&
                       customPlaylistName.trim().isNotEmpty) {
-                    final (result, newPlaylistId) = createCustomPlaylist(
-                      customPlaylistName.trim(),
-                      imageBase64 ?? imageUrl,
-                      context,
-                    );
+                    creating = true;
+                    final String newPlaylistId;
+                    try {
+                      newPlaylistId = await createCustomPlaylist(
+                        customPlaylistName.trim(),
+                        imageBase64 ?? imageUrl?.trim(),
+                      );
+                    } catch (error, stackTrace) {
+                      logger.log(
+                        'Could not create playlist',
+                        error: error,
+                        stackTrace: stackTrace,
+                      );
+                      if (context.mounted) {
+                        showToast(context, context.l10n!.error);
+                      }
+                      return;
+                    } finally {
+                      creating = false;
+                    }
+                    if (!context.mounted) return;
                     if (songToAdd != null) {
                       if (context.mounted) {
                         final addResult = addSongInCustomPlaylist(
@@ -320,7 +339,7 @@ void showCreatePlaylistDialog(
                         showToast(context, addResult);
                       }
                     } else {
-                      if (context.mounted) showToast(context, result);
+                      showToast(context, '${context.l10n!.addedSuccess}!');
                     }
                     if (!context.mounted) return;
                     Navigator.pop(context);

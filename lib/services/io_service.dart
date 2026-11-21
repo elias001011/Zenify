@@ -113,7 +113,7 @@ class FilePaths {
     return false;
   }
 
-  /// Deletes the files [offlineSongs] point at, plus any of ours left behind.
+  /// Deletes registered downloads and orphaned files in the app's own folder.
   static Future<void> deleteDownloadedFiles(List offlineSongs) async {
     final paths = <String>{
       for (final song in offlineSongs)
@@ -128,9 +128,12 @@ class FilePaths {
 
     for (final artwork in [false, true]) {
       final directory = Directory(
-        '$downloadsDirPath/${artwork ? artworksDir : tracksDir}',
+        '$applicationDirPath/${artwork ? artworksDir : tracksDir}',
       );
-      if (!await directory.exists()) continue;
+      if (await FileSystemEntity.type(directory.path, followLinks: false) !=
+          FileSystemEntityType.directory) {
+        continue;
+      }
       await for (final entity in directory.list(followLinks: false)) {
         if (entity is File && isDownloadedFile(entity.path, artwork: artwork)) {
           paths.add(entity.path);

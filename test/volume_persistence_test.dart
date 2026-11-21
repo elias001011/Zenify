@@ -54,6 +54,17 @@ void main() {
     expect(MusifyAudioHandler().volume, 0.4);
   });
 
+  test(
+    'flushing before window close saves the audible choice immediately',
+    () async {
+      final handler = MusifyAudioHandler();
+      await handler.setVolume(0.4);
+      await handler.setVolume(0);
+      await handler.flushVolume();
+      expect(Hive.box('settings').get('volume'), 0.4);
+    },
+  );
+
   test('the sleep fade cannot become the saved volume', () async {
     final handler = MusifyAudioHandler();
     await handler.setVolume(0.6);

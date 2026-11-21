@@ -88,6 +88,7 @@ class GlowColors {
   var _to = <int, Color>{};
   List<String?>? _sources;
   Color? _appColor;
+  bool? _allowNetwork;
   int _generation = 0;
   Timer? _flush;
 
@@ -111,10 +112,20 @@ class GlowColors {
 
   /// Glows for [sources]; one without artwork, or without a colour found in
   /// it, glows in [appColor]. Revisited pages reuse their settled reveal.
-  void update(List<String?> sources, Color appColor) {
-    if (appColor == _appColor && listEquals(sources, _sources)) return;
+  void update(
+    List<String?> sources,
+    Color appColor, {
+    bool allowNetwork = true,
+  }) {
+    if (appColor == _appColor &&
+        allowNetwork == _allowNetwork &&
+        listEquals(sources, _sources)) {
+      return;
+    }
+    final reopening = _appColor == null && _wasRevealed;
     _sources = List.of(sources);
     _appColor = appColor;
+    _allowNetwork = allowNetwork;
     final generation = ++_generation;
     _flush?.cancel();
     _flush = null;
@@ -127,14 +138,18 @@ class GlowColors {
         next[i] = appColor;
       } else if (ArtworkColors.isCached(source)) {
         next[i] = ArtworkColors.cached(source) ?? appColor;
+      } else if (!allowNetwork && source.startsWith('http')) {
+        next[i] = appColor;
       } else {
         // Until its colour is read, a glow keeps the one it has, so a new
         // song doesn't dip to dark first.
-        if (_to[i] case final current?) next[i] = current;
+        // A revisited page can show its theme glow while artwork retries.
+        final current = _to[i] ?? (reopening ? appColor : null);
+        if (current != null) next[i] = current;
         pending.add(ArtworkColors.of(source).then((color) => (i, color)));
       }
     }
-    _retarget(next);
+    _retarget(next, animate: !reopening);
 
     // Colours still to read arrive in batches, at most one transition per
     // 150 ms, so neither a slow artwork nor many quick ones hold the rest.
@@ -149,7 +164,7 @@ class GlowColors {
         _flush ??= Timer(const Duration(milliseconds: 150), () {
           _flush = null;
           if (generation != _generation || arrived.isEmpty) return;
-          _retarget({..._to, ...arrived});
+          _retarget({..._to, ...arrived}, animate: !reopening);
           arrived.clear();
         });
       });
@@ -183,7 +198,7 @@ class GlowColors {
     }
   }
 
-  void _retarget(Map<int, Color> next) {
+  void _retarget(Map<int, Color> next, {required bool animate}) {
     if (mapEquals(next, _to)) {
       if (!_transition.isCompleted && !_transition.isAnimating) {
         _transition.forward();
@@ -196,7 +211,7 @@ class GlowColors {
         if (colorAt(i) case final color? when color.a > 0) i: color,
     };
     _to = next;
-    if (reduceMotion || (_from.isEmpty && _wasRevealed)) {
+    if (reduceMotion || !animate) {
       _from = {};
       _transition.value = 1;
     } else {
@@ -241,13 +256,18 @@ mixin GlowColorsHost<T extends StatefulWidget> on TickerProviderStateMixin<T> {
       return;
     }
     glowColors.reduceMotion = MediaQuery.disableAnimationsOf(context);
-    glowColors.update(glowSources, Theme.of(context).colorScheme.primary);
+    glowColors.update(
+      glowSources,
+      Theme.of(context).colorScheme.primary,
+      allowNetwork: !offlineMode.value,
+    );
   }
 
   @override
   void initState() {
     super.initState();
     dynamicBackground.addListener(_updateGlow);
+    offlineMode.addListener(_updateGlow);
   }
 
   @override
@@ -265,6 +285,7 @@ mixin GlowColorsHost<T extends StatefulWidget> on TickerProviderStateMixin<T> {
   @override
   void dispose() {
     dynamicBackground.removeListener(_updateGlow);
+    offlineMode.removeListener(_updateGlow);
     _glowColors?.dispose();
     super.dispose();
   }

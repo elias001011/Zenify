@@ -108,9 +108,6 @@ String? offlineArtworkPath(Object? ytid) {
 var _songLikeUpdateToken = 0;
 final _latestSongLikeUpdateTokens = <String, int>{};
 
-final lyrics = ValueNotifier<String?>(null);
-String? lastFetchedLyrics;
-
 void reloadSongLibraryStateFromStorage() {
   final userBox = Hive.box('user');
   userLikedRadioStations.value = List<String>.from(
@@ -880,10 +877,6 @@ Future<Map<String, dynamic>> getSongDetails(
   }
 }
 
-Lyrics? _lastLyricsResult;
-(String, String, Duration?, String?)? _lastLyricsIdentity;
-int _lyricsRequestCounter = 0;
-
 /// Plain-text version of [result] as shown for unsynced lyrics.
 String formatPlainLyrics(Lyrics result) {
   return '${result.text}\n\n© ${result.source}'
@@ -895,34 +888,16 @@ String formatPlainLyrics(Lyrics result) {
 Future<Lyrics?> getSongLyricsResult(
   String? artist,
   String title, {
+  String? recordingId,
   Duration? duration,
   String? album,
 }) async {
   if (artist == null) return null;
-  final key = '$artist - $title';
-  final identity = (artist, title, duration, album);
-  if (lastFetchedLyrics == key && _lastLyricsIdentity == identity) {
-    // A pending lookup for another track must not overwrite this one.
-    _lyricsRequestCounter++;
-    return _lastLyricsResult;
-  }
-  if (offlineMode.value) return null;
-
-  lyrics.value = null;
-  final requestId = ++_lyricsRequestCounter;
-  final result = await LyricsManager().fetchLyricsResult(
+  return LyricsManager().fetchLyricsResult(
     TrackInfo(title: title, artist: artist, album: album, duration: duration),
+    recordingId: recordingId,
+    canUseNetwork: () => !offlineMode.value,
   );
-  if (result == null) return null;
-
-  // Ignore the response if the user already moved on to another song.
-  if (requestId == _lyricsRequestCounter) {
-    _lastLyricsResult = result;
-    _lastLyricsIdentity = identity;
-    lyrics.value = formatPlainLyrics(result);
-    lastFetchedLyrics = key;
-  }
-  return result;
 }
 
 /// Downloads [song] for offline use through the [DownloadManager]. A song
@@ -979,19 +954,21 @@ Future<void> saveSongFiles(
       DownloadManager.instance.isCancelled(ytid);
 
   final audioFile = File(FilePaths.getAudioPath(ytid));
-  await audioFile.parent.create(recursive: true);
+  await _prepareDownloadParent(audioFile);
   // Offline mode, deleting every download or a cancel stops this transfer,
   // even before the first byte: the manifest lookup can take a while.
   if (stopped()) throw const DownloadStopped();
 
   final audio = await resolveBestAudioStream(ytid).timeout(_resolveLimit);
   if (stopped()) throw const DownloadStopped();
+  final staging = await audioFile.parent.createTemp('.zenify-download-');
+  final partial = File('${staging.path}/audio.part');
   IOSink? fileStream;
   try {
     final total = audio.size.totalBytes;
     var received = 0;
     var reported = -1;
-    fileStream = audioFile.openWrite();
+    fileStream = partial.openWrite();
     await ytClient.videos.streamsClient
         .get(audio)
         .timeout(
@@ -1012,16 +989,22 @@ Future<void> saveSongFiles(
           return chunk;
         })
         .pipe(fileStream);
-    await fileStream.flush();
-    await fileStream.close();
     fileStream = null;
     if (stopped()) throw const DownloadStopped();
+    if (received == 0 ||
+        (audio.fragments.isEmpty && total > 0 && received != total)) {
+      throw HttpException('Incomplete audio download for $ytid');
+    }
+    // The song's file is ours alone: a half-written one left by an older
+    // build must be replaced, or the retry would fail after the transfer.
+    _publishDownload(partial, audioFile, replace: true);
   } catch (_) {
     try {
       await fileStream?.close();
     } catch (_) {}
-    if (await audioFile.exists()) await audioFile.delete();
     rethrow;
+  } finally {
+    await _discardDownloadStaging(staging);
   }
 
   final offlineSong = {
@@ -1088,7 +1071,7 @@ Future<String?> _saveArtwork(String url, String path) async {
 Future<void> _deleteFileIfExists(File file, String errorDescription) async {
   try {
     if (await file.exists()) {
-      await file.delete(recursive: true);
+      await file.delete();
     }
   } catch (e, stackTrace) {
     logger.log(
@@ -1106,23 +1089,32 @@ String _storedOfflinePath(String ytid, String key, String fallback) {
 }
 
 Future<bool> removeSongFromOffline(dynamic songId) async {
+  if (DownloadManager.instance.storageBusy) return false;
+  return DownloadManager.instance.withExclusiveStorage(
+    () => _removeSongFromOffline(songId),
+  );
+}
+
+Future<bool> _removeSongFromOffline(dynamic songId) async {
   try {
     final ytid = songId.toString();
-    final audioPath = _storedOfflinePath(
-      ytid,
-      'audioPath',
-      FilePaths.getAudioPath(ytid),
-    );
-    final artworkPath = _storedOfflinePath(
-      ytid,
-      'artworkPath',
-      FilePaths.getArtworkPath(ytid),
-    );
 
     await Future.wait([
+      // An older entry may name no path: the file still sits where downloads
+      // have always gone for that song.
       for (final (path, description) in [
-        (audioPath, 'audio file'),
-        (artworkPath, 'artwork file'),
+        (
+          _storedOfflinePath(ytid, 'audioPath', FilePaths.getAudioPath(ytid)),
+          'audio file',
+        ),
+        (
+          _storedOfflinePath(
+            ytid,
+            'artworkPath',
+            FilePaths.getArtworkPath(ytid),
+          ),
+          'artwork file',
+        ),
       ])
         if (await FilePaths.canDeleteDownload(path))
           _deleteFileIfExists(File(path), description),
@@ -1242,20 +1234,53 @@ Future<File?> writeArtworkFile(
   List<int> bytes, {
   bool Function()? abandoned,
 }) async {
-  final partial = File(
-    '$filePath.${DateTime.now().microsecondsSinceEpoch}.part',
-  );
+  final output = File(filePath);
+  await _prepareDownloadParent(output);
+  final staging = await output.parent.createTemp('.zenify-download-');
+  final partial = File('${staging.path}/artwork.part');
   try {
-    await partial.parent.create(recursive: true);
     await partial.writeAsBytes(bytes);
-    if ((abandoned?.call() ?? false) || bytes.isEmpty) {
-      await _deleteFileIfExists(partial, 'late artwork file');
-      return null;
-    }
-    return await partial.rename(filePath);
+    if ((abandoned?.call() ?? false) || bytes.isEmpty) return null;
+    return _publishDownload(partial, output);
+  } finally {
+    await _discardDownloadStaging(staging);
+  }
+}
+
+Future<void> _prepareDownloadParent(File output) async {
+  final parent = output.parent;
+  await parent.create(recursive: true);
+  if (await FileSystemEntity.type(parent.path, followLinks: false) !=
+      FileSystemEntityType.directory) {
+    throw FileSystemException(
+      'Download folder is not a directory',
+      parent.path,
+    );
+  }
+}
+
+File _publishDownload(File partial, File output, {bool replace = false}) {
+  // Reserved first, so two writers of the same cover keep both attempts and
+  // the second one is told its name is taken.
+  if (replace) return partial.renameSync(output.path);
+  output.createSync(exclusive: true);
+  try {
+    return partial.renameSync(output.path);
   } catch (_) {
-    await _deleteFileIfExists(partial, 'artwork file');
+    output.deleteSync();
     rethrow;
+  }
+}
+
+Future<void> _discardDownloadStaging(Directory staging) async {
+  try {
+    await staging.delete(recursive: true);
+  } on FileSystemException catch (error, stackTrace) {
+    logger.log(
+      'Could not clean up download staging',
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 }
 

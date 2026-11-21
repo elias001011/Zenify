@@ -371,6 +371,7 @@ List<Map<String, dynamic>> sortedListeningSongs(
 /// An artist's share of a listening period, worked out from its songs.
 typedef ListeningArtist = ({
   String name,
+  String? id,
   int seconds,
   int songCount,
 
@@ -385,25 +386,31 @@ List<ListeningArtist> topListeningArtists(
   Iterable<Map<String, dynamic>> songs, {
   int limit = wrappedTopArtistsLimit,
 }) {
-  final byArtist = <String, List<Map<String, dynamic>>>{};
+  final byArtist = <(String?, String?), List<Map<String, dynamic>>>{};
   for (final song in songs) {
     final name = _readString(song['artist']).trim();
     if (name.isEmpty || _readInt(song['seconds']) <= 0) continue;
-    byArtist.putIfAbsent(name, () => []).add(song);
+    final id = _readString(song['creditedArtistId']).trim();
+    // Old stats without a credited artist id stay grouped by their name.
+    final key = id.isEmpty ? (null, name) : (id, null);
+    byArtist.putIfAbsent(key, () => []).add(song);
   }
 
-  final artists = [
-    for (final MapEntry(key: name, value: songs) in byArtist.entries)
-      (
-        name: name,
-        seconds: songs.fold<int>(
-          0,
-          (sum, song) => sum + _readInt(song['seconds']),
-        ),
-        songCount: songs.length,
-        topSong: (List.of(songs)..sort(_compareSongStats)).first,
+  final artists = <ListeningArtist>[];
+  for (final entry in byArtist.entries) {
+    final songs = entry.value..sort(_compareSongStats);
+    final top = songs.first;
+    artists.add((
+      name: _readString(top['artist']).trim(),
+      id: entry.key.$1,
+      seconds: songs.fold<int>(
+        0,
+        (sum, song) => sum + _readInt(song['seconds']),
       ),
-  ];
+      songCount: songs.length,
+      topSong: top,
+    ));
+  }
   double score(ListeningArtist artist) =>
       artist.seconds * sqrt(artist.songCount);
   artists.sort((a, b) => score(b).compareTo(score(a)));
@@ -545,6 +552,10 @@ void _upsertSongStats(
     ..['playCount'] =
         _readInt(entry['playCount']) + (incrementPlayCount ? 1 : 0)
     ..['lastPlayed'] = listenedAt.toIso8601String();
+
+  if (song['creditedArtistId'] case final String id when id.isNotEmpty) {
+    entry['creditedArtistId'] = id;
+  }
 
   final duration = _readPersistableDuration(
     song['duration'] ?? entry['duration'],
@@ -748,6 +759,10 @@ void _copyLatestSongMetadata(
       fallback: target['artWorkPath'],
     )
     ..['lastPlayed'] = source['lastPlayed'];
+
+  if (source['creditedArtistId'] case final String id when id.isNotEmpty) {
+    target['creditedArtistId'] = id;
+  }
 
   final duration = _readPersistableDuration(source['duration']);
   if (duration != null) target['duration'] = duration;

@@ -79,12 +79,14 @@ class MusicListSurface extends StatelessWidget {
     this.borderRadius,
     required this.child,
     this.emphasized = false,
+    this.groupRows = false,
   });
 
   final Color? color;
   final BorderRadius? borderRadius;
   final Widget child;
   final bool emphasized;
+  final bool groupRows;
 
   @override
   Widget build(BuildContext context) {
@@ -98,7 +100,7 @@ class MusicListSurface extends StatelessWidget {
           : _surfaceColor(context, color),
       borderRadius: borderRadius ?? commonCustomBarRadius,
       clipBehavior: Clip.antiAlias,
-      child: child,
+      child: groupRows ? _MusicListGroup(child: child) : child,
     );
   }
 }

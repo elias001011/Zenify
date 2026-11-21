@@ -131,11 +131,15 @@ class _PlaylistPageState extends State<PlaylistPage> {
     super.initState();
     _initializePlaylist();
     replacedSongs.addListener(_reloadStoredSongs);
+    userCustomPlaylists.addListener(_reloadStoredSongs);
+    userPlaylistFolders.addListener(_reloadStoredSongs);
   }
 
   @override
   void dispose() {
     replacedSongs.removeListener(_reloadStoredSongs);
+    userCustomPlaylists.removeListener(_reloadStoredSongs);
+    userPlaylistFolders.removeListener(_reloadStoredSongs);
     _searchQueryNotifier.dispose();
     _selection.dispose();
     _songsRevision.dispose();
@@ -374,8 +378,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
     if (result == context.l10n!.songAdded) {
       setState(() {
         _addedRecommendedSongIds.add(song['ytid']?.toString() ?? '');
-        _originalPlaylistList.add(song);
-        _applySort();
       });
     }
   }
@@ -410,20 +412,15 @@ class _PlaylistPageState extends State<PlaylistPage> {
     );
   }
 
-  /// Shows the songs as stored, after some were swapped for others, wherever
-  /// the swap was asked: a page left open would save its old list back.
+  /// Reflect changes from other pages, keeping the current display sort.
   void _reloadStoredSongs() {
     final stored = getUserCustomPlaylists()
         .where(
           (playlist) => playlist['ytid']?.toString() == _resolvedPlaylistId,
         )
         .firstOrNull;
-    final songs = stored?['list'] as List?;
-    if (songs == null || !mounted) return;
-    setState(() {
-      _originalPlaylistList = List<dynamic>.from(songs);
-      _applySort();
-    });
+    if (stored == null || !mounted) return;
+    setState(() => _adoptPlaylist(stored));
   }
 
   Widget _buildHeaderSection() {
@@ -524,42 +521,28 @@ class _PlaylistPageState extends State<PlaylistPage> {
       icon: const Icon(FluentIcons.edit_24_filled),
       iconSize: 24,
       onPressed: () async {
-        final result = await showDialog<Map?>(
+        final playlistId = _resolvedPlaylistId;
+        if (playlistId == null) return;
+        final result = await showDialog<Map>(
           context: context,
-          builder: (context) => EditPlaylistDialog(
-            // Its result is saved, so it must carry the stored order, never
-            // the sorted one on screen.
-            playlistData: _storedPlaylist,
-          ),
+          builder: (context) =>
+              EditPlaylistDialog(playlistData: _storedPlaylist),
         );
-
-        if (result != null) {
-          final resolvedPlaylistYtid =
-              _playlist['ytid']?.toString() ?? widget.playlistId;
-          if (resolvedPlaylistYtid == null ||
-              resolvedPlaylistYtid.isEmpty ||
-              resolvedPlaylistYtid == 'null') {
-            showToast(context, context.l10n!.error);
-            return;
-          }
-
-          final updatedPlaylist = {
-            ..._playlist,
-            ...result,
-            'ytid': resolvedPlaylistYtid,
-            'source': _playlist['source'] ?? result['source'],
-            'list': result['list'] ?? _originalPlaylistList,
-          };
-
-          unawaited(
-            replaceCustomPlaylist(resolvedPlaylistYtid, updatedPlaylist),
+        if (result == null || !mounted) return;
+        try {
+          final saved = await updateCustomPlaylistMetadata(playlistId, result);
+          if (!mounted) return;
+          showToast(
+            context,
+            saved ? context.l10n!.playlistUpdated : context.l10n!.error,
           );
-
-          // Update offline playlist if it exists
-          unawaited(syncOfflinePlaylistMetadata(updatedPlaylist));
-
-          setState(() => _adoptPlaylist(updatedPlaylist));
-          showToast(context, context.l10n!.playlistUpdated);
+        } catch (error, stackTrace) {
+          logger.log(
+            'Could not save playlist',
+            error: error,
+            stackTrace: stackTrace,
+          );
+          if (mounted) showToast(context, context.l10n!.error);
         }
       },
       tooltip: context.l10n!.editPlaylist,
@@ -668,12 +651,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
     // One write for the whole selection, not one per song.
     final playlist = _storedPlaylist;
     final removed = removeSongsFromPlaylist(playlist, songs);
-    if (removed > 0) {
-      _originalPlaylistList = List<dynamic>.from(playlist['list'] as List);
-    }
-    _applySort();
     if (mounted) {
-      setState(() {});
       showToast(context, context.l10n!.songsRemoved(removed));
     }
   }
@@ -714,35 +692,20 @@ class _PlaylistPageState extends State<PlaylistPage> {
   }
 
   void _updateSongsListOnRemove(int indexToRestore, dynamic songToRemove) {
-    _originalPlaylistList = List<dynamic>.from(_originalPlaylistList)
-      ..removeAt(indexToRestore);
-    _applySort();
     final playlistId = _playlist['ytid'];
     if (mounted) {
-      setState(() {});
       showToastWithButton(
         context,
         context.l10n!.songRemoved,
         context.l10n!.undo.toUpperCase(),
         () {
-          final result = addSongInCustomPlaylist(
+          if (!mounted) return;
+          addSongInCustomPlaylist(
             context,
             playlistId,
             songToRemove,
             indexToInsert: indexToRestore,
           );
-          if (result == context.l10n!.songAdded &&
-              !_originalPlaylistList.any(
-                (song) => song['ytid'] == songToRemove['ytid'],
-              )) {
-            final safeIndex = indexToRestore.clamp(
-              0,
-              _originalPlaylistList.length,
-            );
-            _originalPlaylistList.insert(safeIndex, songToRemove);
-            _applySort();
-          }
-          if (mounted) setState(() {});
         },
       );
     } else {

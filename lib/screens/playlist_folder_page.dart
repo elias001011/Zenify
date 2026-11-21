@@ -35,6 +35,7 @@ import 'package:musify/widgets/dialog_parts.dart';
 import 'package:musify/widgets/empty_state.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/playlist_bar.dart';
 import 'package:musify/widgets/popup_menu_item.dart';
 
@@ -138,24 +139,26 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
               else
                 SliverPadding(
                   padding: commonListViewBottomPadding,
-                  sliver: SliverList.builder(
-                    itemCount: playlists.length,
-                    itemBuilder: (context, index) {
-                      final playlist = playlists[index];
-                      final borderRadius = getItemBorderRadius(
-                        index,
-                        playlists.length,
-                      );
-                      return PlaylistBar(
-                        key: listItemKey('folder_playlist', index, playlist),
-                        playlist['title'],
-                        playlistId: playlist['ytid'],
-                        playlistArtwork: playlist['image'],
-                        playlistData: playlist,
-                        onDelete: () => _showRemovePlaylistDialog(playlist),
-                        borderRadius: borderRadius,
-                      );
-                    },
+                  sliver: MusicSliverSurface(
+                    sliver: SliverList.builder(
+                      itemCount: playlists.length,
+                      itemBuilder: (context, index) {
+                        final playlist = playlists[index];
+                        final borderRadius = getItemBorderRadius(
+                          index,
+                          playlists.length,
+                        );
+                        return PlaylistBar(
+                          key: listItemKey('folder_playlist', index, playlist),
+                          playlist['title'],
+                          playlistId: playlist['ytid'],
+                          playlistArtwork: playlist['image'],
+                          playlistData: playlist,
+                          onDelete: () => _showRemovePlaylistDialog(playlist),
+                          borderRadius: borderRadius,
+                        );
+                      },
+                    ),
                   ),
                 ),
               const SliverMiniPlayerBottomSpace(),
@@ -334,6 +337,7 @@ class _PlaylistFolderPageState extends State<PlaylistFolderPage> {
       confirmIcon: FluentIcons.save_20_filled,
       confirmLabel: context.l10n!.update,
       onSubmit: (dialogContext, name) {
+        if (!mounted) return;
         final result = renamePlaylistFolder(
           widget.folderId,
           name,

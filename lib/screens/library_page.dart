@@ -195,7 +195,8 @@ class _LibraryPageState extends State<LibraryPage> {
           userPlaylistFolders.value.isNotEmpty ||
           userPlaylists.value.isNotEmpty ||
           userCustomPlaylists.value.isNotEmpty;
-      final hasOfflinePlaylists = offlinePlaylistService.offlinePlaylists.value
+      final hasOfflinePlaylists = offlinePlaylistService
+          .availableOfflinePlaylists
           .any(_isOfflinePlaylist);
       final hasOfflineArtists = getLikedArtistItems(offlineOnly: true)
           .isNotEmpty;
@@ -371,7 +372,8 @@ class _LibraryPageState extends State<LibraryPage> {
     final colorScheme = Theme.of(context).colorScheme;
     final isOffline = offlineMode.value;
 
-    final rawOfflinePlaylists = offlinePlaylistService.offlinePlaylists.value;
+    final rawOfflinePlaylists =
+        offlinePlaylistService.availableOfflinePlaylists;
     final visibleOfflinePlaylists = rawOfflinePlaylists
         .where(_isOfflinePlaylist)
         .toList();

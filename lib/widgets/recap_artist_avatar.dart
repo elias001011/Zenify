@@ -46,7 +46,8 @@ class _RecapArtistAvatarState extends State<RecapArtistAvatar> {
   @override
   void didUpdateWidget(covariant RecapArtistAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.artist.name != widget.artist.name ||
+    if (oldWidget.artist.id != widget.artist.id ||
+        oldWidget.artist.name != widget.artist.name ||
         oldWidget.artist.topSong['ytid'] != widget.artist.topSong['ytid']) {
       _requested = false;
       _image = null;
@@ -81,41 +82,27 @@ class _RecapArtistAvatarState extends State<RecapArtistAvatar> {
   }
 
   void _check() {
-    if (_requested || !_isVisible()) return;
-    _requested = true;
     final artist = widget.artist;
+    final id = artist.id;
+    if (id == null || _requested || !_isVisible() || offlineMode.value) {
+      return;
+    }
+    _requested = true;
     Future<void> load() async {
       try {
-        final cached = await getCachedArtistProfileForSong(
-          artist.name,
-          artist.topSong['ytid']?.toString(),
+        final profile = await getArtistProfile(
+          id,
+          preferredName: artist.name,
+          preferredVerified: true,
         );
-        if (!mounted ||
-            widget.artist.name != artist.name ||
-            widget.artist.topSong['ytid'] != artist.topSong['ytid'])
-          return;
-        if (!_isVisible()) {
+        if (!mounted || widget.artist.id != id) return;
+        if (!_isVisible() || offlineMode.value) {
           _requested = false;
           return;
         }
-        final profile =
-            cached ??
-            (offlineMode.value
-                ? null
-                : await getArtistProfile(
-                    artist.name,
-                    preferredName: artist.name,
-                    sourceSongId: artist.topSong['ytid']?.toString(),
-                  ));
-        if (!mounted ||
-            widget.artist.name != artist.name ||
-            widget.artist.topSong['ytid'] != artist.topSong['ytid'])
-          return;
         final image = profile?['image']?.toString();
         if (image != null && image.isNotEmpty) {
           setState(() => _image = image);
-        } else if (offlineMode.value) {
-          _requested = false;
         }
       } catch (_) {
         // The song artwork remains usable if the cache or network is unavailable.

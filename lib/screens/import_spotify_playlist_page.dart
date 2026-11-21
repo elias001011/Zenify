@@ -148,7 +148,22 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
     ];
 
     if (!mounted) return;
-    final (_, playlistId) = createCustomPlaylist(playlistName, null, context);
+    final String playlistId;
+    try {
+      playlistId = await createCustomPlaylist(playlistName, null);
+    } catch (error, stackTrace) {
+      logger.log(
+        'Could not create playlist',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (mounted) {
+        setState(() => _isImporting = false);
+        showToast(context, context.l10n!.error);
+      }
+      return;
+    }
+    if (!mounted) return;
     addSongsInCustomPlaylist(context, playlistId, foundSongs);
     setState(() => _isImporting = false);
 
@@ -175,11 +190,28 @@ class _ImportSpotifyPlaylistPageState extends State<ImportSpotifyPlaylistPage> {
         ),
       );
       if (picked != null && picked.isNotEmpty && mounted) {
-        addSongsInCustomPlaylist(context, playlistId, picked.values.toList());
-        imported += picked.length;
+        final reviewed = <int, Map>{
+          for (final row in missingRows)
+            if (picked['file:${row.index}'] case final song?) row.index: song,
+        };
+        try {
+          imported += await insertReviewedPlaylistSongs(
+            playlistId,
+            foundByIndex,
+            reviewed,
+          );
+        } catch (error, stackTrace) {
+          logger.log(
+            'Could not save reviewed CSV rows',
+            error: error,
+            stackTrace: stackTrace,
+          );
+          if (mounted) showToast(context, context.l10n!.error);
+          return;
+        }
         stillMissing = [
           for (final row in missingRows)
-            if (!picked.containsKey('file:${row.index}')) row,
+            if (!reviewed.containsKey(row.index)) row,
         ];
       }
     }

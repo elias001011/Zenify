@@ -75,13 +75,24 @@ class TopArtistTile extends StatelessWidget {
   final ListeningArtist artist;
   final int? rank;
 
-  /// Defaults to opening the artist's page.
+  /// Opens the credited profile or searches for an older unverified credit.
   final VoidCallback? onTap;
 
   void _openArtist(BuildContext context) {
+    final id = artist.id;
+    if (id == null) {
+      context.push(
+        Uri(
+          path: NavigationManager.searchPath,
+          queryParameters: {'q': artist.name},
+        ).toString(),
+      );
+      return;
+    }
     final destination = NavigationManager.artistDestination(
       context,
       name: artist.name,
+      artistId: id,
       sourceSongId: artist.topSong['ytid']?.toString() ?? '',
     );
     if (destination != null) {

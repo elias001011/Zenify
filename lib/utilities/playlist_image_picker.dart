@@ -25,6 +25,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:fluentui_system_icons/fluentui_system_icons.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/utilities/artwork_provider.dart';
 import 'package:musify/utilities/cover_image.dart';
 
 Future<String?> pickImage() async {
@@ -76,39 +77,23 @@ Widget buildImagePreview({
   double width = 80,
   double height = 80,
 }) {
-  Widget? imageWidget;
-
-  if (imageBase64 != null) {
-    final base64Data = imageBase64.contains(',')
-        ? imageBase64.split(',').last
-        : imageBase64;
-
-    imageWidget = Image.memory(
-      base64Decode(base64Data),
-      width: width,
-      height: height,
-      fit: BoxFit.cover,
-    );
-  } else if (imageUrl != null && imageUrl.isNotEmpty) {
-    imageWidget = Image.network(
-      imageUrl,
-      width: width,
-      height: height,
-      fit: BoxFit.cover,
-      errorBuilder: (context, _, __) => Icon(
-        FluentIcons.image_off_20_regular,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    );
-  }
-
-  if (imageWidget == null) return const SizedBox.shrink();
+  final source = imageBase64 ?? imageUrl;
+  if (source == null || source.isEmpty) return const SizedBox.shrink();
 
   return Padding(
     padding: const EdgeInsets.only(top: 12),
     child: ClipRRect(
       borderRadius: BorderRadius.circular(12),
-      child: imageWidget,
+      child: Image(
+        image: ArtworkProvider.get(source),
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
+        errorBuilder: (context, _, __) => Icon(
+          FluentIcons.image_off_20_regular,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
     ),
   );
 }

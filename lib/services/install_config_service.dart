@@ -90,10 +90,7 @@ class InstallConfig {
     try {
       final directory = Directory(target);
       await directory.create(recursive: true);
-      final probe = File(
-        '${directory.path}${Platform.pathSeparator}.write-test',
-      );
-      await probe.writeAsString('ok', flush: true);
+      final probe = await directory.createTemp('.zenify-write-');
       await probe.delete();
 
       final report = await copyHiveBoxes(

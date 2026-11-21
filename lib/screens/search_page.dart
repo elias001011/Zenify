@@ -46,6 +46,7 @@ import 'package:musify/widgets/confirmation_dialog.dart';
 import 'package:musify/widgets/custom_bar.dart';
 import 'package:musify/widgets/floating_island.dart';
 import 'package:musify/widgets/mini_player_bottom_space.dart';
+import 'package:musify/widgets/music_list_surface.dart';
 import 'package:musify/widgets/playlist_bar.dart';
 import 'package:musify/widgets/radio_station_card.dart';
 import 'package:musify/widgets/section_title.dart';
@@ -592,11 +593,12 @@ class _SearchPageState extends State<SearchPage> {
         ),
       );
 
+      final rows = <Widget>[];
       final songsCount = _songsSearchResult.length;
       for (var index = 0; index < songsCount; index++) {
         final song = _songsSearchResult[index];
         final borderRadius = getItemBorderRadius(index, songsCount);
-        widgets.add(
+        rows.add(
           SongBar(
             song,
             true,
@@ -606,6 +608,11 @@ class _SearchPageState extends State<SearchPage> {
           ),
         );
       }
+      final group = MusicListSurface(
+        groupRows: true,
+        child: Column(children: rows),
+      );
+      widgets.add(group);
     }
 
     // Albums section
@@ -618,13 +625,14 @@ class _SearchPageState extends State<SearchPage> {
         ),
       );
 
+      final rows = <Widget>[];
       final albumsCount = _albumsSearchResult.length;
 
       for (var index = 0; index < albumsCount; index++) {
         final playlist = _albumsSearchResult[index];
         final borderRadius = getItemBorderRadius(index, albumsCount);
 
-        widgets.add(
+        rows.add(
           PlaylistBar(
             key: listItemKey('search_album', index, playlist),
             playlist['title'],
@@ -637,6 +645,11 @@ class _SearchPageState extends State<SearchPage> {
           ),
         );
       }
+      final group = MusicListSurface(
+        groupRows: true,
+        child: Column(children: rows),
+      );
+      widgets.add(group);
     }
 
     // Playlists section
@@ -649,28 +662,30 @@ class _SearchPageState extends State<SearchPage> {
         ),
       );
 
+      final rows = <Widget>[];
       final playlistsCount = _playlistsSearchResult.length;
 
       for (var index = 0; index < playlistsCount; index++) {
         final playlist = _playlistsSearchResult[index];
-        final isLast = index == playlistsCount - 1;
         final borderRadius = getItemBorderRadius(index, playlistsCount);
 
-        widgets.add(
-          Padding(
-            padding: isLast ? commonListViewBottomPadding : EdgeInsets.zero,
-            child: PlaylistBar(
-              key: listItemKey('search_playlist', index, playlist),
-              playlist['title'],
-              playlistId: playlist['ytid'],
-              playlistArtwork: playlist['image'],
-              playlistData: _inLibrary(playlist) ? playlist : null,
-              cubeIcon: FluentIcons.apps_list_24_filled,
-              borderRadius: borderRadius,
-            ),
+        rows.add(
+          PlaylistBar(
+            key: listItemKey('search_playlist', index, playlist),
+            playlist['title'],
+            playlistId: playlist['ytid'],
+            playlistArtwork: playlist['image'],
+            playlistData: _inLibrary(playlist) ? playlist : null,
+            cubeIcon: FluentIcons.apps_list_24_filled,
+            borderRadius: borderRadius,
           ),
         );
       }
+      final group = MusicListSurface(
+        groupRows: true,
+        child: Column(children: rows),
+      );
+      widgets.add(Padding(padding: commonListViewBottomPadding, child: group));
     }
 
     // Radio Stations section

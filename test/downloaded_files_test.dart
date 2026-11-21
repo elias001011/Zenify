@@ -83,6 +83,30 @@ void main() {
   });
 
   test(
+    'bulk deletion preserves unregistered files in a custom folder',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'zenify_custom_downloads',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      applicationDirPath = '${root.path}/app';
+      downloadsDirPath = '${root.path}/custom';
+      await FilePaths.ensureDirectoriesExist();
+      final registered = File(FilePaths.getAudioPath('aaaaaaaaaaa'))
+        ..writeAsStringSync('download');
+      final other = File(FilePaths.getAudioPath('bbbbbbbbbbb'))
+        ..writeAsStringSync('different file');
+
+      await FilePaths.deleteDownloadedFiles([
+        {'audioPath': registered.path},
+      ]);
+
+      expect(registered.existsSync(), isFalse);
+      expect(other.readAsStringSync(), 'different file');
+    },
+  );
+
+  test(
     'download cleanup keeps files reached by traversal or symlink',
     () async {
       final root = await Directory.systemTemp.createTemp('zenify_cleanup');

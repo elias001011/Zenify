@@ -237,8 +237,9 @@ Future<Map<String, dynamic>?> getArtistProfile(
   }
 
   if (forceRefresh || !cacheResult) return load();
+  final lookup = artistId.trim();
   final key = (
-    artistId.trim().toLowerCase(),
+    _isChannelId(lookup) ? lookup : lookup.toLowerCase(),
     sourceSongId,
     sourceVideoAuthor,
     preferredName,
@@ -633,7 +634,10 @@ Future<({List<Map<String, dynamic>> songs, bool isComplete})> _catalogSongsOf(
         songs.add({
           ...song,
           if (artistName.isNotEmpty) 'artist': artistName,
-          if (artistId != null && artistId.isNotEmpty) 'artistId': artistId,
+          if (artistId != null && artistId.isNotEmpty) ...{
+            'artistId': artistId,
+            'creditedArtistId': artistId,
+          },
         });
       }
     }

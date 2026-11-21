@@ -26,6 +26,7 @@ import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/constants/app_constants.dart';
 import 'package:musify/extensions/l10n.dart';
+import 'package:musify/main.dart' show logger;
 import 'package:musify/services/artist_service.dart';
 import 'package:musify/services/common_services.dart';
 import 'package:musify/services/playlists_manager.dart';
@@ -609,18 +610,29 @@ class PlaylistBar extends StatelessWidget {
   }
 
   Future<void> _handleEdit(BuildContext context) async {
-    if (playlistData == null) return;
+    final data = playlistData;
+    final id = data?['ytid']?.toString();
+    if (data == null || id == null) return;
 
-    final result = await showDialog<Map?>(
+    final result = await showDialog<Map>(
       context: context,
-      builder: (context) => EditPlaylistDialog(playlistData: playlistData!),
+      builder: (context) => EditPlaylistDialog(playlistData: data),
     );
-
-    if (result != null &&
-        await replaceCustomPlaylist(playlistData!['ytid'].toString(), result)) {
-      unawaited(syncOfflinePlaylistMetadata(result));
-      final appCtx = NavigationManager().context;
-      showToast(appCtx, appCtx.l10n!.playlistUpdated);
+    if (result == null || !context.mounted) return;
+    try {
+      final saved = await updateCustomPlaylistMetadata(id, result);
+      if (!context.mounted) return;
+      showToast(
+        context,
+        saved ? context.l10n!.playlistUpdated : context.l10n!.error,
+      );
+    } catch (error, stackTrace) {
+      logger.log(
+        'Could not save playlist',
+        error: error,
+        stackTrace: stackTrace,
+      );
+      if (context.mounted) showToast(context, context.l10n!.error);
     }
   }
 

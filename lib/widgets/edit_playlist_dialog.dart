@@ -125,20 +125,10 @@ class _EditPlaylistDialogState extends State<EditPlaylistDialog> {
             final title = _titleController.text.trim();
             // A playlist without a name could not be told apart.
             if (title.isEmpty) return;
-            final newPlaylist = {
-              'ytid': widget.playlistData['ytid'],
+            Navigator.pop(context, <String, String?>{
               'title': title,
-              'source': widget.playlistData['source'] ?? 'user-created',
-              if (_imageBase64 != null)
-                'image': _imageBase64
-              else if (_imageUrlController.text.isNotEmpty)
-                'image': _imageUrlController.text,
-              'list': widget.playlistData['list'],
-              if (widget.playlistData['createdAt'] != null)
-                'createdAt': widget.playlistData['createdAt'],
-            };
-
-            Navigator.pop(context, newPlaylist);
+              'image': _imageBase64 ?? _imageUrlController.text.trim(),
+            });
           },
           icon: const Icon(FluentIcons.save_20_regular),
           label: Text(context.l10n!.update),

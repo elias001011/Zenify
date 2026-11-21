@@ -24,6 +24,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:hive_ce/hive_ce.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:musify/extensions/l10n.dart';
@@ -45,6 +46,7 @@ class OfflinePlaylistService {
   final Map<String, ValueNotifier<DownloadProgress>> downloadProgressNotifiers =
       {};
   final List<String> activeDownloads = [];
+  final _playlistRuns = <String, Completer<void>>{};
 
   // List of playlists that are fully available offline
   final offlinePlaylists = ValueNotifier<List<dynamic>>(
@@ -60,19 +62,79 @@ class OfflinePlaylistService {
     return downloadProgressNotifiers[playlistId]!;
   }
 
-  bool isPlaylistDownloaded(String playlistId) {
-    return offlinePlaylists.value.any(
-      (playlist) => playlist['ytid'] == playlistId,
-    );
-  }
+  var _unavailablePlaylists = <String>{};
 
-  Map? getOfflinePlaylist(String playlistId) {
-    for (final playlist in offlinePlaylists.value) {
-      if (playlist is Map && playlist['ytid']?.toString() == playlistId) {
-        return playlist;
+  Iterable<Map> get availableOfflinePlaylists =>
+      offlinePlaylists.value.whereType<Map>().where(
+        (playlist) =>
+            !_unavailablePlaylists.contains(playlist['ytid']?.toString()),
+      );
+
+  bool isPlaylistDownloaded(String playlistId) =>
+      getOfflinePlaylist(playlistId) != null;
+
+  Map? getOfflinePlaylist(String playlistId) => availableOfflinePlaylists
+      .where((playlist) => playlist['ytid']?.toString() == playlistId)
+      .firstOrNull;
+
+  /// Rechecks old flags against the registry and the files. A registered song
+  /// on a disconnected disk keeps its playlist entry for the next check.
+  Future<void> validateStoredPlaylists() async {
+    final current = offlinePlaylists.value;
+    if (current.isEmpty) {
+      _unavailablePlaylists.clear();
+      return;
+    }
+    final registered = <String, Map>{
+      for (final song in userOfflineSongs.value.whereType<Map>())
+        if (song['ytid'] case final String id when id.isNotEmpty) id: song,
+    };
+    final files = <String, bool>{};
+    final kept = <Map>[];
+    final unavailable = <String>{};
+    for (final playlist in current.whereType<Map>()) {
+      final id = playlist['ytid']?.toString();
+      final songs = playlist['list'];
+      if (id == null || songs is! List || songs.isEmpty) continue;
+      final ids = songs.whereType<Map>().map((s) => s['ytid']?.toString());
+      if (ids.length != songs.length || !ids.every(registered.containsKey)) {
+        continue;
+      }
+      kept.add(playlist);
+      for (final songId in ids.whereType<String>().toSet()) {
+        final exists = files[songId] ??= await _registeredAudioExists(
+          songId,
+          registered[songId]!,
+        );
+        if (exists) {
+          continue;
+        }
+        unavailable.add(id);
+        break;
       }
     }
-    return null;
+
+    // Downloads and removals can publish a new list while a file is checked.
+    if (!identical(current, offlinePlaylists.value)) return;
+    final lostFlags = kept.length != current.length;
+    if (!lostFlags && setEquals(_unavailablePlaylists, unavailable)) return;
+    _unavailablePlaylists = unavailable;
+    offlinePlaylists.value = kept;
+    if (lostFlags) {
+      await addOrUpdateData<List>('userNoBackup', 'offlinePlaylists', kept);
+    }
+  }
+
+  Future<bool> _registeredAudioExists(String id, Map song) async {
+    final path = song['audioPath'];
+    final file = File(
+      path is String && path.isNotEmpty ? path : FilePaths.getAudioPath(id),
+    );
+    try {
+      return await file.length() > 0;
+    } on FileSystemException {
+      return false;
+    }
   }
 
   bool isPlaylistDownloading(String playlistId) {
@@ -84,11 +146,14 @@ class OfflinePlaylistService {
     final id = playlist['ytid']?.toString();
     final pList = playlist['list'] as List?;
     if (id == null || pList == null || pList.isEmpty) return;
-    if (isPlaylistDownloaded(id)) return;
+    if (offlinePlaylists.value.whereType<Map>().any((p) => p['ytid'] == id)) {
+      return;
+    }
 
     final offlineSongIds = userOfflineSongs.value.map((s) => s['ytid']).toSet();
     if (!pList.every((s) => offlineSongIds.contains(s['ytid']))) return;
 
+    _unavailablePlaylists.remove(id);
     offlinePlaylists.value = [
       ...offlinePlaylists.value,
       {
@@ -107,6 +172,10 @@ class OfflinePlaylistService {
   }
 
   Future<void> downloadPlaylist(BuildContext context, Map playlist) async {
+    if (DownloadManager.instance.storageBusy) {
+      showToast(context, context.l10n!.downloadsFolderBusy);
+      return;
+    }
     final playlistId = playlist['ytid'] as String? ?? playlist['title'];
 
     if (playlistId == null || playlistId.isEmpty) {
@@ -131,6 +200,7 @@ class OfflinePlaylistService {
     final progressNotifier = getProgressNotifier(playlistId)
       ..value = DownloadProgress(total: songsList.length);
     activeDownloads.add(playlistId);
+    final run = _playlistRuns[playlistId] = Completer<void>();
 
     try {
       // The manager queues them with every other download.
@@ -151,17 +221,14 @@ class OfflinePlaylistService {
         error: e,
         stackTrace: stackTrace,
       );
-      activeDownloads.remove(playlistId);
-      cleanupProgressNotifier(playlistId);
       if (context.mounted) {
         showToast(context, '${context.l10n!.error}: $e');
       }
     } finally {
-      // Ensure cleanup happens even if _handleDownloadCompletion throws
-      if (activeDownloads.contains(playlistId)) {
-        activeDownloads.remove(playlistId);
-        cleanupProgressNotifier(playlistId);
-      }
+      activeDownloads.remove(playlistId);
+      cleanupProgressNotifier(playlistId);
+      _playlistRuns.remove(playlistId);
+      run.complete();
     }
   }
 
@@ -172,9 +239,6 @@ class OfflinePlaylistService {
     ValueNotifier<DownloadProgress> progressNotifier,
   ) async {
     try {
-      // Remove from active downloads
-      activeDownloads.remove(playlistId);
-
       final songsList = playlist['list'] as List<dynamic>;
 
       // Only call the playlist downloaded once every song is available.
@@ -225,10 +289,13 @@ class OfflinePlaylistService {
           if (pList == null ||
               pList.isEmpty ||
               p['ytid'] == playlistId ||
-              isPlaylistDownloaded(p['ytid']?.toString() ?? '')) {
+              updatedPlaylists.any(
+                (saved) => saved is Map && saved['ytid'] == p['ytid'],
+              )) {
             continue;
           }
           if (pList.every((s) => offlineSongIds.contains(s['ytid']))) {
+            _unavailablePlaylists.remove(p['ytid']?.toString());
             updatedPlaylists.add({
               ...p,
               'list': pList,
@@ -237,6 +304,7 @@ class OfflinePlaylistService {
           }
         }
 
+        _unavailablePlaylists.remove(playlistId);
         offlinePlaylists.value = updatedPlaylists;
         unawaited(
           addOrUpdateData<List>(
@@ -253,9 +321,6 @@ class OfflinePlaylistService {
           );
         }
       }
-
-      // Clean up the progress notifier now that the download is fully done.
-      cleanupProgressNotifier(playlistId);
     } catch (e, stackTrace) {
       logger.log(
         'Error handling download completion',
@@ -266,38 +331,15 @@ class OfflinePlaylistService {
   }
 
   Future<void> cancelDownload(BuildContext context, String playlistId) async {
-    if (!isPlaylistDownloading(playlistId)) return;
-
-    try {
-      final progressNotifier = getProgressNotifier(playlistId);
-      progressNotifier.value.isCancelled = true;
-      progressNotifier.notifyListeners();
-
-      // Immediate visual feedback
-      showToast(context, context.l10n!.cancellingDownload);
-
-      const maxWaitTime = Duration(seconds: 30);
-      final startTime = DateTime.now();
-
-      // Wait for the ongoing tasks to complete with timeout
-      while (activeDownloads.contains(playlistId)) {
-        await Future.delayed(const Duration(milliseconds: 100));
-
-        if (DateTime.now().difference(startTime) > maxWaitTime) {
-          logger.log('Timeout waiting for download cancellation');
-          activeDownloads.remove(playlistId);
-          cleanupProgressNotifier(playlistId);
-          break;
-        }
-      }
-
-      showToast(context, context.l10n!.downloadCancelled);
-    } catch (e, stackTrace) {
-      logger.log('Error cancelling download', error: e, stackTrace: stackTrace);
-      // Force remove from active downloads and cleanup on error
-      activeDownloads.remove(playlistId);
-      cleanupProgressNotifier(playlistId);
-    }
+    final run = _playlistRuns[playlistId];
+    if (run == null) return;
+    final progressNotifier = getProgressNotifier(playlistId);
+    if (progressNotifier.value.isCancelled) return;
+    progressNotifier.value.isCancelled = true;
+    progressNotifier.notifyListeners();
+    showToast(context, context.l10n!.cancellingDownload);
+    await run.future;
+    if (context.mounted) showToast(context, context.l10n!.downloadCancelled);
   }
 
   Future<void> removeOfflinePlaylist(String playlistId) async {
@@ -356,6 +398,7 @@ class OfflinePlaylistService {
         ..removeWhere(
           (p) => p is Map && p['ytid']?.toString() == normalizedPlaylistId,
         );
+      _unavailablePlaylists.remove(normalizedPlaylistId);
       offlinePlaylists.value = updatedPlaylists;
       unawaited(
         addOrUpdateData<List>(
@@ -437,10 +480,10 @@ class OfflinePlaylistService {
     return songIds;
   }
 
-  Future<void> deleteAllDownloads() async {
-    // What the manager is downloading stops first: a download that went on
-    // would register its song again after this has deleted them.
-    await DownloadManager.instance.stopAll();
+  Future<void> deleteAllDownloads() =>
+      DownloadManager.instance.withExclusiveStorage(_deleteAllDownloads);
+
+  Future<void> _deleteAllDownloads() async {
     // Cancel all active downloads first and wait for them to stop
     final activeIds = List<String>.from(activeDownloads);
     for (final id in activeIds) {
@@ -451,16 +494,10 @@ class OfflinePlaylistService {
       }
     }
 
-    const maxWaitTime = Duration(seconds: 30);
-    final startTime = DateTime.now();
-    while (activeDownloads.isNotEmpty) {
-      if (DateTime.now().difference(startTime) > maxWaitTime) {
-        logger.log('Timeout waiting for downloads to cancel before delete');
-        activeDownloads.clear();
-        break;
-      }
-      await Future.delayed(const Duration(milliseconds: 100));
-    }
+    // Wait for transfers to release their files before clearing the library.
+    await DownloadManager.instance.stopAll();
+
+    await Future.wait([for (final run in _playlistRuns.values) run.future]);
 
     try {
       await FilePaths.deleteDownloadedFiles(userOfflineSongs.value);
@@ -469,6 +506,7 @@ class OfflinePlaylistService {
 
       userOfflineSongs.value = [];
 
+      _unavailablePlaylists.clear();
       offlinePlaylists.value = [];
       DownloadManager.instance.clearHistory();
 
