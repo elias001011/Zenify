@@ -19,7 +19,6 @@
  *     please visit: https://github.com/gokadzev/Musify
  */
 
-
 import 'package:material_ui/material_ui.dart';
 
 /// A [GestureDetector] that shows the hand cursor over what it handles.
@@ -32,6 +31,7 @@ class ClickDetector extends GestureDetector {
     super.onTapUp,
     super.onTapCancel,
     super.onVerticalDragUpdate,
+    super.onVerticalDragEnd,
     super.behavior,
   });
 

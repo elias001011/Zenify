@@ -249,8 +249,10 @@ class LocalSyncService {
   /// Runs once a pairing is trusted and before the reply is sent (tests).
   @visibleForTesting
   Future<void> Function()? beforePairingReply;
-  http.Client? _client;
+  http.Client? _clientInstance;
+  http.Client get _client => _clientInstance ??= http.Client();
   Future<void> _pairedWrites = Future.value();
+  final Map<String, Future<void>> _counterWrites = {};
   Future<void> _serverOperations = Future.value();
   int _activeTransfers = 0;
   Completer<void>? _transfersIdle;
@@ -456,8 +458,8 @@ class LocalSyncService {
     _settleTimer?.cancel();
     await _stopBackgroundWork();
     await stopServer();
-    _client?.close();
-    _client = null;
+    _clientInstance?.close();
+    _clientInstance = null;
     _initialised = false;
   }
 
@@ -538,6 +540,27 @@ class LocalSyncService {
 
   bool isDevicePaired(String deviceId) => _paired(deviceId) != null;
 
+  Future<T> _serializeCounter<T>(
+    String deviceId,
+    Future<T> Function() action,
+  ) async {
+    final previous = _counterWrites[deviceId] ?? Future<void>.value();
+    final done = Completer<void>();
+
+    _counterWrites[deviceId] = done.future;
+
+    try {
+      await previous;
+      return await action();
+    } finally {
+      done.complete();
+
+      if (identical(_counterWrites[deviceId], done.future)) {
+        unawaited(_counterWrites.remove(deviceId));
+      }
+    }
+  }
+
   Future<void> _serializePaired(Future<void> Function() action) {
     final result = _pairedWrites.then((_) => action());
     _pairedWrites = result.then<void>(
@@ -562,11 +585,17 @@ class LocalSyncService {
       ..removeWhere((item) => item.deviceId == deviceId);
     await _storePairedDevices(updated);
     await _dropCounters((key) => key.contains(':$deviceId:'));
+    _retryAfter.remove(deviceId);
+    _retryCount.remove(deviceId);
+    _verifiedAddress.remove(deviceId);
   });
 
   Future<void> forgetAllDevices() => _serializePaired(() async {
     await _storePairedDevices(const []);
     await _dropCounters((_) => true);
+    _retryAfter.clear();
+    _retryCount.clear();
+    _verifiedAddress.clear();
   });
 
   Iterable<String> _counterKeys(bool Function(String key) matches) =>
@@ -662,6 +691,9 @@ class LocalSyncService {
     final datagram = _udpSocket?.receive();
     final server = _httpServer;
     if (datagram == null || server == null) return;
+    if (!_isPeerAddress(datagram.address, allowLoopback: _allowLoopbackPeers)) {
+      return;
+    }
 
     String message;
     try {
@@ -671,13 +703,24 @@ class LocalSyncService {
     }
     if (message != _discoveryRequest) return;
 
+    final safeName = _sanitizeName(deviceName.replaceAll(';', ' '));
     final response =
-        '$_discoveryResponse;${deviceName.replaceAll(';', ' ')};'
+        '$_discoveryResponse;$safeName;'
         '${server.port};${LibraryMergeService.deviceId}';
     _udpSocket?.send(utf8.encode(response), datagram.address, datagram.port);
   }
 
   Future<void> _handle(HttpRequest request) async {
+    final remote = request.connectionInfo?.remoteAddress;
+    if (remote == null ||
+        !_isPeerAddress(remote, allowLoopback: _allowLoopbackPeers)) {
+      try {
+        request.response.statusCode = 403;
+        await request.response.close();
+      } catch (_) {}
+      return;
+    }
+
     final handler = request.method != 'POST'
         ? null
         : switch (request.uri.path) {
@@ -781,7 +824,7 @@ class LocalSyncService {
         return (426, {'error': 'upgrade_required'});
       }
       final id = data['clientId'];
-      if (id is! String || id.isEmpty || id.length > 128) {
+      if (id is! String || !_isValidDeviceId(id)) {
         return (400, {'error': 'invalid_pairing'});
       }
       final now = _pairingNow();
@@ -798,8 +841,7 @@ class LocalSyncService {
       }
       _lastPairingRequest = now;
       _pendingClientId = id;
-      final name = data['clientName']?.toString() ?? appName;
-      _pendingClientName = name.substring(0, min(100, name.length));
+      _pendingClientName = _sanitizeName(data['clientName']?.toString() ?? '');
       final session = SyncSecurity.randomToken(16);
       _pendingSession = session;
       _pendingCompleter = Completer<bool>();
@@ -894,8 +936,15 @@ class LocalSyncService {
         error: e,
         stackTrace: stackTrace,
       );
+
       _cancelPendingPairing();
+
+      if (completer != null && !completer.isCompleted) {
+        completer.complete(false);
+      }
+
       await _undoTrust(id, previous, counters);
+
       return (500, {'error': 'pairing_failed'});
     }
   }
@@ -978,6 +1027,8 @@ class LocalSyncService {
         await _savePairedDeviceUnlocked(
           PairedSyncDevice(deviceId: deviceId, name: name, secret: secret),
         );
+        _retryAfter.remove(deviceId);
+        _retryCount.remove(deviceId);
         await _dropCounters(
           (key) =>
               key.contains(':$deviceId:') && !key.endsWith(syncDigest(secret)),
@@ -1034,15 +1085,25 @@ class LocalSyncService {
     if (nonce is! String || nonce.length < 20 || nonce.length > 128) {
       throw const _HttpFailure(400, 'invalid_request');
     }
-    final store = Hive.box('userNoBackup');
     final counterKey = 'localSyncReceived:$id:${syncDigest(peer.secret)}';
+
     final sequence = body['sequence'];
-    if (sequence is! int ||
-        sequence <= (store.get(counterKey, defaultValue: 0) as int)) {
-      throw const _HttpFailure(403, 'replayed_request');
+
+    if (sequence is! int || sequence < 1) {
+      throw const _HttpFailure(400, 'invalid_request');
     }
-    await store.put(counterKey, sequence);
-    await store.flush();
+
+    await _serializeCounter(id, () async {
+      final store = Hive.box('userNoBackup');
+      final previous = store.get(counterKey, defaultValue: 0);
+
+      if (previous is! int || sequence <= previous) {
+        throw const _HttpFailure(403, 'replayed_request');
+      }
+
+      await store.put(counterKey, sequence);
+      await store.flush();
+    });
     return (body: body, peer: peer);
   }
 
@@ -1161,10 +1222,13 @@ class LocalSyncService {
     RawDatagramSocket? socket;
     StreamSubscription<RawSocketEvent>? subscription;
     final ownDeviceId = LibraryMergeService.deviceId;
+    var acquiredLock = false;
 
     try {
-      if (isAndroidPlatform) await _acquireMulticastLock();
-
+      if (isAndroidPlatform && _httpServer == null) {
+        await _acquireMulticastLock();
+        acquiredLock = true;
+      }
       socket = await RawDatagramSocket.bind(InternetAddress.anyIPv4, 0)
         ..broadcastEnabled = true;
 
@@ -1254,9 +1318,7 @@ class LocalSyncService {
     } finally {
       await subscription?.cancel();
       socket?.close();
-      if (isAndroidPlatform && _httpServer == null) {
-        await _releaseMulticastLock();
-      }
+      if (acquiredLock) await _releaseMulticastLock();
     }
 
     return discovered;
@@ -1492,10 +1554,15 @@ class LocalSyncService {
       return result.local.isNotEmpty;
     } catch (e) {
       logger.log('Automatic local sync with ${device.name} failed: $e');
+      final untrusted =
+          (e is _LocalSyncException && e.error == LocalSyncError.untrusted) ||
+          (e is _HttpFailure && e.status == 403 && e.code == 'not_paired');
       final count = (_retryCount[device.deviceId] ?? 0) + 1;
       _retryCount[device.deviceId] = count;
       _retryAfter[device.deviceId] = DateTime.now().add(
-        Duration(seconds: min(1800, 30 * pow(2, min(count, 6)).toInt())),
+        untrusted
+            ? const Duration(hours: 24)
+            : Duration(seconds: min(1800, 30 * pow(2, min(count, 6)).toInt())),
       );
       return false;
     }
@@ -1512,9 +1579,10 @@ class LocalSyncService {
       'clientId': LibraryMergeService.deviceId,
       'clientName': deviceName,
     }, timeout: _shortTimeout);
-    if (response['deviceId'] != target.deviceId ||
-        response['session'] is! String ||
-        response['challenge'] is! Map) {
+    if (response['deviceId'] != target.deviceId) {
+      throw const _LocalSyncException(LocalSyncError.unreachable);
+    }
+    if (response['session'] is! String || response['challenge'] is! Map) {
       throw const _LocalSyncException(LocalSyncError.updateRequired);
     }
     _outgoingSession = response['session'];
@@ -1546,7 +1614,7 @@ class LocalSyncService {
     }
     await _trust(
       target.deviceId,
-      proof['deviceName']?.toString() ?? target.name,
+      _sanitizeName(proof['deviceName']?.toString() ?? target.name),
       secret,
     );
     _outgoingSession = null;
@@ -1707,19 +1775,35 @@ class LocalSyncService {
     if (encoded.length > maxSyncMessageBytes) {
       throw const _LocalSyncException(LocalSyncError.tooLarge);
     }
+
+    final abort = Completer<void>();
+    final deadline = Timer(timeout, () {
+      if (!abort.isCompleted) abort.complete();
+    });
     final outgoing =
-        http.Request(
+        http.AbortableRequest(
             'POST',
             Uri(scheme: 'http', host: target.ip, port: target.port, path: path),
+            abortTrigger: abort.future,
           )
           // A peer must not be able to send this request on to another host.
           ..followRedirects = false
           ..maxRedirects = 0
           ..headers.addAll({'Content-Type': 'application/json', ...headers})
           ..bodyBytes = encoded;
-    final client = _client ??= http.Client();
-    final response = await client.send(outgoing).timeout(timeout);
-    final responseBytes = await _readMessage(response.stream).timeout(timeout);
+
+    final int statusCode;
+    final Uint8List responseBytes;
+    try {
+      final response = await _client.send(outgoing);
+      statusCode = response.statusCode;
+      responseBytes = await _readMessage(response.stream);
+    } on http.RequestAbortedException {
+      throw TimeoutException('Request to ${target.ip} timed out');
+    } finally {
+      deadline.cancel();
+    }
+
     dynamic decoded;
     try {
       decoded = json.decode(utf8.decode(responseBytes));
@@ -1727,9 +1811,9 @@ class LocalSyncService {
       decoded = null;
     }
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
+    if (statusCode < 200 || statusCode >= 300) {
       final code = decoded is Map ? decoded['error']?.toString() : null;
-      throw _HttpFailure(response.statusCode, code ?? '');
+      throw _HttpFailure(statusCode, code ?? '');
     }
     if (decoded is! Map) {
       throw const _LocalSyncException(LocalSyncError.failed);
@@ -1746,6 +1830,7 @@ class LocalSyncService {
         429 => LocalSyncError.busy,
         413 => LocalSyncError.tooLarge,
         403 when error.code == 'incorrect_pin' => LocalSyncError.incorrectPin,
+        403 when error.code == 'replayed_request' => LocalSyncError.failed,
         403 => pairing ? LocalSyncError.rejected : LocalSyncError.untrusted,
         _ => LocalSyncError.failed,
       };

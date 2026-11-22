@@ -176,10 +176,10 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
     child: child,
   );
 
-  static const double _dragThresholdForNavigation = 10;
+  static const double _swipeUpVelocity = -300;
 
-  void _handleVerticalDrag(DragUpdateDetails details) {
-    if ((details.primaryDelta ?? 0) < -_dragThresholdForNavigation) {
+  void _onVerticalDragEnd(DragEndDetails details) {
+    if ((details.primaryVelocity ?? 0) < _swipeUpVelocity) {
       _navigateToNowPlaying();
     }
   }
@@ -204,7 +204,7 @@ class _MiniPlayerBodyState extends State<_MiniPlayerBody> {
         },
         onTapUp: (_) => setState(() => _pressed = false),
         onTapCancel: () => setState(() => _pressed = false),
-        onVerticalDragUpdate: _handleVerticalDrag,
+        onVerticalDragEnd: _onVerticalDragEnd,
         onTap: _navigateToNowPlaying,
         child: SizedBox(
           height: MiniPlayer.playerHeight,
@@ -539,15 +539,14 @@ class _CircularPlayButton extends StatelessWidget {
                       : (duration ?? Duration.zero);
                   return CustomPaint(
                     size: const Size(48, 48),
-                    painter: _CircularProgressPainter(
+                    painter: _WavyProgressPainter(
                       progress: position == null || total == Duration.zero
                           ? 0
                           : (position.position.inMilliseconds /
                                     total.inMilliseconds)
                                 .clamp(0.0, 1.0),
-                      backgroundColor: colorScheme.surfaceContainerHighest,
+                      trackColor: colorScheme.surfaceContainerHighest,
                       progressColor: colorScheme.primary,
-                      strokeWidth: 3,
                     ),
                   );
                 },
@@ -585,76 +584,62 @@ class _CircularPlayButton extends StatelessWidget {
   }
 }
 
-class _CircularProgressPainter extends CustomPainter {
-  _CircularProgressPainter({
+class _WavyProgressPainter extends CustomPainter {
+  const _WavyProgressPainter({
     required this.progress,
-    required this.backgroundColor,
+    required this.trackColor,
     required this.progressColor,
-    required this.strokeWidth,
   });
 
+  static const double _strokeWidth = 3;
+  static const double _waveAmplitude = 1.5;
+  static const double _waveFrequency = 12;
+  static const double _startAngle = -math.pi / 2;
+
   final double progress;
-  final Color backgroundColor;
+  final Color trackColor;
   final Color progressColor;
-  final double strokeWidth;
 
-  final waveAmplitude = 1.5;
-  final waveFrequency = 12.0;
-  final animationValue = 0.0;
-
-  Path _buildWavyArcPath(Size size, double startAngle, double sweepAngle) {
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    final baseRadius = (size.width - strokeWidth) / 2;
-    final steps = (sweepAngle.abs() * 180 / math.pi).round().clamp(4, 720);
+  Path _arc(Size size, double sweep) {
+    final center = size.center(Offset.zero);
+    final baseRadius = (size.width - _strokeWidth) / 2;
+    final steps = (sweep.abs() * 180 / math.pi).round().clamp(4, 720);
     final path = Path();
 
     for (var i = 0; i <= steps; i++) {
-      final t = i / steps;
-      final angle = startAngle + sweepAngle * t;
-      final wave =
-          waveAmplitude * math.sin(waveFrequency * angle + animationValue);
-      final r = baseRadius + wave;
-      final x = cx + r * math.cos(angle);
-      final y = cy + r * math.sin(angle);
-      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+      final angle = _startAngle + sweep * i / steps;
+      final r = baseRadius + _waveAmplitude * math.sin(_waveFrequency * angle);
+      final point = center + Offset.fromDirection(angle, r);
+      if (i == 0) {
+        path.moveTo(point.dx, point.dy);
+      } else {
+        path.lineTo(point.dx, point.dy);
+      }
     }
     return path;
   }
 
+  Paint _paint(Color color) => Paint()
+    ..color = color
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = _strokeWidth
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final trackPaint = Paint()
-      ..color = backgroundColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-
-    canvas.drawPath(
-      _buildWavyArcPath(size, -math.pi / 2, 2 * math.pi),
-      trackPaint,
-    );
-
+    canvas.drawPath(_arc(size, 2 * math.pi), _paint(trackColor));
     if (progress > 0) {
-      final progressPaint = Paint()
-        ..color = progressColor
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round;
-
       canvas.drawPath(
-        _buildWavyArcPath(size, -math.pi / 2, 2 * math.pi * progress),
-        progressPaint,
+        _arc(size, 2 * math.pi * progress),
+        _paint(progressColor),
       );
     }
   }
 
   @override
-  bool shouldRepaint(_CircularProgressPainter old) =>
+  bool shouldRepaint(_WavyProgressPainter old) =>
       old.progress != progress ||
-      old.backgroundColor != backgroundColor ||
-      old.progressColor != progressColor ||
-      old.animationValue != animationValue;
+      old.trackColor != trackColor ||
+      old.progressColor != progressColor;
 }
