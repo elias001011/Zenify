@@ -286,6 +286,33 @@ void main() {
     );
   }
 
+  testWidgets('a failed move rolls back the open playlist page', (
+    tester,
+  ) async {
+    await mount(tester);
+    expect(find.text('Track a'), findsOneWidget);
+    userCustomPlaylists.value = [
+      ...userCustomPlaylists.value,
+      {'ytid': 'unwritable', 'bad': Object()},
+    ];
+
+    Object? failure;
+    await tester.runAsync(() async {
+      try {
+        await moveSongsToCustomPlaylist('source', 'target', [
+          {'ytid': 'a'},
+        ]);
+      } catch (error) {
+        failure = error;
+      }
+    });
+    expect(failure, isNotNull);
+    await tester.pump();
+    expect(find.text('Track a'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 30));
+  });
+
   testWidgets(
     'long press selects songs, checkbox taps preserve order when queueing',
     (tester) async {

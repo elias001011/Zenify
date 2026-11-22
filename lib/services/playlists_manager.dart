@@ -377,10 +377,16 @@ Future<int> moveSongsToCustomPlaylist(
     current.playlist['list'] = before
         .where((song) => !moved.contains(song['ytid']))
         .toList();
+    final inFolder = current.folderIndex != null;
     try {
-      await _saveCustomPlaylist(current.folderIndex != null);
+      await _saveCustomPlaylist(inFolder);
     } catch (_) {
       current.playlist['list'] = before;
+      if (inFolder) {
+        userPlaylistFolders.value = [...userPlaylistFolders.value];
+      } else {
+        userCustomPlaylists.value = [...userCustomPlaylists.value];
+      }
       rethrow;
     }
     offlinePlaylistService.checkAndAutoMarkOffline(current.playlist);

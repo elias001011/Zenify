@@ -119,7 +119,6 @@ void main() {
     await tester.tap(row);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull, reason: reason);
     expect(find.byType(AlertDialog), findsNothing, reason: reason);

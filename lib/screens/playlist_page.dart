@@ -629,13 +629,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
         target,
         songs,
       );
-      if (!mounted) return;
-      if (count == 0) return;
-      _originalPlaylistList.removeWhere(
-        (song) => songs.any((selected) => selected['ytid'] == song['ytid']),
-      );
-      _applySort();
-      setState(() {});
+      if (!mounted || count == 0) return;
       showToast(context, context.l10n!.songsMoved(count));
     } catch (error, stackTrace) {
       logger.log(
