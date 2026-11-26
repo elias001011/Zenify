@@ -355,10 +355,13 @@ class LocalSyncService {
   Timer? _settleTimer;
 
   DateTime? _restoreStartedAt;
-  bool get _storageRestoreInProgress =>
-      _restoreStartedAt != null &&
-      DateTime.now().difference(_restoreStartedAt!) <
-          const Duration(minutes: 5);
+
+  /// Until [resumeAfterStorageRestore]. A timeout would sync the old library
+  /// while the file picker is still open.
+  bool get _storageRestoreInProgress => _restoreStartedAt != null;
+
+  @visibleForTesting
+  void debugSetRestoreStartedAt(DateTime? value) => _restoreStartedAt = value;
 
   bool get _backgroundWanted =>
       localSyncEnabled.value && localSyncAutomatic.value;
@@ -1575,9 +1578,9 @@ class LocalSyncService {
   }
 
   /// Resuming fires on every desktop window focus, so it syncs at most every
-  /// 10 minutes, and not at all while local sync is off.
+  /// 10 minutes, and not at all while local sync is off or a restore is open.
   Future<void> syncOnResume() async {
-    if (!localSyncEnabled.value) return;
+    if (!localSyncEnabled.value || _storageRestoreInProgress) return;
     final last = _lastResumeSync;
     if (last != null &&
         DateTime.now().difference(last) < const Duration(minutes: 10)) {

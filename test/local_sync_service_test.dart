@@ -724,6 +724,45 @@ void main() {
     expect(LocalSyncService.hasLocalNetwork(['wlan0', 'v4-ccmni0']), isTrue);
   });
 
+  test('a restore keeps sync paused after the file picker has been open for minutes', () async {
+    Timer? periodic;
+    void Function(Timer)? onPeriod;
+    await runZoned(
+      () async {
+        await server.setEnabled(true);
+        await server.setAutomatic(true);
+        expect(server.serverPort, isNotNull);
+
+        await server.pauseForStorageRestore();
+        expect(server.serverPort, isNull);
+        server.debugSetRestoreStartedAt(
+          DateTime.now().subtract(const Duration(minutes: 6)),
+        );
+
+        onPeriod?.call(periodic!);
+        await server.syncOnResume();
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        expect(server.serverPort, isNull);
+
+        await server.resumeAfterStorageRestore(storageChanged: false);
+        expect(server.serverPort, isNotNull);
+      },
+      zoneSpecification: ZoneSpecification(
+        createPeriodicTimer: (self, parent, zone, duration, callback) {
+          final timer = parent.createPeriodicTimer(zone, duration, callback);
+          if (duration == LocalSyncService.autoSyncInterval) {
+            periodic = timer;
+            onPeriod = callback;
+          }
+          return timer;
+        },
+      ),
+    );
+    expect(onPeriod, isNotNull);
+    await server.setAutomatic(false);
+    await server.setEnabled(false);
+  });
+
   test('turning sync on starts one sync, not two', () async {
     await server.dispose();
     await Hive.box('settings').put('localSyncEnabled', false);
