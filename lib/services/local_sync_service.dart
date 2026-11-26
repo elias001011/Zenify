@@ -205,6 +205,8 @@ class LocalSyncService {
   static const int _maxDiscoveryDatagramBytes = 512;
   static const int _maxDiscoveryNameRunes = 60;
   static const int _minPeerPort = 1024;
+  static const int _maxLargeBodies = 2;
+  static const Duration _pairCooldown = Duration(minutes: 5);
 
   static const String _discoveryRequest = 'MUSIFY_DISCOVERY_REQUEST';
   static const String _discoveryResponse = 'MUSIFY_DISCOVERY_RESPONSE';
@@ -213,6 +215,11 @@ class LocalSyncService {
   static const String _enabledKey = 'localSyncEnabled';
   static const String _automaticKey = 'localSyncAutomatic';
   static const String _lastSyncedAtKey = 'localSyncLastSyncedAt';
+
+  String get _shortId {
+    final id = LibraryMergeService.deviceId;
+    return (id.length <= 4 ? id : id.substring(id.length - 4)).toUpperCase();
+  }
 
   final ValueNotifier<LocalSyncState> state = ValueNotifier(
     const LocalSyncState(),
@@ -242,9 +249,17 @@ class LocalSyncService {
   /// How long a request may take to send its body.
   final Duration _bodyTimeout;
 
-  /// A large body is read by one request at a time: the others would pile
-  /// up to 64 MB each, and none of them has proven who sent it yet.
-  bool _largeBodyActive = false;
+  /// Large bodies are read from at most [_maxLargeBodies] addresses at once,
+  /// and from one request per address: the others would pile up to 64 MB
+  /// each, and none of them has proven who sent it yet.
+  final Set<String> _largeBodyAddresses = {};
+
+  /// Addresses that held the pairing slot without finishing, and until when
+  /// they may not start another pairing.
+  final Map<String, DateTime> _pairCooldownUntil = {};
+
+  static const int _pairStrikeLimit = 3;
+  final Map<String, int> _pairStrikes = {};
 
   /// Runs once a pairing is trusted and before the reply is sent (tests).
   @visibleForTesting
@@ -280,6 +295,7 @@ class LocalSyncService {
   DateTime? _lastPairingRequest;
   Completer<bool>? _pendingCompleter;
   Timer? _pendingTimer;
+  String? _pendingAddress;
 
   // Pairing started from this device, reused if the user retries the PIN.
   String? _outgoingSession;
@@ -302,7 +318,7 @@ class LocalSyncService {
   int? get serverPort => _httpServer?.port;
 
   String get deviceName => isAndroidPlatform
-      ? '$appName (Android)'
+      ? '$appName (Android $_shortId)'
       : '$appName (${Platform.localHostname})';
 
   Future<void> initialise() async {
@@ -337,6 +353,12 @@ class LocalSyncService {
 
   int _pageHolds = 0;
   Timer? _settleTimer;
+
+  DateTime? _restoreStartedAt;
+  bool get _storageRestoreInProgress =>
+      _restoreStartedAt != null &&
+      DateTime.now().difference(_restoreStartedAt!) <
+          const Duration(minutes: 5);
 
   bool get _backgroundWanted =>
       localSyncEnabled.value && localSyncAutomatic.value;
@@ -393,6 +415,21 @@ class LocalSyncService {
       _startupTimer != null ||
       _userBoxSubscription != null;
 
+  /// Periodic and startup work: brings a dead server back up, then syncs.
+  /// Manual mode keeps the server only while the page is open, so a tick must
+  /// not start one the page did not ask for, and must not sync on its own.
+  Future<void> _tick() async {
+    if (!localSyncEnabled.value || _storageRestoreInProgress) return;
+    if (_serverWanted && _httpServer == null) {
+      try {
+        await startServer();
+      } catch (_) {
+        return; // Logged by startServer; retried on the next tick.
+      }
+    }
+    if (_backgroundWanted) await triggerSilentSync();
+  }
+
   /// The watch on the library and the timers that keep devices in step. Only
   /// while local sync is turned on. [startupSync] adds the sync after the start,
   /// for callers that do not sync themselves.
@@ -401,15 +438,12 @@ class LocalSyncService {
     _periodicTimer?.cancel();
     _periodicTimer = Timer.periodic(
       autoSyncInterval,
-      (_) => unawaited(triggerSilentSync()),
+      (_) => unawaited(_tick()),
     );
     _startupTimer?.cancel();
     _startupTimer = null;
     if (!startupSync) return;
-    _startupTimer = Timer(
-      _startupSyncDelay,
-      () => unawaited(triggerSilentSync()),
-    );
+    _startupTimer = Timer(_startupSyncDelay, () => unawaited(_tick()));
   }
 
   Future<void> _stopBackgroundWork() async {
@@ -434,6 +468,7 @@ class LocalSyncService {
   }
 
   Future<void> pauseForStorageRestore() async {
+    _restoreStartedAt = DateTime.now();
     _settleTimer?.cancel();
     _localChangeTimer?.cancel();
     await stopServer();
@@ -444,14 +479,18 @@ class LocalSyncService {
   /// [storageChanged] is false when the restore was cancelled or rolled back:
   /// the library is as it was, so the baseline still describes it.
   Future<void> resumeAfterStorageRestore({bool storageChanged = true}) async {
-    reloadSettingsFromStorage();
-    if (storageChanged) await LibraryMergeService.forgetBaseline();
-    if (_backgroundWanted) {
-      await _startBackgroundWork();
-    } else {
-      await _stopBackgroundWork();
+    try {
+      reloadSettingsFromStorage();
+      if (storageChanged) await LibraryMergeService.forgetBaseline();
+      if (_backgroundWanted) {
+        await _startBackgroundWork();
+      } else {
+        await _stopBackgroundWork();
+      }
+      await _settleServer();
+    } finally {
+      _restoreStartedAt = null;
     }
-    await _settleServer();
   }
 
   Future<void> dispose() async {
@@ -485,7 +524,8 @@ class LocalSyncService {
     }
     if (_backgroundWanted) {
       await _startBackgroundWork();
-      unawaited(triggerSilentSync());
+      _clearBackoff();
+      unawaited(_tick());
     }
     return true;
   }
@@ -495,9 +535,10 @@ class LocalSyncService {
     localSyncAutomatic.value = enabled;
     if (!localSyncEnabled.value) return;
     if (enabled) {
+      _clearBackoff();
       await _settleServer();
       await _startBackgroundWork();
-      unawaited(triggerSilentSync());
+      unawaited(_tick());
     } else {
       await _stopBackgroundWork();
       await _settleServer();
@@ -521,7 +562,16 @@ class LocalSyncService {
     }
     await Hive.box('settings')
         .put('localSyncCategories', categories.map((e) => e.name).toList());
-    if (categories.isNotEmpty) _scheduleLocalSync();
+    if (categories.isNotEmpty) {
+      _clearBackoff();
+      _scheduleLocalSync();
+    }
+  }
+
+  /// A settings change may be what was making devices fail: try them again now.
+  void _clearBackoff() {
+    _retryAfter.clear();
+    _retryCount.clear();
   }
 
   void _beginTransfer() => _activeTransfers++;
@@ -828,9 +878,19 @@ class LocalSyncService {
         return (400, {'error': 'invalid_pairing'});
       }
       final now = _pairingNow();
+      final address = request.connectionInfo?.remoteAddress.address;
+      _pairCooldownUntil.removeWhere((_, until) => !until.isAfter(now));
+      if (address != null && _pairCooldownUntil.containsKey(address)) {
+        return (429, {'error': 'pairing_busy'});
+      }
       final blockedUntil = Hive.box('userNoBackup')
           .get('localSyncPairBlockedUntil');
-      if (blockedUntil is int && now.millisecondsSinceEpoch < blockedUntil) {
+
+      final nowMs = now.millisecondsSinceEpoch;
+
+      if (blockedUntil is int &&
+          nowMs < blockedUntil &&
+          blockedUntil - nowMs <= _pairBlockCap.inMilliseconds) {
         return (429, {'error': 'pairing_busy'});
       }
       if (_pendingSession != null ||
@@ -841,11 +901,12 @@ class LocalSyncService {
       }
       _lastPairingRequest = now;
       _pendingClientId = id;
+      _pendingAddress = address;
       _pendingClientName = _sanitizeName(data['clientName']?.toString() ?? '');
       final session = SyncSecurity.randomToken(16);
       _pendingSession = session;
       _pendingCompleter = Completer<bool>();
-      _pendingTimer = Timer(_pairingTimeout, _cancelPendingPairing);
+      _pendingTimer = Timer(_pairingTimeout, _expirePendingPairing);
       final ownId = LibraryMergeService.deviceId;
       final pairing = await PinPairingReceiver.create('$id|$ownId|$session');
       if (_pendingSession != session) {
@@ -1048,14 +1109,20 @@ class LocalSyncService {
       throw const _HttpFailure(413, 'too_large');
     }
     final large = maxBytes > _smallMessageBytes;
+    String? lockedAddress;
     if (large) {
       // The device id is public (discovery answers with it), so a large body
-      // is not trusted yet: its size must be known, and only one is read.
+      // is not trusted yet: its size must be known, and only a few are read
+      // at once, at most one per address.
       if (request.contentLength < 0) {
         throw const _HttpFailure(411, 'length_required');
       }
-      if (_largeBodyActive) throw const _HttpFailure(429, 'busy');
-      _largeBodyActive = true;
+      final address = request.connectionInfo?.remoteAddress.address ?? '';
+      if (_largeBodyAddresses.length >= _maxLargeBodies ||
+          !_largeBodyAddresses.add(address)) {
+        throw const _HttpFailure(429, 'busy');
+      }
+      lockedAddress = address;
     }
     final Map<String, dynamic> body;
     try {
@@ -1079,7 +1146,7 @@ class LocalSyncService {
     } catch (_) {
       throw const _HttpFailure(400, 'invalid');
     } finally {
-      if (large) _largeBodyActive = false;
+      if (lockedAddress != null) _largeBodyAddresses.remove(lockedAddress);
     }
     final nonce = body['requestId'];
     if (nonce is! String || nonce.length < 20 || nonce.length > 128) {
@@ -1188,7 +1255,27 @@ class LocalSyncService {
   }
 
   /// Rejects the pairing request currently shown on this device, if any.
-  void rejectIncomingPairing() => _cancelPendingPairing();
+  void rejectIncomingPairing() {
+    _startPairCooldown(_pendingAddress);
+    _cancelPendingPairing();
+  }
+
+  void _startPairCooldown(String? address) {
+    if (address == null) return;
+    final strikes = (_pairStrikes[address] ?? 0) + 1;
+    if (strikes < _pairStrikeLimit) {
+      _pairStrikes[address] = strikes;
+      return;
+    }
+    _pairStrikes.remove(address);
+    _pairCooldownUntil[address] = _pairingNow().add(_pairCooldown);
+  }
+
+  /// The attempt timed out without a verification.
+  void _expirePendingPairing() {
+    _startPairCooldown(_pendingAddress);
+    _cancelPendingPairing();
+  }
 
   void _cancelPendingPairing() {
     final completer = _pendingCompleter;
@@ -1202,6 +1289,7 @@ class LocalSyncService {
     _pendingTimer?.cancel();
     _pendingTimer = null;
     _pendingClientId = null;
+    _pendingAddress = null;
     _pendingClientName = null;
     _pendingPairing = null;
     _pendingSession = null;
@@ -1496,7 +1584,7 @@ class LocalSyncService {
       return;
     }
     _lastResumeSync = DateTime.now();
-    await triggerSilentSync();
+    await _tick();
   }
 
   /// Syncs with every paired device found by a short discovery, without UI.
@@ -1535,6 +1623,8 @@ class LocalSyncService {
         if (await _syncQuietly(targets[i])) lastChanged = i;
       }
       for (var i = 0; i < lastChanged && _canSyncQuietly; i++) {
+        final until = _retryAfter[targets[i].deviceId];
+        if (until != null && until.isAfter(DateTime.now())) continue;
         await _syncQuietly(targets[i]);
       }
     } finally {
@@ -1554,9 +1644,16 @@ class LocalSyncService {
       return result.local.isNotEmpty;
     } catch (e) {
       logger.log('Automatic local sync with ${device.name} failed: $e');
+      // The server stopped (restore, sync turned off): not the device's fault.
+      if (e is _LocalSyncException && e.error == LocalSyncError.notRunning) {
+        return false;
+      }
       final untrusted =
           (e is _LocalSyncException && e.error == LocalSyncError.untrusted) ||
-          (e is _HttpFailure && e.status == 403 && e.code == 'not_paired');
+          (e is _HttpFailure &&
+              e.status == 403 &&
+              e.code == 'not_paired' &&
+              _verifiedAddress[device.deviceId] == device.ip);
       final count = (_retryCount[device.deviceId] ?? 0) + 1;
       _retryCount[device.deviceId] = count;
       _retryAfter[device.deviceId] = DateTime.now().add(
@@ -1743,17 +1840,29 @@ class LocalSyncService {
   }
 
   Future<void> _recordSync(String deviceId, String name) async {
-    final now = DateTime.now().toUtc();
-    await Hive.box('settings').put(_lastSyncedAtKey, now.toIso8601String());
-    localSyncLastSyncedAt.value = now;
-    await _serializePaired(() async {
-      final peer = _paired(deviceId);
-      if (peer != null && peer.name != name) {
-        await _savePairedDeviceUnlocked(
-          PairedSyncDevice(deviceId: deviceId, name: name, secret: peer.secret),
-        );
-      }
-    });
+    try {
+      final now = DateTime.now().toUtc();
+      await Hive.box('settings').put(_lastSyncedAtKey, now.toIso8601String());
+      localSyncLastSyncedAt.value = now;
+      await _serializePaired(() async {
+        final peer = _paired(deviceId);
+        if (peer != null && peer.name != name) {
+          await _savePairedDeviceUnlocked(
+            PairedSyncDevice(
+              deviceId: deviceId,
+              name: name,
+              secret: peer.secret,
+            ),
+          );
+        }
+      });
+    } catch (e, stackTrace) {
+      logger.log(
+        'Local sync could not record a finished sync',
+        error: e,
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   Future<Map<String, dynamic>> _post(
@@ -1777,7 +1886,10 @@ class LocalSyncService {
     }
 
     final abort = Completer<void>();
-    final deadline = Timer(timeout, () {
+    // The deadline covers sending, the other side's merge and its reply, so it
+    // grows with the message: one second per 256 KiB, doubled for the reply.
+    final allowance = Duration(seconds: encoded.length ~/ (256 * 1024) * 2);
+    final deadline = Timer(timeout + allowance, () {
       if (!abort.isCompleted) abort.complete();
     });
     final outgoing =

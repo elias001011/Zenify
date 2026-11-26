@@ -94,6 +94,9 @@ const LibraryMatches _noLibraryMatches = (
   songs: [],
 );
 
+const _suggestionsDebounce = Duration(milliseconds: 300);
+const _maxHistoryItems = 30;
+
 class _SearchPageState extends State<SearchPage> {
   late final TextEditingController _searchBar = TextEditingController(
     text: widget.initialQuery ?? '',
@@ -166,24 +169,32 @@ class _SearchPageState extends State<SearchPage> {
     // An emptied field goes back to the search history, and the history only
     // shows while nothing has been found yet. Dropping the suggestions is not
     // enough: the results of the last search have to go with them.
-    if (query.isEmpty) {
+    if (query.trim().isEmpty) {
       unawaited(search());
       return;
     }
     // Suggestions come from YouTube.
     if (offlineMode.value) return;
 
-    _debounce = Timer(const Duration(milliseconds: 300), () async {
-      final searchSuggestions = await getSearchSuggestions(query);
+    _debounce = Timer(_suggestionsDebounce, () async {
+      try {
+        final searchSuggestions = await getSearchSuggestions(query);
 
-      if (!mounted ||
-          requestId != _latestSuggestionRequest ||
-          _searchBar.text != query) {
-        return;
+        if (!mounted ||
+            requestId != _latestSuggestionRequest ||
+            _searchBar.text != query) {
+          return;
+        }
+
+        _suggestionsList = List<String>.from(searchSuggestions);
+        if (mounted) setState(() {});
+      } catch (e, stackTrace) {
+        logger.log(
+          'Error while fetching search suggestions',
+          error: e,
+          stackTrace: stackTrace,
+        );
       }
-
-      _suggestionsList = List<String>.from(searchSuggestions);
-      if (mounted) setState(() {});
     });
   }
 
@@ -271,9 +282,19 @@ class _SearchPageState extends State<SearchPage> {
               .toList();
     if (mounted) setState(() {});
 
-    if (!searchHistoryNotifier.value.contains(query)) {
-      final updatedHistory = List.from(searchHistoryNotifier.value)
+    // Re-searching an old query moves it back to the top.
+    final currentHistory = searchHistoryNotifier.value;
+    final alreadyFirst =
+        currentHistory.isNotEmpty && currentHistory.first == query;
+    if (!alreadyFirst ||
+        !currentHistory.contains(query) ||
+        currentHistory.length > _maxHistoryItems) {
+      final updatedHistory = List.from(currentHistory)
+        ..remove(query)
         ..insert(0, query);
+      if (updatedHistory.length > _maxHistoryItems) {
+        updatedHistory.removeRange(_maxHistoryItems, updatedHistory.length);
+      }
       searchHistoryNotifier.value = updatedHistory;
       unawaited(addOrUpdateData<List>('user', 'searchHistory', updatedHistory));
     }
@@ -464,7 +485,8 @@ class _SearchPageState extends State<SearchPage> {
                   ? ValueListenableBuilder<List>(
                       valueListenable: searchHistoryNotifier,
                       builder: (context, searchHistory, _) {
-                        final items = _suggestionsList.isEmpty
+                        final showingHistory = _suggestionsList.isEmpty;
+                        final items = showingHistory
                             ? searchHistory
                             : _suggestionsList;
 
@@ -487,28 +509,30 @@ class _SearchPageState extends State<SearchPage> {
                                     onTap: () async {
                                       await _submitSearch(query.toString());
                                     },
-                                    onLongPress: () async {
-                                      final confirm =
-                                          await _showConfirmationDialog(
-                                            context,
-                                          ) ??
-                                          false;
-                                      if (confirm &&
-                                          searchHistory.contains(query)) {
-                                        final updatedHistory = List.from(
-                                          searchHistory,
-                                        )..remove(query);
-                                        searchHistoryNotifier.value =
-                                            updatedHistory;
-                                        unawaited(
-                                          addOrUpdateData<List>(
-                                            'user',
-                                            'searchHistory',
-                                            updatedHistory,
-                                          ),
-                                        );
-                                      }
-                                    },
+                                    onLongPress: !showingHistory
+                                        ? null
+                                        : () async {
+                                            final confirm =
+                                                await _showConfirmationDialog(
+                                                  context,
+                                                ) ??
+                                                false;
+                                            if (confirm &&
+                                                searchHistory.contains(query)) {
+                                              final updatedHistory = List.from(
+                                                searchHistory,
+                                              )..remove(query);
+                                              searchHistoryNotifier.value =
+                                                  updatedHistory;
+                                              unawaited(
+                                                addOrUpdateData<List>(
+                                                  'user',
+                                                  'searchHistory',
+                                                  updatedHistory,
+                                                ),
+                                              );
+                                            }
+                                          },
                                   );
                                 },
                               ),
