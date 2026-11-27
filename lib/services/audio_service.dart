@@ -1283,15 +1283,8 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
             .where((ytid) => ytid != null)
             .toSet();
 
-        final removed = _preloadedYtIds.length + _preloadingYtIds.length;
         _preloadedYtIds.removeWhere((ytid) => !queueYtIds.contains(ytid));
         _preloadingYtIds.removeWhere((ytid) => !queueYtIds.contains(ytid));
-        final cleaned =
-            removed - (_preloadedYtIds.length + _preloadingYtIds.length);
-
-        if (cleaned > 0) {
-          logger.log('Cleaned up $cleaned old preload entries');
-        }
       } catch (e, stackTrace) {
         logger.log(
           'Error cleaning up preloaded songs',

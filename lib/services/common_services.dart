@@ -256,11 +256,13 @@ Future<List> getRecommendedSongs() async {
 }
 
 Future<List> _getRecommendationsFromRecentlyPlayed() async {
-  final recent = (List.from(
-    userRecentlyPlayed.value,
-  )..shuffle()).take(5).toList();
+  final latest = userRecentlyPlayed.value.take(20).toList();
+  final picks = latest.asMap().entries.toList()..shuffle();
+  final seeds = (picks.take(5).toList()..sort((a, b) => a.key.compareTo(b.key)))
+      .map((entry) => entry.value)
+      .toList();
 
-  return _getRecommendationsFromSeedSongs(recent);
+  return _getRecommendationsFromSeedSongs(seeds);
 }
 
 /// Expands seed songs into related videos and ranks them for home and playlist recommendations.
@@ -271,6 +273,7 @@ Future<List> _getRecommendationsFromSeedSongs(List seedSongs) async {
       .toList();
   if (seeds.isEmpty) return [];
 
+  final seedIds = seeds.map((song) => song['ytid'].toString()).toSet();
   final scores = <String, double>{};
   final songMap = <String, Map>{};
 
@@ -278,16 +281,23 @@ Future<List> _getRecommendationsFromSeedSongs(List seedSongs) async {
     final seedIndex = entry.key;
     final songData = entry.value;
     try {
-      final song = await ytClient.videos.get(songData['ytid']);
-      final related = await ytClient.videos.getRelatedVideos(song) ?? [];
-      for (var i = 0; i < related.length && i < 8; i++) {
-        final s = returnSongLayout(0, related[i]);
-        final id = s['ytid'];
-        final positionWeight = 1.0 - (i / 8);
-        final recencyWeight = 1.0 - (seedIndex / seeds.length);
-        scores[id] = (scores[id] ?? 0) + positionWeight * recencyWeight;
-        songMap[id] = s;
-      }
+      await () async {
+        final song = await ytClient.videos.get(songData['ytid']);
+        final related = await ytClient.videos.getRelatedVideos(song) ?? [];
+        var rank = 0;
+        for (final video in related) {
+          if (rank >= 8) break;
+          if (!_looksLikeSingleSong(video)) continue;
+          final s = returnSongLayout(0, video);
+          final id = s['ytid']?.toString();
+          if (id == null || seedIds.contains(id)) continue;
+          final positionWeight = 1.0 - (rank / 8);
+          final recencyWeight = 1.0 - (seedIndex / seeds.length);
+          scores[id] = (scores[id] ?? 0) + positionWeight * recencyWeight;
+          songMap[id] = s;
+          rank++;
+        }
+      }().timeout(const Duration(seconds: 10));
     } catch (e, st) {
       logger.log(
         'related videos error for ${songData['ytid']}',
@@ -382,9 +392,9 @@ Future<List> _getRecommendationsFromMixedSources() async {
   }
   recommendationSources.add(globalSongs.take(10));
 
-  if (userCustomPlaylists.value.isNotEmpty) {
-    for (final userPlaylist in userCustomPlaylists.value) {
-      final playlistSongs = userPlaylist['list'] as List;
+  for (final userPlaylist in userCustomPlaylists.value) {
+    final playlistSongs = userPlaylist['list'];
+    if (playlistSongs is List) {
       recommendationSources.add(sampleSeedSongs(playlistSongs, 5));
     }
   }
@@ -397,15 +407,15 @@ Future<void> updateSongLikeStatus(
   bool add, {
   Map? songData,
 }) async {
+  final normalizedSongId = songId?.toString().trim() ?? '';
+  if (normalizedSongId.isEmpty) return;
+  // A local file cannot be liked; the UI hides the action, this is the guard.
+  if (isLocalSongId(normalizedSongId)) return;
+
+  final updateToken = ++_songLikeUpdateToken;
+  _latestSongLikeUpdateTokens[normalizedSongId] = updateToken;
+
   try {
-    final normalizedSongId = songId?.toString().trim() ?? '';
-    if (normalizedSongId.isEmpty) return;
-    // A local file cannot be liked; the UI hides the action, this is the guard.
-    if (isLocalSongId(normalizedSongId)) return;
-
-    final updateToken = ++_songLikeUpdateToken;
-    _latestSongLikeUpdateTokens[normalizedSongId] = updateToken;
-
     final songToAdd = add
         ? await _resolveSongForLikedStatus(normalizedSongId, songData)
         : null;
@@ -429,8 +439,9 @@ Future<void> updateSongLikeStatus(
       );
     }
 
-    if (_likedSongIdsAreEqual(userLikedSongsList.value, updatedLikedSongs))
+    if (_likedSongIdsAreEqual(userLikedSongsList.value, updatedLikedSongs)) {
       return;
+    }
 
     userLikedSongsList.value = updatedLikedSongs;
     unawaited(
@@ -442,6 +453,12 @@ Future<void> updateSongLikeStatus(
       error: e,
       stackTrace: stackTrace,
     );
+  } finally {
+    // Only the newest request for a song may clear its entry; an older one
+    // that finishes late still sees a different token and is ignored above.
+    if (_latestSongLikeUpdateTokens[normalizedSongId] == updateToken) {
+      _latestSongLikeUpdateTokens.remove(normalizedSongId);
+    }
   }
 }
 
@@ -578,8 +595,7 @@ bool isSongAlreadyOffline(songIdToCheck) {
 
 bool isPlaylistFullyOffline(List songs) {
   if (songs.isEmpty) return false;
-  final offlineIds = userOfflineSongs.value.map((s) => s['ytid']).toSet();
-  return songs.every((s) => offlineIds.contains(s['ytid']));
+  return songs.every((s) => _cachedOfflineSongIds.contains(songYtid(s)));
 }
 
 Map<String, dynamic> getOfflineSongByYtid(String ytid) {
@@ -631,10 +647,21 @@ Future<List<String>> getSearchSuggestions(String query) async {
   return suggestions;
 }
 
-// Throws on network, HTTP and parsing failure instead of swallowing it, so
-// callers that need to tell "confirmed no segments" apart from "failed to
-// fetch" (e.g. the offline cache, which must not persist a false negative)
-// can do so.
+List<Map<String, int>> _mergeSkipSegments(List<Map<String, int>> segments) {
+  final sorted = [...segments]
+    ..sort((a, b) => a['start']!.compareTo(b['start']!));
+  final merged = <Map<String, int>>[];
+  for (final segment in sorted) {
+    if (segment['end']! <= segment['start']!) continue;
+    if (merged.isNotEmpty && segment['start']! <= merged.last['end']!) {
+      merged.last['end'] = max(merged.last['end']!, segment['end']!);
+    } else {
+      merged.add({...segment});
+    }
+  }
+  return merged;
+}
+
 Future<List<Map<String, int>>> _fetchSkipSegments(String id) async {
   // A local file's id is never sent out, so it has no segments to fetch.
   if (isLocalSongId(id)) return [];
@@ -665,14 +692,14 @@ Future<List<Map<String, int>>> _fetchSkipSegments(String id) async {
     throw HttpException('SponsorBlock responded ${res.statusCode} for $id');
   }
 
-  final data = jsonDecode(res.body);
-  final segments = data.map((obj) {
-    return Map.castFrom<String, dynamic, String, int>({
-      'start': obj['segment'].first.toInt(),
-      'end': obj['segment'].last.toInt(),
-    });
-  }).toList();
-  return List.castFrom<dynamic, Map<String, int>>(segments);
+  final data = jsonDecode(res.body) as List;
+  return _mergeSkipSegments([
+    for (final obj in data)
+      {
+        'start': (obj['segment'].first as num).floor(),
+        'end': (obj['segment'].last as num).ceil(),
+      },
+  ]);
 }
 
 Future<List<Map<String, int>>> getSkipSegments(String id) async {
@@ -708,7 +735,6 @@ Future<Map<String, dynamic>?> getSimilarSong(
         return candidate;
       }
     }
-    logger.log('No new related songs found for $songYtId');
   } catch (e, stackTrace) {
     logger.log(
       'Error while fetching next similar song:',
@@ -761,7 +787,9 @@ void _cacheSelectedAudioStream(String songId, AudioOnlyStreamInfo stream) {
 /// it again. Used when a cached URL turns out to be dead.
 Future<void> invalidateSongStreamCache(String songId) async {
   _selectedAudioStreams.remove(_selectedAudioStreamKey(songId));
-  await deleteData('cache', 'song_${songId}_${audioQualitySetting.value}_url');
+  final cacheKey = 'song_${songId}_${audioQualitySetting.value}_url';
+  await deleteData('cache', cacheKey);
+  await deleteData('cache', '${cacheKey}_date');
 }
 
 /// The best audio stream of a song. Throws what YouTube answered: a
@@ -879,9 +907,11 @@ Future<Map<String, dynamic>> getSongDetails(
 
 /// Plain-text version of [result] as shown for unsynced lyrics.
 String formatPlainLyrics(Lyrics result) {
-  return '${result.text}\n\n© ${result.source}'
-      .replaceAll(RegExp(r'\n{4}'), '\n\n')
-      .replaceAll(RegExp(r'\n{2}'), '\n');
+  final text = result.text
+      .replaceAll('\r\n', '\n')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
+  return '$text\n\n© ${result.source}';
 }
 
 /// Fetches lyrics for a song, keeping timestamps when the provider has them.
