@@ -30,7 +30,6 @@ class ClickDetector extends GestureDetector {
     super.onTapDown,
     super.onTapUp,
     super.onTapCancel,
-    super.onVerticalDragUpdate,
     super.onVerticalDragEnd,
     super.behavior,
   });

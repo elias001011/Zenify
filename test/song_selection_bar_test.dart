@@ -18,7 +18,7 @@ import 'package:musify/widgets/song_selection_controller.dart';
 import 'support/app_harness.dart';
 
 void main() {
-  useAppSettings();
+  useAppSettings(inMemory: true);
 
   testWidgets('desktop arrows and wheel reach all batch actions', (
     tester,

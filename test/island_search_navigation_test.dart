@@ -13,7 +13,7 @@ import 'package:musify/widgets/song_bar.dart';
 import 'support/app_harness.dart';
 
 void main() {
-  useAppSettings();
+  useAppSettings(inMemory: true);
 
   testWidgets(
     'filter stays live; Enter opens global and Back preserves it; offline stays local',

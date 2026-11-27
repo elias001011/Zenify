@@ -2011,6 +2011,7 @@ class MusifyAudioHandler extends BaseAudioHandler implements AndroidAutoHost {
     if (_currentLoadingIndex >= 0) {
       _queuePlayWhenReady = true;
       _updatePlaybackState();
+      return;
     }
     try {
       if (audioPlayer.audioSource == null) {

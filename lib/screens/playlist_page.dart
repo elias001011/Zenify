@@ -113,7 +113,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
 
   bool _reorderEnabled = false;
   final _selection = SongSelectionController();
-  final _songsRevision = ValueNotifier(0);
 
   // Search
   final ValueNotifier<String> _searchQueryNotifier = ValueNotifier('');
@@ -142,7 +141,6 @@ class _PlaylistPageState extends State<PlaylistPage> {
     userPlaylistFolders.removeListener(_reloadStoredSongs);
     _searchQueryNotifier.dispose();
     _selection.dispose();
-    _songsRevision.dispose();
     super.dispose();
   }
 
@@ -274,45 +272,40 @@ class _PlaylistPageState extends State<PlaylistPage> {
                   if ((_playlist['list'] as List? ?? const []).isNotEmpty) ...[
                     ValueListenableBuilder<String>(
                       valueListenable: _searchQueryNotifier,
-                      builder: (context, searchQuery, _) =>
-                          ValueListenableBuilder<int>(
-                            valueListenable: _songsRevision,
-                            builder: (context, _, __) {
-                              final sourceList = _getSourceList(searchQuery);
-                              final custom =
-                                  _playlist['source'] == 'user-created';
-                              final reorderable =
-                                  custom &&
-                                  _reorderEnabled &&
-                                  searchQuery.trim().isEmpty &&
-                                  _sortType == PlaylistSortType.default_;
-                              Widget item(BuildContext context, int index) =>
-                                  _buildSongListItem(
-                                    sourceList[index],
-                                    index,
-                                    custom,
-                                    sourceList,
-                                    reorderIndex: reorderable ? index : null,
-                                  );
-                              return SliverPadding(
-                                padding: commonListViewBottomPadding,
-                                sliver: reorderable
-                                    ? MusicSliverSurface(
-                                        sliver: SliverReorderableList(
-                                          itemCount: sourceList.length,
-                                          itemBuilder: item,
-                                          onReorderItem: _reorderSongs,
-                                        ),
-                                      )
-                                    : MusicSliverSurface(
-                                        sliver: SliverList.builder(
-                                          itemCount: sourceList.length,
-                                          itemBuilder: item,
-                                        ),
-                                      ),
-                              );
-                            },
-                          ),
+                      builder: (context, searchQuery, _) {
+                        final sourceList = _getSourceList(searchQuery);
+                        final custom = _playlist['source'] == 'user-created';
+                        final reorderable =
+                            custom &&
+                            _reorderEnabled &&
+                            searchQuery.trim().isEmpty &&
+                            _sortType == PlaylistSortType.default_;
+                        Widget item(BuildContext context, int index) =>
+                            _buildSongListItem(
+                              sourceList[index],
+                              index,
+                              custom,
+                              sourceList,
+                              reorderIndex: reorderable ? index : null,
+                            );
+                        return SliverPadding(
+                          padding: commonListViewBottomPadding,
+                          sliver: reorderable
+                              ? MusicSliverSurface(
+                                  sliver: SliverReorderableList(
+                                    itemCount: sourceList.length,
+                                    itemBuilder: item,
+                                    onReorderItem: _reorderSongs,
+                                  ),
+                                )
+                              : MusicSliverSurface(
+                                  sliver: SliverList.builder(
+                                    itemCount: sourceList.length,
+                                    itemBuilder: item,
+                                  ),
+                                ),
+                        );
+                      },
                     ),
                   ] else if (_isArtistCatalogFailed)
                     EmptyPlaylistState(message: context.l10n!.error)
@@ -660,11 +653,7 @@ class _PlaylistPageState extends State<PlaylistPage> {
     next.insert(to, next.removeAt(from));
     if (!reorderCustomPlaylist(_resolvedPlaylistId!, next)) {
       showToast(context, context.l10n!.error);
-      return;
     }
-    _originalPlaylistList = next;
-    _applySort();
-    _songsRevision.value++;
   }
 
   void _removeSong(Map song) {

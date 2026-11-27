@@ -221,6 +221,26 @@ void main() {
       expect(find.byIcon(FluentIcons.next_24_filled), findsNothing);
       await unmount(tester);
     });
+
+    testWidgets('updates when only queueIndex changes while ready', (
+      tester,
+    ) async {
+      await mount(tester, AudioServiceRepeatMode.none, 'queue-index-change');
+      expect(find.byIcon(FluentIcons.next_24_filled), findsNothing);
+
+      audioHandler.playbackState.add(
+        PlaybackState(playing: true, queueIndex: 0),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byIcon(FluentIcons.next_24_filled), findsOneWidget);
+
+      audioHandler.playbackState.add(
+        PlaybackState(playing: true, queueIndex: 1),
+      );
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(find.byIcon(FluentIcons.next_24_filled), findsNothing);
+      await unmount(tester);
+    });
   });
 
   for (final platform in [TargetPlatform.linux, TargetPlatform.android]) {

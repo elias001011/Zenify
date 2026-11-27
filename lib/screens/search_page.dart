@@ -286,9 +286,7 @@ class _SearchPageState extends State<SearchPage> {
     final currentHistory = searchHistoryNotifier.value;
     final alreadyFirst =
         currentHistory.isNotEmpty && currentHistory.first == query;
-    if (!alreadyFirst ||
-        !currentHistory.contains(query) ||
-        currentHistory.length > _maxHistoryItems) {
+    if (!alreadyFirst || currentHistory.length > _maxHistoryItems) {
       final updatedHistory = List.from(currentHistory)
         ..remove(query)
         ..insert(0, query);

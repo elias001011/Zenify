@@ -34,6 +34,7 @@ import 'package:musify/services/download_manager.dart';
 import 'package:musify/services/io_service.dart';
 import 'package:musify/services/local_files_service.dart';
 import 'package:musify/services/lyrics_manager.dart';
+import 'package:musify/services/playlist_download_service.dart';
 import 'package:musify/services/playlists_manager.dart';
 import 'package:musify/services/proxy_manager.dart';
 import 'package:musify/services/settings_manager.dart';
@@ -1071,10 +1072,22 @@ Future<void> saveSongFiles(
   userOfflineSongs.value = updated;
   unawaited(addOrUpdateData<List>('userNoBackup', 'offlineSongs', updated));
   unawaited(cacheSponsorBlockSegments(ytid));
+  if (offlinePlaylistService.hasUnavailablePlaylists) {
+    unawaited(offlinePlaylistService.validateStoredPlaylists());
+  }
 }
 
 /// The path of the cover saved from [url], or null when it could not be.
 Future<String?> _saveArtwork(String url, String path) async {
+  if (await FilePaths.canDeleteDownload(path)) {
+    final existing = File(path);
+    try {
+      if (await existing.length() > 0) return path;
+      await existing.delete();
+    } on FileSystemException {
+      // Fall through and fetch a fresh copy when the file cannot be read.
+    }
+  }
   // Set when the wait gives up. The download itself cannot be stopped, so it
   // checks this before it keeps what it wrote.
   var abandoned = false;
@@ -1118,12 +1131,10 @@ String _storedOfflinePath(String ytid, String key, String fallback) {
   return stored is String && stored.isNotEmpty ? stored : fallback;
 }
 
-Future<bool> removeSongFromOffline(dynamic songId) async {
-  if (DownloadManager.instance.storageBusy) return false;
-  return DownloadManager.instance.withExclusiveStorage(
-    () => _removeSongFromOffline(songId),
-  );
-}
+Future<bool> removeSongFromOffline(dynamic songId) =>
+    DownloadManager.instance.withExclusiveStorage(
+      () => _removeSongFromOffline(songId),
+    );
 
 Future<bool> _removeSongFromOffline(dynamic songId) async {
   try {

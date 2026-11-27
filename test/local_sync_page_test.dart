@@ -8,7 +8,7 @@ import 'package:musify/services/settings_manager.dart';
 import 'support/app_harness.dart';
 
 void main() {
-  useAppSettings();
+  useAppSettings(inMemory: true);
 
   final l10n = lookupAppLocalizations(const Locale('en'));
   final service = LocalSyncService.instance;

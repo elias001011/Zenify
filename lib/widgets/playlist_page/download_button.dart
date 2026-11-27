@@ -77,6 +77,7 @@ class _PlaylistDownloadButtonState extends State<PlaylistDownloadButton> {
       return offlinePlaylistService.isPlaylistDownloaded(playlistId);
     }
     if (!isPlaylistFullyOffline(songs)) return false;
+    if (offlinePlaylistService.isPlaylistUnavailable(playlistId)) return false;
     if (!widget.requireSnapshotMatch) return true;
 
     // The files may already exist because another playlist downloaded them.

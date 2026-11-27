@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +10,8 @@ import 'package:musify/screens/import_spotify_playlist_page.dart';
 import 'package:musify/services/audio_service.dart';
 import 'package:musify/services/router_service.dart';
 import 'package:musify/widgets/spotify_import_intro.dart';
+
+import 'support/app_harness.dart';
 
 class _Handler extends BaseAudioHandler implements MusifyAudioHandler {
   @override
@@ -24,13 +25,10 @@ class _Handler extends BaseAudioHandler implements MusifyAudioHandler {
 }
 
 void main() {
-  setUpAll(() async {
+  useAppSettings(inMemory: true);
+
+  setUpAll(() {
     audioHandler = _Handler();
-    final directory = await Directory.systemTemp.createTemp('zenify_intro');
-    Hive.init(directory.path);
-    for (final name in ['settings', 'user', 'userNoBackup', 'cache']) {
-      await Hive.openBox(name);
-    }
   });
 
   Future<void> open(WidgetTester tester) async {

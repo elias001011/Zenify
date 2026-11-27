@@ -73,6 +73,11 @@ class OfflinePlaylistService {
   bool isPlaylistDownloaded(String playlistId) =>
       getOfflinePlaylist(playlistId) != null;
 
+  bool isPlaylistUnavailable(String playlistId) =>
+      _unavailablePlaylists.contains(playlistId);
+
+  bool get hasUnavailablePlaylists => _unavailablePlaylists.isNotEmpty;
+
   Map? getOfflinePlaylist(String playlistId) => availableOfflinePlaylists
       .where((playlist) => playlist['ytid']?.toString() == playlistId)
       .firstOrNull;

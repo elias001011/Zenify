@@ -146,8 +146,8 @@ class _PlayerActionsState extends State<PlayerActions> {
           ),
         if (!widget.miniPlayer &&
             widget.onPanel != null &&
-            hasQueue &&
-            !isRadioStation)
+            ((hasQueue && !isRadioStation) ||
+                widget.panel == PlayerPanel.queue))
           PlayerActionButton(
             icon: FluentIcons.apps_list_24_regular,
             tooltip: l10n.queue,

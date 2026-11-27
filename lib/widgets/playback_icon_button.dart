@@ -44,7 +44,8 @@ Stream<PlaybackState> settledPlaybackState() => audioHandler.playbackState
     .distinct(
       (previous, current) =>
           previous.playing == current.playing &&
-          previous.processingState == current.processingState,
+          previous.processingState == current.processingState &&
+          previous.queueIndex == current.queueIndex,
     )
     .debounce(
       (state) => isPlaybackLoading(state)

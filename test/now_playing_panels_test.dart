@@ -224,6 +224,45 @@ void main() {
     );
   }
 
+  testWidgets('open queue stays closable when switching to a radio station', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1280, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    audioHandler = _Handler();
+    audioHandler.mediaItem.add(
+      const MediaItem(id: 'a', title: 'Online', extras: {'ytid': 'a'}),
+    );
+    await tester.pumpWidget(localizedApp(const NowPlayingPage()));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    await tester.tap(find.byTooltip('Queue'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(QueueWidget), findsOneWidget);
+
+    audioHandler.mediaItem.add(
+      const MediaItem(
+        id: 'radio-1',
+        title: 'Radio',
+        extras: {'ytid': 'radio-1', 'isLive': true},
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.byType(QueueWidget), findsOneWidget);
+    await tester.tap(find.byTooltip('Queue'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byType(QueueWidget), findsNothing);
+    expect(find.byTooltip('Queue'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 30));
+  });
+
   testWidgets(
     'short desktop windows keep full-size action targets across resizes',
     (tester) async {
