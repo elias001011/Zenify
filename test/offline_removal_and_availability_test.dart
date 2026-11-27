@@ -79,9 +79,7 @@ void main() {
         await offlinePlaylistService.validateStoredPlaylists();
       });
 
-      await tester.runAsync(
-        () => offlinePlaylistService.validateStoredPlaylists(),
-      );
+      await tester.runAsync(offlinePlaylistService.validateStoredPlaylists);
       expect(offlinePlaylistService.isPlaylistUnavailable(playlistId), isTrue);
 
       await tester.pumpWidget(
@@ -108,9 +106,7 @@ void main() {
 
       // Once the missing audio file is restored, validation marks it offline again.
       audio.writeAsStringSync('restored audio');
-      await tester.runAsync(
-        () => offlinePlaylistService.validateStoredPlaylists(),
-      );
+      await tester.runAsync(offlinePlaylistService.validateStoredPlaylists);
       await tester.pump();
 
       expect(offlinePlaylistService.isPlaylistUnavailable(playlistId), isFalse);
