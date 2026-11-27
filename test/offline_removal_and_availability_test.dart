@@ -22,7 +22,9 @@ void main() {
       final root = Directory.systemTemp.createTempSync('zenify_remove_wait');
       addTearDown(() => root.deleteSync(recursive: true));
       applicationDirPath = downloadsDirPath = root.path;
-      await FilePaths.ensureDirectoriesExist();
+      Directory('${root.path}/${FilePaths.tracksDir}').createSync(
+        recursive: true,
+      );
 
       const id = 'aaaaaaaaaaa';
       final audio = File(FilePaths.getAudioPath(id))..writeAsStringSync('data');
@@ -59,7 +61,9 @@ void main() {
       offlineMode.value = false;
       addTearDown(() => offlineMode.value = false);
       applicationDirPath = downloadsDirPath = root.path;
-      await FilePaths.ensureDirectoriesExist();
+      Directory('${root.path}/${FilePaths.tracksDir}').createSync(
+        recursive: true,
+      );
 
       const songId = 'bbbbbbbbbbb';
       const playlistId = 'PL_missing_audio';
